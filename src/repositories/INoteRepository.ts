@@ -1,4 +1,4 @@
-import type { Note } from "../types";
+import type { Note } from "../domain/note/Note";
 
 export interface INoteRepository {
   getAllNotes(): Promise<Note[]>;
@@ -8,5 +8,6 @@ export interface INoteRepository {
   createNote(note: Omit<Note, "createdAt" | "updatedAt">): Promise<Note>;
   updateNote(id: string, updates: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
+  deleteNotesByWorkspace(workspaceId: string): Promise<void>;
   searchNotes(query: string): Promise<Note[]>;
 }

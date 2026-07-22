@@ -1,14 +1,11 @@
 import { create } from "zustand";
-import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
-import type { Note } from "../types";
-
-const noteRepository = new SQLiteNoteRepository();
+import { noteService } from "../di/container";
+import type { Note } from "../domain/note/Note";
 
 interface NoteState {
   notes: Note[];
   activeNoteId: string | null;
   searchQuery: string;
-  isLoading: boolean;
   setActiveNoteId: (id: string | null) => void;
   setSearchQuery: (query: string) => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
@@ -23,7 +20,6 @@ interface NoteState {
   duplicateNote: (id: string) => Promise<void>;
   togglePinNote: (id: string) => Promise<void>;
   toggleFavoriteNote: (id: string) => Promise<void>;
-  deleteNotesByWorkspace: (workspaceId: string) => Promise<void>;
 }
 
 const DEFAULT_NOTES: Note[] = [
@@ -46,58 +42,35 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   notes: DEFAULT_NOTES,
   activeNoteId: "default-note-1",
   searchQuery: "",
-  isLoading: false,
 
   setActiveNoteId: (id) => set({ activeNoteId: id }),
   setSearchQuery: (query) => set({ searchQuery: query }),
 
   fetchNotes: async (workspaceId) => {
-    set({ isLoading: true });
     try {
-      const notes = await noteRepository.getNotesByWorkspace(workspaceId);
+      const notes = await noteService.listMetadataByWorkspace(workspaceId);
       if (notes.length > 0) {
-        set({ notes, activeNoteId: notes[0].id, isLoading: false });
+        set({ notes, activeNoteId: notes[0].id });
       } else {
-        set({ notes: get().notes.filter((n) => n.workspaceId === workspaceId), isLoading: false });
+        set({ notes: get().notes.filter((n) => n.workspaceId === workspaceId) });
       }
     } catch (err) {
       console.error("fetchNotes store error:", err);
-      set({ isLoading: false });
     }
   },
 
-  createNote: async (
-    workspaceId,
-    title = "Untitled Note",
-    content = '[{"type":"paragraph","content":[]}]',
-    icon = "📝",
-  ) => {
+  createNote: async (workspaceId, title, content, icon) => {
     const previousNotes = get().notes;
-    const newNoteInput: Omit<Note, "createdAt" | "updatedAt"> = {
-      id: crypto.randomUUID(),
-      workspaceId,
-      title,
-      content,
-      icon,
-      coverColor: "#ff6f1e",
-      isPinned: false,
-      isFavorite: false,
-    };
-
-    set((state) => ({
-      notes: [{ ...newNoteInput, createdAt: Date.now(), updatedAt: Date.now() }, ...state.notes],
-      activeNoteId: newNoteInput.id,
-    }));
-
     try {
-      const created = await noteRepository.createNote(newNoteInput);
+      const created = await noteService.createNote(workspaceId, title, content, icon);
       set((state) => ({
-        notes: state.notes.map((n) => (n.id === created.id ? created : n)),
+        notes: [created, ...state.notes],
+        activeNoteId: created.id,
       }));
       return created;
     } catch (err) {
-      console.error("createNote store error, rolling back:", err);
-      set({ notes: previousNotes, activeNoteId: previousNotes[0]?.id || null });
+      console.error("createNote store error:", err);
+      set({ notes: previousNotes });
       return null;
     }
   },
@@ -110,7 +83,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }));
 
     try {
-      await noteRepository.updateNote(id, updates);
+      if (updates.content !== undefined) {
+        await noteService.updateContent(id, updates.content);
+      } else {
+        await noteService.updateMetadata(id, updates);
+      }
     } catch (err) {
       console.error("updateNote store error, rolling back:", err);
       set({ notes: previousNotes });
@@ -126,7 +103,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     set({ notes: filtered, activeNoteId: nextActive });
 
     try {
-      await noteRepository.deleteNote(id);
+      await noteService.deleteNote(id);
     } catch (err) {
       console.error("deleteNote store error, rolling back:", err);
       set({ notes: previousNotes, activeNoteId: previousActive });
@@ -134,26 +111,44 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   duplicateNote: async (id) => {
-    const note = get().notes.find((n) => n.id === id);
-    if (!note) return;
-
-    await get().createNote(note.workspaceId, `${note.title} (Copy)`, note.content, note.icon);
+    const previousNotes = get().notes;
+    try {
+      const duplicated = await noteService.duplicateNote(id);
+      set((state) => ({
+        notes: [duplicated, ...state.notes],
+        activeNoteId: duplicated.id,
+      }));
+    } catch (err) {
+      console.error("duplicateNote store error:", err);
+      set({ notes: previousNotes });
+    }
   },
 
   togglePinNote: async (id) => {
-    const note = get().notes.find((n) => n.id === id);
-    if (!note) return;
-    await get().updateNote(id, { isPinned: !note.isPinned });
+    const previousNotes = get().notes;
+    set((state) => ({
+      notes: state.notes.map((n) => (n.id === id ? { ...n, isPinned: !n.isPinned } : n)),
+    }));
+
+    try {
+      await noteService.togglePin(id);
+    } catch (err) {
+      console.error("togglePinNote store error:", err);
+      set({ notes: previousNotes });
+    }
   },
 
   toggleFavoriteNote: async (id) => {
-    const note = get().notes.find((n) => n.id === id);
-    if (!note) return;
-    await get().updateNote(id, { isFavorite: !note.isFavorite });
-  },
+    const previousNotes = get().notes;
+    set((state) => ({
+      notes: state.notes.map((n) => (n.id === id ? { ...n, isFavorite: !n.isFavorite } : n)),
+    }));
 
-  deleteNotesByWorkspace: async (workspaceId) => {
-    const remainingNotes = get().notes.filter((n) => n.workspaceId !== workspaceId);
-    set({ notes: remainingNotes, activeNoteId: remainingNotes[0]?.id || null });
+    try {
+      await noteService.toggleFavorite(id);
+    } catch (err) {
+      console.error("toggleFavoriteNote store error:", err);
+      set({ notes: previousNotes });
+    }
   },
 }));

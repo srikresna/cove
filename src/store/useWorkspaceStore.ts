@@ -1,9 +1,6 @@
 import { create } from "zustand";
-import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
-import type { Workspace } from "../types";
-import { useNoteStore } from "./useNoteStore";
-
-const workspaceRepository = new SQLiteWorkspaceRepository();
+import { workspaceService } from "../di/container";
+import type { Workspace } from "../domain/workspace/Workspace";
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -21,7 +18,7 @@ interface WorkspaceState {
     emoji: string,
     color: string,
     description?: string,
-  ) => Promise<Workspace>;
+  ) => Promise<Workspace | null>;
   updateWorkspace: (id: string, updates: Partial<Workspace>) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
 }
@@ -54,7 +51,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setActiveWorkspace: (id) => {
     set({ activeWorkspaceId: id });
-    useNoteStore.getState().fetchNotes(id);
   },
 
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
@@ -68,10 +64,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   fetchWorkspaces: async () => {
     try {
-      const workspaces = await workspaceRepository.getAllWorkspaces();
+      const workspaces = await workspaceService.getAllWorkspaces();
       if (workspaces.length > 0) {
         set({ workspaces, activeWorkspaceId: workspaces[0].id });
-        useNoteStore.getState().fetchNotes(workspaces[0].id);
       }
     } catch (err) {
       console.error("fetchWorkspaces store error:", err);
@@ -79,60 +74,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createWorkspace: async (name, emoji, color, description) => {
-    const newWsInput: Omit<Workspace, "createdAt"> = {
-      id: crypto.randomUUID(),
-      name,
-      emoji,
-      color,
-      description,
-    };
-
-    set((state) => ({
-      workspaces: [...state.workspaces, { ...newWsInput, createdAt: Date.now() }],
-      activeWorkspaceId: newWsInput.id,
-      isCreateModalOpen: false,
-    }));
-
+    const previous = get().workspaces;
     try {
-      const created = await workspaceRepository.createWorkspace(newWsInput);
+      const created = await workspaceService.createWorkspace(name, emoji, color, description);
       set((state) => ({
-        workspaces: state.workspaces.map((w) => (w.id === created.id ? created : w)),
+        workspaces: [...state.workspaces, created],
+        activeWorkspaceId: created.id,
+        isCreateModalOpen: false,
       }));
-      useNoteStore.getState().fetchNotes(created.id);
       return created;
     } catch (err) {
       console.error("createWorkspace store error:", err);
-      return { ...newWsInput, createdAt: Date.now() };
+      set({ workspaces: previous, isCreateModalOpen: false });
+      return null;
     }
   },
 
   updateWorkspace: async (id, updates) => {
+    const previous = get().workspaces;
     set((state) => ({
       workspaces: state.workspaces.map((w) => (w.id === id ? { ...w, ...updates } : w)),
     }));
 
     try {
-      await workspaceRepository.updateWorkspace(id, updates);
+      await workspaceService.updateWorkspace(id, updates);
     } catch (err) {
       console.error("updateWorkspace store error:", err);
+      set({ workspaces: previous });
     }
   },
 
   deleteWorkspace: async (id) => {
     const current = get().workspaces;
-    if (current.length <= 1) return;
-
     const filtered = current.filter((w) => w.id !== id);
-    const nextActive = filtered[0].id;
-
-    set({ workspaces: filtered, activeWorkspaceId: nextActive });
-
-    useNoteStore.getState().deleteNotesByWorkspace(id);
+    const nextActive = filtered[0]?.id || get().activeWorkspaceId;
 
     try {
-      await workspaceRepository.deleteWorkspace(id);
+      await workspaceService.deleteWorkspace(id, current.length);
+      set({ workspaces: filtered, activeWorkspaceId: nextActive });
     } catch (err) {
       console.error("deleteWorkspace store error:", err);
+      set({ workspaces: current });
     }
   },
 }));

@@ -1,5 +1,5 @@
+import type { Note } from "../domain/note/Note";
 import { EncryptionService } from "../services/EncryptionService";
-import type { Note } from "../types";
 import type { INoteRepository } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
@@ -52,7 +52,6 @@ export class SQLiteNoteRepository implements INoteRepository {
         rows.map(async (row) => ({
           id: String(row.id),
           workspaceId: String(row.workspaceId),
-          folderId: row.folderId ? String(row.folderId) : undefined,
           title: String(row.title),
           content: await EncryptionService.decryptPayload(String(row.content)),
           icon: row.icon ? String(row.icon) : undefined,
@@ -73,14 +72,13 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, folderId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC",
+        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC",
         [workspaceId],
       );
 
       return rows.map((row) => ({
         id: String(row.id),
         workspaceId: String(row.workspaceId),
-        folderId: row.folderId ? String(row.folderId) : undefined,
         title: String(row.title),
         content: "",
         icon: row.icon ? String(row.icon) : undefined,
@@ -108,7 +106,6 @@ export class SQLiteNoteRepository implements INoteRepository {
         rows.map(async (row) => ({
           id: String(row.id),
           workspaceId: String(row.workspaceId),
-          folderId: row.folderId ? String(row.folderId) : undefined,
           title: String(row.title),
           content: await EncryptionService.decryptPayload(String(row.content)),
           icon: row.icon ? String(row.icon) : undefined,
@@ -139,7 +136,6 @@ export class SQLiteNoteRepository implements INoteRepository {
       return {
         id: String(row.id),
         workspaceId: String(row.workspaceId),
-        folderId: row.folderId ? String(row.folderId) : undefined,
         title: String(row.title),
         content: await EncryptionService.decryptPayload(String(row.content)),
         icon: row.icon ? String(row.icon) : undefined,
@@ -170,12 +166,11 @@ export class SQLiteNoteRepository implements INoteRepository {
       await db.execute("BEGIN TRANSACTION");
       await db.execute(
         `INSERT INTO notes 
-        (id, workspaceId, folderId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.id,
           note.workspaceId,
-          note.folderId || null,
           note.title,
           encryptedContent,
           note.icon || null,
@@ -211,10 +206,9 @@ export class SQLiteNoteRepository implements INoteRepository {
       try {
         await db.execute("BEGIN TRANSACTION");
         await db.execute(
-          "UPDATE notes SET workspaceId = ?, folderId = ?, title = ?, content = ?, icon = ?, coverColor = ?, isPinned = ?, isFavorite = ?, updatedAt = ? WHERE id = ?",
+          "UPDATE notes SET workspaceId = ?, title = ?, content = ?, icon = ?, coverColor = ?, isPinned = ?, isFavorite = ?, updatedAt = ? WHERE id = ?",
           [
             updated.workspaceId,
-            updated.folderId || null,
             updated.title,
             encryptedContent,
             updated.icon || null,
@@ -303,6 +297,21 @@ export class SQLiteNoteRepository implements INoteRepository {
       await db.execute("COMMIT");
     } catch (err) {
       console.error("SQLiteNoteRepository deleteNote error:", err);
+      try {
+        await db.execute("ROLLBACK");
+      } catch {}
+      throw err;
+    }
+  }
+
+  async deleteNotesByWorkspace(workspaceId: string): Promise<void> {
+    const db = await this.getDb();
+    try {
+      await db.execute("BEGIN TRANSACTION");
+      await db.execute("DELETE FROM notes WHERE workspaceId = ?", [workspaceId]);
+      await db.execute("COMMIT");
+    } catch (err) {
+      console.error("SQLiteNoteRepository deleteNotesByWorkspace error:", err);
       try {
         await db.execute("ROLLBACK");
       } catch {}
