@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastContainer } from "./components/ToastContainer";
 import { BlockNoteEditor } from "./components/editor/BlockNoteEditor";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
@@ -85,6 +86,7 @@ export const AppContent: React.FC = () => {
 
       <CreateWorkspaceModal />
       <QuickSearchModal />
+      <ToastContainer />
     </div>
   );
 };

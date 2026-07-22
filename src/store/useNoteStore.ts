@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { noteService } from "../di/container";
 import type { Note } from "../domain/note/Note";
+import { presentError } from "../services/errorPresenter";
+import { useNotificationStore } from "./useNotificationStore";
+import { useSaveStatusStore } from "./useSaveStatusStore";
 
 interface NoteState {
   notes: Note[];
@@ -55,22 +58,36 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         set({ notes: get().notes.filter((n) => n.workspaceId === workspaceId) });
       }
     } catch (err) {
-      console.error("fetchNotes store error:", err);
+      const p = presentError(err);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
     }
   },
 
   createNote: async (workspaceId, title, content, icon) => {
     const previousNotes = get().notes;
+    useSaveStatusStore.getState().setSaving();
+
     try {
       const created = await noteService.createNote(workspaceId, title, content, icon);
       set((state) => ({
         notes: [created, ...state.notes],
         activeNoteId: created.id,
       }));
+      useSaveStatusStore.getState().setSaved();
       return created;
     } catch (err) {
-      console.error("createNote store error:", err);
       set({ notes: previousNotes });
+      const p = presentError(err);
+      useSaveStatusStore.getState().setError(p.userMessage);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
       return null;
     }
   },
@@ -81,6 +98,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     set((state) => ({
       notes: state.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now } : n)),
     }));
+    useSaveStatusStore.getState().setSaving();
 
     try {
       if (updates.content !== undefined) {
@@ -88,9 +106,16 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       } else {
         await noteService.updateMetadata(id, updates);
       }
+      useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      console.error("updateNote store error, rolling back:", err);
       set({ notes: previousNotes });
+      const p = presentError(err);
+      useSaveStatusStore.getState().setError(p.userMessage);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
     }
   },
 
@@ -101,26 +126,43 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     const nextActive = filtered[0]?.id || null;
 
     set({ notes: filtered, activeNoteId: nextActive });
+    useSaveStatusStore.getState().setSaving();
 
     try {
       await noteService.deleteNote(id);
+      useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      console.error("deleteNote store error, rolling back:", err);
       set({ notes: previousNotes, activeNoteId: previousActive });
+      const p = presentError(err);
+      useSaveStatusStore.getState().setError(p.userMessage);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
     }
   },
 
   duplicateNote: async (id) => {
     const previousNotes = get().notes;
+    useSaveStatusStore.getState().setSaving();
+
     try {
       const duplicated = await noteService.duplicateNote(id);
       set((state) => ({
         notes: [duplicated, ...state.notes],
         activeNoteId: duplicated.id,
       }));
+      useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      console.error("duplicateNote store error:", err);
       set({ notes: previousNotes });
+      const p = presentError(err);
+      useSaveStatusStore.getState().setError(p.userMessage);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
     }
   },
 
@@ -129,12 +171,20 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     set((state) => ({
       notes: state.notes.map((n) => (n.id === id ? { ...n, isPinned: !n.isPinned } : n)),
     }));
+    useSaveStatusStore.getState().setSaving();
 
     try {
       await noteService.togglePin(id);
+      useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      console.error("togglePinNote store error:", err);
       set({ notes: previousNotes });
+      const p = presentError(err);
+      useSaveStatusStore.getState().setError(p.userMessage);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
     }
   },
 
@@ -143,12 +193,20 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     set((state) => ({
       notes: state.notes.map((n) => (n.id === id ? { ...n, isFavorite: !n.isFavorite } : n)),
     }));
+    useSaveStatusStore.getState().setSaving();
 
     try {
       await noteService.toggleFavorite(id);
+      useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      console.error("toggleFavoriteNote store error:", err);
       set({ notes: previousNotes });
+      const p = presentError(err);
+      useSaveStatusStore.getState().setError(p.userMessage);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
     }
   },
 }));

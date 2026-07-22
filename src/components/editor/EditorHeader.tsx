@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
+import { SaveStatusBadge } from "./SaveStatusBadge";
 
 interface EditorHeaderProps {
   note: Note;
@@ -222,12 +223,14 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           aria-label="Note Title"
           className="w-full text-3xl sm:text-4xl font-extrabold bg-transparent outline-none border-b-[2px] border-transparent focus:border-marker-orange transition-colors py-1 text-cocoa-ink placeholder-slate-300"
         />
-        <div className="flex items-center gap-4 mt-2 text-xs font-medium text-slate-500">
+        <div className="flex items-center gap-4 mt-2 text-xs font-medium text-slate-500 flex-wrap">
           <span>{wordCount} words</span>
           <span>•</span>
           <span>{characterCount} characters</span>
           <span>•</span>
           <span>Updated {formattedDate}</span>
+          <span>•</span>
+          <SaveStatusBadge />
         </div>
       </div>
     </div>
