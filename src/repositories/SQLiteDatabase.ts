@@ -15,4 +15,19 @@ export class SQLiteDatabase {
     }
     return SQLiteDatabase.instance;
   }
+
+  static async withTransaction<T>(work: (db: Database) => Promise<T>): Promise<T> {
+    const db = await SQLiteDatabase.getInstance();
+    await db.execute("BEGIN TRANSACTION");
+    try {
+      const result = await work(db);
+      await db.execute("COMMIT");
+      return result;
+    } catch (err) {
+      try {
+        await db.execute("ROLLBACK");
+      } catch {}
+      throw err;
+    }
+  }
 }
