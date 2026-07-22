@@ -1,0 +1,104 @@
+@import "@blocknote/core/fonts/inter.css";
+@import "@blocknote/mantine/style.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-cream-paper: #fdfbf9;
+  --color-charcoal: #171717;
+  --color-cocoa-ink: #2b1a07;
+  --color-dew-drop: #f7efe9;
+  --color-marker-orange: #ff6f1e;
+  --color-burnt-sienna: #ce500a;
+  --color-sky-sticker: #3b82f6;
+  --color-bubblegum-sticker: #ff66cf;
+  --color-sprout-sticker: #22c55e;
+}
+
+@layer base {
+  body {
+    font-family: 'Outfit', 'Inter', sans-serif;
+    background-color: #fdfbf9;
+    color: #171717;
+    user-select: text;
+  }
+}
+
+.bn-container {
+  background-color: transparent !important;
+  font-family: 'Outfit', 'Inter', sans-serif !important;
+  color: #171717 !important;
+  user-select: text !important;
+}
+
+.bn-editor {
+  background-color: transparent !important;
+  color: #171717 !important;
+  min-height: calc(100vh - 260px);
+  user-select: text !important;
+}
+
+.bn-side-menu button {
+  color: #171717 !important;
+}
+
+.bn-block-content[data-content-type="heading"] {
+  color: #2b1a07 !important;
+}
+
+.bn-slash-menu {
+  background-color: #fdfbf9 !important;
+  border: 1.5px solid #171717 !important;
+  border-radius: 16px !important;
+  box-shadow: 0px 2px 20px 0px rgba(0, 0, 0, 0.06) !important;
+}
+
+.bn-slash-menu-item[data-selected="true"] {
+  background-color: #f7efe9 !important;
+  color: #2b1a07 !important;
+}
+
+.paper-card {
+  background-color: #fdfbf9;
+  border: 1.5px solid #171717;
+  border-radius: 12px;
+  box-shadow: 0px 2px 20px 0px rgba(0, 0, 0, 0.06);
+}
+
+.pill-button {
+  background-color: #fdfbf9;
+  border: 1.5px solid #171717;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #171717;
+  box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pill-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0px 3px 6px 0px rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bebcbb;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #171717;
+}
