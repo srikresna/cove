@@ -1,12 +1,16 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Pin, Plus, Star, Trash2 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { Plus } from "lucide-react";
 import type React from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
+import type { Note } from "../../domain/note/Note";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { NoteItem } from "./NoteItem";
 
 export const NoteList: React.FC = () => {
-  const { activeWorkspaceId } = useWorkspaceStore();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const {
     notes,
     activeNoteId,
@@ -15,153 +19,160 @@ export const NoteList: React.FC = () => {
     deleteNote,
     togglePinNote,
     toggleFavoriteNote,
-  } = useNoteStore();
+  } = useNoteStore(
+    useShallow((s) => ({
+      notes: s.notes,
+      activeNoteId: s.activeNoteId,
+      setActiveNoteId: s.setActiveNoteId,
+      createNote: s.createNote,
+      deleteNote: s.deleteNote,
+      togglePinNote: s.togglePinNote,
+      toggleFavoriteNote: s.toggleFavoriteNote,
+    })),
+  );
 
-  const workspaceNotes = notes.filter((n) => n.workspaceId === activeWorkspaceId);
-  const pinnedNotes = workspaceNotes.filter((n) => n.isPinned);
-  const favoriteNotes = workspaceNotes.filter((n) => n.isFavorite && !n.isPinned);
-  const otherNotes = workspaceNotes.filter((n) => !n.isPinned && !n.isFavorite);
+  const workspaceNotes = useMemo(
+    () => notes.filter((n) => n.workspaceId === activeWorkspaceId),
+    [notes, activeWorkspaceId],
+  );
 
-  const handleCreateNote = () => {
+  const pinnedNotes = useMemo(() => workspaceNotes.filter((n) => n.isPinned), [workspaceNotes]);
+  const favoriteNotes = useMemo(
+    () => workspaceNotes.filter((n) => n.isFavorite && !n.isPinned),
+    [workspaceNotes],
+  );
+  const otherNotes = useMemo(
+    () => workspaceNotes.filter((n) => !n.isPinned && !n.isFavorite),
+    [workspaceNotes],
+  );
+
+  const combinedItems = useMemo(() => {
+    const items: Array<{ type: "header"; title: string } | { type: "note"; note: Note }> = [];
+
+    if (pinnedNotes.length > 0) {
+      items.push({ type: "header", title: "Pinned Notes" });
+      items.push(...pinnedNotes.map((note) => ({ type: "note" as const, note })));
+    }
+
+    if (favoriteNotes.length > 0) {
+      items.push({ type: "header", title: "Favorite Notes" });
+      items.push(...favoriteNotes.map((note) => ({ type: "note" as const, note })));
+    }
+
+    items.push({ type: "header", title: "All Notes" });
+    items.push(...otherNotes.map((note) => ({ type: "note" as const, note })));
+
+    return items;
+  }, [pinnedNotes, favoriteNotes, otherNotes]);
+
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: combinedItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => (combinedItems[index]?.type === "header" ? 32 : 54),
+    overscan: 5,
+  });
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      setActiveNoteId(id);
+    },
+    [setActiveNoteId],
+  );
+
+  const handleTogglePin = useCallback(
+    (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      togglePinNote(id);
+    },
+    [togglePinNote],
+  );
+
+  const handleToggleFavorite = useCallback(
+    (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      toggleFavoriteNote(id);
+    },
+    [toggleFavoriteNote],
+  );
+
+  const handleDelete = useCallback(
+    (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      deleteNote(id);
+    },
+    [deleteNote],
+  );
+
+  const handleCreate = useCallback(() => {
     createNote(
       activeWorkspaceId,
       MESSAGES.UNTITLED_NOTE,
       '[{"type":"paragraph","content":[]}]',
       "📝",
     );
-  };
-
-  const renderNoteItem = (n: (typeof notes)[0]) => {
-    const isActive = n.id === activeNoteId;
-    return (
-      <motion.button
-        key={n.id}
-        type="button"
-        aria-label={`Select note ${n.title || MESSAGES.UNTITLED_NOTE}`}
-        initial={{ opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -8 }}
-        className={`w-full group relative flex items-center justify-between p-2.5 rounded-[12px] cursor-pointer transition-all duration-150 border-[1.5px] text-left outline-none ${
-          isActive
-            ? "bg-dew-drop border-charcoal text-cocoa-ink font-bold shadow-paper-lift"
-            : "border-transparent hover:border-charcoal/30 text-charcoal"
-        }`}
-        onClick={() => setActiveNoteId(n.id)}
-      >
-        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-          <span className="text-base flex-shrink-0" aria-hidden="true">
-            {n.icon || "📝"}
-          </span>
-          <span className="text-xs truncate">{n.title || MESSAGES.UNTITLED_NOTE}</span>
-        </div>
-
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity text-charcoal">
-          <button
-            type="button"
-            aria-label={n.isPinned ? MESSAGES.UNPIN_NOTE : MESSAGES.PIN_NOTE}
-            onClick={(e) => {
-              e.stopPropagation();
-              togglePinNote(n.id);
-            }}
-            className="p-1 rounded hover:bg-marker-orange/20"
-          >
-            <Pin className="w-3 h-3" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label={n.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFavoriteNote(n.id);
-            }}
-            className="p-1 rounded hover:bg-marker-orange/20"
-          >
-            <Star className="w-3 h-3" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label={MESSAGES.DELETE_NOTE}
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteNote(n.id);
-            }}
-            className="p-1 rounded hover:bg-red-100 text-red-600"
-          >
-            <Trash2 className="w-3 h-3" aria-hidden="true" />
-          </button>
-        </div>
-      </motion.button>
-    );
-  };
+  }, [createNote, activeWorkspaceId]);
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+    <div className="space-y-3 h-full flex flex-col">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Notes ({workspaceNotes.length})
+        <span className="text-[10px] font-bold uppercase tracking-wider text-marker-orange">
+          {MESSAGES.NOTES_HEADER} ({workspaceNotes.length})
         </span>
         <button
           type="button"
           aria-label={MESSAGES.CREATE_NEW_NOTE}
-          onClick={handleCreateNote}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal text-xs font-bold shadow-paper-lift hover:scale-105 transition-transform"
+          onClick={handleCreate}
+          className="p-1 rounded-[8px] bg-cream-paper border border-charcoal text-charcoal shadow-paper-lift hover:scale-105 transition-transform outline-none"
         >
           <Plus className="w-3.5 h-3.5 text-marker-orange" aria-hidden="true" />
-          <span>New Note</span>
         </button>
       </div>
 
-      {workspaceNotes.length === 0 && (
-        <div className="p-4 rounded-[12px] bg-dew-drop border-[1.5px] border-dashed border-charcoal text-center">
-          <FileText className="w-8 h-8 mx-auto text-slate-400 mb-2" aria-hidden="true" />
-          <p className="text-xs font-bold text-cocoa-ink">No notes in workspace</p>
-          <button
-            type="button"
-            aria-label="Create first note"
-            onClick={handleCreateNote}
-            className="mt-3 px-3 py-1.5 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal text-xs font-bold shadow-paper-lift hover:scale-105 transition-transform"
-          >
-            Create first note
-          </button>
-        </div>
-      )}
+      <div ref={parentRef} className="flex-1 overflow-y-auto relative space-y-1 pr-1">
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const item = combinedItems[virtualRow.index];
+            if (!item) return null;
 
-      {pinnedNotes.length > 0 && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-marker-orange">
-            <Pin className="w-3 h-3" aria-hidden="true" />
-            <span>Pinned</span>
-          </div>
-          <div className="space-y-1">
-            <AnimatePresence>{pinnedNotes.map(renderNoteItem)}</AnimatePresence>
-          </div>
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                {item.type === "header" ? (
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 py-1">
+                    {item.title}
+                  </div>
+                ) : (
+                  <NoteItem
+                    note={item.note}
+                    isActive={item.note.id === activeNoteId}
+                    onSelect={handleSelect}
+                    onTogglePin={handleTogglePin}
+                    onToggleFavorite={handleToggleFavorite}
+                    onDelete={handleDelete}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
-
-      {favoriteNotes.length > 0 && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-marker-orange">
-            <Star className="w-3 h-3" aria-hidden="true" />
-            <span>Favorites</span>
-          </div>
-          <div className="space-y-1">
-            <AnimatePresence>{favoriteNotes.map(renderNoteItem)}</AnimatePresence>
-          </div>
-        </div>
-      )}
-
-      {otherNotes.length > 0 && (
-        <div className="space-y-1">
-          {pinnedNotes.length > 0 || favoriteNotes.length > 0 ? (
-            <div className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              All Notes
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            <AnimatePresence>{otherNotes.map(renderNoteItem)}</AnimatePresence>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

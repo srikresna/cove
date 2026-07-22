@@ -10,6 +10,10 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA journal_mode = WAL");
         await db.execute("PRAGMA synchronous = NORMAL");
         await db.execute("PRAGMA foreign_keys = ON");
+        await db.execute("PRAGMA temp_store = MEMORY");
+        await db.execute("PRAGMA cache_size = -20000");
+        await db.execute("PRAGMA mmap_size = 268435456");
+        await db.execute("PRAGMA wal_autocheckpoint = 1000");
         return db;
       })();
     }

@@ -54,7 +54,9 @@ export class SQLiteNoteRepository implements INoteRepository {
           FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE
         )
       `);
-      await db.execute("CREATE INDEX IF NOT EXISTS idx_notes_workspaceId ON notes(workspaceId)");
+      await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_notes_workspace_updated ON notes(workspaceId, updatedAt DESC, id DESC)",
+      );
 
       const versionRows = await db.select<Array<{ user_version: number }>>("PRAGMA user_version");
       const version = versionRows[0]?.user_version ?? 0;
@@ -72,7 +74,7 @@ export class SQLiteNoteRepository implements INoteRepository {
             await txDb.execute("DROP TABLE notes");
             await txDb.execute("ALTER TABLE notes_new RENAME TO notes");
             await txDb.execute(
-              "CREATE INDEX IF NOT EXISTS idx_notes_workspaceId ON notes(workspaceId)",
+              "CREATE INDEX IF NOT EXISTS idx_notes_workspace_updated ON notes(workspaceId, updatedAt DESC, id DESC)",
             );
             await txDb.execute("PRAGMA user_version = 2");
           });
@@ -101,7 +103,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC",
+        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
       return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: false })));
