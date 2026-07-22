@@ -1,4 +1,6 @@
 import type { Note } from "../domain/note/Note";
+import { PersistenceError } from "../errors/AppError";
+import { toPersistenceError } from "../errors/errorMappers";
 import { EncryptionService } from "../services/EncryptionService";
 import type { INoteRepository } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
@@ -41,7 +43,6 @@ export class SQLiteNoteRepository implements INoteRepository {
         CREATE TABLE IF NOT EXISTS notes (
           id TEXT PRIMARY KEY,
           workspaceId TEXT NOT NULL,
-          folderId TEXT,
           title TEXT NOT NULL,
           content TEXT NOT NULL,
           icon TEXT,
@@ -54,9 +55,33 @@ export class SQLiteNoteRepository implements INoteRepository {
         )
       `);
       await db.execute("CREATE INDEX IF NOT EXISTS idx_notes_workspaceId ON notes(workspaceId)");
+
+      const versionRows = await db.select<Array<{ user_version: number }>>("PRAGMA user_version");
+      const version = versionRows[0]?.user_version ?? 0;
+
+      if (version < 2) {
+        const cols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+        if (cols.some((c) => c.name === "folderId")) {
+          await SQLiteDatabase.withTransaction(async (txDb) => {
+            await txDb.execute(
+              "CREATE TABLE notes_new (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, icon TEXT, coverColor TEXT, isPinned INTEGER NOT NULL DEFAULT 0, isFavorite INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
+            );
+            await txDb.execute(
+              "INSERT INTO notes_new (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt) SELECT id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes",
+            );
+            await txDb.execute("DROP TABLE notes");
+            await txDb.execute("ALTER TABLE notes_new RENAME TO notes");
+            await txDb.execute(
+              "CREATE INDEX IF NOT EXISTS idx_notes_workspaceId ON notes(workspaceId)",
+            );
+            await txDb.execute("PRAGMA user_version = 2");
+          });
+        } else {
+          await db.execute("PRAGMA user_version = 2");
+        }
+      }
     } catch (err) {
-      console.error("SQLiteNoteRepository initSchema error:", err);
-      throw err;
+      throw toPersistenceError("initSchema", err);
     }
   }
 
@@ -68,8 +93,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       );
       return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
     } catch (err) {
-      console.error("SQLiteNoteRepository getAllNotes error:", err);
-      throw err;
+      throw toPersistenceError("getAllNotes", err);
     }
   }
 
@@ -82,8 +106,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       );
       return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: false })));
     } catch (err) {
-      console.error("SQLiteNoteRepository getNotesMetadataByWorkspace error:", err);
-      throw err;
+      throw toPersistenceError("getNotesMetadataByWorkspace", err);
     }
   }
 
@@ -96,8 +119,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       );
       return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
     } catch (err) {
-      console.error("SQLiteNoteRepository getNotesByWorkspace error:", err);
-      throw err;
+      throw toPersistenceError("getNotesByWorkspace", err);
     }
   }
 
@@ -111,8 +133,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       if (!rows.length || !rows[0]) return null;
       return this.mapRowToNote(rows[0], { decrypt: true });
     } catch (err) {
-      console.error("SQLiteNoteRepository getNoteById error:", err);
-      throw err;
+      throw toPersistenceError("getNoteById", err);
     }
   }
 
@@ -146,8 +167,7 @@ export class SQLiteNoteRepository implements INoteRepository {
         ],
       );
     } catch (err) {
-      console.error("SQLiteNoteRepository createNote error:", err);
-      throw err;
+      throw toPersistenceError("createNote", err);
     }
 
     return note;
@@ -197,12 +217,11 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute(`UPDATE notes SET ${setClauses.join(", ")} WHERE id = ?`, params);
     } catch (err) {
-      console.error("SQLiteNoteRepository updateNote error:", err);
-      throw err;
+      throw toPersistenceError("updateNote", err);
     }
 
     const existing = await this.getNoteById(id);
-    if (!existing) throw new Error(`Note not found after update: ${id}`);
+    if (!existing) throw new PersistenceError("updateNote", `Note not found after update: ${id}`);
     return existing;
   }
 
@@ -211,8 +230,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute("DELETE FROM notes WHERE id = ?", [id]);
     } catch (err) {
-      console.error("SQLiteNoteRepository deleteNote error:", err);
-      throw err;
+      throw toPersistenceError("deleteNote", err);
     }
   }
 
@@ -221,8 +239,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute("DELETE FROM notes WHERE workspaceId = ?", [workspaceId]);
     } catch (err) {
-      console.error("SQLiteNoteRepository deleteNotesByWorkspace error:", err);
-      throw err;
+      throw toPersistenceError("deleteNotesByWorkspace", err);
     }
   }
 

@@ -1,4 +1,6 @@
 import type { Workspace } from "../domain/workspace/Workspace";
+import { PersistenceError } from "../errors/AppError";
+import { toPersistenceError } from "../errors/errorMappers";
 import type { IWorkspaceRepository } from "./IWorkspaceRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
@@ -37,8 +39,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
       `);
       await db.execute("PRAGMA user_version = 1");
     } catch (err) {
-      console.error("SQLiteWorkspaceRepository initSchema error:", err);
-      throw err;
+      throw toPersistenceError("initSchema", err);
     }
   }
 
@@ -50,8 +51,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
       );
       return rows.map((row) => this.mapRowToWorkspace(row));
     } catch (err) {
-      console.error("SQLiteWorkspaceRepository getAllWorkspaces error:", err);
-      throw err;
+      throw toPersistenceError("getAllWorkspaces", err);
     }
   }
 
@@ -65,8 +65,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
       if (!rows.length || !rows[0]) return null;
       return this.mapRowToWorkspace(rows[0]);
     } catch (err) {
-      console.error("SQLiteWorkspaceRepository getWorkspaceById error:", err);
-      throw err;
+      throw toPersistenceError("getWorkspaceById", err);
     }
   }
 
@@ -91,8 +90,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
         ],
       );
     } catch (err) {
-      console.error("SQLiteWorkspaceRepository createWorkspace error:", err);
-      throw err;
+      throw toPersistenceError("createWorkspace", err);
     }
 
     return workspace;
@@ -100,7 +98,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
 
   async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace> {
     const existing = await this.getWorkspaceById(id);
-    if (!existing) throw new Error("Workspace not found");
+    if (!existing) throw new PersistenceError("updateWorkspace", `Workspace not found: ${id}`);
 
     const db = await this.getDb();
     const updated: Workspace = {
@@ -114,8 +112,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
         [updated.name, updated.emoji, updated.color, updated.description || null, id],
       );
     } catch (err) {
-      console.error("SQLiteWorkspaceRepository updateWorkspace error:", err);
-      throw err;
+      throw toPersistenceError("updateWorkspace", err);
     }
 
     return updated;
@@ -126,8 +123,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
     try {
       await db.execute("DELETE FROM workspaces WHERE id = ?", [id]);
     } catch (err) {
-      console.error("SQLiteWorkspaceRepository deleteWorkspace error:", err);
-      throw err;
+      throw toPersistenceError("deleteWorkspace", err);
     }
   }
 }

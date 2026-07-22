@@ -1,9 +1,17 @@
+import {
+  DEFAULT_COVER_COLOR,
+  DEFAULT_NOTE_CONTENT,
+  DEFAULT_NOTE_ICON,
+  DEFAULT_NOTE_TITLE,
+} from "../../constants/app";
 import type { Note } from "./Note";
 
-export const DEFAULT_NOTE_TITLE = "Untitled Note";
-export const DEFAULT_NOTE_ICON = "📝";
-export const DEFAULT_NOTE_COVER_COLOR = "#ff6f1e";
-export const EMPTY_NOTE_CONTENT = '[{"type":"paragraph","content":[]}]';
+export {
+  DEFAULT_NOTE_TITLE,
+  DEFAULT_NOTE_ICON,
+  DEFAULT_COVER_COLOR as DEFAULT_NOTE_COVER_COLOR,
+  DEFAULT_NOTE_CONTENT as EMPTY_NOTE_CONTENT,
+};
 
 export const makeNoteId = (): string => crypto.randomUUID();
 
