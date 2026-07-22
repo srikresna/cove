@@ -1,27 +1,27 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
-  children: ReactNode
+  children: ReactNode;
 }
 
 interface State {
-  hasError: boolean
-  error: Error | null
+  hasError: boolean;
+  error: Error | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
-  }
+    error: null,
+  };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
+    return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught Error Boundary catch:', error, errorInfo)
+    console.error("Uncaught Error Boundary catch:", error, errorInfo);
   }
 
   public render() {
@@ -31,11 +31,10 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[20px] border-[1.5px] border-charcoal bg-red-100 text-red-600 shadow-card-subtle">
             <AlertTriangle className="h-8 w-8" />
           </div>
-          <h2 className="mb-2 text-2xl font-extrabold text-cocoa-ink">
-            Something went wrong
-          </h2>
+          <h2 className="mb-2 text-2xl font-extrabold text-cocoa-ink">Something went wrong</h2>
           <p className="mb-6 max-w-md text-xs font-medium text-slate-500">
-            {this.state.error?.message || 'An unexpected rendering error occurred. Don’t worry, your note data remains safely saved.'}
+            {this.state.error?.message ||
+              "An unexpected rendering error occurred. Don’t worry, your note data remains safely saved."}
           </p>
           <button
             type="button"
@@ -46,9 +45,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <span>Reload Application</span>
           </button>
         </div>
-      )
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }

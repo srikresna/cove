@@ -1,28 +1,29 @@
-import React, { useState } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
-import * as Popover from '@radix-ui/react-popover'
-import { X, Plus, Smile } from 'lucide-react'
-import EmojiPicker from 'emoji-picker-react'
-import { useWorkspaceStore } from '../../store/useWorkspaceStore'
+import * as Dialog from "@radix-ui/react-dialog";
+import * as Popover from "@radix-ui/react-popover";
+import EmojiPicker from "emoji-picker-react";
+import { Plus, Smile, X } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
-const COLORS = ['#ff6f1e', '#a594f9', '#ff70a6', '#ff9770', '#ffd670', '#70d6ff', '#b8f2e6']
+const COLORS = ["#ff6f1e", "#a594f9", "#ff70a6", "#ff9770", "#ffd670", "#70d6ff", "#b8f2e6"];
 
 export const CreateWorkspaceModal: React.FC = () => {
-  const { isCreateModalOpen, setCreateModalOpen, createWorkspace } = useWorkspaceStore()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [selectedEmoji, setSelectedEmoji] = useState('🚀')
-  const [selectedColor, setSelectedColor] = useState('#ff6f1e')
+  const { isCreateModalOpen, setCreateModalOpen, createWorkspace } = useWorkspaceStore();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedEmoji, setSelectedEmoji] = useState("🚀");
+  const [selectedColor, setSelectedColor] = useState("#ff6f1e");
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    createWorkspace(name.trim(), selectedEmoji, selectedColor, description.trim())
-    setName('')
-    setDescription('')
-    setSelectedEmoji('🚀')
-    setSelectedColor('#ff6f1e')
-  }
+    e.preventDefault();
+    if (!name.trim()) return;
+    createWorkspace(name.trim(), selectedEmoji, selectedColor, description.trim());
+    setName("");
+    setDescription("");
+    setSelectedEmoji("🚀");
+    setSelectedColor("#ff6f1e");
+  };
 
   return (
     <Dialog.Root open={isCreateModalOpen} onOpenChange={setCreateModalOpen}>
@@ -53,10 +54,14 @@ export const CreateWorkspaceModal: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
+              <label
+                htmlFor="ws-name-input"
+                className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5"
+              >
                 Workspace Name
               </label>
               <input
+                id="ws-name-input"
                 type="text"
                 required
                 value={name}
@@ -67,9 +72,9 @@ export const CreateWorkspaceModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
                 Pick Icon Emoji
-              </label>
+              </span>
               <Popover.Root>
                 <Popover.Trigger asChild>
                   <button
@@ -100,9 +105,9 @@ export const CreateWorkspaceModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
                 Accent Color
-              </label>
+              </span>
               <div className="flex gap-2">
                 {COLORS.map((color) => (
                   <button
@@ -110,7 +115,9 @@ export const CreateWorkspaceModal: React.FC = () => {
                     type="button"
                     onClick={() => setSelectedColor(color)}
                     className={`w-7 h-7 rounded-full transition-transform ${
-                      selectedColor === color ? 'scale-125 ring-2 ring-charcoal ring-offset-2' : 'hover:scale-110'
+                      selectedColor === color
+                        ? "scale-125 ring-2 ring-charcoal ring-offset-2"
+                        : "hover:scale-110"
                     }`}
                     style={{ backgroundColor: color }}
                   />
@@ -119,15 +126,19 @@ export const CreateWorkspaceModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
+              <label
+                htmlFor="ws-desc-input"
+                className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5"
+              >
                 Description (Optional)
               </label>
               <input
+                id="ws-desc-input"
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Short description of this workspace"
-                className="w-full px-4 py-2.5 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal focus:border-marker-orange outline-none text-xs font-medium text-cocoa-ink transition-colors"
+                className="w-full px-4 py-2.5 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal focus:border-marker-orange outline-none text-xs font-semibold text-cocoa-ink transition-colors"
               />
             </div>
 
@@ -152,5 +163,5 @@ export const CreateWorkspaceModal: React.FC = () => {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  )
-}
+  );
+};

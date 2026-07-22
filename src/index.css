@@ -19,7 +19,7 @@
 
 @layer base {
   body {
-    font-family: 'Outfit', 'Inter', sans-serif;
+    font-family: "Outfit", "Inter", sans-serif;
     background-color: #fdfbf9;
     color: #171717;
     user-select: text;
@@ -28,7 +28,7 @@
 
 .bn-container {
   background-color: transparent !important;
-  font-family: 'Outfit', 'Inter', sans-serif !important;
+  font-family: "Outfit", "Inter", sans-serif !important;
   color: #171717 !important;
   user-select: text !important;
 }
@@ -72,7 +72,7 @@
   border: 1.5px solid #171717;
   border-radius: 20px;
   padding: 8px 20px;
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
   font-size: 14px;
   font-weight: 500;
   color: #171717;

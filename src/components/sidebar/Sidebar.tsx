@@ -1,21 +1,22 @@
-import React, { useState } from 'react'
-import * as Tooltip from '@radix-ui/react-tooltip'
-import { motion, AnimatePresence } from 'framer-motion'
-import { PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react'
-import { WorkspaceSwitcher } from './WorkspaceSwitcher'
-import { NoteList } from './NoteList'
-import { useWorkspaceStore } from '../../store/useWorkspaceStore'
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { AnimatePresence, motion } from "framer-motion";
+import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { NoteList } from "./NoteList";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export const Sidebar: React.FC = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const { setQuickSearchOpen } = useWorkspaceStore()
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { setQuickSearchOpen } = useWorkspaceStore();
 
   return (
     <Tooltip.Provider delayDuration={300}>
       <motion.aside
         initial={false}
         animate={{ width: isCollapsed ? 72 : 280 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className="h-full bg-cream-paper border-r-[1.5px] border-charcoal flex flex-col relative z-20 overflow-hidden shadow-card-subtle flex-shrink-0"
       >
         <div className="p-4 flex items-center justify-between border-b border-charcoal/10">
@@ -44,7 +45,11 @@ export const Sidebar: React.FC = () => {
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="p-1.5 rounded-[10px] bg-cream-paper border border-charcoal text-charcoal shadow-paper-lift hover:scale-105 transition-transform outline-none"
               >
-                {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+                {isCollapsed ? (
+                  <PanelLeftOpen className="w-4 h-4" />
+                ) : (
+                  <PanelLeftClose className="w-4 h-4" />
+                )}
               </button>
             </Tooltip.Trigger>
             <Tooltip.Portal>
@@ -53,7 +58,7 @@ export const Sidebar: React.FC = () => {
                 sideOffset={8}
                 className="z-50 px-2.5 py-1 rounded-[8px] bg-charcoal text-cream-paper text-[10px] font-bold shadow-md outline-none"
               >
-                {isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                {isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
@@ -99,5 +104,5 @@ export const Sidebar: React.FC = () => {
         )}
       </motion.aside>
     </Tooltip.Provider>
-  )
-}
+  );
+};

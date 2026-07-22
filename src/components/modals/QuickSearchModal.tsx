@@ -1,48 +1,57 @@
-import React, { useEffect } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
-import { Command } from 'cmdk'
-import { Search, X, ArrowRight } from 'lucide-react'
-import { useWorkspaceStore } from '../../store/useWorkspaceStore'
-import { useNoteStore } from '../../store/useNoteStore'
+import * as Dialog from "@radix-ui/react-dialog";
+import { Command } from "cmdk";
+import { ArrowRight, Search, X } from "lucide-react";
+import type React from "react";
+import { useEffect } from "react";
+import { useNoteStore } from "../../store/useNoteStore";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
 function extractPlainText(content: string): string {
-  if (!content) return ''
+  if (!content) return "";
   try {
-    const trimmed = content.trim()
-    if (trimmed.startsWith('[')) {
-      const blocks = JSON.parse(trimmed)
-      let text = ''
+    const trimmed = content.trim();
+    if (trimmed.startsWith("[")) {
+      const blocks = JSON.parse(trimmed);
+      let text = "";
       if (Array.isArray(blocks)) {
-        blocks.forEach((block) => {
+        for (const block of blocks) {
           if (block.content && Array.isArray(block.content)) {
-            block.content.forEach((inline: any) => {
-              if (inline.text) text += `${inline.text} `
-            })
+            for (const inline of block.content) {
+              if (
+                inline &&
+                typeof inline === "object" &&
+                "text" in inline &&
+                typeof inline.text === "string"
+              ) {
+                text += `${inline.text} `;
+              }
+            }
           }
-        })
+        }
       }
-      return text
+      return text;
     }
   } catch (err) {
-    console.error('extractPlainText parse error:', err)
+    console.error("extractPlainText parse error:", err);
   }
-  return content.replace(/<[^>]*>/g, ' ')
+  return content.replace(/<[^>]*>/g, " ");
 }
 
 export const QuickSearchModal: React.FC = () => {
-  const { isQuickSearchOpen, setQuickSearchOpen, workspaces, setActiveWorkspace } = useWorkspaceStore()
-  const { notes, setActiveNoteId } = useNoteStore()
+  const { isQuickSearchOpen, setQuickSearchOpen, workspaces, setActiveWorkspace } =
+    useWorkspaceStore();
+  const { notes, setActiveNoteId } = useNoteStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setQuickSearchOpen(!isQuickSearchOpen)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setQuickSearchOpen(!isQuickSearchOpen);
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isQuickSearchOpen, setQuickSearchOpen])
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isQuickSearchOpen, setQuickSearchOpen]);
 
   return (
     <Dialog.Root open={isQuickSearchOpen} onOpenChange={setQuickSearchOpen}>
@@ -72,40 +81,40 @@ export const QuickSearchModal: React.FC = () => {
               </Command.Empty>
 
               {notes.map((note) => {
-                const ws = workspaces.find((w) => w.id === note.workspaceId)
-                const plainText = extractPlainText(note.content)
+                const ws = workspaces.find((w) => w.id === note.workspaceId);
+                const plainText = extractPlainText(note.content);
                 return (
                   <Command.Item
                     key={note.id}
                     value={`${note.title} ${plainText}`}
                     onSelect={() => {
-                      if (ws) setActiveWorkspace(ws.id)
-                      setActiveNoteId(note.id)
-                      setQuickSearchOpen(false)
+                      if (ws) setActiveWorkspace(ws.id);
+                      setActiveNoteId(note.id);
+                      setQuickSearchOpen(false);
                     }}
                     className="w-full flex items-center justify-between p-3 rounded-[12px] hover:bg-dew-drop border border-transparent hover:border-charcoal text-left transition-colors cursor-pointer group outline-none aria-selected:bg-dew-drop aria-selected:border-charcoal"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xl flex-shrink-0">{note.icon || '📝'}</span>
+                      <span className="text-xl flex-shrink-0">{note.icon || "📝"}</span>
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-cocoa-ink truncate">
-                          {note.title || 'Untitled Note'}
+                          {note.title || "Untitled Note"}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                           <span className="px-1.5 py-0.5 rounded-[6px] bg-cream-paper border border-charcoal text-[10px] font-semibold">
-                            {ws?.emoji || '🚀'} {ws?.name || 'Workspace'}
+                            {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
                           </span>
                         </div>
                       </div>
                     </div>
                     <ArrowRight className="w-4 h-4 text-marker-orange opacity-0 group-hover:opacity-100 transition-opacity" />
                   </Command.Item>
-                )
+                );
               })}
             </Command.List>
           </Command>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  )
-}
+  );
+};

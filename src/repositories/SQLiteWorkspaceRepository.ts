@@ -1,20 +1,20 @@
-import Database from '@tauri-apps/plugin-sql'
-import { IWorkspaceRepository } from './IWorkspaceRepository'
-import { Workspace } from '../types'
+import Database from "@tauri-apps/plugin-sql";
+import type { Workspace } from "../types";
+import type { IWorkspaceRepository } from "./IWorkspaceRepository";
 
 export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
-  private dbPromise: Promise<Database>
+  private dbPromise: Promise<Database>;
 
   constructor() {
-    this.dbPromise = Database.load('sqlite:cove.db')
-    this.initSchema()
+    this.dbPromise = Database.load("sqlite:cove.db");
+    this.initSchema();
   }
 
   private async initSchema() {
     try {
-      const db = await this.dbPromise
-      await db.execute('PRAGMA foreign_keys = ON')
-      await db.execute('BEGIN TRANSACTION')
+      const db = await this.dbPromise;
+      await db.execute("PRAGMA foreign_keys = ON");
+      await db.execute("BEGIN TRANSACTION");
       await db.execute(`
         CREATE TABLE IF NOT EXISTS workspaces (
           id TEXT PRIMARY KEY,
@@ -24,20 +24,20 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
           description TEXT,
           createdAt INTEGER NOT NULL
         )
-      `)
-      await db.execute('PRAGMA user_version = 1')
-      await db.execute('COMMIT')
+      `);
+      await db.execute("PRAGMA user_version = 1");
+      await db.execute("COMMIT");
     } catch (err) {
-      console.error('SQLiteWorkspaceRepository initSchema error:', err)
+      console.error("SQLiteWorkspaceRepository initSchema error:", err);
     }
   }
 
   async getAllWorkspaces(): Promise<Workspace[]> {
     try {
-      const db = await this.dbPromise
+      const db = await this.dbPromise;
       const rows = await db.select<Array<Record<string, unknown>>>(
-        'SELECT * FROM workspaces ORDER BY createdAt ASC'
-      )
+        "SELECT * FROM workspaces ORDER BY createdAt ASC",
+      );
 
       return rows.map((row) => ({
         id: String(row.id),
@@ -45,24 +45,24 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
         emoji: String(row.emoji),
         color: String(row.color),
         description: row.description ? String(row.description) : undefined,
-        createdAt: Number(row.createdAt)
-      }))
+        createdAt: Number(row.createdAt),
+      }));
     } catch (err) {
-      console.error('SQLiteWorkspaceRepository getAllWorkspaces error:', err)
-      return []
+      console.error("SQLiteWorkspaceRepository getAllWorkspaces error:", err);
+      return [];
     }
   }
 
   async getWorkspaceById(id: string): Promise<Workspace | null> {
     try {
-      const db = await this.dbPromise
+      const db = await this.dbPromise;
       const rows = await db.select<Array<Record<string, unknown>>>(
-        'SELECT * FROM workspaces WHERE id = ?',
-        [id]
-      )
+        "SELECT * FROM workspaces WHERE id = ?",
+        [id],
+      );
 
-      if (!rows.length) return null
-      const row = rows[0]
+      if (!rows.length) return null;
+      const row = rows[0];
 
       return {
         id: String(row.id),
@@ -70,23 +70,23 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
         emoji: String(row.emoji),
         color: String(row.color),
         description: row.description ? String(row.description) : undefined,
-        createdAt: Number(row.createdAt)
-      }
+        createdAt: Number(row.createdAt),
+      };
     } catch (err) {
-      console.error('SQLiteWorkspaceRepository getWorkspaceById error:', err)
-      return null
+      console.error("SQLiteWorkspaceRepository getWorkspaceById error:", err);
+      return null;
     }
   }
 
-  async createWorkspace(workspaceInput: Omit<Workspace, 'createdAt'>): Promise<Workspace> {
-    const db = await this.dbPromise
+  async createWorkspace(workspaceInput: Omit<Workspace, "createdAt">): Promise<Workspace> {
+    const db = await this.dbPromise;
     const workspace: Workspace = {
       ...workspaceInput,
-      createdAt: Date.now()
-    }
+      createdAt: Date.now(),
+    };
 
     try {
-      await db.execute('BEGIN TRANSACTION')
+      await db.execute("BEGIN TRANSACTION");
       await db.execute(
         `INSERT INTO workspaces (id, name, emoji, color, description, createdAt)
         VALUES (?, ?, ?, ?, ?, ?)`,
@@ -96,61 +96,61 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
           workspace.emoji,
           workspace.color,
           workspace.description || null,
-          workspace.createdAt
-        ]
-      )
-      await db.execute('COMMIT')
+          workspace.createdAt,
+        ],
+      );
+      await db.execute("COMMIT");
     } catch (err) {
-      console.error('SQLiteWorkspaceRepository createWorkspace error:', err)
-      try { await db.execute('ROLLBACK') } catch {}
-      throw err
+      console.error("SQLiteWorkspaceRepository createWorkspace error:", err);
+      try {
+        await db.execute("ROLLBACK");
+      } catch {}
+      throw err;
     }
 
-    return workspace
+    return workspace;
   }
 
   async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace> {
-    const existing = await this.getWorkspaceById(id)
-    if (!existing) throw new Error('Workspace not found')
+    const existing = await this.getWorkspaceById(id);
+    if (!existing) throw new Error("Workspace not found");
 
-    const db = await this.dbPromise
+    const db = await this.dbPromise;
     const updated: Workspace = {
       ...existing,
-      ...updates
-    }
+      ...updates,
+    };
 
     try {
-      await db.execute('BEGIN TRANSACTION')
+      await db.execute("BEGIN TRANSACTION");
       await db.execute(
-        `UPDATE workspaces SET name = ?, emoji = ?, color = ?, description = ? WHERE id = ?`,
-        [
-          updated.name,
-          updated.emoji,
-          updated.color,
-          updated.description || null,
-          id
-        ]
-      )
-      await db.execute('COMMIT')
+        "UPDATE workspaces SET name = ?, emoji = ?, color = ?, description = ? WHERE id = ?",
+        [updated.name, updated.emoji, updated.color, updated.description || null, id],
+      );
+      await db.execute("COMMIT");
     } catch (err) {
-      console.error('SQLiteWorkspaceRepository updateWorkspace error:', err)
-      try { await db.execute('ROLLBACK') } catch {}
-      throw err
+      console.error("SQLiteWorkspaceRepository updateWorkspace error:", err);
+      try {
+        await db.execute("ROLLBACK");
+      } catch {}
+      throw err;
     }
 
-    return updated
+    return updated;
   }
 
   async deleteWorkspace(id: string): Promise<void> {
-    const db = await this.dbPromise
+    const db = await this.dbPromise;
     try {
-      await db.execute('BEGIN TRANSACTION')
-      await db.execute('DELETE FROM workspaces WHERE id = ?', [id])
-      await db.execute('COMMIT')
+      await db.execute("BEGIN TRANSACTION");
+      await db.execute("DELETE FROM workspaces WHERE id = ?", [id]);
+      await db.execute("COMMIT");
     } catch (err) {
-      console.error('SQLiteWorkspaceRepository deleteWorkspace error:', err)
-      try { await db.execute('ROLLBACK') } catch {}
-      throw err
+      console.error("SQLiteWorkspaceRepository deleteWorkspace error:", err);
+      try {
+        await db.execute("ROLLBACK");
+      } catch {}
+      throw err;
     }
   }
 }

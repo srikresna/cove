@@ -1,11 +1,11 @@
-import React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, FileText, Pin, Star, Trash2 } from 'lucide-react'
-import { useWorkspaceStore } from '../../store/useWorkspaceStore'
-import { useNoteStore } from '../../store/useNoteStore'
+import { AnimatePresence, motion } from "framer-motion";
+import { FileText, Pin, Plus, Star, Trash2 } from "lucide-react";
+import type React from "react";
+import { useNoteStore } from "../../store/useNoteStore";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
 export const NoteList: React.FC = () => {
-  const { activeWorkspaceId } = useWorkspaceStore()
+  const { activeWorkspaceId } = useWorkspaceStore();
   const {
     notes,
     activeNoteId,
@@ -13,20 +13,20 @@ export const NoteList: React.FC = () => {
     createNote,
     deleteNote,
     togglePinNote,
-    toggleFavoriteNote
-  } = useNoteStore()
+    toggleFavoriteNote,
+  } = useNoteStore();
 
-  const workspaceNotes = notes.filter((n) => n.workspaceId === activeWorkspaceId)
-  const pinnedNotes = workspaceNotes.filter((n) => n.isPinned)
-  const favoriteNotes = workspaceNotes.filter((n) => n.isFavorite && !n.isPinned)
-  const otherNotes = workspaceNotes.filter((n) => !n.isPinned && !n.isFavorite)
+  const workspaceNotes = notes.filter((n) => n.workspaceId === activeWorkspaceId);
+  const pinnedNotes = workspaceNotes.filter((n) => n.isPinned);
+  const favoriteNotes = workspaceNotes.filter((n) => n.isFavorite && !n.isPinned);
+  const otherNotes = workspaceNotes.filter((n) => !n.isPinned && !n.isFavorite);
 
   const handleCreateNote = () => {
-    createNote(activeWorkspaceId, 'Untitled Note', '<p></p>', '📝')
-  }
+    createNote(activeWorkspaceId, "Untitled Note", "<p></p>", "📝");
+  };
 
-  const renderNoteItem = (n: typeof notes[0]) => {
-    const isActive = n.id === activeNoteId
+  const renderNoteItem = (n: (typeof notes)[0]) => {
+    const isActive = n.id === activeNoteId;
     return (
       <motion.div
         key={n.id}
@@ -35,22 +35,22 @@ export const NoteList: React.FC = () => {
         exit={{ opacity: 0, x: -8 }}
         className={`group relative flex items-center justify-between p-2.5 rounded-[12px] cursor-pointer transition-all duration-150 border-[1.5px] ${
           isActive
-            ? 'bg-dew-drop border-charcoal text-cocoa-ink font-bold shadow-paper-lift'
-            : 'border-transparent hover:border-charcoal/30 text-charcoal'
+            ? "bg-dew-drop border-charcoal text-cocoa-ink font-bold shadow-paper-lift"
+            : "border-transparent hover:border-charcoal/30 text-charcoal"
         }`}
         onClick={() => setActiveNoteId(n.id)}
       >
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
-          <span className="text-base flex-shrink-0">{n.icon || '📝'}</span>
-          <span className="text-xs truncate">{n.title || 'Untitled Note'}</span>
+          <span className="text-base flex-shrink-0">{n.icon || "📝"}</span>
+          <span className="text-xs truncate">{n.title || "Untitled Note"}</span>
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity text-charcoal">
           <button
             type="button"
             onClick={(e) => {
-              e.stopPropagation()
-              togglePinNote(n.id)
+              e.stopPropagation();
+              togglePinNote(n.id);
             }}
             className="p-1 rounded hover:bg-marker-orange/20"
             title="Pin Note"
@@ -60,8 +60,8 @@ export const NoteList: React.FC = () => {
           <button
             type="button"
             onClick={(e) => {
-              e.stopPropagation()
-              toggleFavoriteNote(n.id)
+              e.stopPropagation();
+              toggleFavoriteNote(n.id);
             }}
             className="p-1 rounded hover:bg-marker-orange/20"
             title="Favorite Note"
@@ -71,8 +71,8 @@ export const NoteList: React.FC = () => {
           <button
             type="button"
             onClick={(e) => {
-              e.stopPropagation()
-              deleteNote(n.id)
+              e.stopPropagation();
+              deleteNote(n.id);
             }}
             className="p-1 rounded hover:bg-red-100 text-red-600"
             title="Delete Note"
@@ -81,8 +81,8 @@ export const NoteList: React.FC = () => {
           </button>
         </div>
       </motion.div>
-    )
-  }
+    );
+  };
 
   return (
     <div className="flex-1 overflow-y-auto space-y-4 pr-1">
@@ -121,9 +121,7 @@ export const NoteList: React.FC = () => {
             <span>Pinned</span>
           </div>
           <div className="space-y-1">
-            <AnimatePresence>
-              {pinnedNotes.map(renderNoteItem)}
-            </AnimatePresence>
+            <AnimatePresence>{pinnedNotes.map(renderNoteItem)}</AnimatePresence>
           </div>
         </div>
       )}
@@ -135,9 +133,7 @@ export const NoteList: React.FC = () => {
             <span>Favorites</span>
           </div>
           <div className="space-y-1">
-            <AnimatePresence>
-              {favoriteNotes.map(renderNoteItem)}
-            </AnimatePresence>
+            <AnimatePresence>{favoriteNotes.map(renderNoteItem)}</AnimatePresence>
           </div>
         </div>
       )}
@@ -150,12 +146,10 @@ export const NoteList: React.FC = () => {
             </div>
           ) : null}
           <div className="space-y-1">
-            <AnimatePresence>
-              {otherNotes.map(renderNoteItem)}
-            </AnimatePresence>
+            <AnimatePresence>{otherNotes.map(renderNoteItem)}</AnimatePresence>
           </div>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
