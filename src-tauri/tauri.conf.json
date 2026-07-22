@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Cove Notes",
         "width": 1100,
         "height": 750,
@@ -22,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self'; object-src 'none'; worker-src 'self' blob:; frame-src 'none'; child-src 'none'; connect-src 'self' ipc: http://ipc.localhost tauri://localhost asset://localhost"
     }
   },
   "bundle": {

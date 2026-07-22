@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
+import { Logger } from "../services/Logger";
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -65,11 +66,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   fetchWorkspaces: async () => {
     try {
       const workspaces = await workspaceService.getAllWorkspaces();
-      if (workspaces.length > 0) {
-        set({ workspaces, activeWorkspaceId: workspaces[0].id });
+      const first = workspaces[0];
+      if (first) {
+        set({ workspaces, activeWorkspaceId: first.id });
       }
     } catch (err) {
-      console.error("fetchWorkspaces store error:", err);
+      Logger.error("fetchWorkspaces store error", err);
     }
   },
 
@@ -84,7 +86,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }));
       return created;
     } catch (err) {
-      console.error("createWorkspace store error:", err);
+      Logger.error("createWorkspace store error", err);
       set({ workspaces: previous, isCreateModalOpen: false });
       return null;
     }
@@ -99,7 +101,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await workspaceService.updateWorkspace(id, updates);
     } catch (err) {
-      console.error("updateWorkspace store error:", err);
+      Logger.error("updateWorkspace store error", err);
       set({ workspaces: previous });
     }
   },
@@ -113,7 +115,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await workspaceService.deleteWorkspace(id, current.length);
       set({ workspaces: filtered, activeWorkspaceId: nextActive });
     } catch (err) {
-      console.error("deleteWorkspace store error:", err);
+      Logger.error("deleteWorkspace store error", err);
       set({ workspaces: current });
     }
   },

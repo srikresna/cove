@@ -1,91 +1,72 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { EditorHeader } from "./EditorHeader";
-import { TableOfContents } from "./TableOfContents";
+import "@blocknote/mantine/style.css";
 
 interface BlockNoteEditorProps {
   note: Note;
 }
 
-export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
-  const { updateNote } = useNoteStore();
-  const { isDarkMode } = useWorkspaceStore();
-  const [wordCount, setWordCount] = useState(0);
-  const [characterCount, setCharacterCount] = useState(0);
+function countWordsAndChars(contentStr: string): { wordCount: number; characterCount: number } {
+  if (!contentStr) return { wordCount: 0, characterCount: 0 };
 
-  const [isFullWidth, setIsFullWidth] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const editor = useCreateBlockNote();
-
-  useEffect(() => {
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = "move";
-      }
-    };
-
-    const container = editorRef.current;
-    if (container) {
-      container.addEventListener("dragover", handleDragOver);
-    }
-    return () => {
-      if (container) {
-        container.removeEventListener("dragover", handleDragOver);
-      }
-    };
-  }, []);
-
-  const handleEditorChange = useCallback(() => {
-    if (!editor) return;
-
-    let fullText = "";
-    for (const block of editor.document) {
-      if (block.content && Array.isArray(block.content)) {
-        for (const inline of block.content) {
-          if ("text" in inline) {
-            fullText += `${inline.text} `;
+  let text = "";
+  try {
+    const trimmed = contentStr.trim();
+    if (trimmed.startsWith("[")) {
+      const blocks = JSON.parse(trimmed);
+      if (Array.isArray(blocks)) {
+        for (const block of blocks) {
+          if (block.content && Array.isArray(block.content)) {
+            for (const inline of block.content) {
+              if (
+                inline &&
+                typeof inline === "object" &&
+                "text" in inline &&
+                typeof inline.text === "string"
+              ) {
+                text += `${inline.text} `;
+              }
+            }
           }
         }
       }
+    } else {
+      text = contentStr.replace(/<[^>]*>/g, " ");
     }
+  } catch {
+    text = contentStr.replace(/<[^>]*>/g, " ");
+  }
 
-    const trimmed = fullText.trim();
-    setWordCount(trimmed ? trimmed.split(/\s+/).length : 0);
-    setCharacterCount(trimmed.length);
+  const cleanText = text.trim();
+  const characterCount = cleanText.length;
+  const words = cleanText ? cleanText.split(/\s+/).filter(Boolean) : [];
+  const wordCount = words.length;
 
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
+  return { wordCount, characterCount };
+}
 
-    debounceTimer.current = setTimeout(() => {
-      const jsonContent = JSON.stringify(editor.document);
-      updateNote(note.id, { content: jsonContent });
-    }, 300);
-  }, [editor, note.id, updateNote]);
+export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
+  const { updateNote } = useNoteStore();
+  const { isDarkMode } = useWorkspaceStore();
+  const [isFullWidth, setIsFullWidth] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const lastLoadedContentRef = useRef<string>("");
 
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, []);
+  const editor = useCreateBlockNote({});
 
   useEffect(() => {
     const loadInitialContent = async () => {
-      if (!editor) return;
-      if (!note.content || note.content === "<p></p>") {
-        return;
-      }
+      if (!editor || !note.content) return;
+      if (lastLoadedContentRef.current === note.content) return;
+
+      lastLoadedContentRef.current = note.content;
 
       try {
         const trimmed = note.content.trim();
@@ -101,7 +82,7 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
           }
         }
       } catch (err) {
-        console.error("loadInitialContent error:", err);
+        Logger.error("loadInitialContent error", err);
       }
     };
 
@@ -111,16 +92,18 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
-        console.error("requestFullscreen error:", err);
+        Logger.error("requestFullscreen error", err);
       });
       setIsFullscreen(true);
     } else {
       document.exitFullscreen().catch((err) => {
-        console.error("exitFullscreen error:", err);
+        Logger.error("exitFullscreen error", err);
       });
       setIsFullscreen(false);
     }
   };
+
+  const { wordCount, characterCount } = countWordsAndChars(note.content);
 
   return (
     <div className="w-full h-full overflow-y-auto px-4 sm:px-8 py-6">
@@ -139,16 +122,16 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
           onToggleFullscreen={toggleFullscreen}
         />
 
-        <TableOfContents editorRef={editorRef} contentHtml={note.content || ""} />
-
-        <div ref={editorRef} className="relative min-h-[500px] mt-4">
-          {editor && (
-            <BlockNoteView
-              editor={editor}
-              onChange={handleEditorChange}
-              theme={isDarkMode ? "dark" : "light"}
-            />
-          )}
+        <div className="w-full min-h-[500px]">
+          <BlockNoteView
+            editor={editor}
+            theme={isDarkMode ? "dark" : "light"}
+            onChange={() => {
+              const blocksJson = JSON.stringify(editor.document);
+              lastLoadedContentRef.current = blocksJson;
+              updateNote(note.id, { content: blocksJson });
+            }}
+          />
         </div>
       </div>
     </div>

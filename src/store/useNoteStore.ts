@@ -52,8 +52,9 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   fetchNotes: async (workspaceId) => {
     try {
       const notes = await noteService.listMetadataByWorkspace(workspaceId);
-      if (notes.length > 0) {
-        set({ notes, activeNoteId: notes[0].id });
+      const first = notes[0];
+      if (first) {
+        set({ notes, activeNoteId: first.id });
       } else {
         set({ notes: get().notes.filter((n) => n.workspaceId === workspaceId) });
       }

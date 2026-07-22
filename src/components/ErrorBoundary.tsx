@@ -1,6 +1,7 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { MESSAGES } from "../constants/messages";
+import { Logger } from "../services/Logger";
 
 interface Props {
   children: ReactNode;
@@ -22,7 +23,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught Error Boundary catch:", error, errorInfo);
+    Logger.error("Uncaught Error Boundary catch", error, {
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   public render() {

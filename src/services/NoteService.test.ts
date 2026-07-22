@@ -21,7 +21,11 @@ describe("NoteService", () => {
 
     const result = await service.listMetadataByWorkspace("ws-1");
     expect(result).toHaveLength(1);
-    expect(result[0].content).toBe("");
+    const first = result[0];
+    expect(first).toBeDefined();
+    if (first) {
+      expect(first.content).toBe("");
+    }
     expect(fakeRepo.callLog).toContain("getNotesMetadataByWorkspace");
   });
 

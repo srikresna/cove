@@ -4,6 +4,7 @@ import { ArrowRight, Search, X } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
 import { MESSAGES } from "../../constants/messages";
+import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
@@ -33,7 +34,7 @@ function extractPlainText(content: string): string {
       return text;
     }
   } catch (err) {
-    console.error("extractPlainText parse error:", err);
+    Logger.error("extractPlainText parse error", err);
   }
   return content.replace(/<[^>]*>/g, " ");
 }

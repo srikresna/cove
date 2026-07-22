@@ -8,6 +8,7 @@ import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { MESSAGES } from "./constants/messages";
+import type { Note } from "./domain/note/Note";
 import { useNoteStore } from "./store/useNoteStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
@@ -25,17 +26,20 @@ export const AppContent: React.FC = () => {
     }
   }, [activeWorkspaceId, fetchNotes]);
 
-  const workspaceNotes = notes.filter((n) => n.workspaceId === activeWorkspaceId);
+  const workspaceNotes: Note[] = notes.filter((n) => n.workspaceId === activeWorkspaceId);
+  const firstWorkspaceNote = workspaceNotes[0];
   const activeNote =
     notes.find((n) => n.id === activeNoteId && n.workspaceId === activeWorkspaceId) ||
-    workspaceNotes[0] ||
+    firstWorkspaceNote ||
     null;
 
+  const firstNoteId = firstWorkspaceNote?.id;
+
   useEffect(() => {
-    if (!activeNote && workspaceNotes.length > 0) {
-      setActiveNoteId(workspaceNotes[0].id);
+    if (!activeNote && firstNoteId) {
+      setActiveNoteId(firstNoteId);
     }
-  }, [activeNote, workspaceNotes, setActiveNoteId]);
+  }, [activeNote, firstNoteId, setActiveNoteId]);
 
   useEffect(() => {
     if (isDarkMode) {

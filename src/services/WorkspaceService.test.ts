@@ -68,7 +68,11 @@ describe("WorkspaceService", () => {
     await service.deleteWorkspace("ws-1", 2);
 
     expect(wsRepo.workspaces).toHaveLength(1);
-    expect(wsRepo.workspaces[0].id).toBe("ws-2");
+    const first = wsRepo.workspaces[0];
+    expect(first).toBeDefined();
+    if (first) {
+      expect(first.id).toBe("ws-2");
+    }
     expect(noteRepo.notes).toHaveLength(0);
   });
 

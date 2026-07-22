@@ -31,8 +31,9 @@ export class InMemoryWorkspaceRepository implements IWorkspaceRepository {
     this.callLog.push(`updateWorkspace:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: updateWorkspace");
     const index = this.workspaces.findIndex((w) => w.id === id);
-    if (index === -1) throw new Error(`Workspace not found: ${id}`);
-    const updated: Workspace = { ...this.workspaces[index], ...updates };
+    const existing = this.workspaces[index];
+    if (index === -1 || !existing) throw new Error(`Workspace not found: ${id}`);
+    const updated: Workspace = { ...existing, ...updates };
     this.workspaces[index] = updated;
     return updated;
   }

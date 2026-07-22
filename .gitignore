@@ -6,3 +6,4 @@ src-tauri/gen
 .gemini
 *.log
 .DS_Store
+coverage

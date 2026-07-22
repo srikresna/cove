@@ -12,7 +12,8 @@
     "tauri": "tauri",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ci": "vitest run --coverage"
+    "test:ci": "vitest run --coverage",
+    "verify": "npm run check && npx tsc --noEmit && npm run test:ci && npm run build"
   },
   "dependencies": {
     "@blocknote/core": "^0.23.2",

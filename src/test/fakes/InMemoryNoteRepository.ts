@@ -46,8 +46,9 @@ export class InMemoryNoteRepository implements INoteRepository {
     this.callLog.push(`updateNote:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: updateNote");
     const index = this.notes.findIndex((n) => n.id === id);
-    if (index === -1) throw new Error(`Note not found: ${id}`);
-    const updated: Note = { ...this.notes[index], ...updates, updatedAt: Date.now() };
+    const existing = this.notes[index];
+    if (index === -1 || !existing) throw new Error(`Note not found: ${id}`);
+    const updated: Note = { ...existing, ...updates, updatedAt: Date.now() };
     this.notes[index] = updated;
     return updated;
   }
