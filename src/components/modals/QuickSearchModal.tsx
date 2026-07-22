@@ -23,7 +23,9 @@ function extractPlainText(content: string): string {
       }
       return text
     }
-  } catch {}
+  } catch (err) {
+    console.error('extractPlainText parse error:', err)
+  }
   return content.replace(/<[^>]*>/g, ' ')
 }
 

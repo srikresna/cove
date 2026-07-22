@@ -99,7 +99,9 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
             editor.replaceBlocks(editor.document, blocks)
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error('loadInitialContent error:', err)
+      }
     }
 
     loadInitialContent()
@@ -107,10 +109,14 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {})
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error('requestFullscreen error:', err)
+      })
       setIsFullscreen(true)
     } else {
-      document.exitFullscreen().catch(() => {})
+      document.exitFullscreen().catch((err) => {
+        console.error('exitFullscreen error:', err)
+      })
       setIsFullscreen(false)
     }
   }

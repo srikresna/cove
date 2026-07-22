@@ -26,7 +26,7 @@ const DEFAULT_NOTES: Note[] = [
     id: 'default-note-1',
     workspaceId: 'default-workspace-1',
     title: 'Joyful UI Ideas & Brainstorming',
-    content: '[{"type":"paragraph","content":[{"type":"text","text":"Welcome to your brand new block editor! Type / to bring up commands."}]}]',
+    content: '[{"type":"paragraph","content":[{"type":"text","text":"Welcome to your brand new block editor in Cove Notes!"}]}]',
     icon: '🎨',
     coverColor: '#ff6f1e',
     isPinned: true,
@@ -54,7 +54,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       } else {
         set({ notes: get().notes.filter((n) => n.workspaceId === workspaceId), isLoading: false })
       }
-    } catch {
+    } catch (err) {
+      console.error('fetchNotes store error:', err)
       set({ isLoading: false })
     }
   },
@@ -85,7 +86,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         notes: state.notes.map((n) => (n.id === created.id ? created : n))
       }))
       return created
-    } catch {
+    } catch (err) {
+      console.error('createNote store error:', err)
       return { ...newNoteInput, createdAt: Date.now(), updatedAt: Date.now() }
     }
   },
@@ -98,7 +100,9 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
     try {
       await noteRepository.updateNote(id, updates)
-    } catch {}
+    } catch (err) {
+      console.error('updateNote store error:', err)
+    }
   },
 
   deleteNote: async (id) => {
@@ -110,7 +114,9 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
     try {
       await noteRepository.deleteNote(id)
-    } catch {}
+    } catch (err) {
+      console.error('deleteNote store error:', err)
+    }
   },
 
   duplicateNote: async (id) => {

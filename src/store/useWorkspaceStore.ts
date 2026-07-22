@@ -55,7 +55,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         set({ workspaces, activeWorkspaceId: workspaces[0].id })
         useNoteStore.getState().fetchNotes(workspaces[0].id)
       }
-    } catch {}
+    } catch (err) {
+      console.error('fetchWorkspaces store error:', err)
+    }
   },
 
   createWorkspace: async (name, emoji, color, description) => {
@@ -80,7 +82,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }))
       useNoteStore.getState().fetchNotes(created.id)
       return created
-    } catch {
+    } catch (err) {
+      console.error('createWorkspace store error:', err)
       return { ...newWsInput, createdAt: Date.now() }
     }
   },
@@ -92,7 +95,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     try {
       await workspaceRepository.updateWorkspace(id, updates)
-    } catch {}
+    } catch (err) {
+      console.error('updateWorkspace store error:', err)
+    }
   },
 
   deleteWorkspace: async (id) => {
@@ -108,6 +113,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     try {
       await workspaceRepository.deleteWorkspace(id)
-    } catch {}
+    } catch (err) {
+      console.error('deleteWorkspace store error:', err)
+    }
   }
 }))
