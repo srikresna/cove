@@ -37,12 +37,20 @@ const DEFAULT_WORKSPACES: Workspace[] = [
   },
 ];
 
+const getInitialDarkMode = (): boolean => {
+  const saved = localStorage.getItem("cove_theme");
+  if (saved !== null) {
+    return saved === "dark";
+  }
+  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+};
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: DEFAULT_WORKSPACES,
   activeWorkspaceId: "default-workspace-1",
   isCreateModalOpen: false,
   isQuickSearchOpen: false,
-  isDarkMode: false,
+  isDarkMode: getInitialDarkMode(),
 
   setActiveWorkspace: (id) => {
     set({ activeWorkspaceId: id });
@@ -51,7 +59,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
   setQuickSearchOpen: (open) => set({ isQuickSearchOpen: open }),
-  toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+  toggleDarkMode: () =>
+    set((state) => {
+      const nextMode = !state.isDarkMode;
+      localStorage.setItem("cove_theme", nextMode ? "dark" : "light");
+      return { isDarkMode: nextMode };
+    }),
 
   fetchWorkspaces: async () => {
     try {

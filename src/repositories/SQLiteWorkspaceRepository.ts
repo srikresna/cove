@@ -1,19 +1,19 @@
-import Database from "@tauri-apps/plugin-sql";
 import type { Workspace } from "../types";
 import type { IWorkspaceRepository } from "./IWorkspaceRepository";
+import { SQLiteDatabase } from "./SQLiteDatabase";
 
 export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
-  private dbPromise: Promise<Database>;
+  private getDb() {
+    return SQLiteDatabase.getInstance();
+  }
 
   constructor() {
-    this.dbPromise = Database.load("sqlite:cove.db");
     this.initSchema();
   }
 
   private async initSchema() {
     try {
-      const db = await this.dbPromise;
-      await db.execute("PRAGMA foreign_keys = ON");
+      const db = await this.getDb();
       await db.execute("BEGIN TRANSACTION");
       await db.execute(`
         CREATE TABLE IF NOT EXISTS workspaces (
@@ -34,7 +34,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
 
   async getAllWorkspaces(): Promise<Workspace[]> {
     try {
-      const db = await this.dbPromise;
+      const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
         "SELECT * FROM workspaces ORDER BY createdAt ASC",
       );
@@ -55,7 +55,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
 
   async getWorkspaceById(id: string): Promise<Workspace | null> {
     try {
-      const db = await this.dbPromise;
+      const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
         "SELECT * FROM workspaces WHERE id = ?",
         [id],
@@ -79,7 +79,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
   }
 
   async createWorkspace(workspaceInput: Omit<Workspace, "createdAt">): Promise<Workspace> {
-    const db = await this.dbPromise;
+    const db = await this.getDb();
     const workspace: Workspace = {
       ...workspaceInput,
       createdAt: Date.now(),
@@ -115,7 +115,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
     const existing = await this.getWorkspaceById(id);
     if (!existing) throw new Error("Workspace not found");
 
-    const db = await this.dbPromise;
+    const db = await this.getDb();
     const updated: Workspace = {
       ...existing,
       ...updates,
@@ -140,7 +140,7 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
   }
 
   async deleteWorkspace(id: string): Promise<void> {
-    const db = await this.dbPromise;
+    const db = await this.getDb();
     try {
       await db.execute("BEGIN TRANSACTION");
       await db.execute("DELETE FROM workspaces WHERE id = ?", [id]);

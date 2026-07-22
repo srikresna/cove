@@ -17,7 +17,7 @@ interface NoteState {
     title?: string,
     content?: string,
     icon?: string,
-  ) => Promise<Note>;
+  ) => Promise<Note | null>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
@@ -72,6 +72,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     content = '[{"type":"paragraph","content":[]}]',
     icon = "📝",
   ) => {
+    const previousNotes = get().notes;
     const newNoteInput: Omit<Note, "createdAt" | "updatedAt"> = {
       id: crypto.randomUUID(),
       workspaceId,
@@ -95,12 +96,14 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       }));
       return created;
     } catch (err) {
-      console.error("createNote store error:", err);
-      return { ...newNoteInput, createdAt: Date.now(), updatedAt: Date.now() };
+      console.error("createNote store error, rolling back:", err);
+      set({ notes: previousNotes, activeNoteId: previousNotes[0]?.id || null });
+      return null;
     }
   },
 
   updateNote: async (id, updates) => {
+    const previousNotes = get().notes;
     const now = Date.now();
     set((state) => ({
       notes: state.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now } : n)),
@@ -109,13 +112,15 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       await noteRepository.updateNote(id, updates);
     } catch (err) {
-      console.error("updateNote store error:", err);
+      console.error("updateNote store error, rolling back:", err);
+      set({ notes: previousNotes });
     }
   },
 
   deleteNote: async (id) => {
-    const currentNotes = get().notes;
-    const filtered = currentNotes.filter((n) => n.id !== id);
+    const previousNotes = get().notes;
+    const previousActive = get().activeNoteId;
+    const filtered = previousNotes.filter((n) => n.id !== id);
     const nextActive = filtered[0]?.id || null;
 
     set({ notes: filtered, activeNoteId: nextActive });
@@ -123,7 +128,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       await noteRepository.deleteNote(id);
     } catch (err) {
-      console.error("deleteNote store error:", err);
+      console.error("deleteNote store error, rolling back:", err);
+      set({ notes: previousNotes, activeNoteId: previousActive });
     }
   },
 

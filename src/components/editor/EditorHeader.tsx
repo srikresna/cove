@@ -2,6 +2,7 @@ import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker from "emoji-picker-react";
 import { ArrowRightLeft, Copy, Maximize2, Minimize2, Pin, Star, Trash2 } from "lucide-react";
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
 
@@ -28,6 +29,34 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 }) => {
   const { updateNote, deleteNote, duplicateNote, togglePinNote, toggleFavoriteNote } =
     useNoteStore();
+
+  const [title, setTitle] = useState(note.title);
+  const titleTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setTitle(note.title);
+  }, [note.title]);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+
+    if (titleTimer.current) {
+      clearTimeout(titleTimer.current);
+    }
+
+    titleTimer.current = setTimeout(() => {
+      updateNote(note.id, { title: newTitle });
+    }, 300);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (titleTimer.current) {
+        clearTimeout(titleTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="mb-6 space-y-4">
@@ -174,8 +203,8 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
       <div className="pl-[54px] pr-0">
         <input
           type="text"
-          value={note.title}
-          onChange={(e) => updateNote(note.id, { title: e.target.value })}
+          value={title}
+          onChange={handleTitleChange}
           placeholder="Untitled Note"
           className="w-full text-3xl sm:text-4xl font-extrabold bg-transparent outline-none border-b-[2px] border-transparent focus:border-marker-orange transition-colors py-1 text-cocoa-ink placeholder-slate-300"
         />
