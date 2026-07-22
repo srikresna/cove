@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { MESSAGES } from "../../constants/messages";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { NoteList } from "./NoteList";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -28,11 +29,14 @@ export const Sidebar: React.FC = () => {
                 exit={{ opacity: 0, x: -10 }}
                 className="flex items-center gap-2"
               >
-                <div className="w-7 h-7 rounded-[10px] bg-marker-orange text-cream-paper font-black text-sm flex items-center justify-center border border-charcoal shadow-sm">
+                <div
+                  className="w-7 h-7 rounded-[10px] bg-marker-orange text-cream-paper font-black text-sm flex items-center justify-center border border-charcoal shadow-sm"
+                  aria-hidden="true"
+                >
                   C
                 </div>
                 <span className="font-extrabold text-lg text-cocoa-ink tracking-tight">
-                  Cove Notes
+                  {MESSAGES.APP_NAME}
                 </span>
               </motion.div>
             )}
@@ -42,13 +46,14 @@ export const Sidebar: React.FC = () => {
             <Tooltip.Trigger asChild>
               <button
                 type="button"
+                aria-label={isCollapsed ? MESSAGES.EXPAND_SIDEBAR : MESSAGES.COLLAPSE_SIDEBAR}
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="p-1.5 rounded-[10px] bg-cream-paper border border-charcoal text-charcoal shadow-paper-lift hover:scale-105 transition-transform outline-none"
               >
                 {isCollapsed ? (
-                  <PanelLeftOpen className="w-4 h-4" />
+                  <PanelLeftOpen className="w-4 h-4" aria-hidden="true" />
                 ) : (
-                  <PanelLeftClose className="w-4 h-4" />
+                  <PanelLeftClose className="w-4 h-4" aria-hidden="true" />
                 )}
               </button>
             </Tooltip.Trigger>
@@ -58,7 +63,7 @@ export const Sidebar: React.FC = () => {
                 sideOffset={8}
                 className="z-50 px-2.5 py-1 rounded-[8px] bg-charcoal text-cream-paper text-[10px] font-bold shadow-md outline-none"
               >
-                {isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                {isCollapsed ? MESSAGES.EXPAND_SIDEBAR : MESSAGES.COLLAPSE_SIDEBAR}
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
@@ -71,11 +76,12 @@ export const Sidebar: React.FC = () => {
             <Tooltip.Trigger asChild>
               <button
                 type="button"
+                aria-label="Quick Search"
                 onClick={() => setQuickSearchOpen(true)}
                 className="w-full flex items-center justify-between px-3 py-2 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal text-xs font-semibold text-cocoa-ink hover:bg-cream-paper transition-all outline-none"
               >
                 <div className="flex items-center gap-2 truncate">
-                  <Search className="w-4 h-4 text-marker-orange" />
+                  <Search className="w-4 h-4 text-marker-orange" aria-hidden="true" />
                   {!isCollapsed && <span>Quick Search...</span>}
                 </div>
                 {!isCollapsed && (

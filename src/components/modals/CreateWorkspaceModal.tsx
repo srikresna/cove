@@ -4,6 +4,7 @@ import EmojiPicker from "emoji-picker-react";
 import { Plus, Smile, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { MESSAGES } from "../../constants/messages";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
 const COLORS = ["#ff6f1e", "#a594f9", "#ff70a6", "#ff9770", "#ffd670", "#70d6ff", "#b8f2e6"];
@@ -35,19 +36,21 @@ export const CreateWorkspaceModal: React.FC = () => {
               <div
                 className="w-8 h-8 rounded-[8px] border border-charcoal flex items-center justify-center text-lg shadow-sm"
                 style={{ backgroundColor: `${selectedColor}30` }}
+                aria-hidden="true"
               >
                 {selectedEmoji}
               </div>
               <Dialog.Title className="text-lg font-extrabold text-cocoa-ink">
-                New Workspace
+                {MESSAGES.CREATE_WORKSPACE_TITLE}
               </Dialog.Title>
             </div>
             <Dialog.Close asChild>
               <button
                 type="button"
+                aria-label="Close modal"
                 className="p-1.5 rounded-[12px] text-charcoal hover:bg-dew-drop outline-none"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </Dialog.Close>
           </div>
@@ -58,7 +61,7 @@ export const CreateWorkspaceModal: React.FC = () => {
                 htmlFor="ws-name-input"
                 className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5"
               >
-                Workspace Name
+                {MESSAGES.WORKSPACE_NAME_LABEL}
               </label>
               <input
                 id="ws-name-input"
@@ -73,19 +76,22 @@ export const CreateWorkspaceModal: React.FC = () => {
 
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
-                Pick Icon Emoji
+                {MESSAGES.WORKSPACE_EMOJI_LABEL}
               </span>
               <Popover.Root>
                 <Popover.Trigger asChild>
                   <button
                     type="button"
+                    aria-label="Choose Emoji Icon"
                     className="w-full flex items-center justify-between px-4 py-2.5 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal text-xs font-bold text-cocoa-ink outline-none hover:bg-cream-paper transition-all"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">{selectedEmoji}</span>
+                      <span className="text-xl" aria-hidden="true">
+                        {selectedEmoji}
+                      </span>
                       <span>Choose Emoji Icon</span>
                     </div>
-                    <Smile className="w-4 h-4 text-marker-orange" />
+                    <Smile className="w-4 h-4 text-marker-orange" aria-hidden="true" />
                   </button>
                 </Popover.Trigger>
                 <Popover.Portal>
@@ -106,13 +112,14 @@ export const CreateWorkspaceModal: React.FC = () => {
 
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
-                Accent Color
+                {MESSAGES.WORKSPACE_COLOR_LABEL}
               </span>
               <div className="flex gap-2">
                 {COLORS.map((color) => (
                   <button
                     key={color}
                     type="button"
+                    aria-label={`Select accent color ${color}`}
                     onClick={() => setSelectedColor(color)}
                     className={`w-7 h-7 rounded-full transition-transform ${
                       selectedColor === color
@@ -130,7 +137,7 @@ export const CreateWorkspaceModal: React.FC = () => {
                 htmlFor="ws-desc-input"
                 className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5"
               >
-                Description (Optional)
+                {MESSAGES.WORKSPACE_DESC_LABEL}
               </label>
               <input
                 id="ws-desc-input"
@@ -146,17 +153,19 @@ export const CreateWorkspaceModal: React.FC = () => {
               <Dialog.Close asChild>
                 <button
                   type="button"
+                  aria-label={MESSAGES.CANCEL}
                   className="px-4 py-2 rounded-[20px] text-xs font-bold text-charcoal hover:bg-dew-drop"
                 >
-                  Cancel
+                  {MESSAGES.CANCEL}
                 </button>
               </Dialog.Close>
               <button
                 type="submit"
+                aria-label={MESSAGES.CREATE_WORKSPACE_BUTTON}
                 className="flex items-center gap-2 px-5 py-2 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal text-xs font-bold shadow-paper-lift hover:scale-105 transition-transform"
               >
-                <Plus className="w-3.5 h-3.5 text-marker-orange" />
-                <span>Create Workspace</span>
+                <Plus className="w-3.5 h-3.5 text-marker-orange" aria-hidden="true" />
+                <span>{MESSAGES.CREATE_WORKSPACE_BUTTON}</span>
               </button>
             </div>
           </form>

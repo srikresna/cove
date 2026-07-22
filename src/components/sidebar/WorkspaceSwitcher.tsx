@@ -1,6 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Plus, Trash2 } from "lucide-react";
 import type React from "react";
+import { MESSAGES } from "../../constants/messages";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
 export const WorkspaceSwitcher: React.FC = () => {
@@ -14,12 +15,14 @@ export const WorkspaceSwitcher: React.FC = () => {
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
+          aria-label={`Current workspace: ${activeWorkspace?.name || "Workspace"}`}
           className="w-full flex items-center justify-between p-2.5 rounded-[12px] bg-cream-paper border-[1.5px] border-charcoal shadow-card-subtle hover:scale-[1.01] transition-transform duration-200 group outline-none"
         >
           <div className="flex items-center gap-3 overflow-hidden">
             <div
               className="w-8 h-8 rounded-[8px] border border-charcoal flex items-center justify-center text-lg shadow-sm flex-shrink-0"
               style={{ backgroundColor: `${activeWorkspace?.color || "#ff6f1e"}25` }}
+              aria-hidden="true"
             >
               {activeWorkspace?.emoji || "🚀"}
             </div>
@@ -32,7 +35,10 @@ export const WorkspaceSwitcher: React.FC = () => {
               </div>
             </div>
           </div>
-          <ChevronDown className="w-4 h-4 text-charcoal transition-transform duration-200 flex-shrink-0" />
+          <ChevronDown
+            className="w-4 h-4 text-charcoal transition-transform duration-200 flex-shrink-0"
+            aria-hidden="true"
+          />
         </button>
       </DropdownMenu.Trigger>
 
@@ -50,17 +56,21 @@ export const WorkspaceSwitcher: React.FC = () => {
             {workspaces.map((ws) => {
               const isActive = ws.id === activeWorkspaceId;
               return (
-                <DropdownMenu.Item
+                <div
                   key={ws.id}
-                  onSelect={() => setActiveWorkspace(ws.id)}
-                  className={`w-full flex items-center justify-between p-2 rounded-[10px] cursor-pointer outline-none border-[1.5px] transition-all ${
+                  className={`w-full flex items-center justify-between p-2 rounded-[10px] border-[1.5px] transition-all ${
                     isActive
                       ? "bg-dew-drop border-charcoal text-cocoa-ink font-bold"
                       : "border-transparent hover:bg-dew-drop text-charcoal"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 text-left truncate min-w-0">
-                    <span className="text-base flex-shrink-0">{ws.emoji}</span>
+                  <DropdownMenu.Item
+                    onSelect={() => setActiveWorkspace(ws.id)}
+                    className="flex-1 flex items-center gap-2.5 text-left truncate min-w-0 cursor-pointer outline-none"
+                  >
+                    <span className="text-base flex-shrink-0" aria-hidden="true">
+                      {ws.emoji}
+                    </span>
                     <div className="truncate min-w-0">
                       <div className="text-xs truncate">{ws.name}</div>
                       {ws.description && (
@@ -69,24 +79,27 @@ export const WorkspaceSwitcher: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {isActive && <Check className="w-4 h-4 text-marker-orange" />}
+                  </DropdownMenu.Item>
+
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-1">
+                    {isActive && (
+                      <Check className="w-4 h-4 text-marker-orange" aria-hidden="true" />
+                    )}
                     {workspaces.length > 1 && (
                       <button
                         type="button"
+                        aria-label={`Delete workspace ${ws.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteWorkspace(ws.id);
                         }}
-                        title="Delete Workspace"
-                        className="p-1 rounded text-slate-400 hover:text-red-600"
+                        className="p-1 rounded text-slate-400 hover:text-red-600 outline-none"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     )}
                   </div>
-                </DropdownMenu.Item>
+                </div>
               );
             })}
           </div>
@@ -96,8 +109,8 @@ export const WorkspaceSwitcher: React.FC = () => {
               onSelect={() => setCreateModalOpen(true)}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal text-xs font-bold transition-transform hover:scale-105 shadow-paper-lift cursor-pointer outline-none"
             >
-              <Plus className="w-4 h-4 text-marker-orange" />
-              <span>Create Workspace</span>
+              <Plus className="w-4 h-4 text-marker-orange" aria-hidden="true" />
+              <span>{MESSAGES.CREATE_WORKSPACE_TITLE}</span>
             </DropdownMenu.Item>
           </div>
         </DropdownMenu.Content>

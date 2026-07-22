@@ -3,6 +3,7 @@ import { Command } from "cmdk";
 import { ArrowRight, Search, X } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
+import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
@@ -60,24 +61,25 @@ export const QuickSearchModal: React.FC = () => {
         <Dialog.Content className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg bg-cream-paper rounded-[16px] border-[1.5px] border-charcoal shadow-card-subtle overflow-hidden outline-none">
           <Command className="w-full">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-charcoal/20">
-              <Search className="w-5 h-5 text-marker-orange" />
+              <Search className="w-5 h-5 text-marker-orange" aria-hidden="true" />
               <Command.Input
-                placeholder="Type to search notes across all workspaces..."
+                placeholder={MESSAGES.QUICK_SEARCH_PLACEHOLDER}
                 className="flex-1 bg-transparent outline-none text-sm font-semibold text-cocoa-ink placeholder-slate-400"
               />
               <Dialog.Close asChild>
                 <button
                   type="button"
+                  aria-label="Close search modal"
                   className="p-1 rounded-lg text-charcoal hover:bg-dew-drop outline-none"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" aria-hidden="true" />
                 </button>
               </Dialog.Close>
             </div>
 
             <Command.List className="max-h-80 overflow-y-auto p-2 space-y-1">
               <Command.Empty className="p-8 text-center text-xs text-slate-400">
-                No notes found matching your search.
+                {MESSAGES.QUICK_SEARCH_EMPTY}
               </Command.Empty>
 
               {notes.map((note) => {
@@ -95,10 +97,12 @@ export const QuickSearchModal: React.FC = () => {
                     className="w-full flex items-center justify-between p-3 rounded-[12px] hover:bg-dew-drop border border-transparent hover:border-charcoal text-left transition-colors cursor-pointer group outline-none aria-selected:bg-dew-drop aria-selected:border-charcoal"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xl flex-shrink-0">{note.icon || "📝"}</span>
+                      <span className="text-xl flex-shrink-0" aria-hidden="true">
+                        {note.icon || "📝"}
+                      </span>
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-cocoa-ink truncate">
-                          {note.title || "Untitled Note"}
+                          {note.title || MESSAGES.UNTITLED_NOTE}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                           <span className="px-1.5 py-0.5 rounded-[6px] bg-cream-paper border border-charcoal text-[10px] font-semibold">
@@ -107,7 +111,10 @@ export const QuickSearchModal: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-marker-orange opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight
+                      className="w-4 h-4 text-marker-orange opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-hidden="true"
+                    />
                   </Command.Item>
                 );
               })}

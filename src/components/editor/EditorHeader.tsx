@@ -3,6 +3,7 @@ import EmojiPicker from "emoji-picker-react";
 import { ArrowRightLeft, Copy, Maximize2, Minimize2, Pin, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
 
@@ -58,6 +59,11 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
     };
   }, []);
 
+  const formattedDate = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(note.updatedAt);
+
   return (
     <div className="mb-6 space-y-4">
       <div
@@ -71,9 +77,10 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             <Popover.Trigger asChild>
               <button
                 type="button"
+                aria-label={MESSAGES.CHANGE_ACCENT}
                 className="px-3 py-1 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-xs font-semibold text-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform outline-none"
               >
-                Change Accent
+                {MESSAGES.CHANGE_ACCENT}
               </button>
             </Popover.Trigger>
             <Popover.Portal>
@@ -86,6 +93,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                   <button
                     key={color}
                     type="button"
+                    aria-label={`Select cover accent color ${color}`}
                     onClick={() => updateNote(note.id, { coverColor: color })}
                     className="w-6 h-6 rounded-full transition-transform hover:scale-125 border border-charcoal"
                     style={{ backgroundColor: color }}
@@ -98,26 +106,26 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              aria-label={isFullWidth ? "Standard Width" : "Wide Width"}
               onClick={onToggleFullWidth}
-              title={isFullWidth ? "Standard Width" : "Wide Width"}
               className="p-1.5 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform text-xs flex items-center gap-1 font-semibold px-2.5"
             >
-              <ArrowRightLeft className="w-3.5 h-3.5" />
-              <span>{isFullWidth ? "Standard" : "Wide"}</span>
+              <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}</span>
             </button>
 
             <button
               type="button"
+              aria-label={isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}
               onClick={onToggleFullscreen}
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               className="p-1.5 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform text-xs flex items-center gap-1 font-semibold px-2.5"
             >
               {isFullscreen ? (
-                <Minimize2 className="w-3.5 h-3.5" />
+                <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" />
               ) : (
-                <Maximize2 className="w-3.5 h-3.5" />
+                <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
               )}
-              <span>{isFullscreen ? "Exit" : "Full Window"}</span>
+              <span>{isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}</span>
             </button>
           </div>
         </div>
@@ -129,6 +137,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             <Popover.Trigger asChild>
               <button
                 type="button"
+                aria-label="Change Note Emoji Icon"
                 className="text-4xl p-2 rounded-[16px] bg-cream-paper border-[1.5px] border-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform flex items-center justify-center min-w-[56px] min-h-[56px] outline-none"
               >
                 {note.icon || "📝"}
@@ -156,56 +165,61 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
         <div className="flex items-center gap-1.5 bg-dew-drop p-1.5 rounded-[20px] border-[1.5px] border-charcoal">
           <button
             type="button"
+            aria-label={note.isPinned ? MESSAGES.UNPIN_NOTE : MESSAGES.PIN_NOTE}
             onClick={() => togglePinNote(note.id)}
-            title={note.isPinned ? "Unpin Note" : "Pin Note"}
             className={`p-2 rounded-[14px] transition-all hover:scale-105 active:scale-95 ${
               note.isPinned
                 ? "bg-marker-orange text-cream-paper font-bold"
                 : "text-charcoal hover:bg-cream-paper"
             }`}
           >
-            <Pin className="w-4 h-4" />
+            <Pin className="w-4 h-4" aria-hidden="true" />
           </button>
 
           <button
             type="button"
+            aria-label={note.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}
             onClick={() => toggleFavoriteNote(note.id)}
-            title={note.isFavorite ? "Unfavorite" : "Favorite"}
             className={`p-2 rounded-[14px] transition-all hover:scale-105 active:scale-95 ${
               note.isFavorite
                 ? "bg-marker-orange text-cream-paper font-bold"
                 : "text-charcoal hover:bg-cream-paper"
             }`}
           >
-            <Star className="w-4 h-4" />
+            <Star className="w-4 h-4" aria-hidden="true" />
           </button>
 
           <button
             type="button"
+            aria-label={MESSAGES.DUPLICATE_NOTE}
             onClick={() => duplicateNote(note.id)}
-            title="Duplicate Note"
             className="p-2 rounded-[14px] text-charcoal hover:bg-cream-paper transition-all hover:scale-105 active:scale-95"
           >
-            <Copy className="w-4 h-4" />
+            <Copy className="w-4 h-4" aria-hidden="true" />
           </button>
 
           <button
             type="button"
+            aria-label={MESSAGES.DELETE_NOTE}
             onClick={() => deleteNote(note.id)}
-            title="Delete Note"
             className="p-2 rounded-[14px] text-charcoal hover:text-red-600 hover:bg-red-50 transition-all hover:scale-105 active:scale-95"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
 
       <div className="pl-[54px] pr-0">
+        <label htmlFor="note-title-input" className="sr-only">
+          Note Title
+        </label>
         <input
+          id="note-title-input"
           type="text"
           value={title}
           onChange={handleTitleChange}
-          placeholder="Untitled Note"
+          placeholder={MESSAGES.UNTITLED_NOTE}
+          aria-label="Note Title"
           className="w-full text-3xl sm:text-4xl font-extrabold bg-transparent outline-none border-b-[2px] border-transparent focus:border-marker-orange transition-colors py-1 text-cocoa-ink placeholder-slate-300"
         />
         <div className="flex items-center gap-4 mt-2 text-xs font-medium text-slate-500">
@@ -213,13 +227,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           <span>•</span>
           <span>{characterCount} characters</span>
           <span>•</span>
-          <span>
-            Updated{" "}
-            {new Date(note.updatedAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
+          <span>Updated {formattedDate}</span>
         </div>
       </div>
     </div>

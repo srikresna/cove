@@ -7,6 +7,19 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
+      "a11y": {
+        "useSemanticElements": "error",
+        "useButtonType": "error"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "error"
+      },
+      "style": {
+        "useImportType": "error"
+      },
       "complexity": {
         "noStaticOnlyClass": "off"
       }
