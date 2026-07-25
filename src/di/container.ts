@@ -10,6 +10,7 @@ import { NoteService } from "../services/NoteService";
 import { VaultService } from "../services/VaultService";
 import { WorkspaceService } from "../services/WorkspaceService";
 import { CryptoVault } from "../services/vault/CryptoVault";
+import { DeviceBind } from "../services/vault/DeviceBind";
 import { KeyringKeychainStore } from "../services/vault/KeyringKeychainStore";
 
 // --- Vault singletons (constructed first; CryptoVault is injected into the note
@@ -27,11 +28,13 @@ export const workspaceService: IWorkspaceService = new WorkspaceService(
   workspaceRepository,
   noteRepository,
 );
+const deviceBind = new DeviceBind();
 export const vaultService = new VaultService(
   cryptoVault,
   kmsRepository,
   keychainStore,
   migrationRepository,
+  deviceBind,
 );
 
 export const createNoteService = (repo: INoteRepository): INoteService => new NoteService(repo);

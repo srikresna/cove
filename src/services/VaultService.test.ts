@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { EncryptionError, ValidationError } from "../errors/AppError";
+import { IdentityDeviceBind } from "../test/fakes/IdentityDeviceBind";
 import { InMemoryKeychainStore } from "../test/fakes/InMemoryKeychainStore";
 import { InMemoryKmsRepository } from "../test/fakes/InMemoryKmsRepository";
 import { InMemoryMigrationRepository } from "../test/fakes/InMemoryMigrationRepository";
@@ -17,7 +18,8 @@ function makeVault() {
   const keychain = new InMemoryKeychainStore();
   const migration = new InMemoryMigrationRepository();
   const crypto = new CryptoVault(kms);
-  const service = new VaultService(crypto, kms, keychain, migration);
+  const deviceBind = new IdentityDeviceBind();
+  const service = new VaultService(crypto, kms, keychain, migration, deviceBind);
   return { kms, keychain, migration, crypto, service };
 }
 

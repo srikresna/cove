@@ -2,6 +2,7 @@ import { EncryptionError, ValidationError } from "../errors/AppError";
 import type { IKmsRepository, KmsRecord } from "../repositories/IKmsRepository";
 import type { IMigrationRepository } from "../repositories/IMigrationRepository";
 import type { IVaultService, VaultStatus } from "./IVaultService";
+import type { IDeviceBind } from "./vault/IDeviceBind";
 import type { IEncryptionService } from "./vault/IEncryptionService";
 import { type IKeychainStore, KEYRING_SERVICE, KEYRING_USERS } from "./vault/IKeychainStore";
 import {
@@ -65,6 +66,7 @@ export class VaultService implements IVaultService {
     private readonly kms: IKmsRepository,
     private readonly keychain: IKeychainStore,
     private readonly migrationRepo: IMigrationRepository,
+    private readonly deviceBind: IDeviceBind,
   ) {}
 
   isUnlocked(): boolean {
@@ -140,7 +142,8 @@ export class VaultService implements IVaultService {
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
 
     // Recovery backup (accepted threat model: raw DEK in OS keychain; trusted-device recovery).
-    await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(dek.rawKey));
+    const wrappedDek = await this.deviceBind.wrap(dek.rawKey);
+    await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(wrappedDek));
 
     // Bridge + migrate any legacy (old per-device-key) notes, then purge the legacy key.
     const legacyHex = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -236,7 +239,13 @@ export class VaultService implements IVaultService {
     const backup = await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup);
     if (!backup) return false; // no trusted-device backup -> fall back to passphrase
     try {
-      const rawDek = base64ToBytes(backup);
+      const wrapped = base64ToBytes(backup);
+      let rawDek: Bytes;
+      try {
+        rawDek = await this.deviceBind.unwrap(wrapped);
+      } catch {
+        rawDek = wrapped; // old raw-DEK backup (pre-device-bind migration)
+      }
       await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
       return true;
     } catch {
@@ -269,7 +278,8 @@ export class VaultService implements IVaultService {
       updatedAt: Date.now(),
     };
     await this.kms.save(updated);
-    await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(this.rawDek));
+    const rewrapped = await this.deviceBind.wrap(this.rawDek);
+    await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(rewrapped));
   }
 
   async recoverViaKeychain(newPassphrase: string): Promise<void> {
@@ -280,7 +290,7 @@ export class VaultService implements IVaultService {
     const check = validatePassphrase(newPassphrase);
     if (!check.ok) throw new ValidationError(check.error ?? "Invalid passphrase");
 
-    const rawDek = base64ToBytes(backupB64);
+    const rawDek = await this.deviceBind.unwrap(base64ToBytes(backupB64));
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
 
     const iterations = PBKDF2_ITERATIONS;
