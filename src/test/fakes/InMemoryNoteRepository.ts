@@ -33,6 +33,15 @@ export class InMemoryNoteRepository implements INoteRepository {
     return found ? { ...found } : null;
   }
 
+  async findRecentForSearch(limit: number): Promise<Note[]> {
+    this.callLog.push(`findRecentForSearch:${limit}`);
+    if (this.shouldFail) throw new Error("Fake repo error: findRecentForSearch");
+    return [...this.notes]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, limit)
+      .map((n) => ({ ...n }));
+  }
+
   async createNote(noteInput: Omit<Note, "createdAt" | "updatedAt">): Promise<Note> {
     this.callLog.push(`createNote:${noteInput.id}`);
     if (this.shouldFail) throw new Error("Fake repo error: createNote");

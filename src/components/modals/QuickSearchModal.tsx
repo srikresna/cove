@@ -2,47 +2,22 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Command } from "cmdk";
 import { ArrowRight, Search, X } from "lucide-react";
 import type React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { Logger } from "../../services/Logger";
+import { noteService } from "../../di/container";
+import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
-function extractPlainText(content: string): string {
-  if (!content) return "";
-  try {
-    const trimmed = content.trim();
-    if (trimmed.startsWith("[")) {
-      const blocks = JSON.parse(trimmed);
-      let text = "";
-      if (Array.isArray(blocks)) {
-        for (const block of blocks) {
-          if (block.content && Array.isArray(block.content)) {
-            for (const inline of block.content) {
-              if (
-                inline &&
-                typeof inline === "object" &&
-                "text" in inline &&
-                typeof inline.text === "string"
-              ) {
-                text += `${inline.text} `;
-              }
-            }
-          }
-        }
-      }
-      return text;
-    }
-  } catch (err) {
-    Logger.error("extractPlainText parse error", err);
-  }
-  return content.replace(/<[^>]*>/g, " ");
-}
+const SEARCH_DEBOUNCE_MS = 250;
 
 export const QuickSearchModal: React.FC = () => {
   const { isQuickSearchOpen, setQuickSearchOpen, workspaces, setActiveWorkspace } =
     useWorkspaceStore();
-  const { notes, setActiveNoteId } = useNoteStore();
+  const { setActiveNoteId } = useNoteStore();
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<NoteSearchHit[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -55,15 +30,52 @@ export const QuickSearchModal: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isQuickSearchOpen, setQuickSearchOpen]);
 
+  useEffect(() => {
+    if (!isQuickSearchOpen) {
+      setQuery("");
+      setHits([]);
+    }
+  }, [isQuickSearchOpen]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setHits([]);
+      return;
+    }
+    setLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        setHits(await noteService.searchAcrossWorkspaces(q));
+      } catch {
+        setHits([]);
+      } finally {
+        setLoading(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const openHit = (hit: NoteSearchHit) => {
+    const ws = workspaces.find((w) => w.id === hit.workspaceId);
+    if (ws) setActiveWorkspace(ws.id);
+    setActiveNoteId(hit.id);
+    setQuickSearchOpen(false);
+  };
+
+  const trimmed = query.trim();
+
   return (
     <Dialog.Root open={isQuickSearchOpen} onOpenChange={setQuickSearchOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-charcoal/40 backdrop-blur-sm" />
         <Dialog.Content className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg bg-cream-paper rounded-[16px] border-[1.5px] border-charcoal shadow-card-subtle overflow-hidden outline-none">
-          <Command className="w-full">
+          <Command className="w-full" shouldFilter={false}>
             <div className="flex items-center gap-3 px-4 py-3 border-b border-charcoal/20">
               <Search className="w-5 h-5 text-marker-orange" aria-hidden="true" />
               <Command.Input
+                value={query}
+                onValueChange={setQuery}
                 placeholder={MESSAGES.QUICK_SEARCH_PLACEHOLDER}
                 className="flex-1 bg-transparent outline-none text-sm font-semibold text-cocoa-ink placeholder-slate-400"
               />
@@ -79,41 +91,46 @@ export const QuickSearchModal: React.FC = () => {
             </div>
 
             <Command.List className="max-h-80 overflow-y-auto p-2 space-y-1">
-              <Command.Empty className="p-8 text-center text-xs text-slate-400">
-                {MESSAGES.QUICK_SEARCH_EMPTY}
-              </Command.Empty>
-
-              {notes.map((note) => {
-                const ws = workspaces.find((w) => w.id === note.workspaceId);
-                const plainText = extractPlainText(note.content);
+              {!trimmed && (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  {MESSAGES.QUICK_SEARCH_PLACEHOLDER}
+                </div>
+              )}
+              {trimmed && loading && (
+                <div className="p-8 text-center text-xs text-slate-400">Searching…</div>
+              )}
+              {trimmed && !loading && hits.length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  {MESSAGES.QUICK_SEARCH_EMPTY}
+                </div>
+              )}
+              {hits.map((hit) => {
+                const ws = workspaces.find((w) => w.id === hit.workspaceId);
                 return (
                   <Command.Item
-                    key={note.id}
-                    value={`${note.title} ${plainText}`}
-                    onSelect={() => {
-                      if (ws) setActiveWorkspace(ws.id);
-                      setActiveNoteId(note.id);
-                      setQuickSearchOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-[12px] hover:bg-dew-drop border border-transparent hover:border-charcoal text-left transition-colors cursor-pointer group outline-none aria-selected:bg-dew-drop aria-selected:border-charcoal"
+                    key={hit.id}
+                    value={`${hit.title} ${hit.snippet}`}
+                    onSelect={() => openHit(hit)}
+                    className="w-full flex items-start gap-3 p-3 rounded-[12px] hover:bg-dew-drop border border-transparent hover:border-charcoal text-left cursor-pointer outline-none aria-selected:bg-dew-drop aria-selected:border-charcoal"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xl flex-shrink-0" aria-hidden="true">
-                        {note.icon || "📝"}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-cocoa-ink truncate">
-                          {note.title || MESSAGES.UNTITLED_NOTE}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                          <span className="px-1.5 py-0.5 rounded-[6px] bg-cream-paper border border-charcoal text-[10px] font-semibold">
-                            {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
-                          </span>
-                        </div>
+                    <span className="text-xl flex-shrink-0" aria-hidden="true">
+                      {hit.icon || "📝"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold text-cocoa-ink truncate">
+                        {hit.title || MESSAGES.UNTITLED_NOTE}
+                      </div>
+                      {hit.snippet && (
+                        <div className="text-[11px] text-slate-500 truncate">{hit.snippet}</div>
+                      )}
+                      <div className="mt-0.5">
+                        <span className="px-1.5 py-0.5 rounded-[6px] bg-cream-paper border border-charcoal text-[10px] font-semibold">
+                          {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
+                        </span>
                       </div>
                     </div>
                     <ArrowRight
-                      className="w-4 h-4 text-marker-orange opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="w-4 h-4 text-marker-orange opacity-40"
                       aria-hidden="true"
                     />
                   </Command.Item>

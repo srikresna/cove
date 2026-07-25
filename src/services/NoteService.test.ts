@@ -112,4 +112,34 @@ describe("NoteService", () => {
 
     await expect(service.listMetadataByWorkspace("ws-1")).rejects.toThrow();
   });
+
+  it("searchAcrossWorkspaces matches title and body, returning snippet DTOs", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo);
+
+    fakeRepo.notes.push({
+      id: "n-search",
+      workspaceId: "ws-1",
+      title: "Roadmap",
+      content:
+        '[{"type":"paragraph","content":[{"type":"text","text":"Launch the encrypted vault feature soon"}]}]',
+      icon: "🚀",
+      isPinned: false,
+      isFavorite: false,
+      createdAt: 1000,
+      updatedAt: 3000,
+    });
+
+    const byTitle = await service.searchAcrossWorkspaces("roadmap");
+    expect(byTitle).toHaveLength(1);
+    expect(byTitle[0]?.id).toBe("n-search");
+    expect(byTitle[0]?.snippet).toBe(""); // title-only match -> empty snippet
+
+    const byBody = await service.searchAcrossWorkspaces("vault");
+    expect(byBody).toHaveLength(1);
+    expect(byBody[0]?.snippet.toLowerCase()).toContain("vault");
+
+    const none = await service.searchAcrossWorkspaces("nonexistent-term-xyz");
+    expect(none).toHaveLength(0);
+  });
 });

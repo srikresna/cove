@@ -86,6 +86,19 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
+  async findRecentForSearch(limit: number): Promise<Note[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT * FROM notes ORDER BY updatedAt DESC LIMIT ?",
+        [limit],
+      );
+      return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
+    } catch (err) {
+      throw toPersistenceError("findRecentForSearch", err);
+    }
+  }
+
   async createNote(noteInput: Omit<Note, "createdAt" | "updatedAt">): Promise<Note> {
     const db = await this.getDb();
     const now = Date.now();

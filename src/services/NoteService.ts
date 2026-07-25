@@ -1,5 +1,6 @@
 import { NotFoundError } from "../domain/errors";
 import type { Note } from "../domain/note/Note";
+import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import {
   DEFAULT_NOTE_COVER_COLOR,
   DEFAULT_NOTE_ICON,
@@ -9,6 +10,7 @@ import {
   makeNoteId,
 } from "../domain/note/notePolicy";
 import type { INoteRepository } from "../repositories/INoteRepository";
+import { buildSnippet, extractPlainText } from "../utils/plainText";
 import type { INoteService } from "./INoteService";
 
 export class NoteService implements INoteService {
@@ -20,6 +22,28 @@ export class NoteService implements INoteService {
 
   async getNote(id: string): Promise<Note | null> {
     return this.notes.getNoteById(id);
+  }
+
+  async searchAcrossWorkspaces(query: string): Promise<NoteSearchHit[]> {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const candidates = await this.notes.findRecentForSearch(100);
+    const hits: NoteSearchHit[] = [];
+    for (const note of candidates) {
+      const plain = extractPlainText(note.content);
+      const titleMatch = note.title.toLowerCase().includes(q);
+      const bodyMatch = plain.toLowerCase().includes(q);
+      if (titleMatch || bodyMatch) {
+        hits.push({
+          id: note.id,
+          workspaceId: note.workspaceId,
+          title: note.title,
+          icon: note.icon,
+          snippet: bodyMatch ? buildSnippet(plain, q) : "",
+        });
+      }
+    }
+    return hits;
   }
 
   async createNote(
