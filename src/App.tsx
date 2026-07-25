@@ -23,7 +23,8 @@ const BlockNoteEditor = lazy(() =>
 export const AppContent: React.FC = () => {
   const { activeWorkspaceId, isDarkMode, fetchWorkspaces, workspaces, setCreateModalOpen } =
     useWorkspaceStore();
-  const { notes, activeNoteId, setActiveNoteId, createNote, fetchNotes } = useNoteStore();
+  const { notes, activeNoteId, setActiveNoteId, createNote, fetchNotes, loadActiveNoteContent } =
+    useNoteStore();
 
   useEffect(() => {
     fetchWorkspaces();
@@ -34,6 +35,15 @@ export const AppContent: React.FC = () => {
       fetchNotes(activeWorkspaceId);
     }
   }, [activeWorkspaceId, fetchNotes]);
+
+  // When the active note changes, load its FULL decrypted content from the DB.
+  // fetchNotes returns metadata-only (content=""); this replaces it with the
+  // decrypted body so the editor has something to render.
+  useEffect(() => {
+    if (activeNoteId) {
+      loadActiveNoteContent(activeNoteId);
+    }
+  }, [activeNoteId, loadActiveNoteContent]);
 
   const workspaceNotes: Note[] = notes.filter((n) => n.workspaceId === activeWorkspaceId);
   const firstWorkspaceNote = workspaceNotes[0];

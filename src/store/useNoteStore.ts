@@ -10,6 +10,7 @@ interface NoteState {
   activeNoteId: string | null;
   setActiveNoteId: (id: string | null) => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
+  loadActiveNoteContent: (id: string) => Promise<void>;
   createNote: (
     workspaceId: string,
     title?: string,
@@ -34,6 +35,24 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       const notes = await noteService.listMetadataByWorkspace(workspaceId);
       const first = notes[0];
       set({ notes, activeNoteId: first ? first.id : null });
+    } catch (err) {
+      const p = presentError(err);
+      useNotificationStore.getState().pushToast({
+        kind: p.kind,
+        title: p.toastTitle,
+        description: p.toastDescription,
+      });
+    }
+  },
+
+  loadActiveNoteContent: async (id) => {
+    try {
+      const note = await noteService.getNote(id);
+      if (note) {
+        set((state) => ({
+          notes: state.notes.map((n) => (n.id === id ? note : n)),
+        }));
+      }
     } catch (err) {
       const p = presentError(err);
       useNotificationStore.getState().pushToast({
