@@ -1,7 +1,9 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Lock, X } from "lucide-react";
+import { Download, Lock, X } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
+import { exportBackup } from "../../services/vault/backup";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -11,6 +13,7 @@ export const SettingsModal: React.FC = () => {
   const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
   const setAutoUnlockOnLaunch = useSettingsStore((s) => s.setAutoUnlockOnLaunch);
   const lock = useVaultStore((s) => s.lock);
+  const [backupStatus, setBackupStatus] = useState<"idle" | "saving">("idle");
 
   return (
     <Dialog.Root open={isSettingsOpen} onOpenChange={setSettingsOpen}>
@@ -68,6 +71,25 @@ export const SettingsModal: React.FC = () => {
           >
             <Lock className="h-4 w-4 text-marker-orange" aria-hidden="true" />
             <span>{MESSAGES.SETTINGS_LOCK_NOW}</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={backupStatus === "saving"}
+            onClick={async () => {
+              setBackupStatus("saving");
+              try {
+                await exportBackup();
+              } catch {
+                /* ignore — dialog may have been cancelled */
+              } finally {
+                setBackupStatus("idle");
+              }
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-charcoal bg-cream-paper px-4 py-2.5 text-xs font-bold text-cocoa-ink shadow-paper-lift transition-transform hover:scale-105 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4 text-marker-orange" aria-hidden="true" />
+            <span>{backupStatus === "saving" ? "Exporting…" : "Export Encrypted Backup"}</span>
           </button>
         </Dialog.Content>
       </Dialog.Portal>

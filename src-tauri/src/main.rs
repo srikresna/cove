@@ -14,6 +14,7 @@ fn main() {
   let app = tauri::Builder::default()
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_keyring::init())
+    .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![
         dpapi::device_wrap,
         dpapi::device_unwrap

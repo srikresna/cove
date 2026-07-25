@@ -11,6 +11,7 @@
     "sql:allow-select",
     "keyring:allow-set-password",
     "keyring:allow-get-password",
-    "keyring:allow-delete-password"
+    "keyring:allow-delete-password",
+    "dialog:default"
   ]
 }
