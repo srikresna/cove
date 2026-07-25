@@ -27,9 +27,8 @@ export class InMemoryKmsRepository implements IKmsRepository {
     return { ...this.record };
   }
 
-  async incrementIvCounter(): Promise<number> {
+  async setIvCounter(n: number): Promise<void> {
     if (!this.record) throw new Error("InMemoryKmsRepository: no kms record");
-    this.record.ivCounter += 1;
-    return this.record.ivCounter;
+    this.record.ivCounter = n;
   }
 }

@@ -107,7 +107,7 @@ export class VaultService implements IVaultService {
 
   private async setSessionDek(rawDek: Bytes, cryptoKey: CryptoKey): Promise<void> {
     this.rawDek = rawDek;
-    this.crypto.setSessionKeys({ dek: cryptoKey });
+    await this.crypto.setSessionKeys({ dek: cryptoKey });
   }
 
   async setupPassphrase(passphrase: string): Promise<void> {

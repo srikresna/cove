@@ -38,9 +38,8 @@ export interface IKmsRepository {
   /** Partial update of mutable fields; returns the resulting record. */
   update(patch: KmsPatch): Promise<KmsRecord>;
   /**
-   * Atomically read-and-increment the per-DEK IV counter inside a transaction,
-   * returning the NEW value to use as the deterministic AES-GCM IV input.
-   * (NIST SP 800-38D §8.2.1 deterministic-IV mode; prevents catastrophic IV reuse.)
+   * Persist the per-DEK IV counter (single-statement UPDATE, autocommit — no
+   * transaction, to stay safe under tauri-plugin-sql's pooled connections).
    */
-  incrementIvCounter(): Promise<number>;
+  setIvCounter(n: number): Promise<void>;
 }

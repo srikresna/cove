@@ -101,18 +101,12 @@ export class SQLiteKmsRepository implements IKmsRepository {
     }
   }
 
-  async incrementIvCounter(): Promise<number> {
+  async setIvCounter(n: number): Promise<void> {
     try {
-      return await SQLiteDatabase.withTransaction(async (db) => {
-        const rows = await db.select<Array<{ ivCounter: number }>>(
-          "SELECT ivCounter FROM kms WHERE id = 1",
-        );
-        const next = (rows[0]?.ivCounter ?? 0) + 1;
-        await db.execute("UPDATE kms SET ivCounter = ? WHERE id = 1", [next]);
-        return next;
-      });
+      const db = await this.getDb();
+      await db.execute("UPDATE kms SET ivCounter = ? WHERE id = 1", [n]);
     } catch (err) {
-      throw toPersistenceError("kms.incrementIvCounter", err);
+      throw toPersistenceError("kms.setIvCounter", err);
     }
   }
 }
