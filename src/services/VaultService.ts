@@ -13,7 +13,6 @@ import {
   bytesToBase64,
   computeIntegrityMac,
   constantTimeEqual,
-  derivePrk,
   deriveSubkey,
   encodeUtf8,
   generateDek,
@@ -25,10 +24,19 @@ import {
 } from "./vault/crypto";
 import { validatePassphrase } from "./vault/vaultPolicy";
 
-const KDF_VERSION = 1;
-const KDF_ALG = "PBKDF2-SHA256";
+const ARGON2ID_VERSION = 2;
+const ARGON2ID_ALG = "ARGON2ID";
+const ARGON2ID_PARAMS = JSON.stringify({ m_cost: 65536, t_cost: 3, p_cost: 4 });
 const LEGACY_STORAGE_KEY = "cove_device_sec_key";
 const MIGRATION_BATCH = 50;
+
+/** KDF derivation function — injected so tests use JS WebCrypto while production uses Rust invoke. */
+export type KdfDerive = (
+  passphrase: string,
+  salt: Bytes,
+  kdfAlg: string,
+  kdfParamsJson: string,
+) => Promise<Bytes>;
 
 function hexToBytes(hex: string): Bytes {
   const out = new Uint8Array(hex.length / 2);
@@ -54,9 +62,8 @@ interface DerivedKeys {
 
 /**
  * Orchestrates the passphrase vault: setup, unlock, lock, migration of legacy
- * notes, passphrase change, and keychain recovery. Holds the raw DEK in memory
- * for the session so it can be re-wrapped (e.g. on passphrase change) without
- * ever persisting it; cleared on lock. See docs/CRYPTO_VAULT_BLUEPRINT.md.
+ * notes, passphrase change, and keychain recovery. New vaults use Argon2id
+ * (OWASP first-choice KDF, via Rust). Existing PBKDF2 vaults are backward-compat.
  */
 export class VaultService implements IVaultService {
   private rawDek: Bytes | null = null;
@@ -67,6 +74,7 @@ export class VaultService implements IVaultService {
     private readonly keychain: IKeychainStore,
     private readonly migrationRepo: IMigrationRepository,
     private readonly deviceBind: IDeviceBind,
+    private readonly deriveKeyFn: KdfDerive,
   ) {}
 
   isUnlocked(): boolean {
@@ -83,9 +91,10 @@ export class VaultService implements IVaultService {
   private async deriveKeys(
     passphrase: string,
     salt: Bytes,
-    iterations: number,
+    kdfAlg: string,
+    kdfParamsJson: string,
   ): Promise<DerivedKeys> {
-    const prk = await derivePrk(passphrase, salt, iterations);
+    const prk = await this.deriveKeyFn(passphrase, salt, kdfAlg, kdfParamsJson);
     const wrapKey = await importAesGcmKey(await deriveSubkey(prk, "dek-wrap"));
     const macKey = await importHmacKey(await deriveSubkey(prk, "integrity-mac"));
     return { wrapKey, macKey };
@@ -95,13 +104,15 @@ export class VaultService implements IVaultService {
     macKey: CryptoKey,
     saltB64: string,
     iterations: number,
+    kdfVersion: number,
+    kdfAlg: string,
     wrappedDekB64: string,
   ): Promise<string> {
     const fields: Bytes[] = [
       encodeUtf8(saltB64),
       encodeUtf8(String(iterations)),
-      encodeUtf8(String(KDF_VERSION)),
-      encodeUtf8(KDF_ALG),
+      encodeUtf8(String(kdfVersion)),
+      encodeUtf8(kdfAlg),
       encodeUtf8(wrappedDekB64),
     ];
     return bytesToBase64(await computeIntegrityMac(macKey, fields));
@@ -116,19 +127,30 @@ export class VaultService implements IVaultService {
     const check = validatePassphrase(passphrase);
     if (!check.ok) throw new ValidationError(check.error ?? "Invalid passphrase");
 
-    const iterations = PBKDF2_ITERATIONS;
     const salt = generateSalt();
     const saltB64 = bytesToBase64(salt);
-    const { wrapKey, macKey } = await this.deriveKeys(passphrase, salt, iterations);
+    const { wrapKey, macKey } = await this.deriveKeys(
+      passphrase,
+      salt,
+      ARGON2ID_ALG,
+      ARGON2ID_PARAMS,
+    );
     const dek = await generateDek();
     const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, dek.rawKey));
-    const integrityMacB64 = await this.envelopeMac(macKey, saltB64, iterations, wrappedB64);
+    const integrityMacB64 = await this.envelopeMac(
+      macKey,
+      saltB64,
+      0,
+      ARGON2ID_VERSION,
+      ARGON2ID_ALG,
+      wrappedB64,
+    );
 
     const now = Date.now();
     const rec: KmsRecord = {
-      kdfVersion: KDF_VERSION,
-      kdfAlg: KDF_ALG,
-      kdfParamsJson: JSON.stringify({ iterations }),
+      kdfVersion: ARGON2ID_VERSION,
+      kdfAlg: ARGON2ID_ALG,
+      kdfParamsJson: ARGON2ID_PARAMS,
       saltB64,
       ivCounter: 0,
       wrappedDekLocalB64: wrappedB64,
@@ -141,17 +163,15 @@ export class VaultService implements IVaultService {
     await this.kms.save(rec);
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
 
-    // Recovery backup (accepted threat model: raw DEK in OS keychain; trusted-device recovery).
     const wrappedDek = await this.deviceBind.wrap(dek.rawKey);
     await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(wrappedDek));
 
-    // Bridge + migrate any legacy (old per-device-key) notes, then purge the legacy key.
     const legacyHex = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (legacyHex) {
       try {
         await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.legacyBridge, legacyHex);
       } catch {
-        /* bridge is best-effort; local fallback still has the key until purged */
+        /* best-effort */
       }
       await this.migrateLegacy(hexToBytes(legacyHex));
     }
@@ -190,17 +210,20 @@ export class VaultService implements IVaultService {
   async unlock(passphrase: string): Promise<void> {
     const rec = await this.kms.get();
     if (!rec) throw new ValidationError("Vault is not initialized yet.");
-    const iterations = parseIterations(rec.kdfParamsJson);
+    const iterations = rec.kdfAlg === "ARGON2ID" ? 0 : parseIterations(rec.kdfParamsJson);
     const { wrapKey, macKey } = await this.deriveKeys(
       passphrase,
       base64ToBytes(rec.saltB64),
-      iterations,
+      rec.kdfAlg,
+      rec.kdfParamsJson,
     );
 
     const expectedMac = await this.envelopeMac(
       macKey,
       rec.saltB64,
       iterations,
+      rec.kdfVersion,
+      rec.kdfAlg,
       rec.wrappedDekLocalB64 ?? "",
     );
     if (!constantTimeEqual(base64ToBytes(rec.integrityMacB64), base64ToBytes(expectedMac))) {
@@ -235,16 +258,16 @@ export class VaultService implements IVaultService {
 
   async tryAutoUnlock(): Promise<boolean> {
     const rec = await this.kms.get();
-    if (!rec) return false; // vault not initialized -> show setup screen
+    if (!rec) return false;
     const backup = await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup);
-    if (!backup) return false; // no trusted-device backup -> fall back to passphrase
+    if (!backup) return false;
     try {
       const wrapped = base64ToBytes(backup);
       let rawDek: Bytes;
       try {
         rawDek = await this.deviceBind.unwrap(wrapped);
       } catch {
-        rawDek = wrapped; // old raw-DEK backup (pre-device-bind migration)
+        rawDek = wrapped;
       }
       await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
       return true;
@@ -254,25 +277,38 @@ export class VaultService implements IVaultService {
   }
 
   async changePassphrase(oldPassphrase: string, newPassphrase: string): Promise<void> {
-    await this.unlock(oldPassphrase); // verifies old passphrase + installs DEK
+    await this.unlock(oldPassphrase);
     if (!this.rawDek)
       throw new EncryptionError("key_unavailable", "DEK not available for re-wrap.");
     const check = validatePassphrase(newPassphrase);
     if (!check.ok) throw new ValidationError(check.error ?? "Invalid new passphrase");
 
-    const iterations = PBKDF2_ITERATIONS;
     const salt = generateSalt();
     const saltB64 = bytesToBase64(salt);
-    const { wrapKey, macKey } = await this.deriveKeys(newPassphrase, salt, iterations);
+    const { wrapKey, macKey } = await this.deriveKeys(
+      newPassphrase,
+      salt,
+      ARGON2ID_ALG,
+      ARGON2ID_PARAMS,
+    );
     const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, this.rawDek));
-    const integrityMacB64 = await this.envelopeMac(macKey, saltB64, iterations, wrappedB64);
+    const integrityMacB64 = await this.envelopeMac(
+      macKey,
+      saltB64,
+      0,
+      ARGON2ID_VERSION,
+      ARGON2ID_ALG,
+      wrappedB64,
+    );
 
     const existing = await this.kms.get();
     if (!existing) throw new EncryptionError("key_unavailable", "Vault not initialized.");
     const updated: KmsRecord = {
       ...existing,
+      kdfVersion: ARGON2ID_VERSION,
+      kdfAlg: ARGON2ID_ALG,
       saltB64,
-      kdfParamsJson: JSON.stringify({ iterations }),
+      kdfParamsJson: ARGON2ID_PARAMS,
       wrappedDekLocalB64: wrappedB64,
       integrityMacB64,
       updatedAt: Date.now(),
@@ -293,27 +329,40 @@ export class VaultService implements IVaultService {
     const rawDek = await this.deviceBind.unwrap(base64ToBytes(backupB64));
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
 
-    const iterations = PBKDF2_ITERATIONS;
     const salt = generateSalt();
     const saltB64 = bytesToBase64(salt);
-    const { wrapKey, macKey } = await this.deriveKeys(newPassphrase, salt, iterations);
+    const { wrapKey, macKey } = await this.deriveKeys(
+      newPassphrase,
+      salt,
+      ARGON2ID_ALG,
+      ARGON2ID_PARAMS,
+    );
     const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, rawDek));
-    const integrityMacB64 = await this.envelopeMac(macKey, saltB64, iterations, wrappedB64);
+    const integrityMacB64 = await this.envelopeMac(
+      macKey,
+      saltB64,
+      0,
+      ARGON2ID_VERSION,
+      ARGON2ID_ALG,
+      wrappedB64,
+    );
 
     const existing = await this.kms.get();
     const rec: KmsRecord = existing
       ? {
           ...existing,
+          kdfVersion: ARGON2ID_VERSION,
+          kdfAlg: ARGON2ID_ALG,
           saltB64,
-          kdfParamsJson: JSON.stringify({ iterations }),
+          kdfParamsJson: ARGON2ID_PARAMS,
           wrappedDekLocalB64: wrappedB64,
           integrityMacB64,
           updatedAt: Date.now(),
         }
       : {
-          kdfVersion: KDF_VERSION,
-          kdfAlg: KDF_ALG,
-          kdfParamsJson: JSON.stringify({ iterations }),
+          kdfVersion: ARGON2ID_VERSION,
+          kdfAlg: ARGON2ID_ALG,
+          kdfParamsJson: ARGON2ID_PARAMS,
           saltB64,
           ivCounter: 0,
           wrappedDekLocalB64: wrappedB64,

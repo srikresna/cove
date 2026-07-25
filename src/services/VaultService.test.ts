@@ -4,11 +4,18 @@ import { IdentityDeviceBind } from "../test/fakes/IdentityDeviceBind";
 import { InMemoryKeychainStore } from "../test/fakes/InMemoryKeychainStore";
 import { InMemoryKmsRepository } from "../test/fakes/InMemoryKmsRepository";
 import { InMemoryMigrationRepository } from "../test/fakes/InMemoryMigrationRepository";
-import { VaultService } from "./VaultService";
+import { type KdfDerive, VaultService } from "./VaultService";
 import { CryptoVault } from "./vault/CryptoVault";
 import { KEYRING_SERVICE, KEYRING_USERS } from "./vault/IKeychainStore";
-import { bytesToBase64 } from "./vault/crypto";
-import { aesGcmEncrypt, counterToIv, generateDek, importAesGcmKey } from "./vault/crypto";
+import {
+  PBKDF2_ITERATIONS,
+  aesGcmEncrypt,
+  bytesToBase64,
+  counterToIv,
+  derivePrk,
+  generateDek,
+  importAesGcmKey,
+} from "./vault/crypto";
 
 const PW = "correct horse battery 99";
 const PW2 = "new strong passphrase 22";
@@ -19,7 +26,11 @@ function makeVault() {
   const migration = new InMemoryMigrationRepository();
   const crypto = new CryptoVault(kms);
   const deviceBind = new IdentityDeviceBind();
-  const service = new VaultService(crypto, kms, keychain, migration, deviceBind);
+  const deriveKeyFn: KdfDerive = async (passphrase, salt, _kdfAlg, kdfParamsJson) => {
+    const p = JSON.parse(kdfParamsJson) as { iterations?: number };
+    return derivePrk(passphrase, salt, p.iterations ?? PBKDF2_ITERATIONS);
+  };
+  const service = new VaultService(crypto, kms, keychain, migration, deviceBind, deriveKeyFn);
   return { kms, keychain, migration, crypto, service };
 }
 
