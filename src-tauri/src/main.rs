@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod crypto;
 mod dpapi;
 
 use std::panic;
@@ -17,7 +18,8 @@ fn main() {
     .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![
         dpapi::device_wrap,
-        dpapi::device_unwrap
+        dpapi::device_unwrap,
+        crypto::derive_key_kdf
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");
