@@ -9,5 +9,4 @@ export interface INoteRepository {
   updateNote(id: string, updates: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   deleteNotesByWorkspace(workspaceId: string): Promise<void>;
-  searchNotes(query: string): Promise<Note[]>;
 }

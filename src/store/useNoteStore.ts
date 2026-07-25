@@ -8,9 +8,7 @@ import { useSaveStatusStore } from "./useSaveStatusStore";
 interface NoteState {
   notes: Note[];
   activeNoteId: string | null;
-  searchQuery: string;
   setActiveNoteId: (id: string | null) => void;
-  setSearchQuery: (query: string) => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
   createNote: (
     workspaceId: string,
@@ -28,10 +26,8 @@ interface NoteState {
 export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   activeNoteId: null,
-  searchQuery: "",
 
   setActiveNoteId: (id) => set({ activeNoteId: id }),
-  setSearchQuery: (query) => set({ searchQuery: query }),
 
   fetchNotes: async (workspaceId) => {
     try {

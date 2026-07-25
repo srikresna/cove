@@ -1,11 +1,13 @@
 import type { Note } from "../domain/note/Note";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
-import { EncryptionService } from "../services/EncryptionService";
+import type { IEncryptionService } from "../services/vault/IEncryptionService";
 import type { INoteRepository } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
 export class SQLiteNoteRepository implements INoteRepository {
+  constructor(private readonly crypto: IEncryptionService) {}
+
   private getDb() {
     return SQLiteDatabase.getInstance();
   }
@@ -19,7 +21,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       workspaceId: String(row.workspaceId),
       title: String(row.title),
       content: opts.decrypt
-        ? await EncryptionService.decryptPayload(String(row.content ?? ""))
+        ? await this.crypto.decryptPayload(String(row.content ?? ""))
         : row.content != null
           ? String(row.content)
           : "",
@@ -87,7 +89,7 @@ export class SQLiteNoteRepository implements INoteRepository {
   async createNote(noteInput: Omit<Note, "createdAt" | "updatedAt">): Promise<Note> {
     const db = await this.getDb();
     const now = Date.now();
-    const encryptedContent = await EncryptionService.encryptPayload(noteInput.content);
+    const encryptedContent = await this.crypto.encryptPayload(noteInput.content);
 
     const note: Note = {
       ...noteInput,
@@ -97,7 +99,7 @@ export class SQLiteNoteRepository implements INoteRepository {
 
     try {
       await db.execute(
-        `INSERT INTO notes 
+        `INSERT INTO notes
         (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -136,7 +138,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       params.push(updates.title);
     }
     if (updates.content !== undefined) {
-      const encrypted = await EncryptionService.encryptPayload(updates.content);
+      const encrypted = await this.crypto.encryptPayload(updates.content);
       setClauses.push("content = ?");
       params.push(encrypted);
     }
@@ -188,13 +190,5 @@ export class SQLiteNoteRepository implements INoteRepository {
     } catch (err) {
       throw toPersistenceError("deleteNotesByWorkspace", err);
     }
-  }
-
-  async searchNotes(query: string): Promise<Note[]> {
-    const allNotes = await this.getAllNotes();
-    const q = query.toLowerCase();
-    return allNotes.filter(
-      (n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q),
-    );
   }
 }

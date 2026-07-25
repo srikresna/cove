@@ -12,7 +12,14 @@ import { WorkspaceService } from "../services/WorkspaceService";
 import { CryptoVault } from "../services/vault/CryptoVault";
 import { KeyringKeychainStore } from "../services/vault/KeyringKeychainStore";
 
-const noteRepository = new SQLiteNoteRepository();
+// --- Vault singletons (constructed first; CryptoVault is injected into the note
+// repository so note content is encrypted with the session DEK when unlocked). ---
+const kmsRepository = new SQLiteKmsRepository();
+const migrationRepository = new SQLiteMigrationRepository();
+const keychainStore = new KeyringKeychainStore();
+const cryptoVault = new CryptoVault(kmsRepository);
+
+const noteRepository = new SQLiteNoteRepository(cryptoVault);
 const workspaceRepository = new SQLiteWorkspaceRepository();
 
 export const noteService: INoteService = new NoteService(noteRepository);
@@ -20,13 +27,6 @@ export const workspaceService: IWorkspaceService = new WorkspaceService(
   workspaceRepository,
   noteRepository,
 );
-
-// --- Vault wiring (passphrase-based encryption). The note repository still uses
-// the legacy static EncryptionService until the cutover wires it to cryptoVault. ---
-const kmsRepository = new SQLiteKmsRepository();
-const migrationRepository = new SQLiteMigrationRepository();
-const keychainStore = new KeyringKeychainStore();
-const cryptoVault = new CryptoVault(kmsRepository);
 export const vaultService = new VaultService(
   cryptoVault,
   kmsRepository,

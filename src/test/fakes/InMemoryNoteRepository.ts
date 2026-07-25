@@ -64,13 +64,4 @@ export class InMemoryNoteRepository implements INoteRepository {
     if (this.shouldFail) throw new Error("Fake repo error: deleteNotesByWorkspace");
     this.notes = this.notes.filter((n) => n.workspaceId !== workspaceId);
   }
-
-  async searchNotes(query: string): Promise<Note[]> {
-    this.callLog.push(`searchNotes:${query}`);
-    if (this.shouldFail) throw new Error("Fake repo error: searchNotes");
-    const q = query.toLowerCase();
-    return this.notes.filter(
-      (n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q),
-    );
-  }
 }
