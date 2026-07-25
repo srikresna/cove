@@ -34,4 +34,24 @@ export const MESSAGES = {
   NOTES_HEADER: "Notes",
   NO_WORKSPACE_TITLE: "No Workspace Yet",
   NO_WORKSPACE_DESC: "Create your first workspace to start organizing your notes and ideas.",
+  VAULT_INITIALIZING: "Loading vault…",
+  VAULT_UNLOCK_TITLE: "Unlock Cove Notes",
+  VAULT_UNLOCK_DESC: "Enter your passphrase to decrypt your notes.",
+  VAULT_PASSPHRASE_LABEL: "Passphrase",
+  VAULT_PASSPHRASE_PLACEHOLDER: "Enter passphrase",
+  VAULT_CONFIRM_LABEL: "Confirm passphrase",
+  VAULT_UNLOCK_BUTTON: "Unlock",
+  VAULT_UNLOCK_ERROR: "Wrong passphrase. Try again.",
+  VAULT_RECOVER_LINK: "Forgot passphrase?",
+  VAULT_RECOVER_TITLE: "Recover via keychain",
+  VAULT_RECOVER_DESC:
+    "Set a new passphrase. Your notes will be recovered from this device's OS keychain backup.",
+  VAULT_SET_TITLE: "Set a Passphrase",
+  VAULT_SET_DESC:
+    "Choose a strong passphrase to encrypt your notes. It is not stored anywhere — if you forget it, recovery is possible only on this device via the OS keychain backup.",
+  VAULT_SET_BUTTON: "Create Vault",
+  VAULT_SET_MISMATCH: "Passphrases do not match.",
+  VAULT_DISCLOSURE:
+    "Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (PBKDF2, 600k iterations) and held in memory only while unlocked. A recovery backup is stored in your OS keychain (trusted-device recovery, not zero-knowledge).",
+  VAULT_MIGRATING: "Migrating notes to the new vault…",
 } as const;

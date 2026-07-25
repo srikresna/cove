@@ -6,6 +6,7 @@ import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
+import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import type { Note } from "./domain/note/Note";
 import { useNoteStore } from "./store/useNoteStore";
@@ -136,7 +137,9 @@ export const AppContent: React.FC = () => {
 
 export const App: React.FC = () => (
   <ErrorBoundary>
-    <AppContent />
+    <VaultGate>
+      <AppContent />
+    </VaultGate>
   </ErrorBoundary>
 );
 

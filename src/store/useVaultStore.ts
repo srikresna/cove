@@ -8,6 +8,7 @@ interface VaultState {
   refresh: () => Promise<void>;
   setupPassphrase: (passphrase: string) => Promise<void>;
   unlock: (passphrase: string) => Promise<void>;
+  recover: (passphrase: string) => Promise<void>;
   lock: () => Promise<void>;
 }
 
@@ -33,6 +34,10 @@ export const useVaultStore = create<VaultState>((set) => ({
   },
   unlock: async (passphrase) => {
     await vaultService.unlock(passphrase);
+    set({ status: await refreshStatus() });
+  },
+  recover: async (passphrase) => {
+    await vaultService.recoverViaKeychain(passphrase);
     set({ status: await refreshStatus() });
   },
   lock: async () => {
