@@ -6,6 +6,8 @@ export interface IVaultService {
   setupPassphrase(passphrase: string): Promise<void>;
   unlock(passphrase: string): Promise<void>;
   lock(): Promise<void>;
+  /** Trusted-device auto-unlock: install the DEK from the OS keychain backup, no passphrase. */
+  tryAutoUnlock(): Promise<boolean>;
   changePassphrase(oldPassphrase: string, newPassphrase: string): Promise<void>;
   /** Recovery when the passphrase is forgotten: read the DEK backup from the OS keychain (trusted device). */
   recoverViaKeychain(newPassphrase: string): Promise<void>;

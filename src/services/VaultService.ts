@@ -230,6 +230,20 @@ export class VaultService implements IVaultService {
     return Promise.resolve();
   }
 
+  async tryAutoUnlock(): Promise<boolean> {
+    const rec = await this.kms.get();
+    if (!rec) return false; // vault not initialized -> show setup screen
+    const backup = await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup);
+    if (!backup) return false; // no trusted-device backup -> fall back to passphrase
+    try {
+      const rawDek = base64ToBytes(backup);
+      await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async changePassphrase(oldPassphrase: string, newPassphrase: string): Promise<void> {
     await this.unlock(oldPassphrase); // verifies old passphrase + installs DEK
     if (!this.rawDek)

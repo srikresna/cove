@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
+import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
 import { MigrationScreen } from "./MigrationScreen";
 import { SetPassphraseScreen } from "./SetPassphraseScreen";
@@ -21,10 +22,20 @@ export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
   const status = useVaultStore((s) => s.status);
   const init = useVaultStore((s) => s.init);
   const [view, setView] = useState<"main" | "recover">("main");
+  const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
+  const tryAutoUnlock = useVaultStore((s) => s.tryAutoUnlock);
 
   useEffect(() => {
     init();
   }, [init]);
+
+  // After a lock (launch or idle), silently re-unlock from the keychain if the
+  // user has trusted this device — so no passphrase prompt unless they opted out.
+  useEffect(() => {
+    if (status === "locked" && autoUnlockOnLaunch) {
+      void tryAutoUnlock();
+    }
+  }, [status, autoUnlockOnLaunch, tryAutoUnlock]);
 
   useEffect(() => {
     const lock = () => {

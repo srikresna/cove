@@ -1,6 +1,6 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { AnimatePresence, motion } from "framer-motion";
-import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Search, Settings } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -10,7 +10,7 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { setQuickSearchOpen } = useWorkspaceStore();
+  const { setQuickSearchOpen, setSettingsOpen } = useWorkspaceStore();
 
   return (
     <Tooltip.Provider delayDuration={300}>
@@ -108,6 +108,31 @@ export const Sidebar: React.FC = () => {
             <NoteList />
           </div>
         )}
+
+        <div className="p-3 border-t border-charcoal/10">
+          <Tooltip.Root>
+            <Tooltip.Trigger asChild>
+              <button
+                type="button"
+                aria-label={MESSAGES.SETTINGS_TITLE}
+                onClick={() => setSettingsOpen(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-[12px] text-xs font-semibold text-charcoal hover:bg-dew-drop transition-all outline-none"
+              >
+                <Settings className="w-4 h-4 text-marker-orange" aria-hidden="true" />
+                {!isCollapsed && <span>{MESSAGES.SETTINGS_TITLE}</span>}
+              </button>
+            </Tooltip.Trigger>
+            <Tooltip.Portal>
+              <Tooltip.Content
+                side="right"
+                sideOffset={8}
+                className="z-50 px-2.5 py-1 rounded-[8px] bg-charcoal text-cream-paper text-[10px] font-bold shadow-md outline-none"
+              >
+                {MESSAGES.SETTINGS_TITLE}
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip.Root>
+        </div>
       </motion.aside>
     </Tooltip.Provider>
   );

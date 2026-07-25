@@ -54,4 +54,9 @@ export const MESSAGES = {
   VAULT_DISCLOSURE:
     "Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (PBKDF2, 600k iterations) and held in memory only while unlocked. A recovery backup is stored in your OS keychain (trusted-device recovery, not zero-knowledge).",
   VAULT_MIGRATING: "Migrating notes to the new vault…",
+  SETTINGS_TITLE: "Settings",
+  SETTINGS_AUTO_UNLOCK_LABEL: "Trust this device",
+  SETTINGS_AUTO_UNLOCK_DESC:
+    "Auto-unlock from the OS keychain when the app opens — no passphrase prompt. Your notes stay encrypted at rest, but anyone with access to this computer's login can open the app. Disable if you want a passphrase on every launch.",
+  SETTINGS_LOCK_NOW: "Lock vault now",
 } as const;

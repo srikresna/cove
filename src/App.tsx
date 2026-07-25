@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
+import { SettingsModal } from "./components/modals/SettingsModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
@@ -130,6 +131,7 @@ export const AppContent: React.FC = () => {
 
       <CreateWorkspaceModal />
       <QuickSearchModal />
+      <SettingsModal />
       <ToastContainer />
     </div>
   );
