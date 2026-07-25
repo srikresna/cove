@@ -155,3 +155,40 @@ export function constantTimeEqual(a: Bytes, b: Bytes): boolean {
   }
   return diff === 0;
 }
+
+/**
+ * Deterministic 96-bit AES-GCM IV from a monotonic per-DEK counter
+ * (NIST SP 800-38D §8.2.1 recommended mode). 12 bytes big-endian; the counter
+ * occupies the low bits. Unique per encrypt as long as the counter never repeats
+ * (enforced by kms.incrementIvCounter + fail-loud at 2^28).
+ */
+export function counterToIv(counter: number): Bytes {
+  const iv = new Uint8Array(GCM_IV_BYTES);
+  const view = new DataView(iv.buffer);
+  view.setUint32(8, counter >>> 0);
+  view.setUint32(4, Math.floor(counter / 0x100000000));
+  return iv;
+}
+
+/** AES-GCM encrypt of a UTF-8 string under `key` with an explicit IV. Output: base64(iv||ct). */
+export async function aesGcmEncrypt(key: CryptoKey, plaintext: string, iv: Bytes): Promise<string> {
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encodeUtf8(plaintext)),
+  );
+  const out = new Uint8Array(GCM_IV_BYTES + ct.byteLength);
+  out.set(iv, 0);
+  out.set(ct, GCM_IV_BYTES);
+  return bytesToBase64(out);
+}
+
+/** AES-GCM decrypt of a base64(iv||ct) payload under `key`. Throws on auth-tag failure. */
+export async function aesGcmDecrypt(key: CryptoKey, payloadB64: string): Promise<string> {
+  const combined = base64ToBytes(payloadB64);
+  if (combined.byteLength < GCM_IV_BYTES + GCM_TAG_BYTES) {
+    throw new Error("payload too short");
+  }
+  const iv = combined.subarray(0, GCM_IV_BYTES);
+  const ct = combined.subarray(GCM_IV_BYTES);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  return new TextDecoder().decode(pt);
+}

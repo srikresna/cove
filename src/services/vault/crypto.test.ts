@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  aesGcmDecrypt,
+  aesGcmEncrypt,
   base64ToBytes,
   bytesToBase64,
   computeIntegrityMac,
   constantTimeEqual,
+  counterToIv,
   derivePrk,
   deriveSubkey,
   generateDek,
@@ -112,5 +115,31 @@ describe("vault/crypto constantTimeEqual", () => {
     expect(constantTimeEqual(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 3]))).toBe(true);
     expect(constantTimeEqual(new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 4]))).toBe(false);
     expect(constantTimeEqual(new Uint8Array([1, 2]), new Uint8Array([1, 2, 3]))).toBe(false);
+  });
+});
+
+describe("vault/crypto AES-GCM payload + counter IV", () => {
+  it("counterToIv is deterministic and unique per counter", () => {
+    const a = counterToIv(1);
+    const b = counterToIv(1);
+    const c = counterToIv(2);
+    expect(a).toEqual(b);
+    expect(constantTimeEqual(a, c)).toBe(false);
+    expect(a.byteLength).toBe(12);
+  });
+
+  it("aesGcm encrypt/decrypt round-trips UTF-8 text", async () => {
+    const key = await importAesGcmKey(await generateDek().then((d) => d.rawKey));
+    const iv = counterToIv(42);
+    const ct = await aesGcmEncrypt(key, "Hello 🚀 notes", iv);
+    expect(ct).not.toBe("Hello 🚀 notes");
+    expect(await aesGcmDecrypt(key, ct)).toBe("Hello 🚀 notes");
+  });
+
+  it("aesGcm decrypt with the wrong key throws (auth-tag failure)", async () => {
+    const k1 = await importAesGcmKey(await generateDek().then((d) => d.rawKey));
+    const k2 = await importAesGcmKey(await generateDek().then((d) => d.rawKey));
+    const ct = await aesGcmEncrypt(k1, "secret", counterToIv(1));
+    await expect(aesGcmDecrypt(k2, ct)).rejects.toThrow();
   });
 });
