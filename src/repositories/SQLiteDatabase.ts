@@ -93,6 +93,37 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 2");
       }
     }
+
+    if (version < 3) {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS kms (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          kdfVersion INTEGER NOT NULL,
+          kdfAlg TEXT NOT NULL,
+          kdfParamsJson TEXT NOT NULL,
+          saltB64 TEXT NOT NULL,
+          ivCounter INTEGER NOT NULL DEFAULT 0,
+          wrappedDekLocalB64 TEXT,
+          integrityMacB64 TEXT NOT NULL,
+          migrationState TEXT NOT NULL DEFAULT 'complete',
+          migrationCursor TEXT,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      `);
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS migration_failures (
+          id TEXT PRIMARY KEY,
+          reason TEXT,
+          at INTEGER NOT NULL
+        )
+      `);
+      const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      if (!noteCols.some((c) => c.name === "kmsVersion")) {
+        await db.execute("ALTER TABLE notes ADD COLUMN kmsVersion INTEGER NOT NULL DEFAULT 0");
+      }
+      await db.execute("PRAGMA user_version = 3");
+    }
   }
 
   static async withTransaction<T>(work: (db: Database) => Promise<T>): Promise<T> {
