@@ -5,7 +5,7 @@ import { Logger } from "../services/Logger";
 
 interface WorkspaceState {
   workspaces: Workspace[];
-  activeWorkspaceId: string;
+  activeWorkspaceId: string | null;
   isCreateModalOpen: boolean;
   isQuickSearchOpen: boolean;
   isDarkMode: boolean;
@@ -24,17 +24,6 @@ interface WorkspaceState {
   deleteWorkspace: (id: string) => Promise<void>;
 }
 
-const DEFAULT_WORKSPACES: Workspace[] = [
-  {
-    id: "default-workspace-1",
-    name: "Work & Projects",
-    emoji: "💼",
-    color: "#ff6f1e",
-    description: "Personal notes and side hustle projects",
-    createdAt: Date.now(),
-  },
-];
-
 const getInitialDarkMode = (): boolean => {
   const saved = localStorage.getItem("cove_theme");
   if (saved !== null) {
@@ -44,8 +33,8 @@ const getInitialDarkMode = (): boolean => {
 };
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  workspaces: DEFAULT_WORKSPACES,
-  activeWorkspaceId: "default-workspace-1",
+  workspaces: [],
+  activeWorkspaceId: null,
   isCreateModalOpen: false,
   isQuickSearchOpen: false,
   isDarkMode: getInitialDarkMode(),
@@ -67,9 +56,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const workspaces = await workspaceService.getAllWorkspaces();
       const first = workspaces[0];
-      if (first) {
-        set({ workspaces, activeWorkspaceId: first.id });
-      }
+      set({ workspaces, activeWorkspaceId: first ? first.id : null });
     } catch (err) {
       Logger.error("fetchWorkspaces store error", err);
     }
@@ -109,7 +96,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   deleteWorkspace: async (id) => {
     const current = get().workspaces;
     const filtered = current.filter((w) => w.id !== id);
-    const nextActive = filtered[0]?.id || get().activeWorkspaceId;
+    const nextActive = filtered[0]?.id ?? null;
 
     try {
       await workspaceService.deleteWorkspace(id, current.length);

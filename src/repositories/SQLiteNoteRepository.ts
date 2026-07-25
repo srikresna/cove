@@ -10,10 +10,6 @@ export class SQLiteNoteRepository implements INoteRepository {
     return SQLiteDatabase.getInstance();
   }
 
-  constructor() {
-    this.initSchema();
-  }
-
   private async mapRowToNote(
     row: Record<string, unknown>,
     opts: { decrypt: boolean },
@@ -34,57 +30,6 @@ export class SQLiteNoteRepository implements INoteRepository {
       createdAt: Number(row.createdAt),
       updatedAt: Number(row.updatedAt),
     };
-  }
-
-  private async initSchema() {
-    try {
-      const db = await this.getDb();
-      await db.execute(`
-        CREATE TABLE IF NOT EXISTS notes (
-          id TEXT PRIMARY KEY,
-          workspaceId TEXT NOT NULL,
-          title TEXT NOT NULL,
-          content TEXT NOT NULL,
-          icon TEXT,
-          coverColor TEXT,
-          isPinned INTEGER NOT NULL DEFAULT 0,
-          isFavorite INTEGER NOT NULL DEFAULT 0,
-          createdAt INTEGER NOT NULL,
-          updatedAt INTEGER NOT NULL,
-          FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE
-        )
-      `);
-      await db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_notes_workspace_updated ON notes(workspaceId, updatedAt DESC, id DESC)",
-      );
-
-      const versionRows = await db.select<Array<{ user_version: number }>>("PRAGMA user_version");
-      const version = versionRows[0]?.user_version ?? 0;
-
-      if (version < 2) {
-        const cols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
-        if (cols.some((c) => c.name === "folderId")) {
-          await SQLiteDatabase.withTransaction(async (txDb) => {
-            await txDb.execute(
-              "CREATE TABLE notes_new (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, icon TEXT, coverColor TEXT, isPinned INTEGER NOT NULL DEFAULT 0, isFavorite INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
-            );
-            await txDb.execute(
-              "INSERT INTO notes_new (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt) SELECT id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes",
-            );
-            await txDb.execute("DROP TABLE notes");
-            await txDb.execute("ALTER TABLE notes_new RENAME TO notes");
-            await txDb.execute(
-              "CREATE INDEX IF NOT EXISTS idx_notes_workspace_updated ON notes(workspaceId, updatedAt DESC, id DESC)",
-            );
-            await txDb.execute("PRAGMA user_version = 2");
-          });
-        } else {
-          await db.execute("PRAGMA user_version = 2");
-        }
-      }
-    } catch (err) {
-      throw toPersistenceError("initSchema", err);
-    }
   }
 
   async getAllNotes(): Promise<Note[]> {

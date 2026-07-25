@@ -9,10 +9,6 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
     return SQLiteDatabase.getInstance();
   }
 
-  constructor() {
-    this.initSchema();
-  }
-
   private mapRowToWorkspace(row: Record<string, unknown>): Workspace {
     return {
       id: String(row.id),
@@ -22,25 +18,6 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
       description: row.description ? String(row.description) : undefined,
       createdAt: Number(row.createdAt),
     };
-  }
-
-  private async initSchema() {
-    try {
-      const db = await this.getDb();
-      await db.execute(`
-        CREATE TABLE IF NOT EXISTS workspaces (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          emoji TEXT NOT NULL,
-          color TEXT NOT NULL,
-          description TEXT,
-          createdAt INTEGER NOT NULL
-        )
-      `);
-      await db.execute("PRAGMA user_version = 1");
-    } catch (err) {
-      throw toPersistenceError("initSchema", err);
-    }
   }
 
   async getAllWorkspaces(): Promise<Workspace[]> {

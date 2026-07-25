@@ -32,4 +32,6 @@ export const MESSAGES = {
   EXPAND_SIDEBAR: "Expand Sidebar",
   COLLAPSE_SIDEBAR: "Collapse Sidebar",
   NOTES_HEADER: "Notes",
+  NO_WORKSPACE_TITLE: "No Workspace Yet",
+  NO_WORKSPACE_DESC: "Create your first workspace to start organizing your notes and ideas.",
 } as const;

@@ -25,25 +25,9 @@ interface NoteState {
   toggleFavoriteNote: (id: string) => Promise<void>;
 }
 
-const DEFAULT_NOTES: Note[] = [
-  {
-    id: "default-note-1",
-    workspaceId: "default-workspace-1",
-    title: "Joyful UI Ideas & Brainstorming",
-    content:
-      '[{"type":"paragraph","content":[{"type":"text","text":"Welcome to your brand new block editor in Cove Notes!"}]}]',
-    icon: "🎨",
-    coverColor: "#ff6f1e",
-    isPinned: true,
-    isFavorite: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-];
-
 export const useNoteStore = create<NoteState>((set, get) => ({
-  notes: DEFAULT_NOTES,
-  activeNoteId: "default-note-1",
+  notes: [],
+  activeNoteId: null,
   searchQuery: "",
 
   setActiveNoteId: (id) => set({ activeNoteId: id }),
@@ -53,11 +37,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       const notes = await noteService.listMetadataByWorkspace(workspaceId);
       const first = notes[0];
-      if (first) {
-        set({ notes, activeNoteId: first.id });
-      } else {
-        set({ notes: get().notes.filter((n) => n.workspaceId === workspaceId) });
-      }
+      set({ notes, activeNoteId: first ? first.id : null });
     } catch (err) {
       const p = presentError(err);
       useNotificationStore.getState().pushToast({
