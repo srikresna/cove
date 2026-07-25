@@ -4,10 +4,9 @@ import EmojiPicker from "emoji-picker-react";
 import { Plus, Smile, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
-
-const COLORS = ["#ff6f1e", "#a594f9", "#ff70a6", "#ff9770", "#ffd670", "#70d6ff", "#b8f2e6"];
 
 export const CreateWorkspaceModal: React.FC = () => {
   const { isCreateModalOpen, setCreateModalOpen, createWorkspace } = useWorkspaceStore();
@@ -115,7 +114,7 @@ export const CreateWorkspaceModal: React.FC = () => {
                 {MESSAGES.WORKSPACE_COLOR_LABEL}
               </span>
               <div className="flex gap-2">
-                {COLORS.map((color) => (
+                {COVER_COLORS.map((color) => (
                   <button
                     key={color}
                     type="button"

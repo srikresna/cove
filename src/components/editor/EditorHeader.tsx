@@ -3,6 +3,7 @@ import EmojiPicker from "emoji-picker-react";
 import { ArrowRightLeft, Copy, Maximize2, Minimize2, Pin, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
@@ -17,8 +18,6 @@ interface EditorHeaderProps {
   onToggleFullWidth: () => void;
   onToggleFullscreen: () => void;
 }
-
-const COVER_COLORS = ["#ff6f1e", "#a594f9", "#ff70a6", "#ff9770", "#ffd670", "#70d6ff", "#b8f2e6"];
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({
   note,
