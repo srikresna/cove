@@ -9,8 +9,19 @@ fn main() {
     eprintln!("Tauri application panic: {:?}", info);
   }));
 
-  tauri::Builder::default()
+  let app = tauri::Builder::default()
     .plugin(tauri_plugin_sql::Builder::default().build())
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .plugin(tauri_plugin_keyring::init())
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application");
+
+  // Defense-in-depth telemetry: log unclean exits (process kill / crash / power loss).
+  // The JS-side VaultService.lock() is the real DEK teardown; this fires even when
+  // the renderer is already gone (it cannot null JS fields, only log).
+  app.run(|_app_handle, event| match event {
+    tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+      tracing::info!(target: "cove::lifecycle", "tauri exit requested");
+    }
+    _ => {}
+  });
 }
