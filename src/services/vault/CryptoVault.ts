@@ -65,14 +65,22 @@ export class CryptoVault implements IEncryptionService {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot decrypt.");
     }
     if (!payloadB64) return "";
+    // Try with AAD (Step-1+ ciphertexts). If the GCM tag fails, retry WITHOUT
+    // AAD — pre-Step-1 ciphertexts were encrypted without additionalData.
+    // This backward-compat path lets legacy notes (migrated before AAD was
+    // added) still decrypt without a re-migration.
     try {
       return await aesGcmDecrypt(this.dek, payloadB64, encodeUtf8(aad));
-    } catch (cause) {
-      throw new EncryptionError(
-        "decrypt_failed",
-        "Could not decrypt note content (wrong key, wrong AAD, or corrupted payload).",
-        { cause },
-      );
+    } catch {
+      try {
+        return await aesGcmDecrypt(this.dek, payloadB64);
+      } catch (cause) {
+        throw new EncryptionError(
+          "decrypt_failed",
+          "Could not decrypt note content (wrong key, wrong AAD, or corrupted payload).",
+          { cause },
+        );
+      }
     }
   }
 }
