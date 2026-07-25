@@ -1,4 +1,5 @@
 import type { Note } from "../../domain/note/Note";
+import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
 import type { INoteRepository } from "../../repositories/INoteRepository";
 
 export class InMemoryNoteRepository implements INoteRepository {
@@ -72,5 +73,21 @@ export class InMemoryNoteRepository implements INoteRepository {
     this.callLog.push(`deleteNotesByWorkspace:${workspaceId}`);
     if (this.shouldFail) throw new Error("Fake repo error: deleteNotesByWorkspace");
     this.notes = this.notes.filter((n) => n.workspaceId !== workspaceId);
+  }
+
+  async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {
+    this.callLog.push(`searchTitlesFts:${query}`);
+    if (this.shouldFail) throw new Error("Fake repo error: searchTitlesFts");
+    const q = query.toLowerCase();
+    return this.notes
+      .filter((n) => n.title.toLowerCase().includes(q))
+      .slice(0, limit)
+      .map((n) => ({
+        id: n.id,
+        workspaceId: n.workspaceId,
+        title: n.title,
+        icon: n.icon,
+        snippet: "",
+      }));
   }
 }

@@ -124,6 +124,32 @@ export class SQLiteDatabase {
       }
       await db.execute("PRAGMA user_version = 3");
     }
+
+    if (version < 4) {
+      // FTS5 title index — fast SQL-level title search without decrypting content.
+      // Graceful degradation: if FTS5 is not compiled into the bundled SQLite,
+      // the catch silently skips it and search falls back to decrypt-on-search.
+      try {
+        await db.execute(
+          "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(note_id UNINDEXED, title, tokenize='unicode61 remove_diacritics 2')",
+        );
+        await db.execute(
+          "CREATE TRIGGER IF NOT EXISTS notes_fts_ai AFTER INSERT ON notes BEGIN INSERT INTO notes_fts(note_id, title) VALUES (new.id, new.title); END",
+        );
+        await db.execute(
+          "CREATE TRIGGER IF NOT EXISTS notes_fts_ad AFTER DELETE ON notes BEGIN DELETE FROM notes_fts WHERE note_id = old.id; END",
+        );
+        await db.execute(
+          "CREATE TRIGGER IF NOT EXISTS notes_fts_au AFTER UPDATE OF title ON notes BEGIN UPDATE notes_fts SET title = new.title WHERE note_id = new.id; END",
+        );
+        await db.execute(
+          "INSERT INTO notes_fts(note_id, title) SELECT id, title FROM notes WHERE id NOT IN (SELECT note_id FROM notes_fts)",
+        );
+      } catch {
+        // FTS5 not available — search will use decrypt-on-search only.
+      }
+      await db.execute("PRAGMA user_version = 4");
+    }
   }
 
   static async withTransaction<T>(work: (db: Database) => Promise<T>): Promise<T> {

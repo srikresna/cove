@@ -27,23 +27,26 @@ export class NoteService implements INoteService {
   async searchAcrossWorkspaces(query: string): Promise<NoteSearchHit[]> {
     const q = query.trim().toLowerCase();
     if (!q) return [];
+    // Fast path: FTS5 title search (no decrypt, SQL-level MATCH with ranking).
+    const titleHits = await this.notes.searchTitlesFts(q, 50);
+    const titleIds = new Set(titleHits.map((h) => h.id));
+    // Slow path: decrypt-on-search for body matches (skip notes already found by title).
     const candidates = await this.notes.findRecentForSearch(100);
-    const hits: NoteSearchHit[] = [];
+    const bodyHits: NoteSearchHit[] = [];
     for (const note of candidates) {
+      if (titleIds.has(note.id)) continue;
       const plain = extractPlainText(note.content);
-      const titleMatch = note.title.toLowerCase().includes(q);
-      const bodyMatch = plain.toLowerCase().includes(q);
-      if (titleMatch || bodyMatch) {
-        hits.push({
+      if (plain.toLowerCase().includes(q)) {
+        bodyHits.push({
           id: note.id,
           workspaceId: note.workspaceId,
           title: note.title,
           icon: note.icon,
-          snippet: bodyMatch ? buildSnippet(plain, q) : "",
+          snippet: buildSnippet(plain, q),
         });
       }
     }
-    return hits;
+    return [...titleHits, ...bodyHits];
   }
 
   async createNote(

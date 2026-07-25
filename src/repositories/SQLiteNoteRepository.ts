@@ -1,4 +1,5 @@
 import type { Note } from "../domain/note/Note";
+import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
 import type { IEncryptionService } from "../services/vault/IEncryptionService";
@@ -96,6 +97,25 @@ export class SQLiteNoteRepository implements INoteRepository {
       return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
     } catch (err) {
       throw toPersistenceError("findRecentForSearch", err);
+    }
+  }
+
+  async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT n.id, n.workspaceId, n.title, n.icon FROM notes_fts f JOIN notes n ON n.id = f.note_id WHERE notes_fts MATCH ? ORDER BY rank LIMIT ?",
+        [`${query}*`, limit],
+      );
+      return rows.map((r) => ({
+        id: String(r.id),
+        workspaceId: String(r.workspaceId),
+        title: String(r.title),
+        icon: r.icon ? String(r.icon) : undefined,
+        snippet: "",
+      }));
+    } catch {
+      return [];
     }
   }
 
