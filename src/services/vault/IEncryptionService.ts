@@ -8,6 +8,6 @@ export interface IEncryptionService {
   isUnlocked(): boolean;
   setSessionKeys(keys: { dek: CryptoKey }): Promise<void>;
   clearSessionKeys(): void;
-  encryptPayload(plaintext: string): Promise<string>;
-  decryptPayload(payloadB64: string): Promise<string>;
+  encryptPayload(plaintext: string, aad: string): Promise<string>;
+  decryptPayload(payloadB64: string, aad: string): Promise<string>;
 }

@@ -21,7 +21,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       workspaceId: String(row.workspaceId),
       title: String(row.title),
       content: opts.decrypt
-        ? await this.crypto.decryptPayload(String(row.content ?? ""))
+        ? await this.crypto.decryptPayload(String(row.content ?? ""), String(row.id))
         : row.content != null
           ? String(row.content)
           : "",
@@ -102,7 +102,7 @@ export class SQLiteNoteRepository implements INoteRepository {
   async createNote(noteInput: Omit<Note, "createdAt" | "updatedAt">): Promise<Note> {
     const db = await this.getDb();
     const now = Date.now();
-    const encryptedContent = await this.crypto.encryptPayload(noteInput.content);
+    const encryptedContent = await this.crypto.encryptPayload(noteInput.content, noteInput.id);
 
     const note: Note = {
       ...noteInput,
@@ -151,7 +151,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       params.push(updates.title);
     }
     if (updates.content !== undefined) {
-      const encrypted = await this.crypto.encryptPayload(updates.content);
+      const encrypted = await this.crypto.encryptPayload(updates.content, id);
       setClauses.push("content = ?");
       params.push(encrypted);
     }

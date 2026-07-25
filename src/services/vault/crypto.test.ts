@@ -9,6 +9,7 @@ import {
   counterToIv,
   derivePrk,
   deriveSubkey,
+  encodeUtf8,
   generateDek,
   generateSalt,
   importAesGcmKey,
@@ -141,5 +142,14 @@ describe("vault/crypto AES-GCM payload + counter IV", () => {
     const k2 = await importAesGcmKey(await generateDek().then((d) => d.rawKey));
     const ct = await aesGcmEncrypt(k1, "secret", counterToIv(1));
     await expect(aesGcmDecrypt(k2, ct)).rejects.toThrow();
+  });
+
+  it("binds ciphertext to AAD (note id): same AAD round-trips, wrong AAD fails", async () => {
+    const key = await importAesGcmKey((await generateDek()).rawKey);
+    const iv = counterToIv(7);
+    const ct = await aesGcmEncrypt(key, "secret body", iv, encodeUtf8("note-A"));
+    expect(await aesGcmDecrypt(key, ct, encodeUtf8("note-A"))).toBe("secret body");
+    // Swapping the ciphertext into a different note (wrong AAD) must fail loud.
+    await expect(aesGcmDecrypt(key, ct, encodeUtf8("note-B"))).rejects.toThrow();
   });
 });

@@ -105,7 +105,7 @@ describe("VaultService legacy migration", () => {
     expect(await migration.countLegacy()).toBe(0);
 
     // Migrated content must decrypt back to the original under the session DEK.
-    const plain = await crypto.decryptPayload(migration.contentOf("n1") ?? "");
+    const plain = await crypto.decryptPayload(migration.contentOf("n1") ?? "", "n1");
     expect(plain).toBe("legacy note body");
     expect(localStorage.getItem("cove_device_sec_key")).toBeNull(); // legacy key purged
   });

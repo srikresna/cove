@@ -24,6 +24,13 @@ export const SALT_BYTES = 16;
 /** OWASP 2026 floor for PBKDF2-HMAC-SHA256. */
 export const PBKDF2_ITERATIONS = 600_000;
 
+/**
+ * Conservative per-DEK ceiling on AES-GCM encryptions (NIST SP 800-38D).
+ * Well below the 2^32 birthday bound; reaching it triggers a fail-loud
+ * iv_exhausted error so the key is rotated before any IV-reuse risk.
+ */
+export const IV_EXHAUSTION_LIMIT = 2 ** 28;
+
 export type Bytes = Uint8Array<ArrayBuffer>;
 
 export function randomBytes(n: number): Bytes {
@@ -170,10 +177,20 @@ export function counterToIv(counter: number): Bytes {
   return iv;
 }
 
-/** AES-GCM encrypt of a UTF-8 string under `key` with an explicit IV. Output: base64(iv||ct). */
-export async function aesGcmEncrypt(key: CryptoKey, plaintext: string, iv: Bytes): Promise<string> {
+/** AES-GCM encrypt of a UTF-8 string under `key` with an explicit IV. Output: base64(iv||ct).
+ *  Optional AAD binds the ciphertext to context (e.g. note id) — authenticated but not encrypted. */
+export async function aesGcmEncrypt(
+  key: CryptoKey,
+  plaintext: string,
+  iv: Bytes,
+  aad?: Bytes,
+): Promise<string> {
   const ct = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encodeUtf8(plaintext)),
+    await crypto.subtle.encrypt(
+      aad ? { name: "AES-GCM", iv, additionalData: aad } : { name: "AES-GCM", iv },
+      key,
+      encodeUtf8(plaintext),
+    ),
   );
   const out = new Uint8Array(GCM_IV_BYTES + ct.byteLength);
   out.set(iv, 0);
@@ -181,14 +198,23 @@ export async function aesGcmEncrypt(key: CryptoKey, plaintext: string, iv: Bytes
   return bytesToBase64(out);
 }
 
-/** AES-GCM decrypt of a base64(iv||ct) payload under `key`. Throws on auth-tag failure. */
-export async function aesGcmDecrypt(key: CryptoKey, payloadB64: string): Promise<string> {
+/** AES-GCM decrypt of a base64(iv||ct) payload under `key`. Throws on auth-tag failure.
+ *  If encrypted with AAD, the same AAD must be supplied or the tag check fails. */
+export async function aesGcmDecrypt(
+  key: CryptoKey,
+  payloadB64: string,
+  aad?: Bytes,
+): Promise<string> {
   const combined = base64ToBytes(payloadB64);
   if (combined.byteLength < GCM_IV_BYTES + GCM_TAG_BYTES) {
     throw new Error("payload too short");
   }
   const iv = combined.subarray(0, GCM_IV_BYTES);
   const ct = combined.subarray(GCM_IV_BYTES);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  const pt = await crypto.subtle.decrypt(
+    aad ? { name: "AES-GCM", iv, additionalData: aad } : { name: "AES-GCM", iv },
+    key,
+    ct,
+  );
   return new TextDecoder().decode(pt);
 }

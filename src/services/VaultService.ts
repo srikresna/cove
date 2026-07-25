@@ -170,7 +170,7 @@ export class VaultService implements IVaultService {
       for (const row of batch) {
         try {
           const plain = await aesGcmDecrypt(legacyKey, row.content);
-          const reencrypted = await this.crypto.encryptPayload(plain);
+          const reencrypted = await this.crypto.encryptPayload(plain, row.id);
           await this.migrationRepo.markMigrated(row.id, reencrypted);
         } catch (err) {
           await this.migrationRepo.recordFailure(

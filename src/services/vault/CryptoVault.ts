@@ -1,7 +1,13 @@
 import { EncryptionError } from "../../errors/AppError";
 import type { IKmsRepository } from "../../repositories/IKmsRepository";
 import type { IEncryptionService } from "./IEncryptionService";
-import { aesGcmDecrypt, aesGcmEncrypt, counterToIv } from "./crypto";
+import {
+  IV_EXHAUSTION_LIMIT,
+  aesGcmDecrypt,
+  aesGcmEncrypt,
+  counterToIv,
+  encodeUtf8,
+} from "./crypto";
 
 /**
  * Holds the session DEK (encrypts note content) in memory only. The DEK is a
@@ -36,29 +42,35 @@ export class CryptoVault implements IEncryptionService {
     this.ivCounter = 0;
   }
 
-  async encryptPayload(plaintext: string): Promise<string> {
+  async encryptPayload(plaintext: string, aad: string): Promise<string> {
     if (!this.dek) {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot encrypt.");
     }
     // Synchronous increment => unique per call (single-threaded JS, no interleave).
     this.ivCounter += 1;
     const counter = this.ivCounter;
+    if (counter >= IV_EXHAUSTION_LIMIT) {
+      throw new EncryptionError(
+        "iv_exhausted",
+        "IV counter exhausted; DEK rotation required before more encryptions.",
+      );
+    }
     // Persist BEFORE use so a crash can never lower the counter below an IV already emitted.
     await this.kms.setIvCounter(counter);
-    return aesGcmEncrypt(this.dek, plaintext, counterToIv(counter));
+    return aesGcmEncrypt(this.dek, plaintext, counterToIv(counter), encodeUtf8(aad));
   }
 
-  async decryptPayload(payloadB64: string): Promise<string> {
+  async decryptPayload(payloadB64: string, aad: string): Promise<string> {
     if (!this.dek) {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot decrypt.");
     }
     if (!payloadB64) return "";
     try {
-      return await aesGcmDecrypt(this.dek, payloadB64);
+      return await aesGcmDecrypt(this.dek, payloadB64, encodeUtf8(aad));
     } catch (cause) {
       throw new EncryptionError(
         "decrypt_failed",
-        "Could not decrypt note content (wrong key or corrupted payload).",
+        "Could not decrypt note content (wrong key, wrong AAD, or corrupted payload).",
         { cause },
       );
     }
