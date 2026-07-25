@@ -36,11 +36,6 @@ export default defineConfig({
             ) {
               return "vendor-react";
             }
-            // NOTE: @blocknote / @mantine are intentionally NOT assigned a manual
-            // chunk. They are imported only by the React.lazy()-loaded editor, so
-            // Vite/Rollup must be free to place them in the editor's dynamic-import
-            // (lazy) chunk. Forcing them into a named chunk made it a shared/eager
-            // chunk that Vite preloaded at startup, defeating the lazy boundary.
           }
         },
       },
