@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
 import { presentError } from "../services/errorPresenter";
+import { processCoverImage } from "../utils/coverImage";
 import { useNotificationStore } from "./useNotificationStore";
 import { useSaveStatusStore } from "./useSaveStatusStore";
 import { useWorkspaceStore } from "./useWorkspaceStore";
@@ -9,6 +10,7 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 interface NoteState {
   notes: Note[];
   activeNoteId: string | null;
+  activeCoverImage: string | null;
   pendingDeleteId: string | null;
   setActiveNoteId: (id: string | null) => void;
   requestDeleteNote: (id: string) => void;
@@ -22,6 +24,8 @@ interface NoteState {
     icon?: string,
   ) => Promise<Note | null>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
+  uploadCoverImage: (id: string, file: File) => Promise<void>;
+  removeCoverImage: (id: string) => Promise<void>;
   moveNoteToWorkspace: (id: string, workspaceId: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
@@ -65,9 +69,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
   return {
     notes: [],
     activeNoteId: null,
+    activeCoverImage: null,
     pendingDeleteId: null,
 
-    setActiveNoteId: (id) => set({ activeNoteId: id }),
+    setActiveNoteId: (id) => set({ activeNoteId: id, activeCoverImage: null }),
     requestDeleteNote: (id) => set({ pendingDeleteId: id }),
     cancelDeleteNote: () => set({ pendingDeleteId: null }),
 
@@ -75,7 +80,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       try {
         const notes = await noteService.listMetadataByWorkspace(workspaceId);
         const first = notes[0];
-        set({ notes, activeNoteId: first ? first.id : null });
+        set({ notes, activeNoteId: first ? first.id : null, activeCoverImage: null });
       } catch (err) {
         notifyError(err, { saveStatus: false });
       }
@@ -83,12 +88,16 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
     loadActiveNoteContent: async (id) => {
       try {
-        const note = await noteService.getNote(id);
-        if (note) {
-          set((state) => ({
-            notes: state.notes.map((n) => (n.id === id ? note : n)),
-          }));
-        }
+        const [note, cover] = await Promise.all([
+          noteService.getNote(id),
+          noteService.getCoverImage(id),
+        ]);
+        // The user may have switched notes while this load was in flight.
+        if (get().activeNoteId !== id) return;
+        set((state) => ({
+          notes: note ? state.notes.map((n) => (n.id === id ? note : n)) : state.notes,
+          activeCoverImage: cover,
+        }));
       } catch (err) {
         notifyError(err, { saveStatus: false });
       }
@@ -101,6 +110,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
+          activeCoverImage: null,
         }));
         useSaveStatusStore.getState().setSaved();
         return created;
@@ -131,6 +141,37 @@ export const useNoteStore = create<NoteState>((set, get) => {
       }
     },
 
+    uploadCoverImage: async (id, file) => {
+      useSaveStatusStore.getState().setSaving();
+      try {
+        const dataUrl = await processCoverImage(file);
+        await noteService.setCoverImage(id, dataUrl);
+        if (get().activeNoteId === id) {
+          set({ activeCoverImage: dataUrl });
+        }
+        useSaveStatusStore.getState().setSaved();
+      } catch (err) {
+        notifyError(err);
+      }
+    },
+
+    removeCoverImage: async (id) => {
+      const previous = get().activeCoverImage;
+      if (get().activeNoteId === id) {
+        set({ activeCoverImage: null });
+      }
+      useSaveStatusStore.getState().setSaving();
+      try {
+        await noteService.removeCoverImage(id);
+        useSaveStatusStore.getState().setSaved();
+      } catch (err) {
+        if (get().activeNoteId === id) {
+          set({ activeCoverImage: previous });
+        }
+        notifyError(err);
+      }
+    },
+
     moveNoteToWorkspace: async (id, workspaceId) => {
       useSaveStatusStore.getState().setSaving();
       try {
@@ -153,7 +194,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       const filtered = previousNotes.filter((n) => n.id !== id);
       const nextActive = filtered[0]?.id || null;
 
-      set({ notes: filtered, activeNoteId: nextActive });
+      set({ notes: filtered, activeNoteId: nextActive, activeCoverImage: null });
       useSaveStatusStore.getState().setSaving();
 
       try {
@@ -172,6 +213,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
         set((state) => ({
           notes: [duplicated, ...state.notes],
           activeNoteId: duplicated.id,
+          activeCoverImage: null,
         }));
         useSaveStatusStore.getState().setSaved();
       } catch (err) {
@@ -187,5 +229,5 @@ export const useNoteStore = create<NoteState>((set, get) => {
 // Registered against the service so the plaintext purge fires on EVERY lock,
 // no matter who initiated it — the invariant cannot be bypassed via the store.
 vaultService.onLock(() => {
-  useNoteStore.setState({ notes: [], activeNoteId: null });
+  useNoteStore.setState({ notes: [], activeNoteId: null, activeCoverImage: null });
 });

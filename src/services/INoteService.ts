@@ -19,6 +19,10 @@ export interface INoteService {
     >,
   ): Promise<Note>;
   updateContent(id: string, content: string): Promise<Note>;
+  /** Decrypted cover image data URL, or null when the note has no image cover. */
+  getCoverImage(id: string): Promise<string | null>;
+  setCoverImage(id: string, dataUrl: string): Promise<void>;
+  removeCoverImage(id: string): Promise<void>;
   deleteNote(id: string): Promise<void>;
   duplicateNote(id: string): Promise<Note>;
   togglePin(id: string): Promise<Note>;

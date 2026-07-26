@@ -1,5 +1,6 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
+import { FileText } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -113,7 +114,11 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
       .slice(0, 10)
       .map((n) => ({
         title: n.title || MESSAGES.UNTITLED_NOTE,
-        icon: <span aria-hidden="true">{n.icon || "📝"}</span>,
+        icon: (
+          <span aria-hidden="true">
+            {n.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+          </span>
+        ),
         onItemClick: () => {
           editor.insertInlineContent([
             {

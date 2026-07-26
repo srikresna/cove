@@ -192,5 +192,12 @@ export class SQLiteDatabase {
       await db.execute("CREATE INDEX IF NOT EXISTS idx_note_links_target ON note_links(targetId)");
       await db.execute("PRAGMA user_version = 6");
     }
+
+    if (version < 7) {
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS note_covers (noteId TEXT PRIMARY KEY, payload TEXT NOT NULL, kmsVersion INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE)",
+      );
+      await db.execute("PRAGMA user_version = 7");
+    }
   }
 }

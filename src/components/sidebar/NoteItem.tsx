@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { MoreHorizontal, Pin, Star, Trash2 } from "lucide-react";
+import { FileText, MoreHorizontal, Pin, Star, Trash2 } from "lucide-react";
 import React from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
@@ -43,8 +43,11 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
         )}
       >
         <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
-          <span className="flex-shrink-0 text-lg" aria-hidden="true">
-            {note.icon || "📝"}
+          <span
+            className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-lg"
+            aria-hidden="true"
+          >
+            {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
           </span>
           <div className="min-w-0 truncate">
             <div className="truncate text-[13px] font-medium text-foreground">

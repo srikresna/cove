@@ -43,6 +43,36 @@ export class SQLiteMigrationRepository implements IMigrationRepository {
     }
   }
 
+  async findAllCoverBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    try {
+      const db = await this.getDb();
+      const rows = afterId
+        ? await db.select<Array<Record<string, unknown>>>(
+            "SELECT noteId AS id, payload AS content FROM note_covers WHERE noteId > ? ORDER BY noteId LIMIT ?",
+            [afterId, limit],
+          )
+        : await db.select<Array<Record<string, unknown>>>(
+            "SELECT noteId AS id, payload AS content FROM note_covers ORDER BY noteId LIMIT ?",
+            [limit],
+          );
+      return rows.map((r) => ({ id: String(r.id), content: String(r.content) }));
+    } catch (err) {
+      throw toPersistenceError("migration.findAllCoverBatch", err);
+    }
+  }
+
+  async markCoverMigrated(noteId: string, encryptedPayload: string): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("UPDATE note_covers SET payload = ?, kmsVersion = 1 WHERE noteId = ?", [
+        encryptedPayload,
+        noteId,
+      ]);
+    } catch (err) {
+      throw toPersistenceError("migration.markCoverMigrated", err);
+    }
+  }
+
   async markMigrated(id: string, encryptedContent: string): Promise<void> {
     try {
       const db = await this.getDb();

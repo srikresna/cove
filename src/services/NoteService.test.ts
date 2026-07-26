@@ -101,6 +101,46 @@ describe("NoteService", () => {
     expect(fakeRepo.notes[0]?.content).toBe(`enc[${copy.id}]:new body`);
   });
 
+  it("creates notes without a default icon or cover", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1");
+    expect(created.icon).toBeUndefined();
+    expect(created.coverColor).toBeUndefined();
+  });
+
+  it("encrypts cover images under the cover AAD and round-trips them", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "Title", "body");
+    expect(await service.getCoverImage(created.id)).toBeNull();
+
+    await service.setCoverImage(created.id, "data:image/webp;base64,abc");
+    expect(fakeRepo.covers.get(created.id)).toBe(
+      `enc[cover:${created.id}]:data:image/webp;base64,abc`,
+    );
+    expect(await service.getCoverImage(created.id)).toBe("data:image/webp;base64,abc");
+
+    await service.removeCoverImage(created.id);
+    expect(await service.getCoverImage(created.id)).toBeNull();
+  });
+
+  it("duplicateNote copies the cover color and re-encrypts the cover image for the copy", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const src = await service.createNote("ws-1", "Original", "body");
+    await service.updateMetadata(src.id, { coverColor: "#70d6ff" });
+    await service.setCoverImage(src.id, "data:image/webp;base64,xyz");
+
+    const copy = await service.duplicateNote(src.id);
+    expect(copy.coverColor).toBe("#70d6ff");
+    expect(fakeRepo.covers.get(copy.id)).toBe(`enc[cover:${copy.id}]:data:image/webp;base64,xyz`);
+    expect(await service.getCoverImage(copy.id)).toBe("data:image/webp;base64,xyz");
+  });
+
   it("every operation throws VaultLockedError when the vault is locked (H2 gate)", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     fakeRepo.notes.push({
@@ -123,6 +163,9 @@ describe("NoteService", () => {
       VaultLockedError,
     );
     await expect(service.updateContent("note-1", "x")).rejects.toThrow(VaultLockedError);
+    await expect(service.getCoverImage("note-1")).rejects.toThrow(VaultLockedError);
+    await expect(service.setCoverImage("note-1", "data:x")).rejects.toThrow(VaultLockedError);
+    await expect(service.removeCoverImage("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.deleteNote("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.duplicateNote("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.togglePin("note-1")).rejects.toThrow(VaultLockedError);

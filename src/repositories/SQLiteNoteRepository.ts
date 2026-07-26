@@ -189,13 +189,14 @@ export class SQLiteNoteRepository implements INoteRepository {
     return existing;
   }
 
-  // Explicit link/tag cleanup: ON DELETE CASCADE needs foreign_keys=ON, which
-  // is connection-scoped — the pool may serve connections that never ran it.
+  // Explicit link/tag/cover cleanup: ON DELETE CASCADE needs foreign_keys=ON,
+  // which is connection-scoped — the pool may serve connections that never ran it.
   async deleteNote(id: string): Promise<void> {
     const db = await this.getDb();
     try {
       await db.execute("DELETE FROM note_links WHERE sourceId = ? OR targetId = ?", [id, id]);
       await db.execute("DELETE FROM note_tags WHERE noteId = ?", [id]);
+      await db.execute("DELETE FROM note_covers WHERE noteId = ?", [id]);
       await db.execute("DELETE FROM notes WHERE id = ?", [id]);
     } catch (err) {
       throw toPersistenceError("deleteNote", err);
@@ -213,9 +214,48 @@ export class SQLiteNoteRepository implements INoteRepository {
         "DELETE FROM note_tags WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
         [workspaceId],
       );
+      await db.execute(
+        "DELETE FROM note_covers WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
+        [workspaceId],
+      );
       await db.execute("DELETE FROM notes WHERE workspaceId = ?", [workspaceId]);
     } catch (err) {
       throw toPersistenceError("deleteNotesByWorkspace", err);
+    }
+  }
+
+  async getCover(noteId: string): Promise<EncryptedPayload | null> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ payload: string }>>(
+        "SELECT payload FROM note_covers WHERE noteId = ?",
+        [noteId],
+      );
+      const payload = rows[0]?.payload;
+      return payload ? (payload as EncryptedPayload) : null;
+    } catch (err) {
+      throw toPersistenceError("getCover", err);
+    }
+  }
+
+  async upsertCover(noteId: string, payload: EncryptedPayload): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute(
+        "INSERT INTO note_covers (noteId, payload, kmsVersion, updatedAt) VALUES (?, ?, ?, ?) ON CONFLICT(noteId) DO UPDATE SET payload = excluded.payload, kmsVersion = excluded.kmsVersion, updatedAt = excluded.updatedAt",
+        [noteId, payload, KMS_VERSION_DEK, Date.now()],
+      );
+    } catch (err) {
+      throw toPersistenceError("upsertCover", err);
+    }
+  }
+
+  async deleteCover(noteId: string): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("DELETE FROM note_covers WHERE noteId = ?", [noteId]);
+    } catch (err) {
+      throw toPersistenceError("deleteCover", err);
     }
   }
 }

@@ -1,5 +1,5 @@
 import { Command } from "cmdk";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, FileText, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -118,7 +118,7 @@ export const QuickSearchModal: React.FC = () => {
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-base"
                     aria-hidden="true"
                   >
-                    {hit.icon || "📝"}
+                    {hit.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-foreground">

@@ -1,4 +1,4 @@
-import { PanelRightClose } from "lucide-react";
+import { FileText, PanelRightClose } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -172,7 +172,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span aria-hidden="true" className="shrink-0 text-sm">
-                {meta.icon || "📝"}
+                {meta.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
               </span>
               <span className="truncate">{meta.title || MESSAGES.UNTITLED_NOTE}</span>
             </button>

@@ -1,7 +1,8 @@
 import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
+import { Image as ImageIcon, Smile, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { COVER_COLORS } from "../../constants/app";
+import { COVER_COLORS, DEFAULT_COVER_COLOR } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
@@ -16,12 +17,43 @@ interface EditorHeaderProps {
   isFullWidth: boolean;
 }
 
+interface IconPickerContentProps {
+  onPick: (emoji: string) => void;
+  onRemove?: () => void;
+}
+
+const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove }) => (
+  <PopoverContent align="start" className="w-auto overflow-hidden p-0">
+    <EmojiPicker
+      emojiStyle={EmojiStyle.NATIVE}
+      onEmojiClick={(emojiData) => onPick(emojiData.emoji)}
+      autoFocusSearch={true}
+      width={340}
+      height={400}
+    />
+    {onRemove && (
+      <div className="border-t p-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-muted-foreground"
+          onClick={onRemove}
+        >
+          {MESSAGES.ICON_REMOVE}
+        </Button>
+      </div>
+    )}
+  </PopoverContent>
+);
+
 export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth }) => {
-  const { updateNote } = useNoteStore();
+  const { updateNote, uploadCoverImage, removeCoverImage } = useNoteStore();
+  const coverImage = useNoteStore((s) => s.activeCoverImage);
   const saveStatus = useSaveStatusStore((s) => s.status);
 
   const [title, setTitle] = useState(note.title);
   const titleTimer = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTitle(note.title);
@@ -48,70 +80,164 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
     };
   }, []);
 
-  const accent = note.coverColor || "#0e7c66";
+  const hasIcon = Boolean(note.icon);
+  const hasCover = Boolean(coverImage || note.coverColor);
+  const accent = note.coverColor || DEFAULT_COVER_COLOR;
+
+  const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) {
+      uploadCoverImage(note.id, file);
+    }
+  };
+
+  const handleRemoveCover = () => {
+    if (coverImage) {
+      removeCoverImage(note.id);
+    }
+    if (note.coverColor) {
+      updateNote(note.id, { coverColor: "" });
+    }
+  };
 
   return (
-    <div className="mb-2">
-      <div
-        className="group relative h-36 w-full"
-        style={{
-          background: `linear-gradient(160deg, ${accent}4d 0%, ${accent}14 60%, transparent 100%)`,
-        }}
-      >
-        <div className="absolute right-3 top-3 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+    <div className="group/header mb-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        aria-label={MESSAGES.COVER_UPLOAD}
+        onChange={handleCoverFile}
+      />
+
+      {hasCover && (
+        <div className="group/cover relative h-56 w-full">
+          {coverImage ? (
+            <img src={coverImage} alt="" draggable={false} className="h-full w-full object-cover" />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{
+                background: `linear-gradient(160deg, ${accent}4d 0%, ${accent}14 60%, transparent 100%)`,
+              }}
+            />
+          )}
+          <div className="absolute right-3 top-3 opacity-0 transition-opacity focus-within:opacity-100 group-hover/cover:opacity-100">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={MESSAGES.COVER_CHANGE}
+                  className="bg-card/90 backdrop-blur"
+                >
+                  {MESSAGES.COVER_CHANGE}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-60 p-2">
+                <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  {MESSAGES.COVER_COLOR_LABEL}
+                </p>
+                <div className="flex gap-2 px-1 pb-2">
+                  {COVER_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`Select cover accent color ${color}`}
+                      onClick={() => updateNote(note.id, { coverColor: color })}
+                      className={cn(
+                        "h-6 w-6 rounded-full border transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        !coverImage &&
+                          note.coverColor === color &&
+                          "ring-2 ring-ring ring-offset-1",
+                      )}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <div className="mb-1 h-px bg-border" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {MESSAGES.COVER_UPLOAD}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 text-destructive hover:text-destructive"
+                  onClick={handleRemoveCover}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {MESSAGES.COVER_REMOVE}
+                </Button>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      )}
+
+      <div className={cn("w-full px-6", !isFullWidth && "mx-auto max-w-3xl", !hasCover && "pt-10")}>
+        {hasIcon && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label={MESSAGES.CHANGE_ACCENT}
-                className="bg-card/90 backdrop-blur"
+              <button
+                type="button"
+                aria-label="Change Note Emoji Icon"
+                className={cn(
+                  "relative z-10 flex h-16 w-16 items-center justify-center rounded-xl text-[56px] leading-none transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  hasCover ? "-mt-9" : "mt-2",
+                )}
               >
-                {MESSAGES.CHANGE_ACCENT}
-              </Button>
+                <span aria-hidden="true">{note.icon}</span>
+              </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="flex w-auto gap-2 p-2">
-              {COVER_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  aria-label={`Select cover accent color ${color}`}
-                  onClick={() => updateNote(note.id, { coverColor: color })}
-                  className={cn(
-                    "h-6 w-6 rounded-full border transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    note.coverColor === color && "ring-2 ring-ring ring-offset-1",
-                  )}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-
-      <div className={cn("w-full px-6", !isFullWidth && "mx-auto max-w-3xl")}>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Change Note Emoji Icon"
-              className="relative z-10 -mt-9 flex h-16 w-16 items-center justify-center rounded-xl text-[56px] leading-none transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span aria-hidden="true">{note.icon || "📝"}</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto overflow-hidden p-0">
-            <EmojiPicker
-              emojiStyle={EmojiStyle.NATIVE}
-              onEmojiClick={(emojiData) => {
-                updateNote(note.id, { icon: emojiData.emoji });
-              }}
-              autoFocusSearch={true}
-              width={340}
-              height={400}
+            <IconPickerContent
+              onPick={(emoji) => updateNote(note.id, { icon: emoji })}
+              onRemove={() => updateNote(note.id, { icon: "" })}
             />
-          </PopoverContent>
-        </Popover>
+          </Popover>
+        )}
+
+        {(!hasIcon || !hasCover) && (
+          <div
+            className={cn(
+              "flex items-center gap-1 pt-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover/header:opacity-100",
+            )}
+          >
+            {!hasIcon && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-muted-foreground"
+                  >
+                    <Smile className="h-3.5 w-3.5" aria-hidden="true" />
+                    {MESSAGES.ICON_ADD}
+                  </Button>
+                </PopoverTrigger>
+                <IconPickerContent onPick={(emoji) => updateNote(note.id, { icon: emoji })} />
+              </Popover>
+            )}
+            {!hasCover && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-muted-foreground"
+                onClick={() => updateNote(note.id, { coverColor: DEFAULT_COVER_COLOR })}
+              >
+                <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                {MESSAGES.COVER_ADD}
+              </Button>
+            )}
+          </div>
+        )}
 
         <label htmlFor="note-title-input" className="sr-only">
           Note Title

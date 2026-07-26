@@ -1,3 +1,4 @@
+import { coverAad } from "../domain/note/notePolicy";
 import { EncryptionError, PersistenceError, ValidationError } from "../errors/AppError";
 import type { IKmsRepository, KmsRecord } from "../repositories/IKmsRepository";
 import type { IMigrationRepository } from "../repositories/IMigrationRepository";
@@ -265,7 +266,9 @@ export class VaultService implements IVaultService {
       const oldRaw = base64ToBytes(bridge);
       const oldKey = await importAesGcmKey(oldRaw);
       zeroize(oldRaw);
-      const failed = await this.reencryptAllNotes(oldKey, rec.migrationCursor);
+      const failed =
+        (await this.reencryptAllNotes(oldKey, rec.migrationCursor)) +
+        (await this.reencryptAllCovers(oldKey));
       if (failed === 0) {
         await this.kms.update({ migrationState: "complete", migrationCursor: null });
         await this.purgeLegacyKeyMaterial();
@@ -569,7 +572,8 @@ export class VaultService implements IVaultService {
     });
     zeroize(oldRawDek);
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
-    const failed = await this.reencryptAllNotes(oldKey, null);
+    const failed =
+      (await this.reencryptAllNotes(oldKey, null)) + (await this.reencryptAllCovers(oldKey));
     if (failed === 0) {
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
       await this.purgeLegacyKeyMaterial();
@@ -614,6 +618,42 @@ export class VaultService implements IVaultService {
         }
       }
       await this.kms.update({ migrationCursor: cursor });
+    }
+    return failed;
+  }
+
+  // Covers always postdate AAD-era ciphertexts, so no pre-AAD fallback. The
+  // pass is cursor-free: a resumed sweep rescans covers cheaply, and rows that
+  // already decrypt under the session DEK are skipped, keeping it idempotent.
+  private async reencryptAllCovers(oldKey: CryptoKey): Promise<number> {
+    let cursor: string | null = null;
+    let failed = 0;
+    for (;;) {
+      const batch = await this.migrationRepo.findAllCoverBatch(cursor, MIGRATION_BATCH);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        cursor = row.id;
+        if (!row.content) continue;
+        const aad = coverAad(row.id);
+        try {
+          const plain = await aesGcmDecrypt(oldKey, row.content, encodeUtf8(aad));
+          const reencrypted = await this.crypto.encryptPayload(plain, aad);
+          await this.migrationRepo.markCoverMigrated(row.id, reencrypted);
+        } catch (err) {
+          if (isSystemicMigrationError(err)) throw err;
+          try {
+            await this.crypto.decryptPayload(row.content, aad);
+            continue;
+          } catch (err2) {
+            if (isSystemicMigrationError(err2)) throw err2;
+          }
+          failed += 1;
+          await this.migrationRepo.recordFailure(
+            aad,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
     }
     return failed;
   }

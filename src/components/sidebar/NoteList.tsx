@@ -93,12 +93,7 @@ export const NoteList: React.FC = () => {
 
   const handleCreate = useCallback(() => {
     if (!activeWorkspaceId) return;
-    createNote(
-      activeWorkspaceId,
-      MESSAGES.UNTITLED_NOTE,
-      '[{"type":"paragraph","content":[]}]',
-      "📝",
-    );
+    createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE);
   }, [createNote, activeWorkspaceId]);
 
   return (

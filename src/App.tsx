@@ -119,12 +119,7 @@ export const AppContent: React.FC = () => {
               aria-label={MESSAGES.CREATE_NEW_NOTE}
               onClick={() => {
                 if (activeWorkspaceId) {
-                  createNote(
-                    activeWorkspaceId,
-                    MESSAGES.UNTITLED_NOTE,
-                    '[{"type":"paragraph","content":[]}]',
-                    "📝",
-                  );
+                  createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE);
                 }
               }}
             >

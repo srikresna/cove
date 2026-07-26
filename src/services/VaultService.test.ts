@@ -334,6 +334,8 @@ describe("VaultService changePassphrase + recovery", () => {
     await service.setKeychainEscrow(true);
     const oldCipher = await crypto.encryptPayload("rotate me", "n1");
     migration.seed("n1", oldCipher);
+    const oldCoverCipher = await crypto.encryptPayload("data:image/webp;base64,abc", "cover:n1");
+    migration.seedCover("n1", oldCoverCipher);
 
     kms.clear();
     await service.lock();
@@ -345,6 +347,11 @@ describe("VaultService changePassphrase + recovery", () => {
     const rotated = migration.contentOf("n1") ?? "";
     expect(rotated).not.toBe(oldCipher);
     expect(await crypto.decryptPayload(rotated, "n1")).toBe("rotate me");
+    const rotatedCover = migration.coverContentOf("n1") ?? "";
+    expect(rotatedCover).not.toBe(oldCoverCipher);
+    expect(await crypto.decryptPayload(rotatedCover, "cover:n1")).toBe(
+      "data:image/webp;base64,abc",
+    );
     expect(rec?.ivCounter ?? 0).toBeGreaterThan(0);
     expect(await keychain.get(KEYRING_USERS.dekBackup)).not.toBeNull();
     expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull();
@@ -369,6 +376,13 @@ describe("VaultService changePassphrase + recovery", () => {
     migration.seed("n-old", oldCipher);
     const alreadyRotated = await crypto.encryptPayload("already rotated", "n-done");
     migration.seed("n-done", alreadyRotated);
+    const oldCoverCipher = await aesGcmEncrypt(
+      oldDek.cryptoKey,
+      "unswept cover",
+      counterToIv(10),
+      encodeUtf8("cover:n-old"),
+    );
+    migration.seedCover("n-old", oldCoverCipher);
     await keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldDek.rawKey));
     await kms.update({ migrationState: "rotation_in_progress" });
     await service.lock();
@@ -378,6 +392,9 @@ describe("VaultService changePassphrase + recovery", () => {
     expect(await crypto.decryptPayload(migration.contentOf("n-old") ?? "", "n-old")).toBe(
       "unswept body",
     );
+    expect(
+      await crypto.decryptPayload(migration.coverContentOf("n-old") ?? "", "cover:n-old"),
+    ).toBe("unswept cover");
     expect(migration.contentOf("n-done")).toBe(alreadyRotated);
     expect((await kms.get())?.migrationState).toBe("complete");
     expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull();

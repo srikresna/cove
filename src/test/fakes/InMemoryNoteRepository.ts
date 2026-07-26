@@ -4,6 +4,7 @@ import type { EncryptedPayload } from "../../services/vault/IEncryptionService";
 
 export class InMemoryNoteRepository implements INoteRepository {
   public notes: NoteRecord[] = [];
+  public covers = new Map<string, EncryptedPayload>();
   public callLog: string[] = [];
   public shouldFail = false;
 
@@ -64,12 +65,34 @@ export class InMemoryNoteRepository implements INoteRepository {
     this.callLog.push(`deleteNote:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: deleteNote");
     this.notes = this.notes.filter((n) => n.id !== id);
+    this.covers.delete(id);
   }
 
   async deleteNotesByWorkspace(workspaceId: string): Promise<void> {
     this.callLog.push(`deleteNotesByWorkspace:${workspaceId}`);
     if (this.shouldFail) throw new Error("Fake repo error: deleteNotesByWorkspace");
+    for (const n of this.notes) {
+      if (n.workspaceId === workspaceId) this.covers.delete(n.id);
+    }
     this.notes = this.notes.filter((n) => n.workspaceId !== workspaceId);
+  }
+
+  async getCover(noteId: string): Promise<EncryptedPayload | null> {
+    this.callLog.push(`getCover:${noteId}`);
+    if (this.shouldFail) throw new Error("Fake repo error: getCover");
+    return this.covers.get(noteId) ?? null;
+  }
+
+  async upsertCover(noteId: string, payload: EncryptedPayload): Promise<void> {
+    this.callLog.push(`upsertCover:${noteId}`);
+    if (this.shouldFail) throw new Error("Fake repo error: upsertCover");
+    this.covers.set(noteId, payload);
+  }
+
+  async deleteCover(noteId: string): Promise<void> {
+    this.callLog.push(`deleteCover:${noteId}`);
+    if (this.shouldFail) throw new Error("Fake repo error: deleteCover");
+    this.covers.delete(noteId);
   }
 
   async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {

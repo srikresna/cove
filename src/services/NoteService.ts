@@ -2,10 +2,9 @@ import { NotFoundError } from "../domain/errors";
 import type { Note } from "../domain/note/Note";
 import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import {
-  DEFAULT_NOTE_COVER_COLOR,
-  DEFAULT_NOTE_ICON,
   DEFAULT_NOTE_TITLE,
   EMPTY_NOTE_CONTENT,
+  coverAad,
   duplicateNoteProps,
   makeNoteId,
 } from "../domain/note/notePolicy";
@@ -78,7 +77,7 @@ export class NoteService implements INoteService {
     workspaceId: string,
     title = DEFAULT_NOTE_TITLE,
     content = EMPTY_NOTE_CONTENT,
-    icon = DEFAULT_NOTE_ICON,
+    icon?: string,
   ): Promise<Note> {
     this.assertUnlocked();
     const id = makeNoteId();
@@ -88,7 +87,7 @@ export class NoteService implements INoteService {
       title,
       content: await this.crypto.encryptPayload(content, id),
       icon,
-      coverColor: DEFAULT_NOTE_COVER_COLOR,
+      coverColor: undefined,
       isPinned: false,
       isFavorite: false,
     });
@@ -138,7 +137,31 @@ export class NoteService implements INoteService {
     const src = await this.getNote(id);
     if (!src) throw new NotFoundError("Note", id);
     const { title, content, icon } = duplicateNoteProps(src);
-    return this.createNote(src.workspaceId, title, content, icon);
+    let copy = await this.createNote(src.workspaceId, title, content, icon);
+    if (src.coverColor) {
+      copy = await this.updateMetadata(copy.id, { coverColor: src.coverColor });
+    }
+    const cover = await this.getCoverImage(id);
+    if (cover) {
+      await this.setCoverImage(copy.id, cover);
+    }
+    return { ...copy, content };
+  }
+
+  async getCoverImage(id: string): Promise<string | null> {
+    this.assertUnlocked();
+    const payload = await this.notes.getCover(id);
+    return payload ? this.crypto.decryptPayload(payload, coverAad(id)) : null;
+  }
+
+  async setCoverImage(id: string, dataUrl: string): Promise<void> {
+    this.assertUnlocked();
+    await this.notes.upsertCover(id, await this.crypto.encryptPayload(dataUrl, coverAad(id)));
+  }
+
+  async removeCoverImage(id: string): Promise<void> {
+    this.assertUnlocked();
+    await this.notes.deleteCover(id);
   }
 
   async togglePin(id: string): Promise<Note> {
