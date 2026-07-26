@@ -253,8 +253,14 @@ export class VaultService implements IVaultService {
   private async completePendingMigration(): Promise<void> {
     const rec = await this.kms.get();
     if (!rec || rec.migrationState === "complete") return;
-    const legacyHex =
-      (await this.keychain.get(KEYRING_USERS.legacyBridge)) ?? this.legacyKeys.get();
+    let bridgeHex: string | null = null;
+    try {
+      bridgeHex = await this.keychain.get(KEYRING_USERS.legacyBridge);
+    } catch (err) {
+      // Keychain unavailable — fall back to the legacy store lookup below.
+      Logger.warn("vault: keychain bridge lookup failed during migration resume", err);
+    }
+    const legacyHex = bridgeHex ?? this.legacyKeys.get();
     if (!legacyHex) {
       if ((await this.migrationRepo.countLegacy()) === 0) {
         // Nothing left below the current key version — the interrupted run
@@ -372,11 +378,17 @@ export class VaultService implements IVaultService {
     if (!rec) throw new ValidationError("Vault is not initialized yet.");
     const rawDek = await this.verifyPassphraseAndUnwrap(passphrase, rec);
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
-    if (await this.escrowActive()) {
-      // Refresh the escrow entry on every passphrase unlock: heals pre-DPAPI
-      // (raw) entries now that tryAutoUnlock refuses unwrapped blobs.
-      const wrapped = await this.deviceBind.wrap(rawDek);
-      await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
+    try {
+      if (await this.escrowActive()) {
+        // Refresh the escrow entry on every passphrase unlock: heals pre-DPAPI
+        // (raw) entries now that tryAutoUnlock refuses unwrapped blobs.
+        const wrapped = await this.deviceBind.wrap(rawDek);
+        await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
+      }
+    } catch (err) {
+      // Best-effort: a broken OS keychain must never block a correct-passphrase
+      // unlock (the pre-escrow unlock path never depended on the keychain).
+      Logger.warn("vault: escrow refresh failed during unlock", err);
     }
     await this.completePendingMigration();
   }
@@ -460,9 +472,15 @@ export class VaultService implements IVaultService {
       updatedAt: Date.now(),
     };
     await this.kms.save(updated);
-    if (await this.escrowActive()) {
-      const rewrapped = await this.deviceBind.wrap(rawDek);
-      await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(rewrapped));
+    try {
+      if (await this.escrowActive()) {
+        const rewrapped = await this.deviceBind.wrap(rawDek);
+        await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(rewrapped));
+      }
+    } catch (err) {
+      // Best-effort: the DEK itself is unchanged by a passphrase change, so an
+      // existing escrow entry stays valid even if this refresh fails.
+      Logger.warn("vault: escrow refresh failed during passphrase change", err);
     }
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
   }
@@ -492,7 +510,12 @@ export class VaultService implements IVaultService {
         updatedAt: Date.now(),
       });
       await this.setSessionDek(recoveredDek, await importAesGcmKey(recoveredDek));
-      await this.setKeychainEscrow(true);
+      try {
+        await this.setKeychainEscrow(true);
+      } catch (err) {
+        // Best-effort: the entry we just read still holds this same DEK.
+        Logger.warn("vault: escrow refresh failed during recovery", err);
+      }
       await this.completePendingMigration();
       return;
     }
@@ -534,11 +557,13 @@ export class VaultService implements IVaultService {
     zeroize(oldRawDek);
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
     await this.reencryptAllNotes(oldKey);
-    await this.setKeychainEscrow(true);
     try {
+      // Replace the old-DEK backup with the new DEK. If this fails, the next
+      // passphrase unlock's escrow refresh heals the entry.
+      await this.setKeychainEscrow(true);
       await this.keychain.delete(KEYRING_USERS.legacyBridge);
-    } catch {
-      /* best-effort */
+    } catch (err) {
+      Logger.warn("vault: escrow update failed after DEK rotation", err);
     }
   }
 

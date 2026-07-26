@@ -27,9 +27,14 @@ pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Resu
         // VACUUM INTO refuses to write over an existing file, so clear it here.
         std::fs::remove_file(&target).map_err(|e| format!("Cannot replace backup file: {e}"))?;
     }
+    run_vacuum_into(&db_path, &target).await
+}
 
+/// Consistent snapshot of `db_path` into `target` via VACUUM INTO on a fresh
+/// read-only connection (reads through the WAL; never mutates the source).
+async fn run_vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
     let mut conn = SqliteConnectOptions::new()
-        .filename(&db_path)
+        .filename(db_path)
         .read_only(true)
         .connect()
         .await
@@ -101,5 +106,57 @@ mod tests {
         let target = std::env::temp_dir().join("cove-backup-test.db");
         let validated = validate_target(target.to_str().unwrap(), &data_dir).unwrap();
         assert_eq!(validated.file_name().unwrap(), "cove-backup-test.db");
+    }
+
+    /// The reason this module exists: a plain file copy of a WAL-mode DB misses
+    /// committed rows still living in the -wal sidecar. Prove VACUUM INTO
+    /// captures them while a writer connection is still open.
+    #[tokio::test(flavor = "current_thread")]
+    async fn vacuum_into_captures_wal_resident_rows() {
+        use sqlx::sqlite::SqliteJournalMode;
+
+        let dir = std::env::temp_dir().join(format!("cove-wal-backup-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("cove.db");
+        let target = dir.join("backup.db");
+        let _ = std::fs::remove_file(&db);
+        let _ = std::fs::remove_file(&target);
+
+        let mut writer = SqliteConnectOptions::new()
+            .filename(&db)
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .connect()
+            .await
+            .unwrap();
+        sqlx::query("CREATE TABLE notes(id TEXT PRIMARY KEY, content TEXT)")
+            .execute(&mut writer)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO notes VALUES ('n1', 'wal-resident-content')")
+            .execute(&mut writer)
+            .await
+            .unwrap();
+        // Writer stays open: the committed row lives in cove.db-wal, not cove.db.
+        assert!(dir.join("cove.db-wal").exists(), "test setup: WAL sidecar expected");
+
+        run_vacuum_into(&db, &target).await.unwrap();
+
+        let mut check = SqliteConnectOptions::new()
+            .filename(&target)
+            .read_only(true)
+            .connect()
+            .await
+            .unwrap();
+        let row: (String,) = sqlx::query_as("SELECT content FROM notes WHERE id = 'n1'")
+            .fetch_one(&mut check)
+            .await
+            .unwrap();
+        assert_eq!(row.0, "wal-resident-content");
+
+        use sqlx::Connection;
+        check.close().await.ok();
+        writer.close().await.ok();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

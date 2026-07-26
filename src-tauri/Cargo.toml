@@ -29,6 +29,10 @@ sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runti
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 
+[dev-dependencies]
+# #[tokio::test] for the WAL-backup integration test (runtime already in-tree via sqlx).
+tokio = { version = "1", features = ["rt", "macros"] }
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
