@@ -70,7 +70,6 @@ export const SetPassphraseScreen: React.FC<SetPassphraseScreenProps> = ({ mode, 
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
             placeholder={MESSAGES.VAULT_PASSPHRASE_PLACEHOLDER}
-            // biome-ignore lint/a11y/noAutofocus: full-screen setup form — the input is the sole action
             autoFocus
             autoComplete="new-password"
           />

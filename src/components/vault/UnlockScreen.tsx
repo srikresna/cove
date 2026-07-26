@@ -57,7 +57,6 @@ export const UnlockScreen: React.FC<UnlockScreenProps> = ({ onRecover }) => {
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
             placeholder={MESSAGES.VAULT_PASSPHRASE_PLACEHOLDER}
-            // biome-ignore lint/a11y/noAutofocus: full-screen unlock form — the input is the sole action
             autoFocus
             autoComplete="current-password"
           />
