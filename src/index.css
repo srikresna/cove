@@ -1,8 +1,6 @@
 @import "@fontsource-variable/inter";
-@import "@fontsource/newsreader/400.css";
-@import "@fontsource/newsreader/500.css";
-@import "@fontsource/newsreader/600.css";
-@import "@fontsource/newsreader/500-italic.css";
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
 @import "@fontsource-variable/jetbrains-mono";
 @import "@blocknote/mantine/style.css";
 
@@ -38,28 +36,28 @@
   }
 
   .dark {
-    /* Cove — deep tide */
-    --background: 192 25% 8%;
-    --foreground: 165 18% 91%;
-    --card: 193 24% 12%;
-    --card-foreground: 165 18% 91%;
-    --popover: 193 24% 11%;
-    --popover-foreground: 165 18% 91%;
-    --primary: 166 59% 45%;
-    --primary-foreground: 192 25% 8%;
-    --secondary: 193 18% 16%;
-    --secondary-foreground: 165 18% 88%;
-    --muted: 193 18% 15%;
-    --muted-foreground: 180 8% 60%;
-    --accent: 193 20% 17%;
-    --accent-foreground: 166 40% 80%;
+    /* Neutral dark; teal stays only as the action color */
+    --background: 240 5% 7%;
+    --foreground: 0 0% 93%;
+    --card: 240 4% 10%;
+    --card-foreground: 0 0% 93%;
+    --popover: 240 4% 10%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 166 55% 47%;
+    --primary-foreground: 240 5% 7%;
+    --secondary: 240 4% 15%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 240 4% 14%;
+    --muted-foreground: 240 4% 62%;
+    --accent: 240 4% 17%;
+    --accent-foreground: 0 0% 95%;
     --warm: 33 55% 62%;
     --warm-foreground: 33 60% 12%;
     --destructive: 0 55% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 193 16% 20%;
-    --input: 193 16% 24%;
-    --ring: 166 59% 45%;
+    --border: 240 4% 19%;
+    --input: 240 4% 23%;
+    --ring: 166 55% 47%;
   }
 
   * {
@@ -110,14 +108,16 @@
   --bn-colors-border: hsl(var(--border));
   --bn-colors-side-menu: hsl(var(--muted-foreground));
   --bn-border-radius: 10px;
-  --bn-font-family: "Inter Variable", "Inter", system-ui, sans-serif;
+  --bn-font-family: "Instrument Serif", "Inter Variable", Georgia, serif;
   background-color: transparent;
   user-select: text;
 }
 
 /* ── Doc canvas: metrics adapted from AFFiNE/BlockSuite, recolored to Cove ── */
 
-.bn-editor {
+/* Extra specificity: the vendor stylesheet also loads after ours in the JS
+   bundle order and would win padding-inline back to 54px. */
+.bn-container .bn-editor {
   background-color: transparent;
   min-height: calc(100vh - 320px);
   user-select: text;
@@ -141,25 +141,25 @@
 .bn-block-content[data-content-type="heading"] {
   letter-spacing: -0.02em;
   font-weight: 700;
-  font-size: 28px;
+  font-size: 25px;
   line-height: calc(1em + 8px);
-  margin-top: 18px;
+  margin-top: 16px;
   margin-bottom: 4px;
 }
 
 .bn-block-content[data-content-type="heading"][data-level="2"] {
   font-weight: 600;
-  font-size: 24px;
-  line-height: calc(1em + 10px);
-  margin-top: 14px;
+  font-size: 21px;
+  line-height: calc(1em + 8px);
+  margin-top: 12px;
 }
 
 .bn-block-content[data-content-type="heading"][data-level="3"] {
   font-weight: 600;
-  font-size: 20px;
+  font-size: 18px;
   letter-spacing: -0.015em;
   line-height: calc(1em + 8px);
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 /* Checkbox: 20px glyph in a 24px hit target, shapes via mask so they follow the theme */

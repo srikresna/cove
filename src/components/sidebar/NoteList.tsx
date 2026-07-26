@@ -82,29 +82,14 @@ export const NoteList: React.FC = () => {
     [setActiveNoteId],
   );
 
-  const handleTogglePin = useCallback(
-    (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      togglePinNote(id);
-    },
-    [togglePinNote],
-  );
+  const handleTogglePin = useCallback((id: string) => togglePinNote(id), [togglePinNote]);
 
   const handleToggleFavorite = useCallback(
-    (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      toggleFavoriteNote(id);
-    },
+    (id: string) => toggleFavoriteNote(id),
     [toggleFavoriteNote],
   );
 
-  const handleDelete = useCallback(
-    (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      requestDeleteNote(id);
-    },
-    [requestDeleteNote],
-  );
+  const handleDelete = useCallback((id: string) => requestDeleteNote(id), [requestDeleteNote]);
 
   const handleCreate = useCallback(() => {
     if (!activeWorkspaceId) return;

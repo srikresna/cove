@@ -45,8 +45,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Inter Variable", "Inter", "system-ui", "sans-serif"],
-        display: ["Newsreader", "Georgia", "serif"],
+        sans: ["Instrument Serif", "Inter Variable", "Georgia", "serif"],
+        display: ["Instrument Serif", "Georgia", "serif"],
         mono: ["JetBrains Mono Variable", "ui-monospace", "monospace"],
       },
       borderRadius: {

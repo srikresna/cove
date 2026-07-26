@@ -1,5 +1,4 @@
 import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
-import { ArrowRightLeft, Copy, Maximize2, Minimize2, Pin, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { COVER_COLORS } from "../../constants/app";
@@ -11,29 +10,14 @@ import type { Note } from "../../types";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { NoteInfoPanel } from "./NoteInfoPanel";
-import { SaveStatusBadge } from "./SaveStatusBadge";
 
 interface EditorHeaderProps {
   note: Note;
-  wordCount: number;
-  characterCount: number;
   isFullWidth: boolean;
-  isFullscreen: boolean;
-  onToggleFullWidth: () => void;
-  onToggleFullscreen: () => void;
 }
 
-export const EditorHeader: React.FC<EditorHeaderProps> = ({
-  note,
-  wordCount,
-  characterCount,
-  isFullWidth,
-  isFullscreen,
-  onToggleFullWidth,
-  onToggleFullscreen,
-}) => {
-  const { updateNote, requestDeleteNote, duplicateNote, togglePinNote, toggleFavoriteNote } =
-    useNoteStore();
+export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth }) => {
+  const { updateNote } = useNoteStore();
   const saveStatus = useSaveStatusStore((s) => s.status);
 
   const [title, setTitle] = useState(note.title);
@@ -64,11 +48,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
     };
   }, []);
 
-  const formattedDate = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(note.updatedAt);
-
   const accent = note.coverColor || "#0e7c66";
 
   return (
@@ -79,10 +58,15 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           background: `linear-gradient(160deg, ${accent}4d 0%, ${accent}14 60%, transparent 100%)`,
         }}
       >
-        <div className="absolute right-14 top-3 flex items-center gap-1 rounded-md border bg-card/90 p-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <div className="absolute right-3 top-3 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" aria-label={MESSAGES.CHANGE_ACCENT}>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={MESSAGES.CHANGE_ACCENT}
+                className="bg-card/90 backdrop-blur"
+              >
                 {MESSAGES.CHANGE_ACCENT}
               </Button>
             </PopoverTrigger>
@@ -102,72 +86,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               ))}
             </PopoverContent>
           </Popover>
-
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}
-            onClick={onToggleFullWidth}
-            className="text-muted-foreground"
-          >
-            <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}
-            onClick={onToggleFullscreen}
-            className="text-muted-foreground"
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-            )}
-          </Button>
-
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-border" />
-
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={note.isPinned ? MESSAGES.UNPIN_NOTE : MESSAGES.PIN_NOTE}
-            onClick={() => togglePinNote(note.id)}
-            className={cn(note.isPinned ? "text-primary" : "text-muted-foreground")}
-          >
-            <Pin className="h-4 w-4" aria-hidden="true" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={note.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}
-            onClick={() => toggleFavoriteNote(note.id)}
-            className={cn(note.isFavorite ? "text-warm" : "text-muted-foreground")}
-          >
-            <Star className="h-4 w-4" aria-hidden="true" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={MESSAGES.DUPLICATE_NOTE}
-            onClick={() => duplicateNote(note.id)}
-            className="text-muted-foreground"
-          >
-            <Copy className="h-4 w-4" aria-hidden="true" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={MESSAGES.DELETE_NOTE}
-            onClick={() => requestDeleteNote(note.id)}
-            className="text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </Button>
         </div>
       </div>
 
@@ -214,20 +132,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             saveStatus === "saving" ? "animate-ripple opacity-100" : "opacity-50",
           )}
         />
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
-          <span>
-            {wordCount} {MESSAGES.META_WORDS}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>
-            {characterCount} {MESSAGES.META_CHARACTERS}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>
-            {MESSAGES.META_UPDATED_PREFIX} {formattedDate}
-          </span>
-          <SaveStatusBadge />
-        </div>
 
         <NoteInfoPanel note={note} />
       </div>

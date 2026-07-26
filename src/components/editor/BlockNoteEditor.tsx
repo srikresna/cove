@@ -1,6 +1,5 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
-import { PanelRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -10,12 +9,11 @@ import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { extractPlainText } from "../../utils/plainText";
-import { Button } from "../ui/button";
 import { TooltipProvider } from "../ui/tooltip";
 import { EditorHeader } from "./EditorHeader";
 import { EditorRightBar } from "./EditorRightBar";
+import { EditorTopbar } from "./EditorTopbar";
 import { coveSchema } from "./noteLinkSpec";
-import "@blocknote/mantine/style.css";
 
 interface BlockNoteEditorProps {
   note: Note;
@@ -135,55 +133,51 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-full w-full">
-        <div className="relative h-full min-w-0 flex-1">
-          {!isRightBarOpen && (
-            <Button
-              variant="ghost"
-              size="iconSm"
-              aria-label={MESSAGES.RIGHTBAR_OPEN}
-              onClick={toggleRightBar}
-              className="absolute right-3 top-3 z-20 text-muted-foreground"
-            >
-              <PanelRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          )}
+      <div className="flex h-full w-full flex-col">
+        <EditorTopbar
+          note={note}
+          wordCount={wordCount}
+          characterCount={characterCount}
+          isFullWidth={isFullWidth}
+          isFullscreen={isFullscreen}
+          isRightBarOpen={isRightBarOpen}
+          onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
+          onToggleFullscreen={toggleFullscreen}
+          onToggleRightBar={toggleRightBar}
+        />
 
-          <div ref={scrollRef} className="h-full w-full overflow-y-auto">
-            <EditorHeader
-              note={note}
-              wordCount={wordCount}
-              characterCount={characterCount}
-              isFullWidth={isFullWidth}
-              isFullscreen={isFullscreen}
-              onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
-              onToggleFullscreen={toggleFullscreen}
-            />
+        <div className="flex min-h-0 w-full flex-1">
+          <div className="relative h-full min-w-0 flex-1">
+            <div ref={scrollRef} className="h-full w-full overflow-y-auto">
+              <EditorHeader note={note} isFullWidth={isFullWidth} />
 
-            <div className={cn("min-h-[500px] w-full pb-24", !isFullWidth && "mx-auto max-w-3xl")}>
-              <BlockNoteView
-                editor={editor}
-                theme={isDarkMode ? "dark" : "light"}
-                onChange={() => {
-                  const blocksJson = JSON.stringify(editor.document);
-                  lastLoadedContentRef.current = blocksJson;
-                  pendingContentRef.current = blocksJson;
-                  if (contentTimer.current) clearTimeout(contentTimer.current);
-                  contentTimer.current = setTimeout(() => {
-                    pendingContentRef.current = null;
-                    updateNote(note.id, { content: blocksJson });
-                  }, 500);
-                }}
+              <div
+                className={cn("min-h-[500px] w-full pb-24", !isFullWidth && "mx-auto max-w-3xl")}
               >
-                <SuggestionMenuController triggerCharacter="@" getItems={getLinkSuggestions} />
-              </BlockNoteView>
+                <BlockNoteView
+                  editor={editor}
+                  theme={isDarkMode ? "dark" : "light"}
+                  onChange={() => {
+                    const blocksJson = JSON.stringify(editor.document);
+                    lastLoadedContentRef.current = blocksJson;
+                    pendingContentRef.current = blocksJson;
+                    if (contentTimer.current) clearTimeout(contentTimer.current);
+                    contentTimer.current = setTimeout(() => {
+                      pendingContentRef.current = null;
+                      updateNote(note.id, { content: blocksJson });
+                    }, 500);
+                  }}
+                >
+                  <SuggestionMenuController triggerCharacter="@" getItems={getLinkSuggestions} />
+                </BlockNoteView>
+              </div>
             </div>
           </div>
-        </div>
 
-        {isRightBarOpen && (
-          <EditorRightBar note={note} scrollRef={scrollRef} onClose={toggleRightBar} />
-        )}
+          {isRightBarOpen && (
+            <EditorRightBar note={note} scrollRef={scrollRef} onClose={toggleRightBar} />
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );

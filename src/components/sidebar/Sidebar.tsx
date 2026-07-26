@@ -1,12 +1,11 @@
 import { motion } from "framer-motion";
-import { ChevronDown, Plus, Search, Settings, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
-import { Button } from "../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,14 +21,8 @@ import { WorkspaceRail } from "./WorkspaceRail";
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDeleteWorkspaceOpen, setDeleteWorkspaceOpen] = useState(false);
-  const {
-    workspaces,
-    activeWorkspaceId,
-    setQuickSearchOpen,
-    setSettingsOpen,
-    setCreateModalOpen,
-    deleteWorkspace,
-  } = useWorkspaceStore();
+  const { workspaces, activeWorkspaceId, setQuickSearchOpen, setCreateModalOpen, deleteWorkspace } =
+    useWorkspaceStore();
   const notes = useNoteStore((s) => s.notes);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
@@ -115,19 +108,6 @@ export const Sidebar: React.FC = () => {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               <NoteList />
-            </div>
-
-            <div className="p-3 pt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={MESSAGES.SETTINGS_TITLE}
-                onClick={() => setSettingsOpen(true)}
-                className="w-full justify-start font-normal text-muted-foreground hover:text-foreground"
-              >
-                <Settings aria-hidden="true" />
-                <span>{MESSAGES.SETTINGS_TITLE}</span>
-              </Button>
             </div>
           </div>
         </motion.div>
