@@ -10,6 +10,7 @@ import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import type { Note } from "../../types";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { NoteInfoPanel } from "./NoteInfoPanel";
 import { SaveStatusBadge } from "./SaveStatusBadge";
 
 interface EditorHeaderProps {
@@ -78,7 +79,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           background: `linear-gradient(160deg, ${accent}4d 0%, ${accent}14 60%, transparent 100%)`,
         }}
       >
-        <div className="absolute right-4 top-4 flex items-center gap-1 rounded-md border bg-card/90 p-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <div className="absolute right-14 top-3 flex items-center gap-1 rounded-md border bg-card/90 p-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" aria-label={MESSAGES.CHANGE_ACCENT}>
@@ -221,6 +222,8 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           <span>Updated {formattedDate}</span>
           <SaveStatusBadge />
         </div>
+
+        <NoteInfoPanel note={note} />
       </div>
     </div>
   );

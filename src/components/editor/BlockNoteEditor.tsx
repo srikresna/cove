@@ -1,19 +1,27 @@
 import { BlockNoteView } from "@blocknote/mantine";
-import { useCreateBlockNote } from "@blocknote/react";
+import { SuggestionMenuController, useCreateBlockNote } from "@blocknote/react";
+import { PanelRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
 import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { extractPlainText } from "../../utils/plainText";
+import { Button } from "../ui/button";
+import { TooltipProvider } from "../ui/tooltip";
 import { EditorHeader } from "./EditorHeader";
+import { EditorRightBar } from "./EditorRightBar";
+import { coveSchema } from "./noteLinkSpec";
 import "@blocknote/mantine/style.css";
 
 interface BlockNoteEditorProps {
   note: Note;
 }
+
+const RIGHTBAR_KEY = "cove-rightbar-open";
 
 function countWordsAndChars(contentStr: string): { wordCount: number; characterCount: number } {
   const cleanText = extractPlainText(contentStr).trim();
@@ -26,9 +34,13 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
   const { isDarkMode } = useWorkspaceStore();
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRightBarOpen, setRightBarOpen] = useState(
+    () => localStorage.getItem(RIGHTBAR_KEY) === "true",
+  );
   const lastLoadedContentRef = useRef<string>("");
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const editor = useCreateBlockNote({});
+  const editor = useCreateBlockNote({ schema: coveSchema });
 
   useEffect(() => {
     const loadInitialContent = async () => {
@@ -76,34 +88,87 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
     }
   };
 
+  const toggleRightBar = () => {
+    setRightBarOpen((open) => {
+      localStorage.setItem(RIGHTBAR_KEY, String(!open));
+      return !open;
+    });
+  };
+
+  const getLinkSuggestions = async (query: string) => {
+    const q = query.trim().toLowerCase();
+    return useNoteStore
+      .getState()
+      .notes.filter((n) => n.id !== note.id)
+      .filter((n) => !q || (n.title || MESSAGES.UNTITLED_NOTE).toLowerCase().includes(q))
+      .slice(0, 10)
+      .map((n) => ({
+        title: n.title || MESSAGES.UNTITLED_NOTE,
+        icon: <span aria-hidden="true">{n.icon || "📝"}</span>,
+        onItemClick: () => {
+          editor.insertInlineContent([
+            {
+              type: "noteLink",
+              props: { noteId: n.id, title: n.title || MESSAGES.UNTITLED_NOTE },
+            },
+            " ",
+          ]);
+        },
+      }));
+  };
+
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),
     [note.content],
   );
 
   return (
-    <div className="h-full w-full overflow-y-auto">
-      <EditorHeader
-        note={note}
-        wordCount={wordCount}
-        characterCount={characterCount}
-        isFullWidth={isFullWidth}
-        isFullscreen={isFullscreen}
-        onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
-        onToggleFullscreen={toggleFullscreen}
-      />
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-full w-full">
+        <div className="relative h-full min-w-0 flex-1">
+          {!isRightBarOpen && (
+            <Button
+              variant="ghost"
+              size="iconSm"
+              aria-label={MESSAGES.RIGHTBAR_OPEN}
+              onClick={toggleRightBar}
+              className="absolute right-3 top-3 z-20 text-muted-foreground"
+            >
+              <PanelRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
 
-      <div className={cn("min-h-[500px] w-full pb-24", !isFullWidth && "mx-auto max-w-3xl")}>
-        <BlockNoteView
-          editor={editor}
-          theme={isDarkMode ? "dark" : "light"}
-          onChange={() => {
-            const blocksJson = JSON.stringify(editor.document);
-            lastLoadedContentRef.current = blocksJson;
-            updateNote(note.id, { content: blocksJson });
-          }}
-        />
+          <div ref={scrollRef} className="h-full w-full overflow-y-auto">
+            <EditorHeader
+              note={note}
+              wordCount={wordCount}
+              characterCount={characterCount}
+              isFullWidth={isFullWidth}
+              isFullscreen={isFullscreen}
+              onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
+              onToggleFullscreen={toggleFullscreen}
+            />
+
+            <div className={cn("min-h-[500px] w-full pb-24", !isFullWidth && "mx-auto max-w-3xl")}>
+              <BlockNoteView
+                editor={editor}
+                theme={isDarkMode ? "dark" : "light"}
+                onChange={() => {
+                  const blocksJson = JSON.stringify(editor.document);
+                  lastLoadedContentRef.current = blocksJson;
+                  updateNote(note.id, { content: blocksJson });
+                }}
+              >
+                <SuggestionMenuController triggerCharacter="@" getItems={getLinkSuggestions} />
+              </BlockNoteView>
+            </div>
+          </div>
+        </div>
+
+        {isRightBarOpen && (
+          <EditorRightBar note={note} scrollRef={scrollRef} onClose={toggleRightBar} />
+        )}
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
