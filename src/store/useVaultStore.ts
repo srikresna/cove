@@ -14,6 +14,7 @@ interface VaultState {
   tryAutoUnlock: () => Promise<boolean>;
   lock: () => Promise<void>;
   setTrustDevice: (enabled: boolean) => Promise<void>;
+  changePassphrase: (oldPassphrase: string, newPassphrase: string) => Promise<void>;
 }
 
 const refreshStatus = async (): Promise<VaultStatus> => {
@@ -68,5 +69,9 @@ export const useVaultStore = create<VaultState>((set) => ({
   setTrustDevice: async (enabled) => {
     await vaultService.setKeychainEscrow(enabled);
     useSettingsStore.getState().setAutoUnlockOnLaunch(enabled);
+  },
+  changePassphrase: async (oldPassphrase, newPassphrase) => {
+    await vaultService.changePassphrase(oldPassphrase, newPassphrase);
+    set({ status: await refreshStatus() });
   },
 }));

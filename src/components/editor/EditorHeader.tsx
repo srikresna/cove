@@ -28,7 +28,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   onToggleFullWidth,
   onToggleFullscreen,
 }) => {
-  const { updateNote, deleteNote, duplicateNote, togglePinNote, toggleFavoriteNote } =
+  const { updateNote, requestDeleteNote, duplicateNote, togglePinNote, toggleFavoriteNote } =
     useNoteStore();
 
   const [title, setTitle] = useState(note.title);
@@ -201,7 +201,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           <button
             type="button"
             aria-label={MESSAGES.DELETE_NOTE}
-            onClick={() => deleteNote(note.id)}
+            onClick={() => requestDeleteNote(note.id)}
             className="p-2 rounded-[14px] text-charcoal hover:text-red-600 hover:bg-red-50 transition-all hover:scale-105 active:scale-95"
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />

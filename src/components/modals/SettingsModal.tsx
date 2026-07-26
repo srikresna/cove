@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Download, Lock, X } from "lucide-react";
+import { Download, KeyRound, Lock, Upload, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -9,6 +9,11 @@ import { useNotificationStore } from "../../store/useNotificationStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { ChangePassphraseDialog } from "./ChangePassphraseDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
+
+const actionButton =
+  "flex w-full items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-charcoal bg-cream-paper px-4 py-2.5 text-xs font-bold text-cocoa-ink shadow-paper-lift transition-transform hover:scale-105 disabled:opacity-50";
 
 export const SettingsModal: React.FC = () => {
   const { isSettingsOpen, setSettingsOpen } = useWorkspaceStore();
@@ -17,6 +22,9 @@ export const SettingsModal: React.FC = () => {
   const lock = useVaultStore((s) => s.lock);
   const pushToast = useNotificationStore((s) => s.pushToast);
   const [backupStatus, setBackupStatus] = useState<"idle" | "saving">("idle");
+  const [isChangePassOpen, setChangePassOpen] = useState(false);
+  const [pendingRestorePath, setPendingRestorePath] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const notifyError = (err: unknown) => {
     const p = presentError(err);
@@ -49,6 +57,27 @@ export const SettingsModal: React.FC = () => {
     }
   };
 
+  const handlePickRestore = async () => {
+    try {
+      const path = await backupService.pickBackupFile();
+      if (path) setPendingRestorePath(path);
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!pendingRestorePath) return;
+    setRestoring(true);
+    try {
+      await backupService.restoreFromFile(pendingRestorePath);
+    } catch (err) {
+      notifyError(err);
+      setRestoring(false);
+      setPendingRestorePath(null);
+    }
+  };
+
   return (
     <Dialog.Root open={isSettingsOpen} onOpenChange={setSettingsOpen}>
       <Dialog.Portal>
@@ -59,7 +88,7 @@ export const SettingsModal: React.FC = () => {
             <Dialog.Close asChild>
               <button
                 type="button"
-                aria-label="Close settings"
+                aria-label={MESSAGES.SETTINGS_CLOSE}
                 className="p-1.5 rounded-[12px] text-charcoal hover:bg-dew-drop outline-none"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
@@ -101,10 +130,15 @@ export const SettingsModal: React.FC = () => {
               await lock();
               setSettingsOpen(false);
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-charcoal bg-cream-paper px-4 py-2.5 text-xs font-bold text-cocoa-ink shadow-paper-lift transition-transform hover:scale-105"
+            className={actionButton}
           >
             <Lock className="h-4 w-4 text-marker-orange" aria-hidden="true" />
             <span>{MESSAGES.SETTINGS_LOCK_NOW}</span>
+          </button>
+
+          <button type="button" onClick={() => setChangePassOpen(true)} className={actionButton}>
+            <KeyRound className="h-4 w-4 text-marker-orange" aria-hidden="true" />
+            <span>{MESSAGES.SETTINGS_CHANGE_PASSPHRASE}</span>
           </button>
 
           <div>
@@ -112,17 +146,52 @@ export const SettingsModal: React.FC = () => {
               type="button"
               disabled={backupStatus === "saving"}
               onClick={handleExportBackup}
-              className="flex w-full items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-charcoal bg-cream-paper px-4 py-2.5 text-xs font-bold text-cocoa-ink shadow-paper-lift transition-transform hover:scale-105 disabled:opacity-50"
+              className={actionButton}
             >
               <Download className="h-4 w-4 text-marker-orange" aria-hidden="true" />
               <span>
-                {backupStatus === "saving" ? "Exporting…" : MESSAGES.SETTINGS_EXPORT_BACKUP}
+                {backupStatus === "saving"
+                  ? MESSAGES.SETTINGS_EXPORT_IN_PROGRESS
+                  : MESSAGES.SETTINGS_EXPORT_BACKUP}
               </span>
             </button>
             <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
               {MESSAGES.SETTINGS_EXPORT_BACKUP_HINT}
             </p>
           </div>
+
+          <div>
+            <button
+              type="button"
+              disabled={restoring}
+              onClick={handlePickRestore}
+              className={actionButton}
+            >
+              <Upload className="h-4 w-4 text-marker-orange" aria-hidden="true" />
+              <span>
+                {restoring
+                  ? MESSAGES.SETTINGS_RESTORE_IN_PROGRESS
+                  : MESSAGES.SETTINGS_RESTORE_BACKUP}
+              </span>
+            </button>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
+              {MESSAGES.SETTINGS_RESTORE_BACKUP_HINT}
+            </p>
+          </div>
+
+          <ChangePassphraseDialog open={isChangePassOpen} onOpenChange={setChangePassOpen} />
+          <ConfirmDialog
+            open={pendingRestorePath !== null}
+            title={MESSAGES.RESTORE_CONFIRM_TITLE}
+            description={`${pendingRestorePath ?? ""} — ${MESSAGES.RESTORE_CONFIRM_DESC}`}
+            confirmLabel={MESSAGES.RESTORE_CONFIRM_BUTTON}
+            danger
+            busy={restoring}
+            onConfirm={handleConfirmRestore}
+            onCancel={() => {
+              if (!restoring) setPendingRestorePath(null);
+            }}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

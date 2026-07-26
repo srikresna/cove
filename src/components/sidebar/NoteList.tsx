@@ -16,7 +16,7 @@ export const NoteList: React.FC = () => {
     activeNoteId,
     setActiveNoteId,
     createNote,
-    deleteNote,
+    requestDeleteNote,
     togglePinNote,
     toggleFavoriteNote,
   } = useNoteStore(
@@ -25,7 +25,7 @@ export const NoteList: React.FC = () => {
       activeNoteId: s.activeNoteId,
       setActiveNoteId: s.setActiveNoteId,
       createNote: s.createNote,
-      deleteNote: s.deleteNote,
+      requestDeleteNote: s.requestDeleteNote,
       togglePinNote: s.togglePinNote,
       toggleFavoriteNote: s.toggleFavoriteNote,
     })),
@@ -100,9 +100,9 @@ export const NoteList: React.FC = () => {
   const handleDelete = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      deleteNote(id);
+      requestDeleteNote(id);
     },
-    [deleteNote],
+    [requestDeleteNote],
   );
 
   const handleCreate = useCallback(() => {

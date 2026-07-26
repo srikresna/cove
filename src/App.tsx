@@ -4,6 +4,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
+import { DeleteNoteDialog } from "./components/modals/DeleteNoteDialog";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
@@ -136,6 +137,7 @@ export const AppContent: React.FC = () => {
       <CreateWorkspaceModal />
       <QuickSearchModal />
       <SettingsModal />
+      <DeleteNoteDialog />
       <ToastContainer />
     </div>
   );

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
 import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
@@ -48,4 +49,7 @@ export const vaultService = new VaultService(
   new LocalStorageLegacyKeyStore(),
 );
 
-export const backupService: IBackupService = new TauriBackupService();
+export const backupService: IBackupService = new TauriBackupService({
+  suspend: () => SQLiteDatabase.suspend(),
+  resume: () => SQLiteDatabase.resume(),
+});

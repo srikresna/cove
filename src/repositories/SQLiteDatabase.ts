@@ -1,11 +1,20 @@
 import Database from "@tauri-apps/plugin-sql";
+import { PersistenceError } from "../errors/AppError";
 
 export class SQLiteDatabase {
   private static instance: Promise<Database> | null = null;
+  private static suspended = false;
 
   // Connection + PRAGMAs + schema migration resolve inside one promise, so no
   // caller can race ahead of CREATE TABLE.
   static getInstance(): Promise<Database> {
+    if (SQLiteDatabase.suspended) {
+      // The lazy singleton must not reopen cove.db while a restore is
+      // swapping the file — a fresh pool would re-lock it mid-swap.
+      return Promise.reject(
+        new PersistenceError("db.open", "Database is suspended while a backup is being restored."),
+      );
+    }
     if (!SQLiteDatabase.instance) {
       SQLiteDatabase.instance = (async () => {
         const db = await Database.load("sqlite:cove.db");
@@ -21,6 +30,18 @@ export class SQLiteDatabase {
       })();
     }
     return SQLiteDatabase.instance;
+  }
+
+  static async suspend(): Promise<void> {
+    SQLiteDatabase.suspended = true;
+    if (!SQLiteDatabase.instance) return;
+    const db = await SQLiteDatabase.instance;
+    await db.close();
+    SQLiteDatabase.instance = null;
+  }
+
+  static resume(): void {
+    SQLiteDatabase.suspended = false;
   }
 
   // tauri-plugin-sql's pool may route each execute to a different connection,

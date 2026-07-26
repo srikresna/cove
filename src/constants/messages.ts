@@ -16,6 +16,9 @@ export const MESSAGES = {
   UNFAVORITE_NOTE: "Unfavorite Note",
   DUPLICATE_NOTE: "Duplicate Note",
   DELETE_NOTE: "Delete Note",
+  DELETE_NOTE_CONFIRM_TITLE: "Delete this note?",
+  DELETE_NOTE_CONFIRM_DESC: "It will be permanently deleted. This cannot be undone.",
+  DELETE_NOTE_CONFIRM_BUTTON: "Delete",
   CREATE_WORKSPACE_TITLE: "Create Workspace",
   WORKSPACE_NAME_LABEL: "Workspace Name",
   WORKSPACE_EMOJI_LABEL: "Emoji Icon",
@@ -54,12 +57,30 @@ export const MESSAGES = {
   VAULT_DISCLOSURE:
     'Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (Argon2id, memory-hard) and held in memory only while unlocked. Enabling "Trust this device" in Settings keeps a device-bound recovery copy in your OS keychain (trusted-device recovery, not zero-knowledge).',
   SETTINGS_TITLE: "Settings",
+  SETTINGS_CLOSE: "Close settings",
   SETTINGS_AUTO_UNLOCK_LABEL: "Trust this device",
   SETTINGS_AUTO_UNLOCK_DESC:
     'Keeps a device-bound copy of the vault key in the OS keychain: the app auto-unlocks on launch and "forgot passphrase" recovery works on this device. Anyone with access to this computer\'s login can bypass the passphrase while this is on. Turning it off deletes the keychain copy.',
   SETTINGS_LOCK_NOW: "Lock vault now",
+  SETTINGS_CHANGE_PASSPHRASE: "Change passphrase",
+  CHANGE_PASS_TITLE: "Change Passphrase",
+  CHANGE_PASS_DESC:
+    "Your notes stay encrypted with the same key; only the passphrase that unlocks them changes.",
+  VAULT_CURRENT_PASSPHRASE_LABEL: "Current passphrase",
+  VAULT_NEW_PASSPHRASE_LABEL: "New passphrase",
+  CHANGE_PASS_BUTTON: "Change Passphrase",
+  CHANGE_PASS_SUCCESS_TITLE: "Passphrase changed",
   SETTINGS_EXPORT_BACKUP: "Export Backup",
+  SETTINGS_EXPORT_IN_PROGRESS: "Exporting…",
   SETTINGS_EXPORT_BACKUP_HINT:
     "Note content in the backup is encrypted (passphrase required to read it); titles, workspace names, and timestamps are not.",
   BACKUP_SAVED_TITLE: "Backup saved",
+  SETTINGS_RESTORE_BACKUP: "Restore Backup",
+  SETTINGS_RESTORE_IN_PROGRESS: "Restoring…",
+  SETTINGS_RESTORE_BACKUP_HINT:
+    "Replaces all current data with a backup file. The app restarts afterwards.",
+  RESTORE_CONFIRM_TITLE: "Restore this backup?",
+  RESTORE_CONFIRM_DESC:
+    "All current notes and workspaces will be replaced by the backup. The current database is kept next to it as cove.db.pre-restore. The app will restart, locked with the backup's passphrase.",
+  RESTORE_CONFIRM_BUTTON: "Restore & Restart",
 } as const;

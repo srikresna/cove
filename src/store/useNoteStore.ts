@@ -8,7 +8,10 @@ import { useSaveStatusStore } from "./useSaveStatusStore";
 interface NoteState {
   notes: Note[];
   activeNoteId: string | null;
+  pendingDeleteId: string | null;
   setActiveNoteId: (id: string | null) => void;
+  requestDeleteNote: (id: string) => void;
+  cancelDeleteNote: () => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
   loadActiveNoteContent: (id: string) => Promise<void>;
   createNote: (
@@ -60,8 +63,11 @@ export const useNoteStore = create<NoteState>((set, get) => {
   return {
     notes: [],
     activeNoteId: null,
+    pendingDeleteId: null,
 
     setActiveNoteId: (id) => set({ activeNoteId: id }),
+    requestDeleteNote: (id) => set({ pendingDeleteId: id }),
+    cancelDeleteNote: () => set({ pendingDeleteId: null }),
 
     fetchNotes: async (workspaceId) => {
       try {
