@@ -23,7 +23,7 @@ const cryptoVault = new CryptoVault(kmsRepository);
 const noteRepository = new SQLiteNoteRepository(cryptoVault);
 const workspaceRepository = new SQLiteWorkspaceRepository();
 
-export const noteService: INoteService = new NoteService(noteRepository);
+export const noteService: INoteService = new NoteService(noteRepository, cryptoVault);
 export const workspaceService: IWorkspaceService = new WorkspaceService(
   workspaceRepository,
   noteRepository,
@@ -47,7 +47,8 @@ export const vaultService = new VaultService(
   deriveKeyFn,
 );
 
-export const createNoteService = (repo: INoteRepository): INoteService => new NoteService(repo);
+export const createNoteService = (repo: INoteRepository): INoteService =>
+  new NoteService(repo, cryptoVault);
 export const createWorkspaceService = (
   wsRepo: IWorkspaceRepository,
   noteRepo: INoteRepository,

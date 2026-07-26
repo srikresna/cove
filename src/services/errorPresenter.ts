@@ -1,4 +1,4 @@
-import { AppError } from "../errors/AppError";
+import { AppError, VaultLockedError } from "../errors/AppError";
 
 export interface PresentedError {
   kind: "info" | "success" | "warning" | "error";
@@ -41,9 +41,12 @@ export function presentError(cause: unknown): PresentedError {
       case "encryption":
         return {
           kind: "error",
-          toastTitle: "Security Error",
+          toastTitle: cause instanceof VaultLockedError ? "Vault Locked" : "Security Error",
           toastDescription: cause.message,
-          userMessage: "Could not encrypt or decrypt note data.",
+          userMessage:
+            cause instanceof VaultLockedError
+              ? "The vault is locked. Unlock to access your notes."
+              : "Could not encrypt or decrypt note data.",
         };
       case "concurrency":
         return {

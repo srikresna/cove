@@ -2,11 +2,21 @@ import { describe, expect, it } from "vitest";
 import { NotFoundError } from "../domain/errors";
 import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
 import { NoteService } from "./NoteService";
+import type { IEncryptionService } from "./vault/IEncryptionService";
+
+/** Fake IEncryptionService that always reports unlocked — for NoteService unit tests. */
+const unlockedCrypto: IEncryptionService = {
+  isUnlocked: () => true,
+  setSessionKeys: async () => {},
+  clearSessionKeys: () => {},
+  encryptPayload: async (p: string) => p,
+  decryptPayload: async (c: string) => c,
+};
 
 describe("NoteService", () => {
   it("listMetadataByWorkspace calls getNotesMetadataByWorkspace", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     fakeRepo.notes.push({
       id: "note-1",
@@ -31,7 +41,7 @@ describe("NoteService", () => {
 
   it("getNote, createNote, updateMetadata, updateContent, and deleteNote work as expected", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     const created = await service.createNote("ws-1", "New Title", "New Content");
     expect(created.title).toBe("New Title");
@@ -52,7 +62,7 @@ describe("NoteService", () => {
 
   it("duplicateNote copies content and title with (Copy)", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     fakeRepo.notes.push({
       id: "note-1",
@@ -75,14 +85,14 @@ describe("NoteService", () => {
 
   it("duplicateNote throws NotFoundError for missing id", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     await expect(service.duplicateNote("non-existent")).rejects.toThrow(NotFoundError);
   });
 
   it("togglePin and toggleFavorite toggle flags", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     fakeRepo.notes.push({
       id: "note-1",
@@ -108,14 +118,14 @@ describe("NoteService", () => {
   it("re-throws repository errors (fail fast)", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     fakeRepo.shouldFail = true;
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     await expect(service.listMetadataByWorkspace("ws-1")).rejects.toThrow();
   });
 
   it("searchAcrossWorkspaces matches title and body, returning snippet DTOs", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo);
+    const service = new NoteService(fakeRepo, unlockedCrypto);
 
     fakeRepo.notes.push({
       id: "n-search",

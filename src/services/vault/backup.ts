@@ -1,9 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
-import { SQLiteDatabase } from "../../repositories/SQLiteDatabase";
 
 /**
  * Export an encrypted backup of the vault database.
- * Uses SQLite VACUUM INTO to create a clean, consistent copy at a user-chosen path.
+ * Delegates to a Rust command (file copy) so the path never touches SQL
+ * string interpolation — no injection risk.
  * The backup contains all encrypted notes + the kms record (wrapped DEK). The user's
  * passphrase is required to unlock the backup on any device.
  */
@@ -12,11 +13,8 @@ export async function exportBackup(): Promise<string | null> {
     defaultPath: "cove-backup.db",
     filters: [{ name: "SQLite Database", extensions: ["db"] }],
   });
-  if (!path) return null; // user cancelled
+  if (!path) return null;
 
-  const db = await SQLiteDatabase.getInstance();
-  // VACUUM INTO doesn't accept bound params; escape single quotes in the path.
-  const escaped = path.replace(/'/g, "''");
-  await db.execute(`VACUUM INTO '${escaped}'`);
+  await invoke("backup_database", { targetPath: path });
   return path;
 }

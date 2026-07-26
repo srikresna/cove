@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod backup;
 mod crypto;
 mod dpapi;
 
@@ -19,7 +20,8 @@ fn main() {
     .invoke_handler(tauri::generate_handler![
         dpapi::device_wrap,
         dpapi::device_unwrap,
-        crypto::derive_key_kdf
+        crypto::derive_key_kdf,
+        backup::backup_database
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { vaultService } from "../di/container";
 import type { VaultStatus } from "../services/IVaultService";
+import { useNoteStore } from "./useNoteStore";
 import { useSettingsStore } from "./useSettingsStore";
 
 interface VaultState {
@@ -55,6 +56,10 @@ export const useVaultStore = create<VaultState>((set) => ({
   },
   lock: async () => {
     await vaultService.lock();
+    // H1 fix: clear decrypted note content from memory on lock.
+    // The Zustand store persists across React unmounts; without this, decrypted
+    // note bodies remain reachable in JS heap after lock.
+    useNoteStore.setState({ notes: [], activeNoteId: null });
     set({ status: await refreshStatus() });
   },
 }));

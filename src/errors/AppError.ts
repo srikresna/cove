@@ -89,3 +89,10 @@ export class EncryptionError extends AppError {
 export class ConcurrencyError extends AppError {
   readonly category = "concurrency" as const;
 }
+
+export class VaultLockedError extends AppError {
+  readonly category = "encryption" as const;
+  constructor(message = "Vault is locked; unlock to access notes.", options?: AppErrorOptions) {
+    super(message, options);
+  }
+}
