@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { extractBlockSuiteLinkIds, extractBlockSuitePlainText } from "./blockSuiteContent";
+import {
+  extractBlockSuiteHeadings,
+  extractBlockSuiteLinkIds,
+  extractBlockSuitePlainText,
+} from "./blockSuiteContent";
 import { packBlockSuiteContent } from "./contentFormat";
 import { encodeDocSnapshot } from "./yjsCodec";
 
@@ -52,6 +56,29 @@ describe("blockSuiteContent", () => {
 
   it("extracts referenced doc ids from text deltas", () => {
     expect(extractBlockSuiteLinkIds(buildSampleContent())).toEqual(["note-target-1"]);
+  });
+
+  it("extracts headings with levels in document order", () => {
+    const doc = new Y.Doc();
+    const blocks = doc.getMap("blocks");
+    const page = makeBlock(blocks, "page", "affine:page", ["note"]);
+    setText(page, "prop:title", "");
+    makeBlock(blocks, "note", "affine:note", ["h", "p", "h3"]);
+    const h = makeBlock(blocks, "h", "affine:paragraph", []);
+    h.set("prop:type", "h1");
+    setText(h, "prop:text", "Bab Satu");
+    const p = makeBlock(blocks, "p", "affine:paragraph", []);
+    p.set("prop:type", "text");
+    setText(p, "prop:text", "isi");
+    const h3 = makeBlock(blocks, "h3", "affine:paragraph", []);
+    h3.set("prop:type", "h3");
+    setText(h3, "prop:text", "Sub");
+
+    const content = packBlockSuiteContent(encodeDocSnapshot(doc));
+    expect(extractBlockSuiteHeadings(content)).toEqual([
+      { id: "h", text: "Bab Satu", level: 1 },
+      { id: "h3", text: "Sub", level: 3 },
+    ]);
   });
 
   it("returns null for non-BlockSuite content", () => {

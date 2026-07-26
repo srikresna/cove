@@ -68,6 +68,32 @@ export function extractBlockSuitePlainText(content: string): string | null {
   return paragraphs.join(" ").replace(/\s+/g, " ").trim();
 }
 
+export interface BlockSuiteHeading {
+  id: string;
+  text: string;
+  level: number;
+}
+
+const HEADING_LEVELS: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6 };
+
+/** Headings of a BlockSuite envelope in document order, or null if not one. */
+export function extractBlockSuiteHeadings(content: string): BlockSuiteHeading[] | null {
+  const update = unpackBlockSuiteContent(content);
+  if (update === null) return null;
+  const doc = docFromSnapshot(update);
+  const items: BlockSuiteHeading[] = [];
+  for (const block of blocksInTreeOrder(doc.getMap("blocks"))) {
+    const type = block.get("prop:type");
+    const level = typeof type === "string" ? HEADING_LEVELS[type] : undefined;
+    if (!level) continue;
+    const id = block.get("sys:id");
+    const text = textOf(block, "prop:text").trim();
+    if (typeof id !== "string" || !text) continue;
+    items.push({ id, text, level });
+  }
+  return items;
+}
+
 interface ReferenceDelta {
   attributes?: { reference?: { pageId?: unknown } };
 }

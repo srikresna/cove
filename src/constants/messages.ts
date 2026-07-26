@@ -21,6 +21,7 @@ export const MESSAGES = {
   SEARCH_PREVIEW_HINT: "Highlight a result to preview it.",
   RIGHTBAR_TAB_TOC: "Outline & backlinks",
   RIGHTBAR_TAB_CALENDAR: "Calendar",
+  RIGHTBAR_TAB_INFO: "Note properties",
   CALENDAR_FILTER_UPDATED: "Updated",
   CALENDAR_FILTER_CREATED: "Created",
   CALENDAR_EMPTY_DAY: "No notes on this day.",

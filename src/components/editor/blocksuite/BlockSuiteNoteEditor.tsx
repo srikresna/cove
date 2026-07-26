@@ -1,5 +1,5 @@
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
@@ -7,8 +7,11 @@ import type { Note } from "../../../types";
 import { countWordsAndChars } from "../../../utils/plainText";
 import { TooltipProvider } from "../../ui/tooltip";
 import { EditorHeader } from "../EditorHeader";
+import { EditorRightBar } from "../EditorRightBar";
 import { EditorTopbar } from "../EditorTopbar";
 import { BlockSuiteSurface } from "./BlockSuiteSurface";
+
+const RIGHTBAR_KEY = "cove-rightbar-open";
 
 interface BlockSuiteNoteEditorProps {
   note: Note;
@@ -18,6 +21,10 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
   const updateNote = useNoteStore((s) => s.updateNote);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRightBarOpen, setRightBarOpen] = useState(
+    () => localStorage.getItem(RIGHTBAR_KEY) === "true",
+  );
+  const scrollRef = useRef<HTMLDivElement>(null);
   const mode = note.docMode ?? "page";
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),
@@ -38,6 +45,13 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     }
   };
 
+  const toggleRightBar = () => {
+    setRightBarOpen((open) => {
+      localStorage.setItem(RIGHTBAR_KEY, String(!open));
+      return !open;
+    });
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex h-full w-full flex-col">
@@ -47,14 +61,14 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
           characterCount={characterCount}
           isFullWidth={isFullWidth}
           isFullscreen={isFullscreen}
-          isRightBarOpen={false}
+          isRightBarOpen={isRightBarOpen}
           docMode={mode}
           onToggleDocMode={() =>
             updateNote(note.id, { docMode: mode === "edgeless" ? "page" : "edgeless" })
           }
           onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
           onToggleFullscreen={toggleFullscreen}
-          onToggleRightBar={() => {}}
+          onToggleRightBar={toggleRightBar}
         />
 
         <div className="flex min-h-0 w-full flex-1">
@@ -62,7 +76,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
             {mode === "edgeless" ? (
               <BlockSuiteSurface note={note} mode="edgeless" />
             ) : (
-              <div className="h-full w-full overflow-y-auto">
+              <div ref={scrollRef} className="h-full w-full overflow-y-auto">
                 <EditorHeader note={note} isFullWidth={isFullWidth} />
 
                 <div
@@ -76,6 +90,10 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
               </div>
             )}
           </div>
+
+          {isRightBarOpen && mode === "page" && (
+            <EditorRightBar note={note} scrollRef={scrollRef} onClose={toggleRightBar} />
+          )}
         </div>
       </div>
     </TooltipProvider>

@@ -1,10 +1,11 @@
-import { CalendarDays, FileText, List, PanelRightClose } from "lucide-react";
+import { CalendarDays, FileText, Info, List, PanelRightClose } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { noteService } from "../../di/container";
 import { cn } from "../../lib/utils";
 import type { NoteMeta } from "../../services/INoteService";
+import { extractBlockSuiteHeadings } from "../../services/editor/blockSuiteContent";
 import { presentError } from "../../services/errorPresenter";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
@@ -15,9 +16,13 @@ import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { CalendarPanel } from "./CalendarPanel";
+import { NoteInfoPanel } from "./NoteInfoPanel";
 
 const TAB_KEY = "cove-rightbar-tab";
-type RightBarTab = "toc" | "calendar";
+type RightBarTab = "toc" | "calendar" | "info";
+
+const isRightBarTab = (value: string | null): value is RightBarTab =>
+  value === "toc" || value === "calendar" || value === "info";
 
 interface TocItem {
   id: string;
@@ -32,6 +37,8 @@ interface EditorRightBarProps {
 }
 
 function extractHeadings(content: string): TocItem[] {
+  const blockSuiteHeadings = extractBlockSuiteHeadings(content);
+  if (blockSuiteHeadings !== null) return blockSuiteHeadings;
   const items: TocItem[] = [];
   walkBlocks(content, (block) => {
     if (block.type !== "heading" || typeof block.id !== "string") return;
@@ -63,9 +70,10 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 );
 
 export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef, onClose }) => {
-  const [tab, setTab] = useState<RightBarTab>(() =>
-    localStorage.getItem(TAB_KEY) === "calendar" ? "calendar" : "toc",
-  );
+  const [tab, setTab] = useState<RightBarTab>(() => {
+    const stored = localStorage.getItem(TAB_KEY);
+    return isRightBarTab(stored) ? stored : "toc";
+  });
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
   const [backlinks, setBacklinks] = useState<NoteMeta[]>([]);
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
@@ -95,7 +103,8 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
     const center = container.getBoundingClientRect().top + container.clientHeight / 2;
     let current: string | null = headings[0]?.id ?? null;
     for (const h of headings) {
-      const el = container.querySelector(`[data-id="${h.id}"]`);
+      // data-id is BlockNote's block attribute, data-block-id is BlockSuite's.
+      const el = container.querySelector(`[data-id="${h.id}"], [data-block-id="${h.id}"]`);
       if (!el) continue;
       const rect = el.getBoundingClientRect();
       if (rect.top < center + rect.height) current = h.id;
@@ -112,7 +121,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
   }, [scrollRef, updateActiveHeading]);
 
   const scrollToHeading = (id: string) => {
-    const el = scrollRef.current?.querySelector(`[data-id="${id}"]`);
+    const el = scrollRef.current?.querySelector(`[data-id="${id}"], [data-block-id="${id}"]`);
     if (!(el instanceof HTMLElement)) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.add("cove-block-flash");
@@ -137,6 +146,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
             [
               ["toc", MESSAGES.RIGHTBAR_TAB_TOC, List],
               ["calendar", MESSAGES.RIGHTBAR_TAB_CALENDAR, CalendarDays],
+              ["info", MESSAGES.RIGHTBAR_TAB_INFO, Info],
             ] as const
           ).map(([value, label, Icon]) => (
             <Tooltip key={value}>
@@ -170,6 +180,11 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
       </div>
 
       {tab === "calendar" && <CalendarPanel />}
+      {tab === "info" && (
+        <div className="px-2 pt-1">
+          <NoteInfoPanel note={note} />
+        </div>
+      )}
 
       <div className={cn("px-2 pt-1", tab !== "toc" && "hidden")}>
         {headings.length === 0 ? (
