@@ -3,7 +3,9 @@ import { Download, Lock, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { exportBackup } from "../../services/vault/backup";
+import { backupService } from "../../di/container";
+import { presentError } from "../../services/errorPresenter";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -11,9 +13,41 @@ import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 export const SettingsModal: React.FC = () => {
   const { isSettingsOpen, setSettingsOpen } = useWorkspaceStore();
   const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
-  const setAutoUnlockOnLaunch = useSettingsStore((s) => s.setAutoUnlockOnLaunch);
+  const setTrustDevice = useVaultStore((s) => s.setTrustDevice);
   const lock = useVaultStore((s) => s.lock);
+  const pushToast = useNotificationStore((s) => s.pushToast);
   const [backupStatus, setBackupStatus] = useState<"idle" | "saving">("idle");
+
+  const notifyError = (err: unknown) => {
+    const p = presentError(err);
+    pushToast({ kind: p.kind, title: p.toastTitle, description: p.toastDescription });
+  };
+
+  const handleTrustDeviceToggle = async () => {
+    try {
+      await setTrustDevice(!autoUnlockOnLaunch);
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    setBackupStatus("saving");
+    try {
+      const path = await backupService.exportBackup();
+      if (path) {
+        pushToast({
+          kind: "success",
+          title: MESSAGES.BACKUP_SAVED_TITLE,
+          description: path,
+        });
+      }
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setBackupStatus("idle");
+    }
+  };
 
   return (
     <Dialog.Root open={isSettingsOpen} onOpenChange={setSettingsOpen}>
@@ -47,7 +81,7 @@ export const SettingsModal: React.FC = () => {
               role="switch"
               aria-checked={autoUnlockOnLaunch}
               aria-label={MESSAGES.SETTINGS_AUTO_UNLOCK_LABEL}
-              onClick={() => setAutoUnlockOnLaunch(!autoUnlockOnLaunch)}
+              onClick={handleTrustDeviceToggle}
               className={`relative h-6 w-11 flex-shrink-0 rounded-full border-[1.5px] border-charcoal transition-colors ${
                 autoUnlockOnLaunch ? "bg-marker-orange" : "bg-cream-paper"
               }`}
@@ -73,24 +107,22 @@ export const SettingsModal: React.FC = () => {
             <span>{MESSAGES.SETTINGS_LOCK_NOW}</span>
           </button>
 
-          <button
-            type="button"
-            disabled={backupStatus === "saving"}
-            onClick={async () => {
-              setBackupStatus("saving");
-              try {
-                await exportBackup();
-              } catch {
-                /* ignore — dialog may have been cancelled */
-              } finally {
-                setBackupStatus("idle");
-              }
-            }}
-            className="flex w-full items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-charcoal bg-cream-paper px-4 py-2.5 text-xs font-bold text-cocoa-ink shadow-paper-lift transition-transform hover:scale-105 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4 text-marker-orange" aria-hidden="true" />
-            <span>{backupStatus === "saving" ? "Exporting…" : "Export Encrypted Backup"}</span>
-          </button>
+          <div>
+            <button
+              type="button"
+              disabled={backupStatus === "saving"}
+              onClick={handleExportBackup}
+              className="flex w-full items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-charcoal bg-cream-paper px-4 py-2.5 text-xs font-bold text-cocoa-ink shadow-paper-lift transition-transform hover:scale-105 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4 text-marker-orange" aria-hidden="true" />
+              <span>
+                {backupStatus === "saving" ? "Exporting…" : MESSAGES.SETTINGS_EXPORT_BACKUP}
+              </span>
+            </button>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
+              {MESSAGES.SETTINGS_EXPORT_BACKUP_HINT}
+            </p>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

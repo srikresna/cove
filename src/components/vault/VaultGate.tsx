@@ -2,7 +2,6 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
-import { MigrationScreen } from "./MigrationScreen";
 import { SetPassphraseScreen } from "./SetPassphraseScreen";
 import { UnlockScreen } from "./UnlockScreen";
 
@@ -60,7 +59,6 @@ export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
     };
   }, []);
 
-  if (status === "migration_in_progress") return <MigrationScreen />;
   if (status === "uninitialized") return <SetPassphraseScreen mode="setup" />;
   if (status === "locked") {
     return view === "recover" ? (

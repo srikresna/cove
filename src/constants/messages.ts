@@ -48,15 +48,18 @@ export const MESSAGES = {
     "Set a new passphrase. Your notes will be recovered from this device's OS keychain backup.",
   VAULT_SET_TITLE: "Set a Passphrase",
   VAULT_SET_DESC:
-    "Choose a strong passphrase to encrypt your notes. It is not stored anywhere — if you forget it, recovery is possible only on this device via the OS keychain backup.",
+    'Choose a strong passphrase to encrypt your notes. It is not stored anywhere — if you forget it, recovery is only possible on this device, and only if "Trust this device" is enabled in Settings.',
   VAULT_SET_BUTTON: "Create Vault",
   VAULT_SET_MISMATCH: "Passphrases do not match.",
   VAULT_DISCLOSURE:
-    "Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (PBKDF2, 600k iterations) and held in memory only while unlocked. A recovery backup is stored in your OS keychain (trusted-device recovery, not zero-knowledge).",
-  VAULT_MIGRATING: "Migrating notes to the new vault…",
+    'Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (Argon2id, memory-hard) and held in memory only while unlocked. Enabling "Trust this device" in Settings keeps a device-bound recovery copy in your OS keychain (trusted-device recovery, not zero-knowledge).',
   SETTINGS_TITLE: "Settings",
   SETTINGS_AUTO_UNLOCK_LABEL: "Trust this device",
   SETTINGS_AUTO_UNLOCK_DESC:
-    "Auto-unlock from the OS keychain when the app opens — no passphrase prompt. Your notes stay encrypted at rest, but anyone with access to this computer's login can open the app. Disable if you want a passphrase on every launch.",
+    'Keeps a device-bound copy of the vault key in the OS keychain: the app auto-unlocks on launch and "forgot passphrase" recovery works on this device. Anyone with access to this computer\'s login can bypass the passphrase while this is on. Turning it off deletes the keychain copy.',
   SETTINGS_LOCK_NOW: "Lock vault now",
+  SETTINGS_EXPORT_BACKUP: "Export Backup",
+  SETTINGS_EXPORT_BACKUP_HINT:
+    "Note content in the backup is encrypted (passphrase required to read it); titles, workspace names, and timestamps are not.",
+  BACKUP_SAVED_TITLE: "Backup saved",
 } as const;

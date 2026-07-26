@@ -15,10 +15,18 @@ export const CreateWorkspaceModal: React.FC = () => {
   const [selectedEmoji, setSelectedEmoji] = useState("🚀");
   const [selectedColor, setSelectedColor] = useState("#ff6f1e");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    createWorkspace(name.trim(), selectedEmoji, selectedColor, description.trim());
+    const created = await createWorkspace(
+      name.trim(),
+      selectedEmoji,
+      selectedColor,
+      description.trim(),
+    );
+    // On failure the store keeps the modal open and shows a toast — keep the
+    // user's input so they can retry.
+    if (!created) return;
     setName("");
     setDescription("");
     setSelectedEmoji("🚀");

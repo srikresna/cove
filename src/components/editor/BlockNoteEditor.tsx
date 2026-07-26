@@ -1,11 +1,12 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
+import { extractPlainText } from "../../utils/plainText";
 import { EditorHeader } from "./EditorHeader";
 import "@blocknote/mantine/style.css";
 
@@ -14,42 +15,9 @@ interface BlockNoteEditorProps {
 }
 
 function countWordsAndChars(contentStr: string): { wordCount: number; characterCount: number } {
-  if (!contentStr) return { wordCount: 0, characterCount: 0 };
-
-  let text = "";
-  try {
-    const trimmed = contentStr.trim();
-    if (trimmed.startsWith("[")) {
-      const blocks = JSON.parse(trimmed);
-      if (Array.isArray(blocks)) {
-        for (const block of blocks) {
-          if (block.content && Array.isArray(block.content)) {
-            for (const inline of block.content) {
-              if (
-                inline &&
-                typeof inline === "object" &&
-                "text" in inline &&
-                typeof inline.text === "string"
-              ) {
-                text += `${inline.text} `;
-              }
-            }
-          }
-        }
-      }
-    } else {
-      text = contentStr.replace(/<[^>]*>/g, " ");
-    }
-  } catch {
-    text = contentStr.replace(/<[^>]*>/g, " ");
-  }
-
-  const cleanText = text.trim();
-  const characterCount = cleanText.length;
+  const cleanText = extractPlainText(contentStr).trim();
   const words = cleanText ? cleanText.split(/\s+/).filter(Boolean) : [];
-  const wordCount = words.length;
-
-  return { wordCount, characterCount };
+  return { wordCount: words.length, characterCount: cleanText.length };
 }
 
 export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
@@ -82,7 +50,12 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
           }
         }
       } catch (err) {
-        Logger.error("loadInitialContent error", err);
+        // Never log the raw error: V8 embeds excerpts of the parsed source in
+        // SyntaxError messages, which would leak decrypted note content into
+        // the console sink. The error name alone is enough to diagnose.
+        Logger.error("loadInitialContent error", undefined, {
+          errorName: err instanceof Error ? err.name : typeof err,
+        });
       }
     };
 
@@ -103,7 +76,10 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
     }
   };
 
-  const { wordCount, characterCount } = countWordsAndChars(note.content);
+  const { wordCount, characterCount } = useMemo(
+    () => countWordsAndChars(note.content),
+    [note.content],
+  );
 
   return (
     <div className="w-full h-full overflow-y-auto px-4 sm:px-8 py-6">

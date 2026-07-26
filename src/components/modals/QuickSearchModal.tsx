@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { noteService } from "../../di/container";
 import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
+import { presentError } from "../../services/errorPresenter";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -47,8 +49,15 @@ export const QuickSearchModal: React.FC = () => {
     const timer = window.setTimeout(async () => {
       try {
         setHits(await noteService.searchAcrossWorkspaces(q));
-      } catch {
+      } catch (err) {
+        // A failed search must not masquerade as "no results".
         setHits([]);
+        const p = presentError(err);
+        useNotificationStore.getState().pushToast({
+          kind: p.kind,
+          title: p.toastTitle,
+          description: p.toastDescription,
+        });
       } finally {
         setLoading(false);
       }
