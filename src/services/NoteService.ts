@@ -15,25 +15,18 @@ import { buildSnippet, extractPlainText } from "../utils/plainText";
 import type { INoteService } from "./INoteService";
 import type { IEncryptionService } from "./vault/IEncryptionService";
 
-/**
- * Application-layer note operations. Encryption-at-rest happens HERE: content
- * is encrypted before it reaches the repository and decrypted after it comes
- * back, so the repository contract (NoteRecord) never sees plaintext.
- */
 export class NoteService implements INoteService {
   constructor(
     private readonly notes: INoteRepository,
     private readonly crypto: IEncryptionService,
   ) {}
 
-  /** H2 fix: defense-in-depth lock gate — throws before any repo call if vault is locked. */
   private assertUnlocked(): void {
     if (!this.crypto.isUnlocked()) {
       throw new VaultLockedError();
     }
   }
 
-  /** Decrypt a persisted record back into the plaintext domain Note. */
   private async toNote(rec: NoteRecord): Promise<Note> {
     return { ...rec, content: await this.crypto.decryptPayload(rec.content, rec.id) };
   }
@@ -41,7 +34,6 @@ export class NoteService implements INoteService {
   async listMetadataByWorkspace(workspaceId: string): Promise<Note[]> {
     this.assertUnlocked();
     const records = await this.notes.getNotesMetadataByWorkspace(workspaceId);
-    // Metadata-only records carry empty content; no decrypt cost.
     return Promise.all(records.map((rec) => this.toNote(rec)));
   }
 
@@ -55,12 +47,8 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    // Fast path: FTS5 title search (no decrypt, SQL-level MATCH with ranking).
     const titleHits = await this.notes.searchTitlesFts(q, 50);
     const titleIds = new Set(titleHits.map((h) => h.id));
-    // Slow path: decrypt-on-search for body matches. Each note is decrypted
-    // individually and the full plaintext goes out of scope immediately after
-    // the snippet is built — no Note[] holding 100 decrypted bodies in memory.
     const candidates = await this.notes.findRecentForSearch(100);
     const bodyHits: NoteSearchHit[] = [];
     for (const rec of candidates) {

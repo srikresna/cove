@@ -3,21 +3,13 @@ use sqlx::ConnectOptions;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
-/// Export a consistent snapshot of the vault database to a user-chosen path.
-///
-/// Uses SQLite's `VACUUM INTO` on a fresh read-only connection instead of a
-/// raw file copy: the app runs in WAL mode, so committed transactions can live
-/// exclusively in cove.db-wal — a plain copy of cove.db would silently miss
-/// them (and could tear mid-checkpoint). `VACUUM INTO` reads through the WAL
-/// and produces a complete, self-contained database file.
-///
-/// Note: note *content* in the snapshot is AES-GCM ciphertext, but titles,
-/// workspace names, and timestamps are stored (and exported) in plaintext.
+/// `VACUUM INTO` instead of a file copy: the DB runs in WAL mode, so committed
+/// rows can live exclusively in cove.db-wal — a copy of cove.db alone silently
+/// misses them. Content in the snapshot is ciphertext; titles/metadata are not.
 #[tauri::command]
 pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Result<(), String> {
-    // tauri-plugin-sql resolves "sqlite:cove.db" under app_config_dir — the
-    // live database lives there (NOT app_local_data_dir; on Windows that's
-    // Roaming vs Local, on Linux ~/.config vs ~/.local/share).
+    // app_config_dir, NOT app_local_data_dir: tauri-plugin-sql resolves
+    // "sqlite:cove.db" there (Roaming vs Local on Windows).
     let data_dir = app
         .path()
         .app_config_dir()
@@ -29,15 +21,13 @@ pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Resu
 
     let target = validate_target(&target_path, &data_dir)?;
     if target.exists() {
-        // The OS save dialog already asked the user to confirm overwriting;
-        // VACUUM INTO refuses to write over an existing file, so clear it here.
+        // The save dialog already confirmed overwriting; VACUUM INTO refuses
+        // to write over an existing file.
         std::fs::remove_file(&target).map_err(|e| format!("Cannot replace backup file: {e}"))?;
     }
     run_vacuum_into(&db_path, &target).await
 }
 
-/// Consistent snapshot of `db_path` into `target` via VACUUM INTO on a fresh
-/// read-only connection (reads through the WAL; never mutates the source).
 async fn run_vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
     let mut conn = SqliteConnectOptions::new()
         .filename(db_path)
@@ -58,12 +48,9 @@ async fn run_vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// The renderer supplies the target path (it owns the save dialog), so treat it
-/// as untrusted: require an absolute .db path outside the live database
-/// directory, which guards cove.db and its -wal/-shm sidecars from being
-/// clobbered by their own backup. A data-dir that fails to canonicalize is a
-/// hard error — silently skipping the containment check would disable the
-/// guard exactly when paths are at their least trustworthy.
+/// The renderer supplies the path, so it is untrusted: absolute, .db, and
+/// outside the live DB directory (guards cove.db and its -wal/-shm sidecars).
+/// A non-canonicalizable data dir is a hard error, never a skipped guard.
 fn validate_target(raw: &str, data_dir: &Path) -> Result<PathBuf, String> {
     let target = PathBuf::from(raw);
     if !target.is_absolute() {
@@ -125,9 +112,6 @@ mod tests {
         assert!(validate_target(target.to_str().unwrap(), &data_dir).is_err());
     }
 
-    /// The reason this module exists: a plain file copy of a WAL-mode DB misses
-    /// committed rows still living in the -wal sidecar. Prove VACUUM INTO
-    /// captures them while a writer connection is still open.
     #[tokio::test(flavor = "current_thread")]
     async fn vacuum_into_captures_wal_resident_rows() {
         use sqlx::sqlite::SqliteJournalMode;
@@ -154,7 +138,7 @@ mod tests {
             .execute(&mut writer)
             .await
             .unwrap();
-        // Writer stays open: the committed row lives in cove.db-wal, not cove.db.
+        // Writer stays open so the committed row lives only in cove.db-wal.
         assert!(dir.join("cove.db-wal").exists(), "test setup: WAL sidecar expected");
 
         run_vacuum_into(&db, &target).await.unwrap();

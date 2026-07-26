@@ -50,9 +50,8 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
           }
         }
       } catch (err) {
-        // Never log the raw error: V8 embeds excerpts of the parsed source in
-        // SyntaxError messages, which would leak decrypted note content into
-        // the console sink. The error name alone is enough to diagnose.
+        // Name only — V8 SyntaxError messages embed excerpts of the parsed
+        // source, which here is decrypted note content.
         Logger.error("loadInitialContent error", undefined, {
           errorName: err instanceof Error ? err.name : typeof err,
         });

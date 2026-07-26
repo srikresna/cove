@@ -50,7 +50,6 @@ export const QuickSearchModal: React.FC = () => {
       try {
         setHits(await noteService.searchAcrossWorkspaces(q));
       } catch (err) {
-        // A failed search must not masquerade as "no results".
         setHits([]);
         const p = presentError(err);
         useNotificationStore.getState().pushToast({

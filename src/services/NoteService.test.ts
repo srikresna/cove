@@ -5,7 +5,6 @@ import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
 import { NoteService } from "./NoteService";
 import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
 
-/** Identity IEncryptionService that always reports unlocked — for behavior-focused tests. */
 const unlockedCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
@@ -14,7 +13,6 @@ const unlockedCrypto: IEncryptionService = {
   decryptPayload: async (c: string) => c,
 };
 
-/** Marker-envelope crypto fake: makes it observable whether the repo ever saw plaintext. */
 const envelopeCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
@@ -87,9 +85,7 @@ describe("NoteService", () => {
     const service = new NoteService(fakeRepo, envelopeCrypto);
 
     const created = await service.createNote("ws-1", "Title", "top secret body");
-    // The service hands plaintext back to callers...
     expect(created.content).toBe("top secret body");
-    // ...but the repository only ever saw ciphertext.
     expect(fakeRepo.notes[0]?.content).toBe(`enc[${created.id}]:top secret body`);
 
     const fetched = await service.getNote(created.id);
@@ -99,7 +95,6 @@ describe("NoteService", () => {
     expect(updated.content).toBe("new body");
     expect(fakeRepo.notes[0]?.content).toBe(`enc[${created.id}]:new body`);
 
-    // Duplicate must re-encrypt under the copy's own id (AAD binding).
     const copy = await service.duplicateNote(created.id);
     expect(copy.content).toBe("new body");
     expect(fakeRepo.notes[0]?.content).toBe(`enc[${copy.id}]:new body`);
@@ -131,7 +126,6 @@ describe("NoteService", () => {
     await expect(service.duplicateNote("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.togglePin("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.toggleFavorite("note-1")).rejects.toThrow(VaultLockedError);
-    // The gate fires before any repository access.
     expect(fakeRepo.callLog).toHaveLength(0);
   });
 
@@ -219,7 +213,7 @@ describe("NoteService", () => {
     const byTitle = await service.searchAcrossWorkspaces("roadmap");
     expect(byTitle).toHaveLength(1);
     expect(byTitle[0]?.id).toBe("n-search");
-    expect(byTitle[0]?.snippet).toBe(""); // title-only match -> empty snippet
+    expect(byTitle[0]?.snippet).toBe("");
 
     const byBody = await service.searchAcrossWorkspaces("vault");
     expect(byBody).toHaveLength(1);

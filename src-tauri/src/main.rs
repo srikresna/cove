@@ -17,8 +17,7 @@ fn main() {
 
   let app = tauri::Builder::default()
     // Must be the first plugin. A second process on the same DB would load the
-    // same AES-GCM IV counter into memory and could re-emit IVs under the same
-    // DEK (nonce reuse) — so a second launch focuses the existing window instead.
+    // same AES-GCM IV counter and could re-emit IVs under the same DEK.
     .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
       if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_focus();
@@ -38,9 +37,8 @@ fn main() {
     .build(tauri::generate_context!())
     .expect("error while building tauri application");
 
-  // Defense-in-depth telemetry: log unclean exits (process kill / crash / power loss).
-  // The JS-side VaultService.lock() is the real DEK teardown; this fires even when
-  // the renderer is already gone (it cannot null JS fields, only log).
+  // Fires even when the renderer is already gone; the JS-side lock() is the
+  // real DEK teardown — this can only log.
   app.run(|_app_handle, event| match event {
     tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
       tracing::info!(target: "cove::lifecycle", "tauri exit requested");

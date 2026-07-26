@@ -30,7 +30,6 @@ function makeVault(overrides: { deviceBind?: IDeviceBind } = {}) {
   const legacyKeys = new InMemoryLegacyKeyStore();
   const crypto = new CryptoVault(kms);
   const deviceBind = overrides.deviceBind ?? new IdentityDeviceBind();
-  // Cheap PBKDF2 stand-in for the Rust KDF — the KDF itself is not under test.
   const deriveKeyFn: KdfDerive = async (passphrase, salt) => derivePrk(passphrase, salt, 1_000);
   const service = new VaultService(
     crypto,
@@ -50,7 +49,6 @@ function toHex(bytes: Uint8Array): string {
     .join("");
 }
 
-/** Device-bind fake with a real wrapped-format marker, so unwrap can FAIL on raw blobs. */
 class PrefixDeviceBind implements IDeviceBind {
   async wrap(plaintext: Bytes): Promise<Bytes> {
     const out = new Uint8Array(plaintext.byteLength + 1);
@@ -79,7 +77,6 @@ describe("VaultService setup / unlock / lock", () => {
     expect(service.isUnlocked()).toBe(true);
     expect(await service.computeStatus()).toBe("unlocked");
     expect(await kms.get()).not.toBeNull();
-    // Keychain escrow is opt-in ("Trust this device"), never automatic.
     expect(await keychain.get(KEYRING_USERS.dekBackup)).toBeNull();
   });
 
@@ -133,7 +130,7 @@ describe("VaultService setup / unlock / lock", () => {
 
     const rec = await kms.get();
     if (!rec) throw new Error("kms record missing");
-    rec.integrityMacB64 = bytesToBase64(new Uint8Array(32)); // bogus MAC
+    rec.integrityMacB64 = bytesToBase64(new Uint8Array(32));
     await kms.save(rec);
 
     await expect(service.unlock(PW)).rejects.toThrow(EncryptionError);
@@ -146,7 +143,6 @@ describe("VaultService setup / unlock / lock", () => {
 
     const rec = await kms.get();
     if (!rec) throw new Error("kms record missing");
-    // Attacker lowers the Argon2 cost params to weaken future derivations.
     rec.kdfParamsJson = JSON.stringify({ m_cost: 8, t_cost: 1, p_cost: 1 });
     await kms.save(rec);
 
@@ -182,19 +178,16 @@ describe("VaultService legacy migration", () => {
     expect(migration.contentOf("n1")).not.toBe(cipher);
     expect(await migration.countLegacy()).toBe(0);
 
-    // Migrated content must decrypt back to the original under the session DEK.
     const plain = await crypto.decryptPayload(migration.contentOf("n1") ?? "", "n1");
     expect(plain).toBe("legacy note body");
-    expect(legacyKeys.get()).toBeNull(); // legacy key purged
-    expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull(); // bridge purged
+    expect(legacyKeys.get()).toBeNull();
+    expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull();
   });
 
   it("resumes an interrupted migration at the next unlock (crash-safe)", async () => {
     const { service, kms, keychain, migration, crypto } = makeVault();
     await service.setupPassphrase(PW);
 
-    // Simulate the state a mid-migration crash leaves behind: a stranded
-    // legacy row, migrationState stuck, bridge key still in the keychain.
     const legacyRaw = (await generateDek()).rawKey;
     const legacyKey = await importAesGcmKey(legacyRaw);
     const cipher = await aesGcmEncrypt(legacyKey, "stranded body", counterToIv(1));
@@ -203,7 +196,6 @@ describe("VaultService legacy migration", () => {
     await keychain.set(KEYRING_USERS.legacyBridge, toHex(legacyRaw));
     await service.lock();
 
-    // The app no longer dead-ends on a migration screen — it is just locked.
     expect(await service.computeStatus()).toBe("locked");
 
     await service.unlock(PW);
@@ -238,8 +230,6 @@ describe("VaultService legacy migration", () => {
 
     expect(migration.isMigrated("n-good")).toBe(true);
     expect(migration.isMigrated("n-corrupt")).toBe(false);
-    // A failure must NOT purge the only key that could still decrypt the row:
-    // state stays resumable and the bridge key survives for a retry.
     expect((await kms.get())?.migrationState).toBe("in_progress");
     expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBe(toHex(legacyRaw));
   });
@@ -268,7 +258,7 @@ describe("VaultService keychain escrow (Trust this device)", () => {
     const { service } = makeVault();
     await service.setupPassphrase(PW);
     await service.lock();
-    expect(await service.tryAutoUnlock()).toBe(false); // no escrow
+    expect(await service.tryAutoUnlock()).toBe(false);
 
     await service.unlock(PW);
     await service.setKeychainEscrow(true);
@@ -281,9 +271,8 @@ describe("VaultService keychain escrow (Trust this device)", () => {
     await service.setupPassphrase(PW);
     await service.setKeychainEscrow(true);
     await service.lock();
-    expect(await service.tryAutoUnlock()).toBe(true); // properly wrapped: fine
+    expect(await service.tryAutoUnlock()).toBe(true);
 
-    // A raw 32-byte blob (the removed legacy fallback would have accepted this).
     await service.lock();
     await keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(new Uint8Array(32)));
     expect(await service.tryAutoUnlock()).toBe(false);
@@ -305,11 +294,10 @@ describe("VaultService changePassphrase + recovery", () => {
 
   it("changePassphrase verifies the old passphrase even when already unlocked", async () => {
     const { service } = makeVault();
-    await service.setupPassphrase(PW); // session is unlocked
+    await service.setupPassphrase(PW);
     await expect(service.changePassphrase("not the old pass 77", PW2)).rejects.toThrow(
       EncryptionError,
     );
-    // The envelope must be untouched: the original passphrase still works.
     await service.lock();
     await service.unlock(PW);
     expect(service.isUnlocked()).toBe(true);
@@ -325,9 +313,7 @@ describe("VaultService changePassphrase + recovery", () => {
 
     await service.recoverViaKeychain("recovered strong pw 33");
     expect(service.isUnlocked()).toBe(true);
-    // Same DEK: pre-recovery ciphertext still decrypts.
     expect(await crypto.decryptPayload(cipher, "n1")).toBe("keep me readable");
-    // IV counter survives recovery — the IV sequence keeps advancing.
     expect((await kms.get())?.ivCounter ?? 0).toBeGreaterThanOrEqual(counterBefore);
 
     await service.lock();
@@ -349,7 +335,6 @@ describe("VaultService changePassphrase + recovery", () => {
     const oldCipher = await crypto.encryptPayload("rotate me", "n1");
     migration.seed("n1", oldCipher);
 
-    // Simulate the pathological state: kms row lost, keychain backup intact.
     kms.clear();
     await service.lock();
     await service.recoverViaKeychain(PW2);
@@ -357,12 +342,10 @@ describe("VaultService changePassphrase + recovery", () => {
     expect(service.isUnlocked()).toBe(true);
     const rec = await kms.get();
     expect(rec).not.toBeNull();
-    // The sweep re-encrypted the note under the NEW DEK with fresh counters.
     const rotated = migration.contentOf("n1") ?? "";
     expect(rotated).not.toBe(oldCipher);
     expect(await crypto.decryptPayload(rotated, "n1")).toBe("rotate me");
     expect(rec?.ivCounter ?? 0).toBeGreaterThan(0);
-    // New DEK escrowed; rotation bridge cleaned up.
     expect(await keychain.get(KEYRING_USERS.dekBackup)).not.toBeNull();
     expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull();
 
@@ -376,9 +359,6 @@ describe("VaultService changePassphrase + recovery", () => {
     await service.setupPassphrase(PW);
     await service.setKeychainEscrow(true);
 
-    // Simulate the state a crash mid-sweep leaves behind: an old DEK parked in
-    // the bridge (base64), one row still under it, one already rotated, and
-    // migrationState stuck at 'rotation_in_progress'.
     const oldDek = await generateDek();
     const oldCipher = await aesGcmEncrypt(
       oldDek.cryptoKey,
@@ -395,8 +375,6 @@ describe("VaultService changePassphrase + recovery", () => {
 
     await service.unlock(PW);
 
-    // Unswept row re-encrypted under the session DEK; rotated row untouched
-    // (skipped without being recorded as a failure).
     expect(await crypto.decryptPayload(migration.contentOf("n-old") ?? "", "n-old")).toBe(
       "unswept body",
     );

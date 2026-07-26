@@ -11,12 +11,6 @@ interface VaultGateProps {
   children: React.ReactNode;
 }
 
-/**
- * Gates the whole app behind the vault state. Renders setup/unlock/migration
- * screens until the vault is unlocked, then renders the main app (children).
- * Also enforces auto-lock: on window close (beforeunload) and after 15 min idle,
- * the session DEK is wiped from memory (the clear itself is synchronous).
- */
 export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
   const status = useVaultStore((s) => s.status);
   const init = useVaultStore((s) => s.init);
@@ -28,8 +22,6 @@ export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
     init();
   }, [init]);
 
-  // After a lock (launch or idle), silently re-unlock from the keychain if the
-  // user has trusted this device — so no passphrase prompt unless they opted out.
   useEffect(() => {
     if (status === "locked" && autoUnlockOnLaunch) {
       void tryAutoUnlock();

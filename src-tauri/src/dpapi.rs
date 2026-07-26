@@ -1,7 +1,5 @@
-/// Device-bound key wrapping via Windows DPAPI (CryptProtectData / CryptUnprotectData).
-/// On Windows, the wrapped blob can ONLY be unwrapped on the same machine + user account
-/// (per-SID key managed by the OS). Copying it to another device → CryptUnprotectData fails.
-/// On non-Windows, device-bound recovery is not yet supported (returns an error).
+/// DPAPI blobs unwrap only on the same machine + user account (per-SID OS key);
+/// non-Windows returns an error rather than a weaker fallback.
 
 #[cfg(target_os = "windows")]
 mod platform {

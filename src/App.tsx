@@ -13,9 +13,6 @@ import type { Note } from "./domain/note/Note";
 import { useNoteStore } from "./store/useNoteStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
-// BlockNote (+ its Shiki syntax-highlighter dependency, which pulls many language
-// grammars) is by far the heaviest part of the app. Lazy-load it so it is excluded
-// from the initial bundle and only fetched when a note is actually opened.
 const BlockNoteEditor = lazy(() =>
   import("./components/editor/BlockNoteEditor").then((m) => ({ default: m.BlockNoteEditor })),
 );
@@ -36,9 +33,6 @@ export const AppContent: React.FC = () => {
     }
   }, [activeWorkspaceId, fetchNotes]);
 
-  // When the active note changes, load its FULL decrypted content from the DB.
-  // fetchNotes returns metadata-only (content=""); this replaces it with the
-  // decrypted body so the editor has something to render.
   useEffect(() => {
     if (activeNoteId) {
       loadActiveNoteContent(activeNoteId);

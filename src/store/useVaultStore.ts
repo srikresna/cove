@@ -13,7 +13,6 @@ interface VaultState {
   recover: (passphrase: string) => Promise<void>;
   tryAutoUnlock: () => Promise<boolean>;
   lock: () => Promise<void>;
-  /** "Trust this device": keychain DEK escrow + auto-unlock preference, kept in sync. */
   setTrustDevice: (enabled: boolean) => Promise<void>;
 }
 
@@ -28,7 +27,6 @@ const refreshStatus = async (): Promise<VaultStatus> => {
 export const useVaultStore = create<VaultState>((set) => ({
   status: "uninitialized",
   init: async () => {
-    // Trusted-device launch: auto-unlock silently from the keychain if enabled.
     const auto = useSettingsStore.getState().autoUnlockOnLaunch;
     if (auto && (await vaultService.tryAutoUnlock())) {
       set({ status: "unlocked" });
@@ -46,9 +44,6 @@ export const useVaultStore = create<VaultState>((set) => ({
   unlock: async (passphrase) => {
     await vaultService.unlock(passphrase);
     if (useSettingsStore.getState().autoUnlockOnLaunch) {
-      // Trusted device: refresh/heal the escrow entry after a successful
-      // passphrase unlock (e.g. re-wrap a legacy raw-format entry). Gated on
-      // the user's setting so an entry is never written behind their back.
       try {
         await vaultService.setKeychainEscrow(true);
       } catch (err) {
@@ -67,8 +62,6 @@ export const useVaultStore = create<VaultState>((set) => ({
     return ok;
   },
   lock: async () => {
-    // Plaintext purge happens inside the service's onLock listeners (H1 fix),
-    // so it also covers callers that bypass this store.
     await vaultService.lock();
     set({ status: await refreshStatus() });
   },

@@ -3,11 +3,8 @@ import Database from "@tauri-apps/plugin-sql";
 export class SQLiteDatabase {
   private static instance: Promise<Database> | null = null;
 
-  /**
-   * Returns a DB handle that is guaranteed to have its schema fully migrated.
-   * The connection + PRAGMAs + schema migration all resolve inside this promise,
-   * so any `await this.getDb()` caller cannot race ahead of `CREATE TABLE`.
-   */
+  // Connection + PRAGMAs + schema migration resolve inside one promise, so no
+  // caller can race ahead of CREATE TABLE.
   static getInstance(): Promise<Database> {
     if (!SQLiteDatabase.instance) {
       SQLiteDatabase.instance = (async () => {
@@ -26,13 +23,9 @@ export class SQLiteDatabase {
     return SQLiteDatabase.instance;
   }
 
-  /**
-   * Single owner of schema + versioned migrations (PRAGMA user_version ladder).
-   * v1: base schema (workspaces, notes, index). v2: drop legacy `folderId` column.
-   * NOTE: the v2 recreate-table uses a raw BEGIN/COMMIT inline (NOT a helper) because
-   * tauri-plugin-sql's sqlx pool may route each execute to a different connection,
-   * breaking multi-call transactions. Single-statement autocommit is always safe.
-   */
+  // tauri-plugin-sql's pool may route each execute to a different connection,
+  // so multi-statement transactions are unsafe except the inline BEGIN/COMMIT
+  // in the v2 block (accepted risk: recreate-table must be atomic).
   private static async migrate(db: Database): Promise<void> {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS workspaces (
@@ -127,9 +120,7 @@ export class SQLiteDatabase {
     }
 
     if (version < 4) {
-      // FTS5 title index — fast SQL-level title search without decrypting content.
-      // Graceful degradation: if FTS5 is not compiled into the bundled SQLite,
-      // the catch silently skips it and search falls back to decrypt-on-search.
+      // If FTS5 is missing from the bundled SQLite, search falls back to decrypt-on-search.
       try {
         await db.execute(
           "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(note_id UNINDEXED, title, tokenize='unicode61 remove_diacritics 2')",
@@ -147,18 +138,15 @@ export class SQLiteDatabase {
           "INSERT INTO notes_fts(note_id, title) SELECT id, title FROM notes WHERE id NOT IN (SELECT note_id FROM notes_fts)",
         );
       } catch {
-        // FTS5 not available — search will use decrypt-on-search only.
+        /* FTS5 unavailable */
       }
       await db.execute("PRAGMA user_version = 4");
     }
 
     if (version < 5) {
-      // Backfill kmsVersion for rows written by the pre-v5 code, whose INSERT
-      // omitted the column (leaving the DEFAULT 0 that marks pre-vault legacy
-      // rows). Safe exactly when the vault's migration already completed:
-      // legacy rows can only exist while a migration is pending, so post-
-      // completion 0-rows are by definition DEK-encrypted. Rows in
-      // migration_failures are left at 0 (their ciphertext really is legacy).
+      // Pre-v5 INSERTs omitted kmsVersion, leaving DEK-encrypted rows at the
+      // legacy default 0. Backfill is safe only once migration completed:
+      // legacy rows cannot exist after that, except those in migration_failures.
       const kmsRows = await db.select<Array<{ migrationState: string }>>(
         "SELECT migrationState FROM kms WHERE id = 1",
       );

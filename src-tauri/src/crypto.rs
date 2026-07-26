@@ -1,11 +1,8 @@
 use serde_json::Value;
 
-/// Bounds for KDF parameters supplied over IPC (they originate from the kms
-/// row in the database, which is attacker-writable in the DB-theft threat
-/// model). Argon2 allocates m_cost KiB up front, so unbounded values are an
-/// unlock-time memory/CPU DoS. Out-of-range or malformed params fail loud —
-/// no silent defaults, so the derivation params can never diverge from what
-/// the TS-side envelope MAC binds.
+/// The params originate from the kms row (attacker-writable under DB theft),
+/// and Argon2 allocates m_cost KiB up front — unbounded values are an
+/// unlock-time DoS. Malformed/out-of-range params fail loud, never default.
 const PBKDF2_MIN_ITERATIONS: u64 = 100_000;
 const PBKDF2_MAX_ITERATIONS: u64 = 10_000_000;
 const ARGON2_MIN_M_COST_KIB: u64 = 8 * 1024; // 8 MiB
@@ -28,13 +25,8 @@ fn required_param(params: &Value, key: &str, min: u64, max: u64) -> Result<u32, 
     Ok(v as u32)
 }
 
-/// Derive a 32-byte key from a passphrase using the specified KDF (runs in Rust,
-/// not the JS webview — GPU/ASIC-resistant Argon2id available here).
-///
-/// Supports:
-/// - "PBKDF2-SHA256" with params {"iterations": 600000}  (existing vaults)
-/// - "ARGON2ID"       with params {"m_cost": 65536, "t_cost": 3, "p_cost": 4}
-///   (OWASP first-choice KDF; 64 MiB memory-hard)
+/// Runs in Rust rather than the webview so the memory-hard Argon2id is
+/// GPU/ASIC-resistant at full strength.
 #[tauri::command]
 pub fn derive_key_kdf(
     passphrase: String,
@@ -97,7 +89,6 @@ mod tests {
 
     #[test]
     fn argon2id_is_deterministic_and_differs_from_pbkdf2() {
-        // Minimum allowed m_cost keeps the test fast while exercising the real path.
         let params = r#"{"m_cost": 8192, "t_cost": 1, "p_cost": 1}"#;
         let a =
             derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
@@ -126,16 +117,14 @@ mod tests {
 
     #[test]
     fn rejects_missing_and_out_of_range_params() {
-        // Missing field — no silent default.
         assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "{}".into()).is_err());
         assert!(
             derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), "{}".into())
                 .is_err()
         );
-        // DoS-sized m_cost (would ask Argon2 for ~4 TiB).
+        // ~4 TiB m_cost
         let huge = r#"{"m_cost": 4294967295, "t_cost": 3, "p_cost": 4}"#;
         assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), huge.into()).is_err());
-        // Wrapped-to-tiny iteration counts.
         let tiny = r#"{"iterations": 1}"#;
         assert!(
             derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), tiny.into())

@@ -1,11 +1,3 @@
-/**
- * Convert a note's stored content (BlockNote JSON, or legacy HTML) to plain text,
- * and build a short search snippet around the match.
- *
- * Used by decrypt-on-search: the service decrypts a candidate note's content,
- * extracts plain text, and returns only a snippet DTO (never the full body) so
- * decrypted plaintext stays scoped to the search function call.
- */
 export function extractPlainText(content: string): string {
   if (!content) return "";
   try {

@@ -1,6 +1,5 @@
 import type { IKeychainStore } from "../../services/vault/IKeychainStore";
 
-/** In-memory IKeychainStore fake for unit tests (no OS keychain / Tauri IPC). */
 export class InMemoryKeychainStore implements IKeychainStore {
   private store = new Map<string, string>();
 
@@ -16,7 +15,6 @@ export class InMemoryKeychainStore implements IKeychainStore {
     this.store.delete(user);
   }
 
-  /** Test helper: simulate a missing/unavailable OS keychain. */
   clear(): void {
     this.store.clear();
   }

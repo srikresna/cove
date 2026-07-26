@@ -4,7 +4,6 @@ import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 export interface INoteService {
   listMetadataByWorkspace(workspaceId: string): Promise<Note[]>;
   getNote(id: string): Promise<Note | null>;
-  /** Cross-workspace body search; returns snippet-only DTOs (decrypt-in-scope). */
   searchAcrossWorkspaces(query: string): Promise<NoteSearchHit[]>;
   createNote(workspaceId: string, title?: string, content?: string, icon?: string): Promise<Note>;
   updateMetadata(

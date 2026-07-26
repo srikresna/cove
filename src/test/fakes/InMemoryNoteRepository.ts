@@ -2,15 +2,6 @@ import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
 import type { INoteRepository, NoteRecord } from "../../repositories/INoteRepository";
 import type { EncryptedPayload } from "../../services/vault/IEncryptionService";
 
-/**
- * In-memory INoteRepository fake. Like the real SQLite adapter it stores
- * whatever (encrypted) content it is handed and never decrypts — encryption
- * lives in NoteService.
- *
- * NOTE: searchTitlesFts here does case-insensitive SUBSTRING matching, while
- * the real FTS5 implementation does token-PREFIX matching with rank ordering
- * ("oad" matches "Roadmap" only in this fake) and swallows errors returning [].
- */
 export class InMemoryNoteRepository implements INoteRepository {
   public notes: NoteRecord[] = [];
   public callLog: string[] = [];

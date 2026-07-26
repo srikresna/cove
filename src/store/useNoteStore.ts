@@ -24,7 +24,6 @@ interface NoteState {
   toggleFavoriteNote: (id: string) => Promise<void>;
 }
 
-/** Single error-presentation path: toast always, save-status only for save-flow ops. */
 function notifyError(err: unknown, opts: { saveStatus: boolean } = { saveStatus: true }): void {
   const p = presentError(err);
   if (opts.saveStatus) {
@@ -38,7 +37,6 @@ function notifyError(err: unknown, opts: { saveStatus: boolean } = { saveStatus:
 }
 
 export const useNoteStore = create<NoteState>((set, get) => {
-  /** Shared optimistic toggle for boolean note flags. */
   const toggleFlag = async (id: string, key: "isPinned" | "isFavorite"): Promise<void> => {
     const previousNotes = get().notes;
     set((state) => ({
@@ -162,10 +160,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
   };
 });
 
-// H1 fix: purge decrypted note content from memory on EVERY lock, no matter
-// who initiated it (settings button, idle timer, beforeunload, future callers
-// of vaultService.lock()). Registered against the service so the invariant
-// cannot be bypassed by skipping the vault store.
+// Registered against the service so the plaintext purge fires on EVERY lock,
+// no matter who initiated it — the invariant cannot be bypassed via the store.
 vaultService.onLock(() => {
   useNoteStore.setState({ notes: [], activeNoteId: null });
 });

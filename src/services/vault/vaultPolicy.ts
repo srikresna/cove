@@ -1,14 +1,3 @@
-/**
- * Passphrase strength policy.
- *
- * With no standalone verifier (the wrapped_dek is the single offline oracle),
- * passphrase strength is the primary at-rest defense — so weak passphrases are
- * rejected structurally, not merely advised.
- *
- * (A zxcvbn score gate is the ideal; this is a pragmatic v1 check — length floor,
- * character-class variety, and a small common-passphrase blocklist. Upgrade to
- * zxcvbn is a tracked enhancement.)
- */
 const MIN_LENGTH = 12;
 
 const COMMON_BLOCKLIST = new Set([

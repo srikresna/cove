@@ -15,7 +15,6 @@ import { KeyringKeychainStore } from "../services/vault/KeyringKeychainStore";
 import { LocalStorageLegacyKeyStore } from "../services/vault/LocalStorageLegacyKeyStore";
 import { TauriBackupService } from "../services/vault/backup";
 
-// --- Vault singletons ---
 const kmsRepository = new SQLiteKmsRepository();
 const migrationRepository = new SQLiteMigrationRepository();
 const keychainStore = new KeyringKeychainStore();

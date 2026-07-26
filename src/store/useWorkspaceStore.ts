@@ -35,7 +35,6 @@ const getInitialDarkMode = (): boolean => {
   return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
 };
 
-/** Mirror of useNoteStore's discipline: every failure reaches the user as a toast. */
 function notifyError(err: unknown): void {
   const p = presentError(err);
   useNotificationStore.getState().pushToast({
@@ -87,7 +86,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }));
       return created;
     } catch (err) {
-      // Keep the modal open so the user's input isn't thrown away on failure.
       notifyError(err);
       return null;
     }

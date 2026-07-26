@@ -1,14 +1,9 @@
 import type { IMigrationRepository, LegacyRow } from "../../repositories/IMigrationRepository";
 
-/**
- * In-memory IMigrationRepository fake. Holds raw encrypted content per note id
- * plus a migrated flag, so VaultService migration can be unit-tested without SQLite.
- */
 export class InMemoryMigrationRepository implements IMigrationRepository {
   private rows = new Map<string, { content: string; migrated: boolean }>();
   private failures = new Map<string, string>();
 
-  /** Test helper: seed a legacy (unmigrated) row with raw ciphertext. */
   seed(id: string, content: string): void {
     this.rows.set(id, { content, migrated: false });
   }
@@ -41,12 +36,10 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
     return [...this.rows.values()].filter((r) => !r.migrated).length;
   }
 
-  /** Test helper: inspect a row's (possibly re-encrypted) content. */
   contentOf(id: string): string | undefined {
     return this.rows.get(id)?.content;
   }
 
-  /** Test helper: did a given row get marked migrated? */
   isMigrated(id: string): boolean {
     return this.rows.get(id)?.migrated ?? false;
   }

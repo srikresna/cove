@@ -49,8 +49,8 @@ describe("vault/crypto PBKDF2 + HKDF", () => {
     const wrap = await deriveSubkey(prk, "dek-wrap");
     const mac = await deriveSubkey(prk, "integrity-mac");
     const wrapAgain = await deriveSubkey(prk, "dek-wrap");
-    expect(constantTimeEqual(wrap, mac)).toBe(false); // different labels -> different keys
-    expect(constantTimeEqual(wrap, wrapAgain)).toBe(true); // same label -> same key
+    expect(constantTimeEqual(wrap, mac)).toBe(false);
+    expect(constantTimeEqual(wrap, wrapAgain)).toBe(true);
   });
 });
 
@@ -115,8 +115,6 @@ describe("vault/crypto integrity MAC", () => {
     const macKey = await importHmacKey(
       await deriveSubkey(await derivePrk("pw", generateSalt(), 1000), "integrity-mac"),
     );
-    // Same concatenated bytes, different field split — the legacy concat MAC
-    // cannot tell these apart; the length-prefixed one must.
     const split1 = [encodeUtf8("ab"), encodeUtf8("c")];
     const split2 = [encodeUtf8("a"), encodeUtf8("bc")];
     expect(
@@ -124,14 +122,13 @@ describe("vault/crypto integrity MAC", () => {
         await computeIntegrityMac(macKey, split1),
         await computeIntegrityMac(macKey, split2),
       ),
-    ).toBe(true); // documents the legacy weakness
+    ).toBe(true);
     expect(
       constantTimeEqual(
         await computeIntegrityMacDelimited(macKey, split1),
         await computeIntegrityMacDelimited(macKey, split2),
       ),
     ).toBe(false);
-    // Still deterministic for identical fields.
     expect(await computeIntegrityMacDelimited(macKey, split1)).toEqual(
       await computeIntegrityMacDelimited(macKey, split1),
     );
@@ -176,7 +173,6 @@ describe("vault/crypto AES-GCM payload + counter IV", () => {
     const iv = counterToIv(7);
     const ct = await aesGcmEncrypt(key, "secret body", iv, encodeUtf8("note-A"));
     expect(await aesGcmDecrypt(key, ct, encodeUtf8("note-A"))).toBe("secret body");
-    // Swapping the ciphertext into a different note (wrong AAD) must fail loud.
     await expect(aesGcmDecrypt(key, ct, encodeUtf8("note-B"))).rejects.toThrow();
   });
 });

@@ -24,8 +24,6 @@ export const CreateWorkspaceModal: React.FC = () => {
       selectedColor,
       description.trim(),
     );
-    // On failure the store keeps the modal open and shows a toast — keep the
-    // user's input so they can retry.
     if (!created) return;
     setName("");
     setDescription("");

@@ -5,11 +5,7 @@ import type { EncryptedPayload } from "../services/vault/IEncryptionService";
 import type { INoteRepository, NoteRecord } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
-/**
- * Rows encrypted under the session DEK carry kmsVersion = 1; 0 marks pre-vault
- * legacy rows still awaiting migration. Stamped on every content write so
- * migration/rotation sweeps can tell the two apart.
- */
+// 1 = encrypted under the session DEK; 0 = pre-vault legacy row awaiting migration.
 const KMS_VERSION_DEK = 1;
 
 export class SQLiteNoteRepository implements INoteRepository {

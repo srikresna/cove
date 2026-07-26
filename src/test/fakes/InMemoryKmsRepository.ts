@@ -1,6 +1,5 @@
 import type { IKmsRepository, KmsPatch, KmsRecord } from "../../repositories/IKmsRepository";
 
-/** In-memory IKmsRepository fake for unit tests (no SQLite / Tauri needed). */
 export class InMemoryKmsRepository implements IKmsRepository {
   private record: KmsRecord | null = null;
 
@@ -32,7 +31,6 @@ export class InMemoryKmsRepository implements IKmsRepository {
     this.record.ivCounter = n;
   }
 
-  /** Test helper: simulate a lost/corrupted kms row. */
   clear(): void {
     this.record = null;
   }

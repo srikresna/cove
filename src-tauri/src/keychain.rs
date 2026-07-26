@@ -1,9 +1,7 @@
 use keyring::Entry;
 
-/// Scoped OS-keychain access. The generic keyring plugin let the webview read,
-/// write, and delete ANY credential in the OS store; these commands hard-code
-/// the service name and allowlist the entry names, so the renderer can only
-/// ever touch cove's own entries.
+/// Hard-coded service + allowlisted entry names: the renderer can only ever
+/// touch cove's own OS credentials, never other applications'.
 const SERVICE: &str = "com.cove.notes";
 
 /// Must match KEYRING_USERS on the TS side (src/services/vault/IKeychainStore.ts).

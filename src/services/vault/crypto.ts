@@ -1,19 +1,3 @@
-/**
- * Pure WebCrypto primitives for the passphrase-based vault.
- *
- * Stateless, no I/O — fully unit-testable in isolation. The stateful DEK/KEK
- * session and persistence live in the vault service / repositories.
- *
- * Key model (see docs/CRYPTO_VAULT_BLUEPRINT.md §0):
- * - KDF(passphrase, salt) -> 32-byte PRK — Argon2id via Rust for new vaults,
- *   PBKDF2-HMAC-SHA256 (600k, this module) for pre-Argon2 vaults and tests
- * - HKDF(PRK, "dek-wrap")      -> wrap key (AES-GCM)  that encrypts the DEK
- * - HKDF(PRK, "integrity-mac") -> MAC key (HMAC-SHA256) for the kms envelope
- * Domain separation via distinct HKDF `info` labels prevents reusing the wrap
- * key as the MAC key. The DEK itself is a random 256-bit AES-GCM key that
- * encrypts note content; it never touches disk in the clear.
- */
-
 const PBKDF2_HASH = "SHA-256";
 const HKDF_HASH = "SHA-256";
 const KEY_BITS = 256;
@@ -22,14 +6,11 @@ const GCM_IV_BYTES = 12;
 const GCM_TAG_BYTES = 16;
 export const SALT_BYTES = 16;
 
-/** OWASP 2026 floor for PBKDF2-HMAC-SHA256. */
+// OWASP 2026 floor for PBKDF2-HMAC-SHA256 (legacy vaults only; new vaults use Argon2id).
 export const PBKDF2_ITERATIONS = 600_000;
 
-/**
- * Conservative per-DEK ceiling on AES-GCM encryptions (NIST SP 800-38D).
- * Well below the 2^32 birthday bound; reaching it triggers a fail-loud
- * iv_exhausted error so the key is rotated before any IV-reuse risk.
- */
+// Per-DEK AES-GCM encryption ceiling, well below the 2^32 NIST SP 800-38D
+// birthday bound; hitting it fails loud so the key rotates before IV-reuse risk.
 export const IV_EXHAUSTION_LIMIT = 2 ** 28;
 
 export type Bytes = Uint8Array<ArrayBuffer>;
@@ -38,11 +19,7 @@ export function randomBytes(n: number): Bytes {
   return crypto.getRandomValues(new Uint8Array(n));
 }
 
-/**
- * Best-effort key-material scrubbing. JS GC can already have copied the bytes,
- * so this is defense-in-depth, not a guarantee — but it removes the deliberate
- * long-lived copies once a key has been imported into a CryptoKey.
- */
+// Best-effort scrubbing: GC may already have copied the bytes — defense-in-depth only.
 export function zeroize(bytes: Bytes): void {
   bytes.fill(0);
 }
@@ -74,7 +51,6 @@ export function base64ToBytes(b64: string): Bytes {
   return out;
 }
 
-/** PBKDF2 -> 32-byte pseudo-random key (PRK) from the passphrase. */
 export async function derivePrk(
   passphrase: string,
   salt: Bytes,
@@ -91,7 +67,7 @@ export async function derivePrk(
   return new Uint8Array(bits);
 }
 
-/** HKDF domain-separated subkey (empty salt — PRK is already salted via PBKDF2). */
+// Empty HKDF salt: the PRK is already salted by the passphrase KDF.
 export async function deriveSubkey(
   prk: Bytes,
   info: string,
@@ -106,7 +82,6 @@ export async function deriveSubkey(
   return new Uint8Array(bits);
 }
 
-/** AES-GCM-256 key (used both as the DEK and as the passphrase-derived wrap key). */
 export async function importAesGcmKey(raw: Bytes): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: KEY_BITS }, false, [
     "encrypt",
@@ -114,7 +89,6 @@ export async function importAesGcmKey(raw: Bytes): Promise<CryptoKey> {
   ]);
 }
 
-/** HMAC-SHA256 key for the kms integrity envelope. */
 export async function importHmacKey(raw: Bytes): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
@@ -122,14 +96,12 @@ export async function importHmacKey(raw: Bytes): Promise<CryptoKey> {
   ]);
 }
 
-/** Generate a fresh random DEK: raw bytes (for wrapping) + non-extractable CryptoKey (for use). */
 export async function generateDek(): Promise<{ rawKey: Bytes; cryptoKey: CryptoKey }> {
   const rawKey = randomBytes(KEY_BYTES);
   const cryptoKey = await importAesGcmKey(rawKey);
   return { rawKey, cryptoKey };
 }
 
-/** AES-GCM wrap of the raw DEK under the wrap key. Output layout: iv(12) || ciphertext. */
 export async function wrapDek(wrapKey: CryptoKey, rawDek: Bytes): Promise<Bytes> {
   const iv = randomBytes(GCM_IV_BYTES);
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, wrapKey, rawDek));
@@ -139,7 +111,6 @@ export async function wrapDek(wrapKey: CryptoKey, rawDek: Bytes): Promise<Bytes>
   return out;
 }
 
-/** AES-GCM unwrap. Throws (GCM auth-tag failure) if the wrap key is wrong. */
 export async function unwrapDek(wrapKey: CryptoKey, wrapped: Bytes): Promise<Bytes> {
   if (wrapped.byteLength < GCM_IV_BYTES + GCM_TAG_BYTES) {
     throw new Error("wrapped DEK is too short");
@@ -150,11 +121,8 @@ export async function unwrapDek(wrapKey: CryptoKey, wrapped: Bytes): Promise<Byt
   return pt;
 }
 
-/**
- * HMAC-SHA256 over the plain concatenation of field bytes.
- * LEGACY (envelope v1/v2 verification only): without delimiters the field
- * boundaries are ambiguous — new envelopes use computeIntegrityMacDelimited.
- */
+// Legacy envelope v1/v2 verification only: plain concatenation leaves field
+// boundaries ambiguous — new envelopes use computeIntegrityMacDelimited.
 export async function computeIntegrityMac(macKey: CryptoKey, fields: Bytes[]): Promise<Bytes> {
   const total = fields.reduce((n, f) => n + f.byteLength, 0);
   const buf = new Uint8Array(total);
@@ -167,11 +135,7 @@ export async function computeIntegrityMac(macKey: CryptoKey, fields: Bytes[]): P
   return new Uint8Array(sig);
 }
 
-/**
- * HMAC-SHA256 with each field prefixed by its 4-byte big-endian length, so the
- * MAC input parses unambiguously (["ab","c"] can never collide with ["a","bc"]).
- * Used by envelope v3+.
- */
+// 4-byte big-endian length prefix per field: ["ab","c"] can never collide with ["a","bc"].
 export async function computeIntegrityMacDelimited(
   macKey: CryptoKey,
   fields: Bytes[],
@@ -189,7 +153,6 @@ export async function computeIntegrityMacDelimited(
   return new Uint8Array(sig);
 }
 
-/** Constant-time byte comparison (avoids timing side-channels on MAC/verifier checks). */
 export function constantTimeEqual(a: Bytes, b: Bytes): boolean {
   if (a.byteLength !== b.byteLength) return false;
   let diff = 0;
@@ -199,13 +162,8 @@ export function constantTimeEqual(a: Bytes, b: Bytes): boolean {
   return diff === 0;
 }
 
-/**
- * Deterministic 96-bit AES-GCM IV from a monotonic per-DEK counter
- * (NIST SP 800-38D §8.2.1 recommended mode). 12 bytes big-endian; the counter
- * occupies the low bits. Unique per encrypt as long as the counter never
- * repeats — enforced by CryptoVault's synchronous in-memory increment,
- * persisted via kms.setIvCounter BEFORE use, fail-loud at 2^28.
- */
+// Deterministic counter IV (NIST SP 800-38D §8.2.1). Uniqueness is enforced by
+// CryptoVault's synchronous increment, persisted via kms.setIvCounter BEFORE use.
 export function counterToIv(counter: number): Bytes {
   const iv = new Uint8Array(GCM_IV_BYTES);
   const view = new DataView(iv.buffer);
@@ -214,8 +172,6 @@ export function counterToIv(counter: number): Bytes {
   return iv;
 }
 
-/** AES-GCM encrypt of a UTF-8 string under `key` with an explicit IV. Output: base64(iv||ct).
- *  Optional AAD binds the ciphertext to context (e.g. note id) — authenticated but not encrypted. */
 export async function aesGcmEncrypt(
   key: CryptoKey,
   plaintext: string,
@@ -235,8 +191,6 @@ export async function aesGcmEncrypt(
   return bytesToBase64(out);
 }
 
-/** AES-GCM decrypt of a base64(iv||ct) payload under `key`. Throws on auth-tag failure.
- *  If encrypted with AAD, the same AAD must be supplied or the tag check fails. */
 export async function aesGcmDecrypt(
   key: CryptoKey,
   payloadB64: string,
