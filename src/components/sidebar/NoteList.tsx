@@ -17,7 +17,7 @@ export const NoteList: React.FC = () => {
     activeNoteId,
     setActiveNoteId,
     createNote,
-    requestDeleteNote,
+    trashNote,
     togglePinNote,
     toggleFavoriteNote,
   } = useNoteStore(
@@ -26,7 +26,7 @@ export const NoteList: React.FC = () => {
       activeNoteId: s.activeNoteId,
       setActiveNoteId: s.setActiveNoteId,
       createNote: s.createNote,
-      requestDeleteNote: s.requestDeleteNote,
+      trashNote: s.trashNote,
       togglePinNote: s.togglePinNote,
       toggleFavoriteNote: s.toggleFavoriteNote,
     })),
@@ -89,7 +89,7 @@ export const NoteList: React.FC = () => {
     [toggleFavoriteNote],
   );
 
-  const handleDelete = useCallback((id: string) => requestDeleteNote(id), [requestDeleteNote]);
+  const handleDelete = useCallback((id: string) => trashNote(id), [trashNote]);
 
   const handleCreate = useCallback(() => {
     if (!activeWorkspaceId) return;

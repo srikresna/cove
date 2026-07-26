@@ -16,3 +16,8 @@ export const duplicateNoteProps = (note: Pick<Note, "title" | "content" | "icon"
 });
 
 export const canDeleteLastWorkspace = (count: number): boolean => count > 1;
+
+export const TRASH_RETENTION_DAYS = 30;
+
+export const trashPurgeCutoff = (now: number): number =>
+  now - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;

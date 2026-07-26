@@ -15,6 +15,8 @@ interface WorkspaceState {
   setCreateModalOpen: (open: boolean) => void;
   setQuickSearchOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  isTrashOpen: boolean;
+  setTrashOpen: (open: boolean) => void;
   toggleDarkMode: () => void;
   fetchWorkspaces: () => Promise<void>;
   createWorkspace: (
@@ -46,6 +48,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isCreateModalOpen: false,
   isQuickSearchOpen: false,
   isSettingsOpen: false,
+  isTrashOpen: false,
   isDarkMode: getInitialDarkMode(),
 
   setActiveWorkspace: (id) => {
@@ -55,6 +58,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
   setQuickSearchOpen: (open) => set({ isQuickSearchOpen: open }),
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
+  setTrashOpen: (open) => set({ isTrashOpen: open }),
   toggleDarkMode: () =>
     set((state) => {
       const nextMode = !state.isDarkMode;

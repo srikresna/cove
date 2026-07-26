@@ -7,6 +7,7 @@ import {
   coverAad,
   duplicateNoteProps,
   makeNoteId,
+  trashPurgeCutoff,
 } from "../domain/note/notePolicy";
 import { VaultLockedError } from "../errors/AppError";
 import type { INoteLinkRepository } from "../repositories/INoteLinkRepository";
@@ -130,6 +131,31 @@ export class NoteService implements INoteService {
   async deleteNote(id: string): Promise<void> {
     this.assertUnlocked();
     return this.notes.deleteNote(id);
+  }
+
+  async trashNote(id: string): Promise<void> {
+    this.assertUnlocked();
+    await this.notes.setDeleted(id, Date.now());
+  }
+
+  async restoreNote(id: string): Promise<void> {
+    this.assertUnlocked();
+    await this.notes.setDeleted(id, null);
+  }
+
+  async listTrash(): Promise<Note[]> {
+    this.assertUnlocked();
+    const records = await this.notes.listTrashed();
+    return records.map((rec) => ({ ...rec, content: "" }));
+  }
+
+  async purgeExpiredTrash(now = Date.now()): Promise<number> {
+    this.assertUnlocked();
+    const expired = await this.notes.findExpiredTrash(trashPurgeCutoff(now));
+    for (const id of expired) {
+      await this.notes.deleteNote(id);
+    }
+    return expired.length;
   }
 
   async duplicateNote(id: string): Promise<Note> {

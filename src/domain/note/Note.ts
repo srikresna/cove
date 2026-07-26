@@ -9,4 +9,5 @@ export interface Note {
   isFavorite: boolean;
   createdAt: number;
   updatedAt: number;
+  deletedAt?: number;
 }

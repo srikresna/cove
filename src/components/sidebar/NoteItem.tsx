@@ -90,7 +90,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
               className="text-destructive focus:text-destructive"
             >
               <Trash2 aria-hidden="true" />
-              <span>{MESSAGES.DELETE_NOTE}</span>
+              <span>{MESSAGES.MOVE_TO_TRASH}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

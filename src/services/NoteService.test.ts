@@ -167,6 +167,10 @@ describe("NoteService", () => {
     await expect(service.setCoverImage("note-1", "data:x")).rejects.toThrow(VaultLockedError);
     await expect(service.removeCoverImage("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.deleteNote("note-1")).rejects.toThrow(VaultLockedError);
+    await expect(service.trashNote("note-1")).rejects.toThrow(VaultLockedError);
+    await expect(service.restoreNote("note-1")).rejects.toThrow(VaultLockedError);
+    await expect(service.listTrash()).rejects.toThrow(VaultLockedError);
+    await expect(service.purgeExpiredTrash()).rejects.toThrow(VaultLockedError);
     await expect(service.duplicateNote("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.togglePin("note-1")).rejects.toThrow(VaultLockedError);
     await expect(service.toggleFavorite("note-1")).rejects.toThrow(VaultLockedError);
@@ -226,6 +230,42 @@ describe("NoteService", () => {
 
     await expect(service.togglePin("missing")).rejects.toThrow(NotFoundError);
     await expect(service.toggleFavorite("missing")).rejects.toThrow(NotFoundError);
+  });
+
+  it("trash hides a note from lists and search until restored", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    const note = await service.createNote("ws-1", "Trashable", "body text here");
+
+    await service.trashNote(note.id);
+    expect(await service.listMetadataByWorkspace("ws-1")).toHaveLength(0);
+    expect(await service.searchAcrossWorkspaces("trashable")).toHaveLength(0);
+
+    const trash = await service.listTrash();
+    expect(trash).toHaveLength(1);
+    expect(trash[0]?.id).toBe(note.id);
+    expect(trash[0]?.deletedAt).toBeGreaterThan(0);
+
+    await service.restoreNote(note.id);
+    expect(await service.listMetadataByWorkspace("ws-1")).toHaveLength(1);
+    expect(await service.listTrash()).toHaveLength(0);
+  });
+
+  it("purgeExpiredTrash hard-deletes only notes past the retention window", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    const expired = await service.createNote("ws-1", "Old");
+    const fresh = await service.createNote("ws-1", "New");
+
+    await service.trashNote(expired.id);
+    await service.trashNote(fresh.id);
+    const record = fakeRepo.notes.find((n) => n.id === expired.id);
+    if (record) record.deletedAt = Date.now() - 31 * 24 * 60 * 60 * 1000;
+
+    const purged = await service.purgeExpiredTrash();
+    expect(purged).toBe(1);
+    expect(fakeRepo.notes.map((n) => n.id)).toEqual([fresh.id]);
+    expect((await service.listTrash())[0]?.id).toBe(fresh.id);
   });
 
   it("re-throws repository errors (fail fast)", async () => {

@@ -199,5 +199,14 @@ export class SQLiteDatabase {
       );
       await db.execute("PRAGMA user_version = 7");
     }
+
+    if (version < 8) {
+      const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      if (!noteCols.some((c) => c.name === "deletedAt")) {
+        await db.execute("ALTER TABLE notes ADD COLUMN deletedAt INTEGER");
+      }
+      await db.execute("CREATE INDEX IF NOT EXISTS idx_notes_deleted ON notes(deletedAt)");
+      await db.execute("PRAGMA user_version = 8");
+    }
   }
 }

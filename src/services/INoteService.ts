@@ -23,7 +23,15 @@ export interface INoteService {
   getCoverImage(id: string): Promise<string | null>;
   setCoverImage(id: string, dataUrl: string): Promise<void>;
   removeCoverImage(id: string): Promise<void>;
+  /** Permanently removes the note and its links, tags, and cover. */
   deleteNote(id: string): Promise<void>;
+  /** Soft delete: hides the note everywhere until restored or purged. */
+  trashNote(id: string): Promise<void>;
+  restoreNote(id: string): Promise<void>;
+  /** Trashed notes across all workspaces, metadata only, newest first. */
+  listTrash(): Promise<Note[]>;
+  /** Hard-deletes trash older than the retention window; returns the count. */
+  purgeExpiredTrash(now?: number): Promise<number>;
   duplicateNote(id: string): Promise<Note>;
   togglePin(id: string): Promise<Note>;
   toggleFavorite(id: string): Promise<Note>;

@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Plus, Settings, Trash2 } from "lucide-react";
 import type React from "react";
 import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
@@ -14,8 +14,14 @@ const tile =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onToggleCollapsed }) => {
-  const { workspaces, activeWorkspaceId, setActiveWorkspace, setCreateModalOpen, setSettingsOpen } =
-    useWorkspaceStore();
+  const {
+    workspaces,
+    activeWorkspaceId,
+    setActiveWorkspace,
+    setCreateModalOpen,
+    setSettingsOpen,
+    setTrashOpen,
+  } = useWorkspaceStore();
 
   return (
     <div className="flex h-full w-[52px] flex-shrink-0 flex-col items-center gap-2 py-3">
@@ -84,6 +90,20 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
           <TooltipContent side="right">{MESSAGES.CREATE_WORKSPACE_TITLE}</TooltipContent>
         </Tooltip>
       </div>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={MESSAGES.TRASH_TITLE}
+            onClick={() => setTrashOpen(true)}
+            className={cn(tile, "text-muted-foreground hover:bg-accent hover:text-foreground")}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">{MESSAGES.TRASH_TITLE}</TooltipContent>
+      </Tooltip>
 
       <Tooltip>
         <TooltipTrigger asChild>

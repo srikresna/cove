@@ -25,6 +25,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       isFavorite: Boolean(row.isFavorite),
       createdAt: Number(row.createdAt),
       updatedAt: Number(row.updatedAt),
+      deletedAt: row.deletedAt != null ? Number(row.deletedAt) : undefined,
     };
   }
 
@@ -32,7 +33,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC, id DESC",
+        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -74,7 +75,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT * FROM notes ORDER BY updatedAt DESC LIMIT ?",
+        "SELECT * FROM notes WHERE deletedAt IS NULL ORDER BY updatedAt DESC LIMIT ?",
         [limit],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -87,7 +88,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT n.id, n.workspaceId, n.title, n.icon FROM notes_fts f JOIN notes n ON n.id = f.note_id WHERE notes_fts MATCH ? ORDER BY rank LIMIT ?",
+        "SELECT n.id, n.workspaceId, n.title, n.icon FROM notes_fts f JOIN notes n ON n.id = f.note_id WHERE notes_fts MATCH ? AND n.deletedAt IS NULL ORDER BY rank LIMIT ?",
         [`${query}*`, limit],
       );
       return rows.map((r) => ({
@@ -256,6 +257,40 @@ export class SQLiteNoteRepository implements INoteRepository {
       await db.execute("DELETE FROM note_covers WHERE noteId = ?", [noteId]);
     } catch (err) {
       throw toPersistenceError("deleteCover", err);
+    }
+  }
+
+  async listTrashed(): Promise<NoteRecord[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt, deletedAt FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
+      );
+      return rows.map((row) => this.mapRowToRecord(row));
+    } catch (err) {
+      throw toPersistenceError("listTrashed", err);
+    }
+  }
+
+  async setDeleted(id: string, deletedAt: number | null): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("UPDATE notes SET deletedAt = ? WHERE id = ?", [deletedAt, id]);
+    } catch (err) {
+      throw toPersistenceError("setDeleted", err);
+    }
+  }
+
+  async findExpiredTrash(cutoff: number): Promise<string[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ id: string }>>(
+        "SELECT id FROM notes WHERE deletedAt IS NOT NULL AND deletedAt < ?",
+        [cutoff],
+      );
+      return rows.map((r) => String(r.id));
+    } catch (err) {
+      throw toPersistenceError("findExpiredTrash", err);
     }
   }
 }

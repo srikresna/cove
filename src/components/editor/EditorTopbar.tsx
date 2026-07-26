@@ -63,7 +63,7 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   onToggleFullscreen,
   onToggleRightBar,
 }) => {
-  const { requestDeleteNote, duplicateNote, togglePinNote, toggleFavoriteNote } = useNoteStore();
+  const { trashNote, duplicateNote, togglePinNote, toggleFavoriteNote } = useNoteStore();
 
   const formattedDate = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
@@ -125,8 +125,8 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
           <Copy className="h-4 w-4" aria-hidden="true" />
         </IconAction>
         <IconAction
-          label={MESSAGES.DELETE_NOTE}
-          onClick={() => requestDeleteNote(note.id)}
+          label={MESSAGES.MOVE_TO_TRASH}
+          onClick={() => trashNote(note.id)}
           className="hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />

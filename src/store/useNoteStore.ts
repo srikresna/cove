@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { MESSAGES } from "../constants/messages";
 import { noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
 import { presentError } from "../services/errorPresenter";
@@ -9,13 +10,12 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 
 interface NoteState {
   notes: Note[];
+  trashedNotes: Note[];
   activeNoteId: string | null;
   activeCoverImage: string | null;
-  pendingDeleteId: string | null;
   setActiveNoteId: (id: string | null) => void;
-  requestDeleteNote: (id: string) => void;
-  cancelDeleteNote: () => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
+  fetchTrash: () => Promise<void>;
   loadActiveNoteContent: (id: string) => Promise<void>;
   createNote: (
     workspaceId: string,
@@ -27,7 +27,10 @@ interface NoteState {
   uploadCoverImage: (id: string, file: File) => Promise<void>;
   removeCoverImage: (id: string) => Promise<void>;
   moveNoteToWorkspace: (id: string, workspaceId: string) => Promise<void>;
-  deleteNote: (id: string) => Promise<void>;
+  trashNote: (id: string) => Promise<void>;
+  restoreNote: (id: string) => Promise<void>;
+  deleteNotePermanently: (id: string) => Promise<void>;
+  purgeExpiredTrash: () => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
   togglePinNote: (id: string) => Promise<void>;
   toggleFavoriteNote: (id: string) => Promise<void>;
@@ -68,19 +71,25 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
   return {
     notes: [],
+    trashedNotes: [],
     activeNoteId: null,
     activeCoverImage: null,
-    pendingDeleteId: null,
 
     setActiveNoteId: (id) => set({ activeNoteId: id, activeCoverImage: null }),
-    requestDeleteNote: (id) => set({ pendingDeleteId: id }),
-    cancelDeleteNote: () => set({ pendingDeleteId: null }),
 
     fetchNotes: async (workspaceId) => {
       try {
         const notes = await noteService.listMetadataByWorkspace(workspaceId);
         const first = notes[0];
         set({ notes, activeNoteId: first ? first.id : null, activeCoverImage: null });
+      } catch (err) {
+        notifyError(err, { saveStatus: false });
+      }
+    },
+
+    fetchTrash: async () => {
+      try {
+        set({ trashedNotes: await noteService.listTrash() });
       } catch (err) {
         notifyError(err, { saveStatus: false });
       }
@@ -188,21 +197,69 @@ export const useNoteStore = create<NoteState>((set, get) => {
       }
     },
 
-    deleteNote: async (id) => {
+    trashNote: async (id) => {
       const previousNotes = get().notes;
       const previousActive = get().activeNoteId;
       const filtered = previousNotes.filter((n) => n.id !== id);
-      const nextActive = filtered[0]?.id || null;
+      const wasActive = previousActive === id;
 
-      set({ notes: filtered, activeNoteId: nextActive, activeCoverImage: null });
+      set({
+        notes: filtered,
+        activeNoteId: wasActive ? (filtered[0]?.id ?? null) : previousActive,
+        ...(wasActive ? { activeCoverImage: null } : {}),
+      });
       useSaveStatusStore.getState().setSaving();
 
       try {
-        await noteService.deleteNote(id);
+        await noteService.trashNote(id);
         useSaveStatusStore.getState().setSaved();
+        useNotificationStore.getState().pushToast({
+          kind: "info",
+          title: MESSAGES.TRASH_MOVED_TOAST,
+          description: MESSAGES.TRASH_MOVED_DESC,
+        });
       } catch (err) {
         set({ notes: previousNotes, activeNoteId: previousActive });
         notifyError(err);
+      }
+    },
+
+    restoreNote: async (id) => {
+      const trashed = get().trashedNotes.find((n) => n.id === id);
+      set((state) => ({ trashedNotes: state.trashedNotes.filter((n) => n.id !== id) }));
+
+      try {
+        await noteService.restoreNote(id);
+        const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+        if (trashed && trashed.workspaceId === activeWorkspaceId) {
+          const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
+          set({ notes });
+        }
+      } catch (err) {
+        if (trashed) {
+          set((state) => ({ trashedNotes: [trashed, ...state.trashedNotes] }));
+        }
+        notifyError(err, { saveStatus: false });
+      }
+    },
+
+    deleteNotePermanently: async (id) => {
+      const previousTrash = get().trashedNotes;
+      set((state) => ({ trashedNotes: state.trashedNotes.filter((n) => n.id !== id) }));
+
+      try {
+        await noteService.deleteNote(id);
+      } catch (err) {
+        set({ trashedNotes: previousTrash });
+        notifyError(err, { saveStatus: false });
+      }
+    },
+
+    purgeExpiredTrash: async () => {
+      try {
+        await noteService.purgeExpiredTrash();
+      } catch (err) {
+        notifyError(err, { saveStatus: false });
       }
     },
 

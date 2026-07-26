@@ -12,7 +12,7 @@ export class InMemoryNoteRepository implements INoteRepository {
     this.callLog.push("getNotesMetadataByWorkspace");
     if (this.shouldFail) throw new Error("Fake repo error: getNotesMetadataByWorkspace");
     return this.notes
-      .filter((n) => n.workspaceId === workspaceId)
+      .filter((n) => n.workspaceId === workspaceId && n.deletedAt == null)
       .map((n) => ({ ...n, content: "" as EncryptedPayload }));
   }
 
@@ -35,7 +35,8 @@ export class InMemoryNoteRepository implements INoteRepository {
   async findRecentForSearch(limit: number): Promise<NoteRecord[]> {
     this.callLog.push(`findRecentForSearch:${limit}`);
     if (this.shouldFail) throw new Error("Fake repo error: findRecentForSearch");
-    return [...this.notes]
+    return this.notes
+      .filter((n) => n.deletedAt == null)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, limit)
       .map((n) => ({ ...n }));
@@ -95,12 +96,34 @@ export class InMemoryNoteRepository implements INoteRepository {
     this.covers.delete(noteId);
   }
 
+  async listTrashed(): Promise<NoteRecord[]> {
+    this.callLog.push("listTrashed");
+    if (this.shouldFail) throw new Error("Fake repo error: listTrashed");
+    return this.notes
+      .filter((n) => n.deletedAt != null)
+      .sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0))
+      .map((n) => ({ ...n, content: "" as EncryptedPayload }));
+  }
+
+  async setDeleted(id: string, deletedAt: number | null): Promise<void> {
+    this.callLog.push(`setDeleted:${id}:${deletedAt}`);
+    if (this.shouldFail) throw new Error("Fake repo error: setDeleted");
+    const note = this.notes.find((n) => n.id === id);
+    if (note) note.deletedAt = deletedAt ?? undefined;
+  }
+
+  async findExpiredTrash(cutoff: number): Promise<string[]> {
+    this.callLog.push(`findExpiredTrash:${cutoff}`);
+    if (this.shouldFail) throw new Error("Fake repo error: findExpiredTrash");
+    return this.notes.filter((n) => n.deletedAt != null && n.deletedAt < cutoff).map((n) => n.id);
+  }
+
   async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {
     this.callLog.push(`searchTitlesFts:${query}`);
     if (this.shouldFail) throw new Error("Fake repo error: searchTitlesFts");
     const q = query.toLowerCase();
     return this.notes
-      .filter((n) => n.title.toLowerCase().includes(q))
+      .filter((n) => n.deletedAt == null && n.title.toLowerCase().includes(q))
       .slice(0, limit)
       .map((n) => ({
         id: n.id,

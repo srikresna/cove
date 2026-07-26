@@ -4,9 +4,9 @@ import { Suspense, lazy, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
-import { DeleteNoteDialog } from "./components/modals/DeleteNoteDialog";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
+import { TrashDialog } from "./components/modals/TrashDialog";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { Button } from "./components/ui/button";
 import { VaultGate } from "./components/vault/VaultGate";
@@ -24,10 +24,12 @@ export const AppContent: React.FC = () => {
     useWorkspaceStore();
   const { notes, activeNoteId, setActiveNoteId, createNote, fetchNotes, loadActiveNoteContent } =
     useNoteStore();
+  const purgeExpiredTrash = useNoteStore((s) => s.purgeExpiredTrash);
 
   useEffect(() => {
     fetchWorkspaces();
-  }, [fetchWorkspaces]);
+    void purgeExpiredTrash();
+  }, [fetchWorkspaces, purgeExpiredTrash]);
 
   useEffect(() => {
     if (activeWorkspaceId) {
@@ -133,7 +135,7 @@ export const AppContent: React.FC = () => {
       <CreateWorkspaceModal />
       <QuickSearchModal />
       <SettingsModal />
-      <DeleteNoteDialog />
+      <TrashDialog />
       <ToastContainer />
     </div>
   );
