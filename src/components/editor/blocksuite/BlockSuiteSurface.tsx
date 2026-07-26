@@ -3,10 +3,7 @@ import "@toeverything/theme/fonts.css";
 import { BlockStdScope } from "@blocksuite/affine/std";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import {
-  packBlockSuiteContent,
-  unpackBlockSuiteContent,
-} from "../../../services/editor/contentFormat";
+import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
 import type { Note } from "../../../types";
@@ -24,7 +21,7 @@ export const BlockSuiteSurface: React.FC<{ note: Note }> = ({ note }) => {
     const container = containerRef.current;
     if (!container) return;
 
-    const doc = openNoteDoc(noteId, unpackBlockSuiteContent(initialContent.current));
+    const doc = openNoteDoc(noteId, initialContent.current);
     const host = new BlockStdScope({
       store: doc.getStore(),
       extensions: getViewManager().get("page"),
