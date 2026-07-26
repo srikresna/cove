@@ -12,7 +12,7 @@ tauri-build = { version = "2.0.0", features = [] }
 tauri = { version = "2.0.0", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
-tauri-plugin-keyring = "0.1"
+tauri-plugin-single-instance = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
@@ -20,6 +20,11 @@ tracing-subscriber = "0.3"
 argon2 = "0.5"
 pbkdf2 = "0.12"
 sha2 = "0.10"
+# Direct keychain access with a hard-coded service name (replaces the generic
+# tauri-plugin-keyring, whose permissions exposed the whole OS credential store).
+keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
+# WAL-safe backup via VACUUM INTO; same sqlx/libsqlite3 already pulled in by tauri-plugin-sql.
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }

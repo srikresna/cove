@@ -9,9 +9,6 @@
     "sql:allow-load",
     "sql:allow-execute",
     "sql:allow-select",
-    "keyring:allow-set-password",
-    "keyring:allow-get-password",
-    "keyring:allow-delete-password",
     "dialog:default"
   ]
 }

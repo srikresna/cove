@@ -1,5 +1,33 @@
 use serde_json::Value;
 
+/// Bounds for KDF parameters supplied over IPC (they originate from the kms
+/// row in the database, which is attacker-writable in the DB-theft threat
+/// model). Argon2 allocates m_cost KiB up front, so unbounded values are an
+/// unlock-time memory/CPU DoS. Out-of-range or malformed params fail loud —
+/// no silent defaults, so the derivation params can never diverge from what
+/// the TS-side envelope MAC binds.
+const PBKDF2_MIN_ITERATIONS: u64 = 100_000;
+const PBKDF2_MAX_ITERATIONS: u64 = 10_000_000;
+const ARGON2_MIN_M_COST_KIB: u64 = 8 * 1024; // 8 MiB
+const ARGON2_MAX_M_COST_KIB: u64 = 1024 * 1024; // 1 GiB
+const ARGON2_MIN_T_COST: u64 = 1;
+const ARGON2_MAX_T_COST: u64 = 10;
+const ARGON2_MIN_P_COST: u64 = 1;
+const ARGON2_MAX_P_COST: u64 = 8;
+
+fn required_param(params: &Value, key: &str, min: u64, max: u64) -> Result<u32, String> {
+    let v = params
+        .get(key)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("KDF params missing or non-numeric field: {key}"))?;
+    if v < min || v > max {
+        return Err(format!(
+            "KDF param {key}={v} outside allowed range [{min}, {max}]"
+        ));
+    }
+    Ok(v as u32)
+}
+
 /// Derive a 32-byte key from a passphrase using the specified KDF (runs in Rust,
 /// not the JS webview — GPU/ASIC-resistant Argon2id available here).
 ///
@@ -14,19 +42,25 @@ pub fn derive_key_kdf(
     kdf_alg: String,
     params: String,
 ) -> Result<Vec<u8>, String> {
+    let p: Value =
+        serde_json::from_str(&params).map_err(|e| format!("Malformed KDF params JSON: {e}"))?;
     match kdf_alg.as_str() {
         "PBKDF2-SHA256" => {
-            let p: Value = serde_json::from_str(&params).map_err(|e| e.to_string())?;
-            let iterations = p["iterations"].as_u64().unwrap_or(600_000) as u32;
+            let iterations =
+                required_param(&p, "iterations", PBKDF2_MIN_ITERATIONS, PBKDF2_MAX_ITERATIONS)?;
             let mut output = vec![0u8; 32];
-            pbkdf2::pbkdf2_hmac::<sha2::Sha256>(passphrase.as_bytes(), &salt, iterations, &mut output);
+            pbkdf2::pbkdf2_hmac::<sha2::Sha256>(
+                passphrase.as_bytes(),
+                &salt,
+                iterations,
+                &mut output,
+            );
             Ok(output)
         }
         "ARGON2ID" => {
-            let p: Value = serde_json::from_str(&params).map_err(|e| e.to_string())?;
-            let m_cost = p["m_cost"].as_u64().unwrap_or(65_536) as u32; // 64 MiB
-            let t_cost = p["t_cost"].as_u64().unwrap_or(3) as u32;
-            let p_cost = p["p_cost"].as_u64().unwrap_or(4) as u32;
+            let m_cost = required_param(&p, "m_cost", ARGON2_MIN_M_COST_KIB, ARGON2_MAX_M_COST_KIB)?;
+            let t_cost = required_param(&p, "t_cost", ARGON2_MIN_T_COST, ARGON2_MAX_T_COST)?;
+            let p_cost = required_param(&p, "p_cost", ARGON2_MIN_P_COST, ARGON2_MAX_P_COST)?;
             let argon_params =
                 argon2::Params::new(m_cost, t_cost, p_cost, Some(32)).map_err(|e| e.to_string())?;
             let argon = argon2::Argon2::new(
@@ -41,5 +75,71 @@ pub fn derive_key_kdf(
             Ok(output)
         }
         _ => Err(format!("Unknown KDF algorithm: {}", kdf_alg)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SALT: [u8; 16] = [7u8; 16];
+
+    #[test]
+    fn pbkdf2_is_deterministic_and_32_bytes() {
+        let params = r#"{"iterations": 100000}"#;
+        let a = derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
+            .unwrap();
+        let b = derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
+            .unwrap();
+        assert_eq!(a.len(), 32);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn argon2id_is_deterministic_and_differs_from_pbkdf2() {
+        // Minimum allowed m_cost keeps the test fast while exercising the real path.
+        let params = r#"{"m_cost": 8192, "t_cost": 1, "p_cost": 1}"#;
+        let a =
+            derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
+        let b =
+            derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
+        assert_eq!(a.len(), 32);
+        assert_eq!(a, b);
+        let pb = derive_key_kdf(
+            "pw".into(),
+            SALT.to_vec(),
+            "PBKDF2-SHA256".into(),
+            r#"{"iterations": 100000}"#.into(),
+        )
+        .unwrap();
+        assert_ne!(a, pb);
+    }
+
+    #[test]
+    fn rejects_unknown_algorithm_and_malformed_json() {
+        assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "MD5".into(), "{}".into()).is_err());
+        assert!(
+            derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "not json".into())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_missing_and_out_of_range_params() {
+        // Missing field — no silent default.
+        assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "{}".into()).is_err());
+        assert!(
+            derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), "{}".into())
+                .is_err()
+        );
+        // DoS-sized m_cost (would ask Argon2 for ~4 TiB).
+        let huge = r#"{"m_cost": 4294967295, "t_cost": 3, "p_cost": 4}"#;
+        assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), huge.into()).is_err());
+        // Wrapped-to-tiny iteration counts.
+        let tiny = r#"{"iterations": 1}"#;
+        assert!(
+            derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), tiny.into())
+                .is_err()
+        );
     }
 }
