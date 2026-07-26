@@ -1,4 +1,4 @@
-import EmojiPicker from "emoji-picker-react";
+import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
 import { ArrowRightLeft, Copy, Maximize2, Minimize2, Pin, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -71,19 +71,21 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   const accent = note.coverColor || "#0e7c66";
 
   return (
-    <div className="mb-6 space-y-4">
+    <div className="mb-2">
       <div
-        className="group relative flex h-20 w-full items-end overflow-hidden rounded-lg border p-3"
-        style={{ background: `linear-gradient(135deg, ${accent}2e 0%, transparent 75%)` }}
+        className="group relative h-36 w-full"
+        style={{
+          background: `linear-gradient(160deg, ${accent}4d 0%, ${accent}14 60%, transparent 100%)`,
+        }}
       >
-        <div className="flex w-full items-center justify-between">
+        <div className="absolute right-4 top-4 flex items-center gap-1 rounded-md border bg-card/90 p-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" aria-label={MESSAGES.CHANGE_ACCENT}>
+              <Button variant="ghost" size="sm" aria-label={MESSAGES.CHANGE_ACCENT}>
                 {MESSAGES.CHANGE_ACCENT}
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="flex w-auto gap-2 p-2">
+            <PopoverContent align="end" className="flex w-auto gap-2 p-2">
               {COVER_COLORS.map((color) => (
                 <button
                   key={color}
@@ -100,58 +102,32 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             </PopoverContent>
           </Popover>
 
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}
-              onClick={onToggleFullWidth}
-            >
-              <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}</span>
-            </Button>
+          <Button
+            variant="ghost"
+            size="iconSm"
+            aria-label={isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}
+            onClick={onToggleFullWidth}
+            className="text-muted-foreground"
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}
-              onClick={onToggleFullscreen}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
-              ) : (
-                <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              <span>{isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}</span>
-            </Button>
-          </div>
-        </div>
-      </div>
+          <Button
+            variant="ghost"
+            size="iconSm"
+            aria-label={isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}
+            onClick={onToggleFullscreen}
+            className="text-muted-foreground"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </Button>
 
-      <div className="flex items-start justify-between gap-4">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Change Note Emoji Icon"
-              className="flex h-14 w-14 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {note.icon || "📝"}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto overflow-hidden p-0">
-            <EmojiPicker
-              onEmojiClick={(emojiData) => {
-                updateNote(note.id, { icon: emojiData.emoji });
-              }}
-              autoFocusSearch={true}
-              width={340}
-              height={400}
-            />
-          </PopoverContent>
-        </Popover>
+          <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-border" />
 
-        <div className="flex items-center gap-0.5 rounded-md border bg-card p-0.5 shadow-sm">
           <Button
             variant="ghost"
             size="iconSm"
@@ -194,7 +170,30 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
         </div>
       </div>
 
-      <div>
+      <div className={cn("w-full px-6", !isFullWidth && "mx-auto max-w-3xl")}>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Change Note Emoji Icon"
+              className="relative z-10 -mt-9 flex h-16 w-16 items-center justify-center rounded-xl text-[56px] leading-none transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span aria-hidden="true">{note.icon || "📝"}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto overflow-hidden p-0">
+            <EmojiPicker
+              emojiStyle={EmojiStyle.NATIVE}
+              onEmojiClick={(emojiData) => {
+                updateNote(note.id, { icon: emojiData.emoji });
+              }}
+              autoFocusSearch={true}
+              width={340}
+              height={400}
+            />
+          </PopoverContent>
+        </Popover>
+
         <label htmlFor="note-title-input" className="sr-only">
           Note Title
         </label>
@@ -205,7 +204,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           onChange={handleTitleChange}
           placeholder={MESSAGES.UNTITLED_NOTE}
           aria-label="Note Title"
-          className="w-full bg-transparent py-1 font-display text-3xl font-medium tracking-tight text-foreground outline-none placeholder:text-muted-foreground/50 sm:text-4xl"
+          className="mt-2 w-full bg-transparent font-display text-[40px] font-bold leading-[50px] tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
         />
         <div
           aria-hidden="true"

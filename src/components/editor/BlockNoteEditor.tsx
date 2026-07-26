@@ -2,6 +2,7 @@ import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "../../lib/utils";
 import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -81,33 +82,27 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
   );
 
   return (
-    <div className="w-full h-full overflow-y-auto px-4 sm:px-8 py-6">
-      <div
-        className={`transition-all duration-200 ${
-          isFullWidth ? "max-w-full px-6" : "max-w-4xl mx-auto w-full"
-        }`}
-      >
-        <EditorHeader
-          note={note}
-          wordCount={wordCount}
-          characterCount={characterCount}
-          isFullWidth={isFullWidth}
-          isFullscreen={isFullscreen}
-          onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
-          onToggleFullscreen={toggleFullscreen}
-        />
+    <div className="h-full w-full overflow-y-auto">
+      <EditorHeader
+        note={note}
+        wordCount={wordCount}
+        characterCount={characterCount}
+        isFullWidth={isFullWidth}
+        isFullscreen={isFullscreen}
+        onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
+        onToggleFullscreen={toggleFullscreen}
+      />
 
-        <div className="w-full min-h-[500px]">
-          <BlockNoteView
-            editor={editor}
-            theme={isDarkMode ? "dark" : "light"}
-            onChange={() => {
-              const blocksJson = JSON.stringify(editor.document);
-              lastLoadedContentRef.current = blocksJson;
-              updateNote(note.id, { content: blocksJson });
-            }}
-          />
-        </div>
+      <div className={cn("min-h-[500px] w-full pb-24", !isFullWidth && "mx-auto max-w-3xl")}>
+        <BlockNoteView
+          editor={editor}
+          theme={isDarkMode ? "dark" : "light"}
+          onChange={() => {
+            const blocksJson = JSON.stringify(editor.document);
+            lastLoadedContentRef.current = blocksJson;
+            updateNote(note.id, { content: blocksJson });
+          }}
+        />
       </div>
     </div>
   );

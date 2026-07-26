@@ -1,4 +1,4 @@
-import EmojiPicker from "emoji-picker-react";
+import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
 import { Plus, Smile } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -93,6 +93,7 @@ export const CreateWorkspaceModal: React.FC = () => {
               </PopoverTrigger>
               <PopoverContent sideOffset={8} className="overflow-hidden">
                 <EmojiPicker
+                  emojiStyle={EmojiStyle.NATIVE}
                   onEmojiClick={(emojiData) => setSelectedEmoji(emojiData.emoji)}
                   autoFocusSearch={true}
                   width={340}
