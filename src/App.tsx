@@ -12,16 +12,26 @@ import { Button } from "./components/ui/button";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import type { Note } from "./domain/note/Note";
+import { isBlockSuiteContent } from "./services/editor/contentFormat";
 import { useNoteStore } from "./store/useNoteStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
 const BlockNoteEditor = lazy(() =>
   import("./components/editor/BlockNoteEditor").then((m) => ({ default: m.BlockNoteEditor })),
 );
+const BlockSuiteNoteEditor = lazy(
+  () => import("./components/editor/blocksuite/BlockSuiteNoteEditor"),
+);
 
 export const AppContent: React.FC = () => {
-  const { activeWorkspaceId, isDarkMode, fetchWorkspaces, workspaces, setCreateModalOpen } =
-    useWorkspaceStore();
+  const {
+    activeWorkspaceId,
+    isDarkMode,
+    editorEngine,
+    fetchWorkspaces,
+    workspaces,
+    setCreateModalOpen,
+  } = useWorkspaceStore();
   const { notes, activeNoteId, setActiveNoteId, createNote, fetchNotes, loadActiveNoteContent } =
     useNoteStore();
   const purgeExpiredTrash = useNoteStore((s) => s.purgeExpiredTrash);
@@ -59,12 +69,14 @@ export const AppContent: React.FC = () => {
   }, [activeNote, firstNoteId, setActiveNoteId]);
 
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    // BlockSuite's ThemeObserver watches the data-theme attribute.
+    document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
   }, [isDarkMode]);
+
+  const useBlockSuite =
+    activeNote != null &&
+    (editorEngine === "blocksuite" || isBlockSuiteContent(activeNote.content));
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
@@ -79,7 +91,11 @@ export const AppContent: React.FC = () => {
               </div>
             }
           >
-            <BlockNoteEditor key={activeNote.id} note={activeNote} />
+            {useBlockSuite ? (
+              <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
+            ) : (
+              <BlockNoteEditor key={activeNote.id} note={activeNote} />
+            )}
           </Suspense>
         ) : workspaces.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">

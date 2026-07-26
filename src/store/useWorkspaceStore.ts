@@ -4,6 +4,8 @@ import type { Workspace } from "../domain/workspace/Workspace";
 import { presentError } from "../services/errorPresenter";
 import { useNotificationStore } from "./useNotificationStore";
 
+export type EditorEngine = "blocknote" | "blocksuite";
+
 interface WorkspaceState {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
@@ -11,6 +13,8 @@ interface WorkspaceState {
   isQuickSearchOpen: boolean;
   isSettingsOpen: boolean;
   isDarkMode: boolean;
+  editorEngine: EditorEngine;
+  setEditorEngine: (engine: EditorEngine) => void;
   setActiveWorkspace: (id: string) => void;
   setCreateModalOpen: (open: boolean) => void;
   setQuickSearchOpen: (open: boolean) => void;
@@ -33,6 +37,12 @@ const getInitialDarkMode = (): boolean => {
   return localStorage.getItem("cove_theme") === "dark";
 };
 
+const EDITOR_ENGINE_KEY = "cove_editor_engine";
+
+const getInitialEditorEngine = (): EditorEngine => {
+  return localStorage.getItem(EDITOR_ENGINE_KEY) === "blocksuite" ? "blocksuite" : "blocknote";
+};
+
 function notifyError(err: unknown): void {
   const p = presentError(err);
   useNotificationStore.getState().pushToast({
@@ -50,6 +60,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isSettingsOpen: false,
   isTrashOpen: false,
   isDarkMode: getInitialDarkMode(),
+  editorEngine: getInitialEditorEngine(),
+
+  setEditorEngine: (engine) => {
+    localStorage.setItem(EDITOR_ENGINE_KEY, engine);
+    set({ editorEngine: engine });
+  },
 
   setActiveWorkspace: (id) => {
     set({ activeWorkspaceId: id });

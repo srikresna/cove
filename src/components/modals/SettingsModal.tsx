@@ -15,7 +15,14 @@ import { ChangePassphraseDialog } from "./ChangePassphraseDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 export const SettingsModal: React.FC = () => {
-  const { isSettingsOpen, setSettingsOpen, isDarkMode, toggleDarkMode } = useWorkspaceStore();
+  const {
+    isSettingsOpen,
+    setSettingsOpen,
+    isDarkMode,
+    toggleDarkMode,
+    editorEngine,
+    setEditorEngine,
+  } = useWorkspaceStore();
   const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
   const setTrustDevice = useVaultStore((s) => s.setTrustDevice);
   const lock = useVaultStore((s) => s.lock);
@@ -95,6 +102,20 @@ export const SettingsModal: React.FC = () => {
             checked={isDarkMode}
             onCheckedChange={toggleDarkMode}
             aria-label={MESSAGES.SETTINGS_DARK_MODE_LABEL}
+          />
+        </div>
+
+        <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/40 p-4">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">{MESSAGES.SETTINGS_EDITOR_ENGINE_LABEL}</div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {MESSAGES.SETTINGS_EDITOR_ENGINE_DESC}
+            </p>
+          </div>
+          <Switch
+            checked={editorEngine === "blocksuite"}
+            onCheckedChange={(next) => setEditorEngine(next ? "blocksuite" : "blocknote")}
+            aria-label={MESSAGES.SETTINGS_EDITOR_ENGINE_LABEL}
           />
         </div>
 
