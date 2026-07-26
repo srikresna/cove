@@ -17,6 +17,8 @@ export const MESSAGES = {
   SETTINGS_EDITOR_ENGINE_LABEL: "BlockSuite editor (beta)",
   SETTINGS_EDITOR_ENGINE_DESC:
     "New editing engine with canvas, databases, and premium blocks. Notes created with it always reopen in BlockSuite; existing notes stay on the classic editor.",
+  DOC_MODE_CANVAS: "Open canvas view",
+  DOC_MODE_PAGE: "Back to page view",
   STANDARD_WIDTH: "Standard Width",
   WIDE_WIDTH: "Wide Width",
   FULL_WINDOW: "Full Window",

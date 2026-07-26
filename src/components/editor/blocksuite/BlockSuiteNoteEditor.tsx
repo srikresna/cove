@@ -2,6 +2,7 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
+import { useNoteStore } from "../../../store/useNoteStore";
 import type { Note } from "../../../types";
 import { countWordsAndChars } from "../../../utils/plainText";
 import { TooltipProvider } from "../../ui/tooltip";
@@ -14,8 +15,10 @@ interface BlockSuiteNoteEditorProps {
 }
 
 export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note }) => {
+  const updateNote = useNoteStore((s) => s.updateNote);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const mode = note.docMode ?? "page";
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),
     [note.content],
@@ -45,6 +48,10 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
           isFullWidth={isFullWidth}
           isFullscreen={isFullscreen}
           isRightBarOpen={false}
+          docMode={mode}
+          onToggleDocMode={() =>
+            updateNote(note.id, { docMode: mode === "edgeless" ? "page" : "edgeless" })
+          }
           onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
           onToggleFullscreen={toggleFullscreen}
           onToggleRightBar={() => {}}
@@ -52,18 +59,22 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
 
         <div className="flex min-h-0 w-full flex-1">
           <div className="relative h-full min-w-0 flex-1">
-            <div className="h-full w-full overflow-y-auto">
-              <EditorHeader note={note} isFullWidth={isFullWidth} />
+            {mode === "edgeless" ? (
+              <BlockSuiteSurface note={note} mode="edgeless" />
+            ) : (
+              <div className="h-full w-full overflow-y-auto">
+                <EditorHeader note={note} isFullWidth={isFullWidth} />
 
-              <div
-                className={cn(
-                  "flex min-h-[500px] w-full flex-col pb-24",
-                  !isFullWidth && "mx-auto max-w-3xl",
-                )}
-              >
-                <BlockSuiteSurface note={note} />
+                <div
+                  className={cn(
+                    "flex min-h-[500px] w-full flex-col pb-24",
+                    !isFullWidth && "mx-auto max-w-3xl",
+                  )}
+                >
+                  <BlockSuiteSurface note={note} mode="page" />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

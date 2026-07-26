@@ -208,5 +208,13 @@ export class SQLiteDatabase {
       await db.execute("CREATE INDEX IF NOT EXISTS idx_notes_deleted ON notes(deletedAt)");
       await db.execute("PRAGMA user_version = 8");
     }
+
+    if (version < 9) {
+      const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      if (!noteCols.some((c) => c.name === "docMode")) {
+        await db.execute("ALTER TABLE notes ADD COLUMN docMode TEXT");
+      }
+      await db.execute("PRAGMA user_version = 9");
+    }
   }
 }

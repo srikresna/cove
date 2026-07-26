@@ -15,7 +15,10 @@ export interface INoteService {
   updateMetadata(
     id: string,
     updates: Partial<
-      Pick<Note, "title" | "icon" | "coverColor" | "isPinned" | "isFavorite" | "workspaceId">
+      Pick<
+        Note,
+        "title" | "icon" | "coverColor" | "docMode" | "isPinned" | "isFavorite" | "workspaceId"
+      >
     >,
   ): Promise<Note>;
   updateContent(id: string, content: string): Promise<Note>;

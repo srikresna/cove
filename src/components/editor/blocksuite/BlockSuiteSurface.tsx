@@ -3,6 +3,7 @@ import "@toeverything/theme/fonts.css";
 import { BlockStdScope } from "@blocksuite/affine/std";
 import type React from "react";
 import { useEffect, useRef } from "react";
+import type { DocMode } from "../../../domain/note/Note";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
@@ -11,7 +12,12 @@ import { getViewManager, openNoteDoc } from "./engine";
 
 const SAVE_DEBOUNCE_MS = 800;
 
-export const BlockSuiteSurface: React.FC<{ note: Note }> = ({ note }) => {
+interface BlockSuiteSurfaceProps {
+  note: Note;
+  mode: DocMode;
+}
+
+export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const noteId = note.id;
   const initialContent = useRef(note.content);
@@ -24,13 +30,17 @@ export const BlockSuiteSurface: React.FC<{ note: Note }> = ({ note }) => {
     const doc = openNoteDoc(noteId, initialContent.current);
     const host = new BlockStdScope({
       store: doc.getStore(),
-      extensions: getViewManager().get("page"),
+      extensions: getViewManager().get(mode),
     }).render();
 
-    // RootViewExtension resolves scrolling against this ancestor class.
+    // RootViewExtension resolves scrolling/viewport against this ancestor class.
     const viewport = document.createElement("div");
-    viewport.className = "affine-page-viewport";
+    viewport.className = mode === "edgeless" ? "affine-edgeless-viewport" : "affine-page-viewport";
     viewport.style.height = "100%";
+    if (mode === "edgeless") {
+      viewport.style.position = "relative";
+      viewport.style.overflow = "clip";
+    }
     viewport.append(host);
     container.append(viewport);
 
@@ -55,9 +65,9 @@ export const BlockSuiteSurface: React.FC<{ note: Note }> = ({ note }) => {
       if (pending) flush();
       viewport.remove();
     };
-  }, [noteId]);
+  }, [noteId, mode]);
 
-  return <div ref={containerRef} className="min-h-full flex-1" />;
+  return <div ref={containerRef} className="h-full min-h-full flex-1" />;
 };
 
 export default BlockSuiteSurface;

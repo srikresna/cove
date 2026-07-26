@@ -6,11 +6,13 @@ import {
   PanelRight,
   PanelRightClose,
   Pin,
+  Shapes,
   Star,
   Trash2,
 } from "lucide-react";
 import type React from "react";
 import { MESSAGES } from "../../constants/messages";
+import type { DocMode } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
@@ -25,6 +27,8 @@ interface EditorTopbarProps {
   isFullWidth: boolean;
   isFullscreen: boolean;
   isRightBarOpen: boolean;
+  docMode?: DocMode;
+  onToggleDocMode?: () => void;
   onToggleFullWidth: () => void;
   onToggleFullscreen: () => void;
   onToggleRightBar: () => void;
@@ -59,6 +63,8 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   isFullWidth,
   isFullscreen,
   isRightBarOpen,
+  docMode,
+  onToggleDocMode,
   onToggleFullWidth,
   onToggleFullscreen,
   onToggleRightBar,
@@ -88,6 +94,18 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
       </div>
 
       <div className="flex items-center gap-0.5">
+        {onToggleDocMode && (
+          <>
+            <IconAction
+              label={docMode === "edgeless" ? MESSAGES.DOC_MODE_PAGE : MESSAGES.DOC_MODE_CANVAS}
+              onClick={onToggleDocMode}
+              className={cn(docMode === "edgeless" && "text-primary")}
+            >
+              <Shapes className="h-4 w-4" aria-hidden="true" />
+            </IconAction>
+            <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+          </>
+        )}
         <IconAction
           label={isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}
           onClick={onToggleFullWidth}

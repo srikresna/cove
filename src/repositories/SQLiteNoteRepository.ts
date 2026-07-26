@@ -21,6 +21,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       content: (row.content != null ? String(row.content) : "") as EncryptedPayload,
       icon: row.icon ? String(row.icon) : undefined,
       coverColor: row.coverColor ? String(row.coverColor) : undefined,
+      docMode: row.docMode === "edgeless" ? "edgeless" : undefined,
       isPinned: Boolean(row.isPinned),
       isFavorite: Boolean(row.isFavorite),
       createdAt: Number(row.createdAt),
@@ -33,7 +34,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
+        "SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -48,7 +49,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       const db = await this.getDb();
       const placeholders = ids.map(() => "?").join(", ");
       const rows = await db.select<Array<Record<string, unknown>>>(
-        `SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
+        `SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
         ids,
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -166,6 +167,10 @@ export class SQLiteNoteRepository implements INoteRepository {
       setClauses.push("coverColor = ?");
       params.push(updates.coverColor || null);
     }
+    if (updates.docMode !== undefined) {
+      setClauses.push("docMode = ?");
+      params.push(updates.docMode === "edgeless" ? "edgeless" : null);
+    }
     if (updates.isPinned !== undefined) {
       setClauses.push("isPinned = ?");
       params.push(updates.isPinned ? 1 : 0);
@@ -264,7 +269,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt, deletedAt FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
+        "SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt, deletedAt FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
       );
       return rows.map((row) => this.mapRowToRecord(row));
     } catch (err) {

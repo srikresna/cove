@@ -99,7 +99,10 @@ export class NoteService implements INoteService {
   async updateMetadata(
     id: string,
     updates: Partial<
-      Pick<Note, "title" | "icon" | "coverColor" | "isPinned" | "isFavorite" | "workspaceId">
+      Pick<
+        Note,
+        "title" | "icon" | "coverColor" | "docMode" | "isPinned" | "isFavorite" | "workspaceId"
+      >
     >,
   ): Promise<Note> {
     this.assertUnlocked();
