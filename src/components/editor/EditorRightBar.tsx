@@ -1,4 +1,4 @@
-import { FileText, PanelRightClose } from "lucide-react";
+import { CalendarDays, FileText, List, PanelRightClose } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -14,6 +14,10 @@ import { walkBlocks } from "../../utils/blockTree";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { CalendarPanel } from "./CalendarPanel";
+
+const TAB_KEY = "cove-rightbar-tab";
+type RightBarTab = "toc" | "calendar";
 
 interface TocItem {
   id: string;
@@ -59,6 +63,9 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 );
 
 export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef, onClose }) => {
+  const [tab, setTab] = useState<RightBarTab>(() =>
+    localStorage.getItem(TAB_KEY) === "calendar" ? "calendar" : "toc",
+  );
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
   const [backlinks, setBacklinks] = useState<NoteMeta[]>([]);
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
@@ -117,10 +124,40 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
     setActiveNoteId(meta.id);
   };
 
+  const selectTab = (next: RightBarTab) => {
+    localStorage.setItem(TAB_KEY, next);
+    setTab(next);
+  };
+
   return (
     <aside className="flex h-full w-[264px] flex-shrink-0 flex-col overflow-y-auto border-l bg-background">
       <div className="flex items-center justify-between px-3 pt-3">
-        <span className="text-sm font-medium text-muted-foreground">{MESSAGES.TOC_TITLE}</span>
+        <div className="flex items-center gap-0.5">
+          {(
+            [
+              ["toc", MESSAGES.RIGHTBAR_TAB_TOC, List],
+              ["calendar", MESSAGES.RIGHTBAR_TAB_CALENDAR, CalendarDays],
+            ] as const
+          ).map(([value, label, Icon]) => (
+            <Tooltip key={value}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="iconSm"
+                  aria-label={label}
+                  aria-pressed={tab === value}
+                  onClick={() => selectTab(value)}
+                  className={cn(
+                    tab === value ? "bg-accent text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{label}</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
         <Button
           variant="ghost"
           size="iconSm"
@@ -132,7 +169,9 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
         </Button>
       </div>
 
-      <div className="px-2 pt-1">
+      {tab === "calendar" && <CalendarPanel />}
+
+      <div className={cn("px-2 pt-1", tab !== "toc" && "hidden")}>
         {headings.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs leading-relaxed text-muted-foreground">
             {MESSAGES.TOC_EMPTY}
@@ -156,7 +195,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
         )}
       </div>
 
-      <div className="px-2">
+      <div className={cn("px-2", tab !== "toc" && "hidden")}>
         <SectionLabel>
           {MESSAGES.BACKLINKS_TITLE}
           {backlinks.length > 0 && <span className="font-mono"> · {backlinks.length}</span>}
@@ -180,7 +219,12 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
         )}
       </div>
 
-      <div className="mt-auto space-y-1 border-t p-3 font-mono text-[11px] text-muted-foreground">
+      <div
+        className={cn(
+          "mt-auto space-y-1 border-t p-3 font-mono text-[11px] text-muted-foreground",
+          tab !== "toc" && "hidden",
+        )}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex justify-between">
