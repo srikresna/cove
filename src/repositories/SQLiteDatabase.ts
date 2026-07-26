@@ -29,8 +29,9 @@ export class SQLiteDatabase {
   /**
    * Single owner of schema + versioned migrations (PRAGMA user_version ladder).
    * v1: base schema (workspaces, notes, index). v2: drop legacy `folderId` column.
-   * Runs a raw BEGIN/COMMIT (not withTransaction) because withTransaction re-enters
-   * getInstance(), which is mid-resolution while migrate() runs.
+   * NOTE: the v2 recreate-table uses a raw BEGIN/COMMIT inline (NOT a helper) because
+   * tauri-plugin-sql's sqlx pool may route each execute to a different connection,
+   * breaking multi-call transactions. Single-statement autocommit is always safe.
    */
   private static async migrate(db: Database): Promise<void> {
     await db.execute(`
@@ -149,21 +150,6 @@ export class SQLiteDatabase {
         // FTS5 not available — search will use decrypt-on-search only.
       }
       await db.execute("PRAGMA user_version = 4");
-    }
-  }
-
-  static async withTransaction<T>(work: (db: Database) => Promise<T>): Promise<T> {
-    const db = await SQLiteDatabase.getInstance();
-    await db.execute("BEGIN TRANSACTION");
-    try {
-      const result = await work(db);
-      await db.execute("COMMIT");
-      return result;
-    } catch (err) {
-      try {
-        await db.execute("ROLLBACK");
-      } catch {}
-      throw err;
     }
   }
 }

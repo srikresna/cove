@@ -1,3 +1,5 @@
+import type { Bytes } from "./vault/crypto";
+
 export type VaultStatus = "uninitialized" | "locked" | "unlocked" | "migration_in_progress";
 
 export interface IVaultService {
@@ -6,6 +8,8 @@ export interface IVaultService {
   setupPassphrase(passphrase: string): Promise<void>;
   unlock(passphrase: string): Promise<void>;
   lock(): Promise<void>;
+  /** Resume an interrupted migration if kms state is not 'complete'. */
+  resumeMigrationIfPending(legacyRawKey: Bytes): Promise<void>;
   /** Trusted-device auto-unlock: install the DEK from the OS keychain backup, no passphrase. */
   tryAutoUnlock(): Promise<boolean>;
   changePassphrase(oldPassphrase: string, newPassphrase: string): Promise<void>;

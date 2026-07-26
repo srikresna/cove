@@ -67,6 +67,7 @@ interface DerivedKeys {
  */
 export class VaultService implements IVaultService {
   private rawDek: Bytes | null = null;
+  private isUnlocking = false;
 
   constructor(
     private readonly crypto: IEncryptionService,
@@ -173,9 +174,12 @@ export class VaultService implements IVaultService {
       } catch {
         /* best-effort */
       }
+      await this.kms.update({ migrationState: "in_progress" });
       await this.migrateLegacy(hexToBytes(legacyHex));
+      await this.kms.update({ migrationState: "complete", migrationCursor: null });
+    } else {
+      await this.kms.update({ migrationState: "complete", migrationCursor: null });
     }
-    await this.kms.update({ migrationState: "complete", migrationCursor: null });
     localStorage.removeItem(LEGACY_STORAGE_KEY);
     try {
       await this.keychain.delete(KEYRING_SERVICE, KEYRING_USERS.legacyBridge);
@@ -184,9 +188,23 @@ export class VaultService implements IVaultService {
     }
   }
 
+  /**
+   * Resume an interrupted migration if kms.migrationState is not 'complete'.
+   * Called at unlock time. Uses the legacy bridge key from the keychain to
+   * re-encrypt remaining kmsVersion=0 notes under the session DEK.
+   */
+  async resumeMigrationIfPending(legacyRawKey: Bytes): Promise<void> {
+    const rec = await this.kms.get();
+    if (!rec || rec.migrationState === "complete") return;
+    await this.kms.update({ migrationState: "in_progress" });
+    await this.migrateLegacy(legacyRawKey);
+    await this.kms.update({ migrationState: "complete", migrationCursor: null });
+  }
+
   private async migrateLegacy(legacyRawKey: Bytes): Promise<void> {
     const legacyKey = await importAesGcmKey(legacyRawKey);
-    let cursor: string | null = null;
+    const rec = await this.kms.get();
+    let cursor: string | null = rec?.migrationCursor ?? null;
     for (;;) {
       const batch = await this.migrationRepo.findLegacyBatch(cursor, MIGRATION_BATCH);
       if (batch.length === 0) break;
@@ -208,6 +226,16 @@ export class VaultService implements IVaultService {
   }
 
   async unlock(passphrase: string): Promise<void> {
+    if (this.isUnlocking) return;
+    this.isUnlocking = true;
+    try {
+      await this.doUnlock(passphrase);
+    } finally {
+      this.isUnlocking = false;
+    }
+  }
+
+  private async doUnlock(passphrase: string): Promise<void> {
     const rec = await this.kms.get();
     if (!rec) throw new ValidationError("Vault is not initialized yet.");
     const iterations = rec.kdfAlg === "ARGON2ID" ? 0 : parseIterations(rec.kdfParamsJson);
@@ -257,6 +285,16 @@ export class VaultService implements IVaultService {
   }
 
   async tryAutoUnlock(): Promise<boolean> {
+    if (this.isUnlocking) return false;
+    this.isUnlocking = true;
+    try {
+      return await this.doTryAutoUnlock();
+    } finally {
+      this.isUnlocking = false;
+    }
+  }
+
+  private async doTryAutoUnlock(): Promise<boolean> {
     const rec = await this.kms.get();
     if (!rec) return false;
     const backup = await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup);
