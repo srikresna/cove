@@ -4,7 +4,6 @@ import type React from "react";
 import { useCallback, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
-import type { Note } from "../../domain/note/Note";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -47,41 +46,12 @@ export const NoteList: React.FC = () => {
     [notes, activeWorkspaceId, taggedNoteIds],
   );
 
-  const pinnedNotes = useMemo(() => workspaceNotes.filter((n) => n.isPinned), [workspaceNotes]);
-  const favoriteNotes = useMemo(
-    () => workspaceNotes.filter((n) => n.isFavorite && !n.isPinned),
-    [workspaceNotes],
-  );
-  const otherNotes = useMemo(
-    () => workspaceNotes.filter((n) => !n.isPinned && !n.isFavorite),
-    [workspaceNotes],
-  );
-
-  const combinedItems = useMemo(() => {
-    const items: Array<{ type: "header"; title: string } | { type: "note"; note: Note }> = [];
-
-    if (pinnedNotes.length > 0) {
-      items.push({ type: "header", title: "Pinned Notes" });
-      items.push(...pinnedNotes.map((note) => ({ type: "note" as const, note })));
-    }
-
-    if (favoriteNotes.length > 0) {
-      items.push({ type: "header", title: "Favorite Notes" });
-      items.push(...favoriteNotes.map((note) => ({ type: "note" as const, note })));
-    }
-
-    items.push({ type: "header", title: "All Notes" });
-    items.push(...otherNotes.map((note) => ({ type: "note" as const, note })));
-
-    return items;
-  }, [pinnedNotes, favoriteNotes, otherNotes]);
-
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
-    count: combinedItems.length,
+    count: workspaceNotes.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: (index) => (combinedItems[index]?.type === "header" ? 32 : 54),
+    estimateSize: () => 54,
     overscan: 5,
   });
 
@@ -133,8 +103,8 @@ export const NoteList: React.FC = () => {
           }}
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {
-            const item = combinedItems[virtualRow.index];
-            if (!item) return null;
+            const note = workspaceNotes[virtualRow.index];
+            if (!note) return null;
 
             return (
               <div
@@ -148,23 +118,15 @@ export const NoteList: React.FC = () => {
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                {item.type === "header" ? (
-                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    {item.title}
-                  </div>
-                ) : (
-                  <div className="ml-2 h-full border-l pl-2">
-                    <NoteItem
-                      note={item.note}
-                      isActive={item.note.id === activeNoteId}
-                      onSelect={handleSelect}
-                      onTogglePin={handleTogglePin}
-                      onToggleFavorite={handleToggleFavorite}
-                      onDuplicate={handleDuplicate}
-                      onDelete={handleDelete}
-                    />
-                  </div>
-                )}
+                <NoteItem
+                  note={note}
+                  isActive={note.id === activeNoteId}
+                  onSelect={handleSelect}
+                  onTogglePin={handleTogglePin}
+                  onToggleFavorite={handleToggleFavorite}
+                  onDuplicate={handleDuplicate}
+                  onDelete={handleDelete}
+                />
               </div>
             );
           })}
