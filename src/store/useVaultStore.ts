@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { vaultService } from "../di/container";
 import type { VaultStatus } from "../services/IVaultService";
+import { Logger } from "../services/Logger";
 import { useSettingsStore } from "./useSettingsStore";
 
 interface VaultState {
@@ -44,6 +45,16 @@ export const useVaultStore = create<VaultState>((set) => ({
   },
   unlock: async (passphrase) => {
     await vaultService.unlock(passphrase);
+    if (useSettingsStore.getState().autoUnlockOnLaunch) {
+      // Trusted device: refresh/heal the escrow entry after a successful
+      // passphrase unlock (e.g. re-wrap a legacy raw-format entry). Gated on
+      // the user's setting so an entry is never written behind their back.
+      try {
+        await vaultService.setKeychainEscrow(true);
+      } catch (err) {
+        Logger.warn("vault: escrow refresh after unlock failed", err);
+      }
+    }
     set({ status: await refreshStatus() });
   },
   recover: async (passphrase) => {

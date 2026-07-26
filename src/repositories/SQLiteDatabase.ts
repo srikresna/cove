@@ -151,5 +151,23 @@ export class SQLiteDatabase {
       }
       await db.execute("PRAGMA user_version = 4");
     }
+
+    if (version < 5) {
+      // Backfill kmsVersion for rows written by the pre-v5 code, whose INSERT
+      // omitted the column (leaving the DEFAULT 0 that marks pre-vault legacy
+      // rows). Safe exactly when the vault's migration already completed:
+      // legacy rows can only exist while a migration is pending, so post-
+      // completion 0-rows are by definition DEK-encrypted. Rows in
+      // migration_failures are left at 0 (their ciphertext really is legacy).
+      const kmsRows = await db.select<Array<{ migrationState: string }>>(
+        "SELECT migrationState FROM kms WHERE id = 1",
+      );
+      if (kmsRows[0]?.migrationState === "complete") {
+        await db.execute(
+          "UPDATE notes SET kmsVersion = 1 WHERE kmsVersion = 0 AND id NOT IN (SELECT id FROM migration_failures)",
+        );
+      }
+      await db.execute("PRAGMA user_version = 5");
+    }
   }
 }

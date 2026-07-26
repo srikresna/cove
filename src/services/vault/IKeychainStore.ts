@@ -28,6 +28,11 @@ export interface IKeychainStore {
 export const KEYRING_USERS = {
   /** DEK backup (passphrase-less recovery on the trusted device; opt-in). */
   dekBackup: "dek-backup",
-  /** Transient old-key bridge so an interrupted migration/rotation can resume (purged when done). */
+  /**
+   * Transient old-key bridge so an interrupted migration/rotation can resume
+   * (purged only after a failure-free run). Encoding is state-dependent: the
+   * legacy migration stores the historical hex form; a DEK rotation stores
+   * base64 (distinguished via kms.migrationState).
+   */
   legacyBridge: "legacy-dek-bridge",
 } as const;

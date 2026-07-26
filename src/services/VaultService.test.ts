@@ -15,6 +15,7 @@ import {
   bytesToBase64,
   counterToIv,
   derivePrk,
+  encodeUtf8,
   generateDek,
   importAesGcmKey,
 } from "./vault/crypto";
@@ -222,6 +223,26 @@ describe("VaultService legacy migration", () => {
     await service.unlock(PW);
     expect((await kms.get())?.migrationState).toBe("complete");
   });
+
+  it("retains the legacy key and resumable state when a row fails to migrate", async () => {
+    const { service, migration, legacyKeys, keychain, kms } = makeVault();
+
+    const legacyRaw = (await generateDek()).rawKey;
+    const legacyKey = await importAesGcmKey(legacyRaw);
+    const good = await aesGcmEncrypt(legacyKey, "healthy body", counterToIv(1));
+    migration.seed("n-good", good);
+    migration.seed("n-corrupt", "definitely-not-valid-ciphertext");
+    legacyKeys.seed(toHex(legacyRaw));
+
+    await service.setupPassphrase(PW);
+
+    expect(migration.isMigrated("n-good")).toBe(true);
+    expect(migration.isMigrated("n-corrupt")).toBe(false);
+    // A failure must NOT purge the only key that could still decrypt the row:
+    // state stays resumable and the bridge key survives for a retry.
+    expect((await kms.get())?.migrationState).toBe("in_progress");
+    expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBe(toHex(legacyRaw));
+  });
 });
 
 describe("VaultService keychain escrow (Trust this device)", () => {
@@ -348,5 +369,39 @@ describe("VaultService changePassphrase + recovery", () => {
     await service.lock();
     await service.unlock(PW2);
     expect(service.isUnlocked()).toBe(true);
+  });
+
+  it("resumes an interrupted DEK rotation at the next unlock", async () => {
+    const { service, kms, keychain, migration, crypto } = makeVault();
+    await service.setupPassphrase(PW);
+    await service.setKeychainEscrow(true);
+
+    // Simulate the state a crash mid-sweep leaves behind: an old DEK parked in
+    // the bridge (base64), one row still under it, one already rotated, and
+    // migrationState stuck at 'rotation_in_progress'.
+    const oldDek = await generateDek();
+    const oldCipher = await aesGcmEncrypt(
+      oldDek.cryptoKey,
+      "unswept body",
+      counterToIv(9),
+      encodeUtf8("n-old"),
+    );
+    migration.seed("n-old", oldCipher);
+    const alreadyRotated = await crypto.encryptPayload("already rotated", "n-done");
+    migration.seed("n-done", alreadyRotated);
+    await keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldDek.rawKey));
+    await kms.update({ migrationState: "rotation_in_progress" });
+    await service.lock();
+
+    await service.unlock(PW);
+
+    // Unswept row re-encrypted under the session DEK; rotated row untouched
+    // (skipped without being recorded as a failure).
+    expect(await crypto.decryptPayload(migration.contentOf("n-old") ?? "", "n-old")).toBe(
+      "unswept body",
+    );
+    expect(migration.contentOf("n-done")).toBe(alreadyRotated);
+    expect((await kms.get())?.migrationState).toBe("complete");
+    expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull();
   });
 });

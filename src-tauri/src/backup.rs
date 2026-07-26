@@ -15,11 +15,17 @@ use tauri::Manager;
 /// workspace names, and timestamps are stored (and exported) in plaintext.
 #[tauri::command]
 pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Result<(), String> {
+    // tauri-plugin-sql resolves "sqlite:cove.db" under app_config_dir — the
+    // live database lives there (NOT app_local_data_dir; on Windows that's
+    // Roaming vs Local, on Linux ~/.config vs ~/.local/share).
     let data_dir = app
         .path()
-        .app_local_data_dir()
-        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
+        .app_config_dir()
+        .map_err(|e| format!("Cannot resolve app config dir: {e}"))?;
     let db_path = data_dir.join("cove.db");
+    if !db_path.exists() {
+        return Err("Database not found; nothing to back up yet.".into());
+    }
 
     let target = validate_target(&target_path, &data_dir)?;
     if target.exists() {
@@ -53,9 +59,11 @@ async fn run_vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
 }
 
 /// The renderer supplies the target path (it owns the save dialog), so treat it
-/// as untrusted: require an absolute .db path outside the live data directory,
-/// which also guards cove.db / cove.db-wal from being clobbered by their own
-/// backup.
+/// as untrusted: require an absolute .db path outside the live database
+/// directory, which guards cove.db and its -wal/-shm sidecars from being
+/// clobbered by their own backup. A data-dir that fails to canonicalize is a
+/// hard error — silently skipping the containment check would disable the
+/// guard exactly when paths are at their least trustworthy.
 fn validate_target(raw: &str, data_dir: &Path) -> Result<PathBuf, String> {
     let target = PathBuf::from(raw);
     if !target.is_absolute() {
@@ -73,10 +81,11 @@ fn validate_target(raw: &str, data_dir: &Path) -> Result<PathBuf, String> {
         .ok_or("Backup path has no parent directory.")?
         .canonicalize()
         .map_err(|e| format!("Backup directory does not exist: {e}"))?;
-    if let Ok(dd) = data_dir.canonicalize() {
-        if parent.starts_with(&dd) {
-            return Err("Backup cannot be written into the app data directory.".into());
-        }
+    let dd = data_dir
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve the app data directory: {e}"))?;
+    if parent.starts_with(&dd) {
+        return Err("Backup cannot be written into the app data directory.".into());
     }
     Ok(parent.join(file_name))
 }
@@ -102,10 +111,18 @@ mod tests {
 
     #[test]
     fn accepts_absolute_db_path_outside_data_dir() {
-        let data_dir = std::env::temp_dir().join("cove-nonexistent-data-dir");
+        let data_dir = std::env::temp_dir().join("cove-validate-data-dir");
+        std::fs::create_dir_all(&data_dir).unwrap();
         let target = std::env::temp_dir().join("cove-backup-test.db");
         let validated = validate_target(target.to_str().unwrap(), &data_dir).unwrap();
         assert_eq!(validated.file_name().unwrap(), "cove-backup-test.db");
+    }
+
+    #[test]
+    fn missing_data_dir_is_a_hard_error_not_a_skipped_guard() {
+        let data_dir = std::env::temp_dir().join("cove-nonexistent-data-dir");
+        let target = std::env::temp_dir().join("cove-backup-test.db");
+        assert!(validate_target(target.to_str().unwrap(), &data_dir).is_err());
     }
 
     /// The reason this module exists: a plain file copy of a WAL-mode DB misses

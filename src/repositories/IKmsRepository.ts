@@ -6,7 +6,11 @@
  *
  * See docs/CRYPTO_VAULT_BLUEPRINT.md §0/§10.
  */
-export type MigrationState = "pending_migration" | "in_progress" | "complete";
+export type MigrationState =
+  | "pending_migration"
+  | "in_progress"
+  | "rotation_in_progress"
+  | "complete";
 
 export interface KmsRecord {
   kdfVersion: number;

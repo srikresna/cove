@@ -1,4 +1,4 @@
-import { EncryptionError, ValidationError } from "../errors/AppError";
+import { EncryptionError, PersistenceError, ValidationError } from "../errors/AppError";
 import type { IKmsRepository, KmsRecord } from "../repositories/IKmsRepository";
 import type { IMigrationRepository } from "../repositories/IMigrationRepository";
 import type { IVaultService, VaultStatus } from "./IVaultService";
@@ -66,6 +66,18 @@ function parseIterations(kdfParamsJson: string): number {
   throw new EncryptionError(
     "malformed_payload",
     "KDF parameters are malformed (missing iteration count).",
+  );
+}
+
+/**
+ * Errors that doom an entire migration/rotation run (locked vault, broken
+ * persistence) — the run must abort and retry at a later unlock instead of
+ * mislabeling every remaining row as corrupt.
+ */
+function isSystemicMigrationError(err: unknown): boolean {
+  return (
+    err instanceof PersistenceError ||
+    (err instanceof EncryptionError && err.reason === "key_unavailable")
   );
 }
 
@@ -237,30 +249,71 @@ export class VaultService implements IVaultService {
       }
       await this.kms.update({ migrationState: "in_progress" });
       const legacyRaw = hexToBytes(legacyHex);
-      await this.migrateLegacy(legacyRaw);
-      zeroize(legacyRaw);
+      let failed: number;
+      try {
+        failed = await this.migrateLegacy(legacyRaw);
+      } finally {
+        zeroize(legacyRaw);
+      }
+      await this.finishLegacyRun(failed);
+    } else {
+      await this.kms.update({ migrationState: "complete", migrationCursor: null });
+      await this.purgeLegacyKeyMaterial();
     }
-    await this.kms.update({ migrationState: "complete", migrationCursor: null });
-    await this.purgeLegacyKeyMaterial();
   }
 
   /**
-   * Crash-safe resume: if a legacy migration was interrupted (state stuck at
-   * 'pending_migration' or 'in_progress'), finish it now using the bridge key
-   * persisted in the keychain. Runs after every successful unlock, so a crash
-   * mid-migration can no longer strand the vault.
+   * Key material is purged ONLY after a run with zero recorded failures — a
+   * transient failure must never destroy the last key able to decrypt the
+   * affected rows. With failures, the state stays resumable and the bridge key
+   * is retained so the next unlock retries.
+   */
+  private async finishLegacyRun(failed: number): Promise<void> {
+    if (failed === 0) {
+      await this.kms.update({ migrationState: "complete", migrationCursor: null });
+      await this.purgeLegacyKeyMaterial();
+    } else {
+      Logger.warn("vault: migration recorded failures; legacy key retained for retry", { failed });
+    }
+  }
+
+  /**
+   * Crash-safe resume: if a key-migration run was interrupted, finish it now
+   * using the bridge key persisted in the keychain. Handles both the legacy
+   * migration ('pending_migration'/'in_progress'; hex bridge) and a DEK
+   * rotation ('rotation_in_progress'; base64 bridge). Runs after every
+   * successful unlock, so a crash mid-run can no longer strand the vault.
    */
   private async completePendingMigration(): Promise<void> {
     const rec = await this.kms.get();
     if (!rec || rec.migrationState === "complete") return;
-    let bridgeHex: string | null = null;
+    let bridge: string | null = null;
     try {
-      bridgeHex = await this.keychain.get(KEYRING_USERS.legacyBridge);
+      bridge = await this.keychain.get(KEYRING_USERS.legacyBridge);
     } catch (err) {
       // Keychain unavailable — fall back to the legacy store lookup below.
       Logger.warn("vault: keychain bridge lookup failed during migration resume", err);
     }
-    const legacyHex = bridgeHex ?? this.legacyKeys.get();
+
+    if (rec.migrationState === "rotation_in_progress") {
+      if (!bridge) {
+        Logger.warn("vault: interrupted DEK rotation but no bridge key; unswept rows left as-is");
+        return;
+      }
+      const oldRaw = base64ToBytes(bridge);
+      const oldKey = await importAesGcmKey(oldRaw);
+      zeroize(oldRaw);
+      const failed = await this.reencryptAllNotes(oldKey, rec.migrationCursor);
+      if (failed === 0) {
+        await this.kms.update({ migrationState: "complete", migrationCursor: null });
+        await this.purgeLegacyKeyMaterial();
+      } else {
+        Logger.warn("vault: rotation sweep recorded failures; bridge key retained", { failed });
+      }
+      return;
+    }
+
+    const legacyHex = bridge ?? this.legacyKeys.get();
     if (!legacyHex) {
       if ((await this.migrationRepo.countLegacy()) === 0) {
         // Nothing left below the current key version — the interrupted run
@@ -275,10 +328,13 @@ export class VaultService implements IVaultService {
     }
     await this.kms.update({ migrationState: "in_progress" });
     const legacyRaw = hexToBytes(legacyHex);
-    await this.migrateLegacy(legacyRaw);
-    zeroize(legacyRaw);
-    await this.kms.update({ migrationState: "complete", migrationCursor: null });
-    await this.purgeLegacyKeyMaterial();
+    let failed: number;
+    try {
+      failed = await this.migrateLegacy(legacyRaw);
+    } finally {
+      zeroize(legacyRaw);
+    }
+    await this.finishLegacyRun(failed);
   }
 
   private async purgeLegacyKeyMaterial(): Promise<void> {
@@ -290,10 +346,12 @@ export class VaultService implements IVaultService {
     }
   }
 
-  private async migrateLegacy(legacyRawKey: Bytes): Promise<void> {
+  /** @returns rows recorded as per-row failures (corrupt ciphertext). Systemic errors rethrow. */
+  private async migrateLegacy(legacyRawKey: Bytes): Promise<number> {
     const legacyKey = await importAesGcmKey(legacyRawKey);
     const rec = await this.kms.get();
     let cursor: string | null = rec?.migrationCursor ?? null;
+    let failed = 0;
     for (;;) {
       const batch = await this.migrationRepo.findLegacyBatch(cursor, MIGRATION_BATCH);
       if (batch.length === 0) break;
@@ -303,6 +361,8 @@ export class VaultService implements IVaultService {
           const reencrypted = await this.crypto.encryptPayload(plain, row.id);
           await this.migrationRepo.markMigrated(row.id, reencrypted);
         } catch (err) {
+          if (isSystemicMigrationError(err)) throw err;
+          failed += 1;
           await this.migrationRepo.recordFailure(
             row.id,
             err instanceof Error ? err.message : String(err),
@@ -312,6 +372,7 @@ export class VaultService implements IVaultService {
       }
       await this.kms.update({ migrationCursor: cursor });
     }
+    return failed;
   }
 
   async unlock(passphrase: string): Promise<void> {
@@ -378,22 +439,31 @@ export class VaultService implements IVaultService {
     if (!rec) throw new ValidationError("Vault is not initialized yet.");
     const rawDek = await this.verifyPassphraseAndUnwrap(passphrase, rec);
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
+    // Unlock itself never touches the escrow entry: a broken keychain cannot
+    // block a correct-passphrase unlock, and a pre-existing entry is never
+    // silently refreshed behind the user's Trust-this-device setting (the
+    // store re-escrows after unlock when — and only when — trust is enabled).
+    await this.resumeMigrationBestEffort();
+  }
+
+  /** The session is already unlocked; a failed resume retries at the next unlock. */
+  private async resumeMigrationBestEffort(): Promise<void> {
     try {
-      if (await this.escrowActive()) {
-        // Refresh the escrow entry on every passphrase unlock: heals pre-DPAPI
-        // (raw) entries now that tryAutoUnlock refuses unwrapped blobs.
-        const wrapped = await this.deviceBind.wrap(rawDek);
-        await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
-      }
+      await this.completePendingMigration();
     } catch (err) {
-      // Best-effort: a broken OS keychain must never block a correct-passphrase
-      // unlock (the pre-escrow unlock path never depended on the keychain).
-      Logger.warn("vault: escrow refresh failed during unlock", err);
+      Logger.warn("vault: migration resume failed; will retry at next unlock", err);
     }
-    await this.completePendingMigration();
   }
 
   async lock(): Promise<void> {
+    // Wait out any in-flight unlock: zeroizing this.rawDek mid-attempt could
+    // otherwise hand zeroed key bytes to an operation still using the buffer.
+    while (this.unlockInFlight) {
+      await this.unlockInFlight.then(
+        () => {},
+        () => {},
+      );
+    }
     if (this.rawDek) zeroize(this.rawDek);
     this.rawDek = null;
     this.crypto.clearSessionKeys();
@@ -426,15 +496,26 @@ export class VaultService implements IVaultService {
       // tampered/foreign, never silently accepted as a plaintext DEK.
       const rawDek = await this.deviceBind.unwrap(base64ToBytes(backup));
       await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
-      await this.completePendingMigration();
+      await this.resumeMigrationBestEffort();
       return true;
     } catch {
       return false;
     }
   }
 
-  private async escrowActive(): Promise<boolean> {
-    return (await this.keychain.get(KEYRING_USERS.dekBackup)) !== null;
+  /**
+   * Device-wrap a private COPY of the DEK into the keychain — never hands the
+   * shared session buffer across awaits where a concurrent lock() could
+   * zeroize it into an all-zero escrow entry.
+   */
+  private async writeEscrow(rawDek: Bytes): Promise<void> {
+    const copy = new Uint8Array(rawDek);
+    try {
+      const wrapped = await this.deviceBind.wrap(copy);
+      await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
+    } finally {
+      zeroize(copy);
+    }
   }
 
   async setKeychainEscrow(enabled: boolean): Promise<void> {
@@ -445,8 +526,7 @@ export class VaultService implements IVaultService {
     if (!this.rawDek) {
       throw new EncryptionError("key_unavailable", "Unlock the vault before trusting this device.");
     }
-    const wrapped = await this.deviceBind.wrap(this.rawDek);
-    await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
+    await this.writeEscrow(this.rawDek);
   }
 
   async changePassphrase(oldPassphrase: string, newPassphrase: string): Promise<void> {
@@ -472,16 +552,8 @@ export class VaultService implements IVaultService {
       updatedAt: Date.now(),
     };
     await this.kms.save(updated);
-    try {
-      if (await this.escrowActive()) {
-        const rewrapped = await this.deviceBind.wrap(rawDek);
-        await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(rewrapped));
-      }
-    } catch (err) {
-      // Best-effort: the DEK itself is unchanged by a passphrase change, so an
-      // existing escrow entry stays valid even if this refresh fails.
-      Logger.warn("vault: escrow refresh failed during passphrase change", err);
-    }
+    // No escrow touch needed: the DEK itself is unchanged by a passphrase
+    // change, so an existing escrow entry remains valid as-is.
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
   }
 
@@ -511,12 +583,12 @@ export class VaultService implements IVaultService {
       });
       await this.setSessionDek(recoveredDek, await importAesGcmKey(recoveredDek));
       try {
-        await this.setKeychainEscrow(true);
+        await this.writeEscrow(recoveredDek);
       } catch (err) {
         // Best-effort: the entry we just read still holds this same DEK.
         Logger.warn("vault: escrow refresh failed during recovery", err);
       }
-      await this.completePendingMigration();
+      await this.resumeMigrationBestEffort();
       return;
     }
     await this.recoverWithDekRotation(newPassphrase, recoveredDek);
@@ -527,18 +599,21 @@ export class VaultService implements IVaultService {
    * tampering). The old DEK's IV counter is unknown, so reusing that DEK would
    * risk AES-GCM nonce reuse against ciphertexts surviving in exported backups.
    * Instead: mint a fresh DEK (counter restarts safely at 0) and re-encrypt
-   * every note from the old DEK to the new one. The old DEK is parked in the
-   * keychain bridge slot until the sweep finishes, so a crash mid-sweep loses
-   * no data — unswept rows fail loud and the old key is still recoverable.
+   * every note from the old DEK to the new one.
+   *
+   * Crash-safety ordering: the old DEK is parked in the bridge slot (base64)
+   * and the keychain backup is replaced with the NEW DEK before any other
+   * state persists — from that point on, no crash can ever auto-unlock a
+   * session under the old DEK against the new (reset) IV space. The kms row
+   * carries 'rotation_in_progress' until the sweep completes, so an
+   * interrupted sweep resumes at the next unlock via completePendingMigration.
    */
   private async recoverWithDekRotation(newPassphrase: string, oldRawDek: Bytes): Promise<void> {
-    try {
-      await this.keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldRawDek));
-    } catch {
-      /* best-effort crash bridge */
-    }
+    // NOT best-effort: the crash-resume path depends on this copy of the old DEK.
+    await this.keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldRawDek));
     const oldKey = await importAesGcmKey(oldRawDek);
     const dek = await generateDek();
+    await this.writeEscrow(dek.rawKey);
     const env = await this.buildArgon2Envelope(newPassphrase, dek.rawKey);
     const now = Date.now();
     await this.kms.save({
@@ -549,27 +624,31 @@ export class VaultService implements IVaultService {
       ivCounter: 0,
       wrappedDekLocalB64: env.wrappedB64,
       integrityMacB64: env.integrityMacB64,
-      migrationState: "complete",
+      migrationState: "rotation_in_progress",
       migrationCursor: null,
       createdAt: now,
       updatedAt: now,
     });
     zeroize(oldRawDek);
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
-    await this.reencryptAllNotes(oldKey);
-    try {
-      // Replace the old-DEK backup with the new DEK. If this fails, the next
-      // passphrase unlock's escrow refresh heals the entry.
-      await this.setKeychainEscrow(true);
-      await this.keychain.delete(KEYRING_USERS.legacyBridge);
-    } catch (err) {
-      Logger.warn("vault: escrow update failed after DEK rotation", err);
+    const failed = await this.reencryptAllNotes(oldKey, null);
+    if (failed === 0) {
+      await this.kms.update({ migrationState: "complete", migrationCursor: null });
+      await this.purgeLegacyKeyMaterial();
+    } else {
+      Logger.warn("vault: rotation sweep recorded failures; bridge key retained", { failed });
     }
   }
 
-  /** Rotation sweep: decrypt every row under `oldKey`, re-encrypt under the session DEK. */
-  private async reencryptAllNotes(oldKey: CryptoKey): Promise<void> {
-    let cursor: string | null = null;
+  /**
+   * Rotation sweep: decrypt every row under `oldKey`, re-encrypt under the
+   * session DEK. Resumable: persists a cursor per batch and skips rows already
+   * re-encrypted under the session DEK (from a previous interrupted run).
+   * @returns rows recorded as failures (undecryptable under either key).
+   */
+  private async reencryptAllNotes(oldKey: CryptoKey, startCursor: string | null): Promise<number> {
+    let cursor = startCursor;
+    let failed = 0;
     for (;;) {
       const batch = await this.migrationRepo.findAllBatch(cursor, MIGRATION_BATCH);
       if (batch.length === 0) break;
@@ -587,12 +666,24 @@ export class VaultService implements IVaultService {
           const reencrypted = await this.crypto.encryptPayload(plain, row.id);
           await this.migrationRepo.markMigrated(row.id, reencrypted);
         } catch (err) {
+          if (isSystemicMigrationError(err)) throw err;
+          try {
+            // Not old-DEK ciphertext — already rotated by an interrupted run?
+            await this.crypto.decryptPayload(row.content, row.id);
+            continue;
+          } catch (err2) {
+            if (isSystemicMigrationError(err2)) throw err2;
+            /* not under the session DEK either — genuinely undecryptable */
+          }
+          failed += 1;
           await this.migrationRepo.recordFailure(
             row.id,
             err instanceof Error ? err.message : String(err),
           );
         }
       }
+      await this.kms.update({ migrationCursor: cursor });
     }
+    return failed;
   }
 }
