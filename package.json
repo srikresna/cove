@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ci": "vitest run --coverage",
-    "verify": "npm run check && npx tsc --noEmit && npm run test:ci && npm run build"
+    "verify": "biome check ./src && tsc --noEmit && vitest run --coverage && vite build"
   },
   "dependencies": {
     "@blocknote/core": "^0.23.2",
@@ -34,7 +34,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^3.0.1",
-    "tauri-plugin-keyring-api": "^0.1.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

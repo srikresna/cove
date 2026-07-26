@@ -5,12 +5,18 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [
     react(),
-    visualizer({
-      filename: "stats.html",
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
+    // Bundle analysis is opt-in (ANALYZE=1 bun run build) so routine builds
+    // don't regenerate a 2MB stats.html in the repo root.
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: "stats.html",
+            open: false,
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ]
+      : []),
   ],
   clearScreen: false,
   server: {

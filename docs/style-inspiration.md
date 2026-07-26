@@ -1,3 +1,9 @@
+> **Note (cove-notes):** this document is an external brand/style reference
+> ("Superr", a physical notebook product) kept as visual inspiration for the
+> app's cream-paper / marker-orange aesthetic. It is NOT cove's design or
+> architecture documentation — for the vault design see
+> [CRYPTO_VAULT_BLUEPRINT.md](./CRYPTO_VAULT_BLUEPRINT.md).
+
 # Superr — Style Reference
 > Warm schoolyard notebook in soft afternoon light. A cream page, an orange marker uncapped, and a stack of sticker-laminated name labels waiting to be peeled.
 
