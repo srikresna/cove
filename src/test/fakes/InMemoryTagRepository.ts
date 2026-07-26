@@ -1,0 +1,38 @@
+import type { Tag } from "../../domain/tag/Tag";
+import type { ITagRepository } from "../../repositories/ITagRepository";
+
+export class InMemoryTagRepository implements ITagRepository {
+  public tags: Tag[] = [];
+  public noteTags = new Map<string, Set<string>>();
+
+  async listAll(): Promise<Tag[]> {
+    return [...this.tags].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async findByName(name: string): Promise<Tag | null> {
+    return this.tags.find((t) => t.name.toLowerCase() === name.toLowerCase()) ?? null;
+  }
+
+  async create(tag: Tag): Promise<void> {
+    this.tags.push({ ...tag });
+  }
+
+  async count(): Promise<number> {
+    return this.tags.length;
+  }
+
+  async tagsForNote(noteId: string): Promise<Tag[]> {
+    const ids = this.noteTags.get(noteId) ?? new Set();
+    return this.tags.filter((t) => ids.has(t.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async addToNote(noteId: string, tagId: string): Promise<void> {
+    const set = this.noteTags.get(noteId) ?? new Set<string>();
+    set.add(tagId);
+    this.noteTags.set(noteId, set);
+  }
+
+  async removeFromNote(noteId: string, tagId: string): Promise<void> {
+    this.noteTags.get(noteId)?.delete(tagId);
+  }
+}

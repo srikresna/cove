@@ -10,15 +10,22 @@ import {
   makeNoteId,
 } from "../domain/note/notePolicy";
 import { VaultLockedError } from "../errors/AppError";
+import type { INoteLinkRepository } from "../repositories/INoteLinkRepository";
 import type { INoteRepository, NoteRecord } from "../repositories/INoteRepository";
+import { extractNoteLinkIds } from "../utils/noteLinks";
 import { buildSnippet, extractPlainText } from "../utils/plainText";
-import type { INoteService } from "./INoteService";
+import type { INoteService, NoteMeta } from "./INoteService";
 import type { IEncryptionService } from "./vault/IEncryptionService";
+
+function toMeta(rec: NoteRecord): NoteMeta {
+  return { id: rec.id, workspaceId: rec.workspaceId, title: rec.title, icon: rec.icon };
+}
 
 export class NoteService implements INoteService {
   constructor(
     private readonly notes: INoteRepository,
     private readonly crypto: IEncryptionService,
+    private readonly links: INoteLinkRepository,
   ) {}
 
   private assertUnlocked(): void {
@@ -85,6 +92,7 @@ export class NoteService implements INoteService {
       isPinned: false,
       isFavorite: false,
     });
+    await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content };
   }
 
@@ -103,7 +111,21 @@ export class NoteService implements INoteService {
     const rec = await this.notes.updateNote(id, {
       content: await this.crypto.encryptPayload(content, id),
     });
+    await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content };
+  }
+
+  async backlinksOf(id: string): Promise<NoteMeta[]> {
+    this.assertUnlocked();
+    const sources = await this.links.backlinksOf(id);
+    const records = await this.notes.getMetaByIds(sources);
+    return records.map(toMeta);
+  }
+
+  async getLinkTargets(ids: string[]): Promise<NoteMeta[]> {
+    this.assertUnlocked();
+    const records = await this.notes.getMetaByIds(ids);
+    return records.map(toMeta);
   }
 
   async deleteNote(id: string): Promise<void> {

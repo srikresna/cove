@@ -15,6 +15,15 @@ export class InMemoryNoteRepository implements INoteRepository {
       .map((n) => ({ ...n, content: "" as EncryptedPayload }));
   }
 
+  async getMetaByIds(ids: string[]): Promise<NoteRecord[]> {
+    this.callLog.push(`getMetaByIds:${ids.join(",")}`);
+    if (this.shouldFail) throw new Error("Fake repo error: getMetaByIds");
+    const idSet = new Set(ids);
+    return this.notes
+      .filter((n) => idSet.has(n.id))
+      .map((n) => ({ ...n, content: "" as EncryptedPayload }));
+  }
+
   async getNoteById(id: string): Promise<NoteRecord | null> {
     this.callLog.push(`getNoteById:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: getNoteById");

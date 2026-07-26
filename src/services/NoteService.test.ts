@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NotFoundError } from "../domain/errors";
 import { VaultLockedError } from "../errors/AppError";
+import { InMemoryNoteLinkRepository } from "../test/fakes/InMemoryNoteLinkRepository";
 import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
 import { NoteService } from "./NoteService";
 import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
@@ -36,7 +37,7 @@ const enc = (s: string): EncryptedPayload => s as EncryptedPayload;
 describe("NoteService", () => {
   it("listMetadataByWorkspace calls getNotesMetadataByWorkspace", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     fakeRepo.notes.push({
       id: "note-1",
@@ -61,7 +62,7 @@ describe("NoteService", () => {
 
   it("getNote, createNote, updateMetadata, updateContent, and deleteNote work as expected", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     const created = await service.createNote("ws-1", "New Title", "New Content");
     expect(created.title).toBe("New Title");
@@ -82,7 +83,7 @@ describe("NoteService", () => {
 
   it("encrypts content before it reaches the repository and decrypts on read", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, envelopeCrypto);
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
 
     const created = await service.createNote("ws-1", "Title", "top secret body");
     expect(created.content).toBe("top secret body");
@@ -112,7 +113,7 @@ describe("NoteService", () => {
       createdAt: 1000,
       updatedAt: 2000,
     });
-    const service = new NoteService(fakeRepo, lockedCrypto);
+    const service = new NoteService(fakeRepo, lockedCrypto, new InMemoryNoteLinkRepository());
 
     await expect(service.listMetadataByWorkspace("ws-1")).rejects.toThrow(VaultLockedError);
     await expect(service.getNote("note-1")).rejects.toThrow(VaultLockedError);
@@ -131,7 +132,7 @@ describe("NoteService", () => {
 
   it("duplicateNote copies content and title with (Copy)", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     fakeRepo.notes.push({
       id: "note-1",
@@ -154,14 +155,14 @@ describe("NoteService", () => {
 
   it("duplicateNote throws NotFoundError for missing id", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     await expect(service.duplicateNote("non-existent")).rejects.toThrow(NotFoundError);
   });
 
   it("togglePin and toggleFavorite toggle flags", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     fakeRepo.notes.push({
       id: "note-1",
@@ -187,14 +188,14 @@ describe("NoteService", () => {
   it("re-throws repository errors (fail fast)", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     fakeRepo.shouldFail = true;
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     await expect(service.listMetadataByWorkspace("ws-1")).rejects.toThrow();
   });
 
   it("searchAcrossWorkspaces matches title and body, returning snippet DTOs", async () => {
     const fakeRepo = new InMemoryNoteRepository();
-    const service = new NoteService(fakeRepo, unlockedCrypto);
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
     fakeRepo.notes.push({
       id: "n-search",

@@ -8,6 +8,7 @@ export interface NoteRecord extends Omit<Note, "content"> {
 
 export interface INoteRepository {
   getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]>;
+  getMetaByIds(ids: string[]): Promise<NoteRecord[]>;
   getNoteById(id: string): Promise<NoteRecord | null>;
   findRecentForSearch(limit: number): Promise<NoteRecord[]>;
   searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]>;

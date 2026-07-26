@@ -2,11 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
+import { SQLiteNoteLinkRepository } from "../repositories/SQLiteNoteLinkRepository";
 import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
+import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
 import type { INoteService } from "../services/INoteService";
+import type { ITagService } from "../services/ITagService";
 import type { IWorkspaceService } from "../services/IWorkspaceService";
 import { NoteService } from "../services/NoteService";
+import { TagService } from "../services/TagService";
 import { type KdfDerive, VaultService } from "../services/VaultService";
 import { WorkspaceService } from "../services/WorkspaceService";
 import { CryptoVault } from "../services/vault/CryptoVault";
@@ -23,8 +27,15 @@ const cryptoVault = new CryptoVault(kmsRepository);
 
 const noteRepository = new SQLiteNoteRepository();
 const workspaceRepository = new SQLiteWorkspaceRepository();
+const noteLinkRepository = new SQLiteNoteLinkRepository();
+const tagRepository = new SQLiteTagRepository();
 
-export const noteService: INoteService = new NoteService(noteRepository, cryptoVault);
+export const noteService: INoteService = new NoteService(
+  noteRepository,
+  cryptoVault,
+  noteLinkRepository,
+);
+export const tagService: ITagService = new TagService(tagRepository);
 export const workspaceService: IWorkspaceService = new WorkspaceService(
   workspaceRepository,
   noteRepository,

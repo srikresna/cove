@@ -1,7 +1,13 @@
 import type { Note } from "../domain/note/Note";
 import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 
+export type NoteMeta = Pick<Note, "id" | "workspaceId" | "title" | "icon">;
+
 export interface INoteService {
+  /** Notes that link TO this note (metadata only). */
+  backlinksOf(id: string): Promise<NoteMeta[]>;
+  /** Metadata for specific ids across workspaces — for link chips. */
+  getLinkTargets(ids: string[]): Promise<NoteMeta[]>;
   listMetadataByWorkspace(workspaceId: string): Promise<Note[]>;
   getNote(id: string): Promise<Note | null>;
   searchAcrossWorkspaces(query: string): Promise<NoteSearchHit[]>;

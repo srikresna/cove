@@ -41,6 +41,21 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
+  async getMetaByIds(ids: string[]): Promise<NoteRecord[]> {
+    if (ids.length === 0) return [];
+    try {
+      const db = await this.getDb();
+      const placeholders = ids.map(() => "?").join(", ");
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        `SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
+        ids,
+      );
+      return rows.map((row) => this.mapRowToRecord(row));
+    } catch (err) {
+      throw toPersistenceError("getMetaByIds", err);
+    }
+  }
+
   async getNoteById(id: string): Promise<NoteRecord | null> {
     try {
       const db = await this.getDb();
