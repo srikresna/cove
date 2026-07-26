@@ -18,6 +18,8 @@ export const MESSAGES = {
   SETTINGS_EDITOR_ENGINE_DESC:
     "New editing engine with canvas, databases, and premium blocks. Notes created with it always reopen in BlockSuite; existing notes stay on the classic editor.",
   TAGS_HEADER: "Tags",
+  SEARCH_PREVIEW_HINT: "Highlight a result to preview it.",
+  SEARCH_PREVIEW_EMPTY_NOTE: "This note is empty.",
   DOC_MODE_CANVAS: "Open canvas view",
   DOC_MODE_PAGE: "Back to page view",
   STANDARD_WIDTH: "Standard Width",

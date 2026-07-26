@@ -1,4 +1,37 @@
-import { extractBlockSuitePlainText } from "../services/editor/blockSuiteContent";
+import {
+  extractBlockSuiteParagraphs,
+  extractBlockSuitePlainText,
+} from "../services/editor/blockSuiteContent";
+import { walkBlocks } from "./blockTree";
+
+function inlineText(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  let text = "";
+  for (const inline of content) {
+    if (
+      inline &&
+      typeof inline === "object" &&
+      "text" in inline &&
+      typeof inline.text === "string"
+    ) {
+      text += inline.text;
+    }
+  }
+  return text.trim();
+}
+
+/** One string per non-empty block, for content previews. */
+export function extractParagraphs(content: string): string[] {
+  if (!content) return [];
+  const blockSuiteParagraphs = extractBlockSuiteParagraphs(content);
+  if (blockSuiteParagraphs !== null) return blockSuiteParagraphs;
+  const paragraphs: string[] = [];
+  walkBlocks(content, (block) => {
+    const text = inlineText(block.content);
+    if (text) paragraphs.push(text);
+  });
+  return paragraphs;
+}
 
 export function extractPlainText(content: string): string {
   if (!content) return "";

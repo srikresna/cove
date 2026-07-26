@@ -46,8 +46,8 @@ function blocksInTreeOrder(blocks: Y.Map<unknown>): YBlock[] {
   return ordered;
 }
 
-/** Plaintext of a BlockSuite envelope in document order, or null if not one. */
-export function extractBlockSuitePlainText(content: string): string | null {
+/** One string per non-empty block, in document order; null if not an envelope. */
+export function extractBlockSuiteParagraphs(content: string): string[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;
   const doc = docFromSnapshot(update);
@@ -55,10 +55,17 @@ export function extractBlockSuitePlainText(content: string): string | null {
   for (const block of blocksInTreeOrder(doc.getMap("blocks"))) {
     const title = textOf(block, "prop:title");
     const text = textOf(block, "prop:text");
-    if (title) parts.push(title);
-    if (text) parts.push(text);
+    if (title.trim()) parts.push(title.trim());
+    if (text.trim()) parts.push(text.trim());
   }
-  return parts.join(" ").replace(/\s+/g, " ").trim();
+  return parts;
+}
+
+/** Plaintext of a BlockSuite envelope in document order, or null if not one. */
+export function extractBlockSuitePlainText(content: string): string | null {
+  const paragraphs = extractBlockSuiteParagraphs(content);
+  if (paragraphs === null) return null;
+  return paragraphs.join(" ").replace(/\s+/g, " ").trim();
 }
 
 interface ReferenceDelta {
