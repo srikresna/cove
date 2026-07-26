@@ -203,6 +203,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       await db.execute("DELETE FROM note_links WHERE sourceId = ? OR targetId = ?", [id, id]);
       await db.execute("DELETE FROM note_tags WHERE noteId = ?", [id]);
       await db.execute("DELETE FROM note_covers WHERE noteId = ?", [id]);
+      await db.execute("DELETE FROM note_properties WHERE noteId = ?", [id]);
       await db.execute("DELETE FROM notes WHERE id = ?", [id]);
     } catch (err) {
       throw toPersistenceError("deleteNote", err);
@@ -222,6 +223,10 @@ export class SQLiteNoteRepository implements INoteRepository {
       );
       await db.execute(
         "DELETE FROM note_covers WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
+        [workspaceId],
+      );
+      await db.execute(
+        "DELETE FROM note_properties WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
         [workspaceId],
       );
       await db.execute("DELETE FROM notes WHERE workspaceId = ?", [workspaceId]);

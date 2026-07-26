@@ -216,5 +216,15 @@ export class SQLiteDatabase {
       }
       await db.execute("PRAGMA user_version = 9");
     }
+
+    if (version < 10) {
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS property_defs (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, optionsJson TEXT NOT NULL DEFAULT '[]', createdAt INTEGER NOT NULL)",
+      );
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS note_properties (noteId TEXT NOT NULL, propertyId TEXT NOT NULL, valueJson TEXT NOT NULL, PRIMARY KEY (noteId, propertyId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (propertyId) REFERENCES property_defs(id) ON DELETE CASCADE)",
+      );
+      await db.execute("PRAGMA user_version = 10");
+    }
   }
 }

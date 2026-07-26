@@ -1,4 +1,4 @@
-import { Calendar, ChevronDown, FolderOpen, History, Plus, Tag as TagIcon, X } from "lucide-react";
+﻿import { Calendar, ChevronDown, FolderOpen, History, Plus, Tag as TagIcon, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -20,6 +20,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { NotePropertiesRows } from "./NotePropertiesRows";
 
 const OPEN_KEY = "cove-info-open";
 
@@ -44,11 +45,11 @@ const TagChip: React.FC<{ tag: Tag; onRemove?: () => void }> = ({ tag, onRemove 
   </span>
 );
 
-const Row: React.FC<{ icon: React.ReactNode; label: string; children: React.ReactNode }> = ({
-  icon,
-  label,
-  children,
-}) => (
+export const InfoRow: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}> = ({ icon, label, children }) => (
   <div className="flex min-h-[30px] flex-wrap gap-1">
     <div className="flex w-[150px] shrink-0 items-center gap-1.5 self-start rounded p-1 text-sm text-muted-foreground">
       <span aria-hidden="true" className="[&_svg]:h-4 [&_svg]:w-4">
@@ -161,7 +162,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
 
       {isOpen && (
         <div className="mt-2 space-y-1 pb-2">
-          <Row icon={<TagIcon />} label={MESSAGES.INFO_TAGS_LABEL}>
+          <InfoRow icon={<TagIcon />} label={MESSAGES.INFO_TAGS_LABEL}>
             <div className="flex flex-wrap items-center gap-1.5">
               {tags.map((tag) => (
                 <TagChip key={tag.id} tag={tag} onRemove={() => removeTag(tag.id)} />
@@ -228,9 +229,9 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
                 </PopoverContent>
               </Popover>
             </div>
-          </Row>
+          </InfoRow>
 
-          <Row icon={<FolderOpen />} label={MESSAGES.INFO_WORKSPACE_LABEL}>
+          <InfoRow icon={<FolderOpen />} label={MESSAGES.INFO_WORKSPACE_LABEL}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -250,15 +251,17 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          </Row>
+          </InfoRow>
 
-          <Row icon={<History />} label={MESSAGES.INFO_CREATED_LABEL}>
+          <InfoRow icon={<History />} label={MESSAGES.INFO_CREATED_LABEL}>
             <DateValue timestamp={note.createdAt} />
-          </Row>
+          </InfoRow>
 
-          <Row icon={<Calendar />} label={MESSAGES.INFO_UPDATED_LABEL}>
+          <InfoRow icon={<Calendar />} label={MESSAGES.INFO_UPDATED_LABEL}>
             <DateValue timestamp={note.updatedAt} />
-          </Row>
+          </InfoRow>
+
+          <NotePropertiesRows note={note} />
         </div>
       )}
     </div>

@@ -4,12 +4,15 @@ import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
 import { SQLiteNoteLinkRepository } from "../repositories/SQLiteNoteLinkRepository";
 import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
+import { SQLitePropertyRepository } from "../repositories/SQLitePropertyRepository";
 import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
 import type { INoteService } from "../services/INoteService";
+import type { IPropertyService } from "../services/IPropertyService";
 import type { ITagService } from "../services/ITagService";
 import type { IWorkspaceService } from "../services/IWorkspaceService";
 import { NoteService } from "../services/NoteService";
+import { PropertyService } from "../services/PropertyService";
 import { TagService } from "../services/TagService";
 import { type KdfDerive, VaultService } from "../services/VaultService";
 import { WorkspaceService } from "../services/WorkspaceService";
@@ -36,6 +39,9 @@ export const noteService: INoteService = new NoteService(
   noteLinkRepository,
 );
 export const tagService: ITagService = new TagService(tagRepository);
+export const propertyService: IPropertyService = new PropertyService(
+  new SQLitePropertyRepository(),
+);
 export const workspaceService: IWorkspaceService = new WorkspaceService(
   workspaceRepository,
   noteRepository,
