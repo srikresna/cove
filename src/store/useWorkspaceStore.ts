@@ -28,11 +28,7 @@ interface WorkspaceState {
 }
 
 const getInitialDarkMode = (): boolean => {
-  const saved = localStorage.getItem("cove_theme");
-  if (saved !== null) {
-    return saved === "dark";
-  }
-  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return localStorage.getItem("cove_theme") === "dark";
 };
 
 function notifyError(err: unknown): void {

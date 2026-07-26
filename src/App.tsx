@@ -68,7 +68,7 @@ export const AppContent: React.FC = () => {
     <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
       <Sidebar />
 
-      <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-background">
+      <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
         {activeNote ? (
           <Suspense
             fallback={

@@ -161,14 +161,16 @@ export const NoteList: React.FC = () => {
                     {item.title}
                   </div>
                 ) : (
-                  <NoteItem
-                    note={item.note}
-                    isActive={item.note.id === activeNoteId}
-                    onSelect={handleSelect}
-                    onTogglePin={handleTogglePin}
-                    onToggleFavorite={handleToggleFavorite}
-                    onDelete={handleDelete}
-                  />
+                  <div className="ml-2 h-full border-l pl-2">
+                    <NoteItem
+                      note={item.note}
+                      isActive={item.note.id === activeNoteId}
+                      onSelect={handleSelect}
+                      onTogglePin={handleTogglePin}
+                      onToggleFavorite={handleToggleFavorite}
+                      onDelete={handleDelete}
+                    />
+                  </div>
                 )}
               </div>
             );

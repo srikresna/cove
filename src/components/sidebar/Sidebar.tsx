@@ -42,7 +42,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <aside className="relative z-20 flex h-full flex-shrink-0">
+      <aside className="relative z-20 flex h-full flex-shrink-0 border-r bg-background">
         <WorkspaceRail
           isCollapsed={isCollapsed}
           onToggleCollapsed={() => setIsCollapsed((v) => !v)}
@@ -50,30 +50,24 @@ export const Sidebar: React.FC = () => {
 
         <motion.div
           initial={false}
-          animate={{ width: isCollapsed ? 0 : 232 }}
+          animate={{ width: isCollapsed ? 0 : 224 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="h-full overflow-hidden bg-card"
+          className="h-full overflow-hidden"
         >
-          <div className="flex h-full w-[232px] flex-col border-r">
-            <div className="border-b p-3">
+          <div className="flex h-full w-[224px] flex-col">
+            <div className="px-4 pb-1 pt-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
                     aria-label={`Current workspace: ${activeWorkspace?.name || "Workspace"}`}
-                    className="flex w-full min-w-0 items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-lg"
-                      aria-hidden="true"
-                    >
-                      {activeWorkspace?.emoji || "🚀"}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground">
+                    <span className="min-w-0">
+                      <span className="block truncate text-[15px] font-semibold tracking-tight text-foreground">
                         {activeWorkspace?.name || "Workspace"}
                       </span>
-                      <span className="block font-mono text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                         {noteCount} {noteCount === 1 ? "note" : "notes"}
                       </span>
                     </span>
@@ -101,18 +95,21 @@ export const Sidebar: React.FC = () => {
               </DropdownMenu>
             </div>
 
-            <div className="p-3 pb-0">
+            <div className="px-3 pt-3">
               <button
                 type="button"
                 aria-label="Quick Search"
                 onClick={() => setQuickSearchOpen(true)}
-                className="flex w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-full items-center justify-between rounded-full border bg-card py-1.5 pl-3 pr-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="flex items-center gap-2 truncate">
                   <Search className="h-4 w-4" aria-hidden="true" />
                   <span>Search</span>
                 </span>
-                <Kbd>⌘K</Kbd>
+                <span className="flex items-center gap-1">
+                  <Kbd>⌘</Kbd>
+                  <Kbd>K</Kbd>
+                </span>
               </button>
             </div>
 
@@ -120,14 +117,15 @@ export const Sidebar: React.FC = () => {
               <NoteList />
             </div>
 
-            <div className="border-t p-3">
+            <div className="p-3 pt-1">
               <Button
                 variant="ghost"
+                size="sm"
                 aria-label={MESSAGES.SETTINGS_TITLE}
                 onClick={() => setSettingsOpen(true)}
-                className="w-full justify-start"
+                className="w-full justify-start font-normal text-muted-foreground hover:text-foreground"
               >
-                <Settings className="text-muted-foreground" aria-hidden="true" />
+                <Settings aria-hidden="true" />
                 <span>{MESSAGES.SETTINGS_TITLE}</span>
               </Button>
             </div>

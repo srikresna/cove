@@ -23,16 +23,10 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
         aria-label={`Note: ${note.title || MESSAGES.UNTITLED_NOTE}`}
         onClick={() => onSelect(note.id)}
         className={cn(
-          "group relative flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left transition-colors outline-none",
-          isActive ? "bg-accent" : "hover:bg-accent/60",
+          "group relative flex w-full items-center justify-between rounded-md border px-2.5 py-2 text-left transition-colors outline-none",
+          isActive ? "border-border bg-card shadow-sm" : "border-transparent hover:bg-accent/50",
         )}
       >
-        {isActive && (
-          <span
-            aria-hidden="true"
-            className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
-          />
-        )}
         <div className="flex items-center gap-3 overflow-hidden min-w-0">
           <span className="text-xl flex-shrink-0" aria-hidden="true">
             {note.icon || "📝"}

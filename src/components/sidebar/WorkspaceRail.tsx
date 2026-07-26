@@ -11,23 +11,15 @@ interface WorkspaceRailProps {
 }
 
 const tile =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onToggleCollapsed }) => {
   const { workspaces, activeWorkspaceId, setActiveWorkspace, setCreateModalOpen } =
     useWorkspaceStore();
 
   return (
-    <div className="flex h-full w-[52px] flex-shrink-0 flex-col items-center gap-2 border-r bg-background py-3">
-      <div
-        aria-hidden="true"
-        className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary font-display text-base font-semibold text-primary-foreground"
-      >
-        C
-      </div>
-      <div className="h-px w-6 bg-border" aria-hidden="true" />
-
-      <div className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto py-0.5">
+    <div className="flex h-full w-[52px] flex-shrink-0 flex-col items-center gap-2 py-4">
+      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto py-0.5">
         {workspaces.map((ws) => {
           const isActive = ws.id === activeWorkspaceId;
           return (
@@ -42,8 +34,8 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
                     tile,
                     "text-lg",
                     isActive
-                      ? "border bg-card shadow-sm"
-                      : "opacity-75 hover:bg-accent hover:opacity-100",
+                      ? "border bg-card shadow-sm ring-1 ring-ring/20"
+                      : "border border-transparent opacity-70 hover:border-border hover:bg-card hover:opacity-100",
                   )}
                 >
                   <span aria-hidden="true">{ws.emoji}</span>
@@ -62,7 +54,7 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
               onClick={() => setCreateModalOpen(true)}
               className={cn(
                 tile,
-                "border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
+                "border bg-card text-muted-foreground shadow-sm hover:text-foreground",
               )}
             >
               <Plus className="h-4 w-4" aria-hidden="true" />

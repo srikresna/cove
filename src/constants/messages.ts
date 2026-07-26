@@ -63,6 +63,8 @@ export const MESSAGES = {
     'Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (Argon2id, memory-hard) and held in memory only while unlocked. Enabling "Trust this device" in Settings keeps a device-bound recovery copy in your OS keychain (trusted-device recovery, not zero-knowledge).',
   SETTINGS_TITLE: "Settings",
   SETTINGS_CLOSE: "Close settings",
+  SETTINGS_DARK_MODE_LABEL: "Dark mode",
+  SETTINGS_DARK_MODE_DESC: "Deep-tide theme for low-light writing.",
   SETTINGS_AUTO_UNLOCK_LABEL: "Trust this device",
   SETTINGS_AUTO_UNLOCK_DESC:
     'Keeps a device-bound copy of the vault key in the OS keychain: the app auto-unlocks on launch and "forgot passphrase" recovery works on this device. Anyone with access to this computer\'s login can bypass the passphrase while this is on. Turning it off deletes the keychain copy.',
