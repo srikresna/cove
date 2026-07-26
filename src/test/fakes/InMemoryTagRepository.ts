@@ -26,6 +26,14 @@ export class InMemoryTagRepository implements ITagRepository {
     return this.tags.filter((t) => ids.has(t.id)).sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  async noteIdsForTag(tagId: string): Promise<string[]> {
+    const ids: string[] = [];
+    for (const [noteId, tagIds] of this.noteTags.entries()) {
+      if (tagIds.has(tagId)) ids.push(noteId);
+    }
+    return ids;
+  }
+
   async addToNote(noteId: string, tagId: string): Promise<void> {
     const set = this.noteTags.get(noteId) ?? new Set<string>();
     set.add(tagId);

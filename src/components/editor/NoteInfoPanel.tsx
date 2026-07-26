@@ -8,6 +8,7 @@ import { cn } from "../../lib/utils";
 import { presentError } from "../../services/errorPresenter";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
+import { useTagStore } from "../../store/useTagStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
@@ -113,6 +114,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
       setQuery("");
       refreshTags();
       loadAllTags();
+      void useTagStore.getState().refresh();
     } catch (err) {
       notifyError(err);
     }
@@ -122,6 +124,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
     try {
       await tagService.removeTag(note.id, tagId);
       refreshTags();
+      void useTagStore.getState().refresh();
     } catch (err) {
       notifyError(err);
     }

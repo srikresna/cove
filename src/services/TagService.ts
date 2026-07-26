@@ -15,6 +15,10 @@ export class TagService implements ITagService {
     return this.tags.tagsForNote(noteId);
   }
 
+  notesForTag(tagId: string): Promise<string[]> {
+    return this.tags.noteIdsForTag(tagId);
+  }
+
   async addTag(noteId: string, name: string): Promise<Tag> {
     const normalized = normalizeTagName(name);
     if (!normalized) throw new ValidationError("Tag name cannot be empty.");

@@ -6,6 +6,7 @@ export interface ITagRepository {
   create(tag: Tag): Promise<void>;
   count(): Promise<number>;
   tagsForNote(noteId: string): Promise<Tag[]>;
+  noteIdsForTag(tagId: string): Promise<string[]>;
   addToNote(noteId: string, tagId: string): Promise<void>;
   removeFromNote(noteId: string, tagId: string): Promise<void>;
 }

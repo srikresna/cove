@@ -6,6 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useTagStore } from "../../store/useTagStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import { NoteItem } from "./NoteItem";
@@ -32,9 +33,16 @@ export const NoteList: React.FC = () => {
     })),
   );
 
+  const taggedNoteIds = useTagStore((s) => s.taggedNoteIds);
+
   const workspaceNotes = useMemo(
-    () => notes.filter((n) => n.workspaceId === activeWorkspaceId),
-    [notes, activeWorkspaceId],
+    () =>
+      notes.filter(
+        (n) =>
+          n.workspaceId === activeWorkspaceId &&
+          (taggedNoteIds === null || taggedNoteIds.has(n.id)),
+      ),
+    [notes, activeWorkspaceId, taggedNoteIds],
   );
 
   const pinnedNotes = useMemo(() => workspaceNotes.filter((n) => n.isPinned), [workspaceNotes]);

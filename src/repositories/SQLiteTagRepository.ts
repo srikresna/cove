@@ -79,6 +79,19 @@ export class SQLiteTagRepository implements ITagRepository {
     }
   }
 
+  async noteIdsForTag(tagId: string): Promise<string[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ noteId: string }>>(
+        "SELECT noteId FROM note_tags WHERE tagId = ?",
+        [tagId],
+      );
+      return rows.map((r) => String(r.noteId));
+    } catch (err) {
+      throw toPersistenceError("tags.noteIdsForTag", err);
+    }
+  }
+
   async addToNote(noteId: string, tagId: string): Promise<void> {
     try {
       const db = await this.getDb();

@@ -29,6 +29,17 @@ describe("TagService", () => {
     expect((await service.tagsForNote("n2"))[0]?.id).toBe(created.id);
   });
 
+  it("lists note ids for a tag across workspaces", async () => {
+    const repo = new InMemoryTagRepository();
+    const service = new TagService(repo);
+
+    const tag = await service.addTag("n1", "shared");
+    await service.addTag("n2", "shared");
+    await service.addTag("n3", "other");
+
+    expect((await service.notesForTag(tag.id)).sort()).toEqual(["n1", "n2"]);
+  });
+
   it("rejects empty names and removes tags from a note", async () => {
     const repo = new InMemoryTagRepository();
     const service = new TagService(repo);

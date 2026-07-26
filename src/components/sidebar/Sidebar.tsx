@@ -16,6 +16,7 @@ import {
 import { Kbd } from "../ui/kbd";
 import { TooltipProvider } from "../ui/tooltip";
 import { NoteList } from "./NoteList";
+import { TagsSection } from "./TagsSection";
 import { WorkspaceRail } from "./WorkspaceRail";
 
 export const Sidebar: React.FC = () => {
@@ -107,6 +108,7 @@ export const Sidebar: React.FC = () => {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <TagsSection />
               <NoteList />
             </div>
           </div>
