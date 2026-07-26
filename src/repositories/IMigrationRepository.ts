@@ -12,6 +12,8 @@ export interface LegacyRow {
 export interface IMigrationRepository {
   /** Next batch of legacy rows (kmsVersion = 0), id-sorted, after `afterId`. */
   findLegacyBatch(afterId: string | null, limit: number): Promise<LegacyRow[]>;
+  /** Next batch of ALL rows regardless of kmsVersion — for DEK-rotation sweeps. */
+  findAllBatch(afterId: string | null, limit: number): Promise<LegacyRow[]>;
   /** Rewrite a row's content (now under the DEK) and mark it migrated (kmsVersion = 1). */
   markMigrated(id: string, encryptedContent: string): Promise<void>;
   /** Record a corrupt/undecryptable row so the pass continues instead of aborting. */

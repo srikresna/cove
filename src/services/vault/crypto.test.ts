@@ -5,6 +5,7 @@ import {
   base64ToBytes,
   bytesToBase64,
   computeIntegrityMac,
+  computeIntegrityMacDelimited,
   constantTimeEqual,
   counterToIv,
   derivePrk,
@@ -108,6 +109,32 @@ describe("vault/crypto integrity MAC", () => {
     const a = await computeIntegrityMac(macKey, [new Uint8Array([1, 2, 3])]);
     const b = await computeIntegrityMac(macKey, [new Uint8Array([1, 2, 4])]);
     expect(constantTimeEqual(a, b)).toBe(false);
+  });
+
+  it("delimited MAC distinguishes field boundaries (no reparse ambiguity)", async () => {
+    const macKey = await importHmacKey(
+      await deriveSubkey(await derivePrk("pw", generateSalt(), 1000), "integrity-mac"),
+    );
+    // Same concatenated bytes, different field split — the legacy concat MAC
+    // cannot tell these apart; the length-prefixed one must.
+    const split1 = [encodeUtf8("ab"), encodeUtf8("c")];
+    const split2 = [encodeUtf8("a"), encodeUtf8("bc")];
+    expect(
+      constantTimeEqual(
+        await computeIntegrityMac(macKey, split1),
+        await computeIntegrityMac(macKey, split2),
+      ),
+    ).toBe(true); // documents the legacy weakness
+    expect(
+      constantTimeEqual(
+        await computeIntegrityMacDelimited(macKey, split1),
+        await computeIntegrityMacDelimited(macKey, split2),
+      ),
+    ).toBe(false);
+    // Still deterministic for identical fields.
+    expect(await computeIntegrityMacDelimited(macKey, split1)).toEqual(
+      await computeIntegrityMacDelimited(macKey, split1),
+    );
   });
 });
 

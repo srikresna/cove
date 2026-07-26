@@ -1,20 +1,28 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
+import type { IBackupService } from "./IBackupService";
 
 /**
- * Export an encrypted backup of the vault database.
- * Delegates to a Rust command (file copy) so the path never touches SQL
- * string interpolation — no injection risk.
- * The backup contains all encrypted notes + the kms record (wrapped DEK). The user's
- * passphrase is required to unlock the backup on any device.
+ * Export a snapshot of the vault database to a user-chosen path.
+ *
+ * The Rust command produces a WAL-consistent snapshot via SQLite's VACUUM INTO
+ * (a plain file copy would silently miss transactions still living in the WAL)
+ * and validates the target path.
+ *
+ * What the backup contains: note CONTENT is AES-GCM ciphertext plus the kms
+ * record (wrapped DEK) — the passphrase is required to read it. Note titles,
+ * workspace names, icons, and timestamps are stored in plaintext and are
+ * therefore readable from the backup file without the passphrase.
  */
-export async function exportBackup(): Promise<string | null> {
-  const path = await save({
-    defaultPath: "cove-backup.db",
-    filters: [{ name: "SQLite Database", extensions: ["db"] }],
-  });
-  if (!path) return null;
+export class TauriBackupService implements IBackupService {
+  async exportBackup(): Promise<string | null> {
+    const path = await save({
+      defaultPath: "cove-backup.db",
+      filters: [{ name: "SQLite Database", extensions: ["db"] }],
+    });
+    if (!path) return null;
 
-  await invoke("backup_database", { targetPath: path });
-  return path;
+    await invoke("backup_database", { targetPath: path });
+    return path;
+  }
 }

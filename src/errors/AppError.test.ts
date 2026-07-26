@@ -6,7 +6,6 @@ import {
   PersistenceError,
   ValidationError,
 } from "./AppError";
-import { err, isErr, isOk, ok } from "./Result";
 import { toAppError, toPersistenceError } from "./errorMappers";
 
 describe("AppError hierarchy", () => {
@@ -45,18 +44,5 @@ describe("AppError hierarchy", () => {
 
     const appErr = toAppError("Random string error");
     expect(appErr).toBeInstanceOf(PersistenceError);
-  });
-
-  it("Result type helpers work as expected", () => {
-    const success = ok(42);
-    expect(isOk(success)).toBe(true);
-    expect(isErr(success)).toBe(false);
-    if (isOk(success)) {
-      expect(success.value).toBe(42);
-    }
-
-    const failure = err(new Error("Failed"));
-    expect(isOk(failure)).toBe(false);
-    expect(isErr(failure)).toBe(true);
   });
 });

@@ -31,4 +31,9 @@ export class InMemoryKmsRepository implements IKmsRepository {
     if (!this.record) throw new Error("InMemoryKmsRepository: no kms record");
     this.record.ivCounter = n;
   }
+
+  /** Test helper: simulate a lost/corrupted kms row. */
+  clear(): void {
+    this.record = null;
+  }
 }

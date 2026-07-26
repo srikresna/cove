@@ -3,6 +3,7 @@ import { BusinessRuleError, NotFoundError } from "../domain/errors";
 import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
 import { InMemoryWorkspaceRepository } from "../test/fakes/InMemoryWorkspaceRepository";
 import { WorkspaceService } from "./WorkspaceService";
+import type { EncryptedPayload } from "./vault/IEncryptionService";
 
 describe("WorkspaceService", () => {
   it("getAllWorkspaces, getWorkspace, createWorkspace, updateWorkspace work as expected", async () => {
@@ -58,7 +59,7 @@ describe("WorkspaceService", () => {
       id: "note-1",
       workspaceId: "ws-1",
       title: "Note in ws 1",
-      content: "",
+      content: "" as EncryptedPayload,
       isPinned: false,
       isFavorite: false,
       createdAt: 1000,

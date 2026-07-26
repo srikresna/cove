@@ -5,7 +5,8 @@
  * session and persistence live in the vault service / repositories.
  *
  * Key model (see docs/CRYPTO_VAULT_BLUEPRINT.md §0):
- * - PBKDF2-HMAC-SHA256(passphrase, salt, 600_000) -> 32-byte PRK
+ * - KDF(passphrase, salt) -> 32-byte PRK — Argon2id via Rust for new vaults,
+ *   PBKDF2-HMAC-SHA256 (600k, this module) for pre-Argon2 vaults and tests
  * - HKDF(PRK, "dek-wrap")      -> wrap key (AES-GCM)  that encrypts the DEK
  * - HKDF(PRK, "integrity-mac") -> MAC key (HMAC-SHA256) for the kms envelope
  * Domain separation via distinct HKDF `info` labels prevents reusing the wrap
@@ -35,6 +36,15 @@ export type Bytes = Uint8Array<ArrayBuffer>;
 
 export function randomBytes(n: number): Bytes {
   return crypto.getRandomValues(new Uint8Array(n));
+}
+
+/**
+ * Best-effort key-material scrubbing. JS GC can already have copied the bytes,
+ * so this is defense-in-depth, not a guarantee — but it removes the deliberate
+ * long-lived copies once a key has been imported into a CryptoKey.
+ */
+export function zeroize(bytes: Bytes): void {
+  bytes.fill(0);
 }
 
 export function generateSalt(): Bytes {
@@ -140,7 +150,11 @@ export async function unwrapDek(wrapKey: CryptoKey, wrapped: Bytes): Promise<Byt
   return pt;
 }
 
-/** HMAC-SHA256 over the concatenation of field bytes — binds kms parameters. */
+/**
+ * HMAC-SHA256 over the plain concatenation of field bytes.
+ * LEGACY (envelope v1/v2 verification only): without delimiters the field
+ * boundaries are ambiguous — new envelopes use computeIntegrityMacDelimited.
+ */
 export async function computeIntegrityMac(macKey: CryptoKey, fields: Bytes[]): Promise<Bytes> {
   const total = fields.reduce((n, f) => n + f.byteLength, 0);
   const buf = new Uint8Array(total);
@@ -148,6 +162,28 @@ export async function computeIntegrityMac(macKey: CryptoKey, fields: Bytes[]): P
   for (const f of fields) {
     buf.set(f, off);
     off += f.byteLength;
+  }
+  const sig = await crypto.subtle.sign("HMAC", macKey, buf);
+  return new Uint8Array(sig);
+}
+
+/**
+ * HMAC-SHA256 with each field prefixed by its 4-byte big-endian length, so the
+ * MAC input parses unambiguously (["ab","c"] can never collide with ["a","bc"]).
+ * Used by envelope v3+.
+ */
+export async function computeIntegrityMacDelimited(
+  macKey: CryptoKey,
+  fields: Bytes[],
+): Promise<Bytes> {
+  const total = fields.reduce((n, f) => n + 4 + f.byteLength, 0);
+  const buf = new Uint8Array(total);
+  const view = new DataView(buf.buffer);
+  let off = 0;
+  for (const f of fields) {
+    view.setUint32(off, f.byteLength);
+    buf.set(f, off + 4);
+    off += 4 + f.byteLength;
   }
   const sig = await crypto.subtle.sign("HMAC", macKey, buf);
   return new Uint8Array(sig);
@@ -166,8 +202,9 @@ export function constantTimeEqual(a: Bytes, b: Bytes): boolean {
 /**
  * Deterministic 96-bit AES-GCM IV from a monotonic per-DEK counter
  * (NIST SP 800-38D §8.2.1 recommended mode). 12 bytes big-endian; the counter
- * occupies the low bits. Unique per encrypt as long as the counter never repeats
- * (enforced by kms.incrementIvCounter + fail-loud at 2^28).
+ * occupies the low bits. Unique per encrypt as long as the counter never
+ * repeats — enforced by CryptoVault's synchronous in-memory increment,
+ * persisted via kms.setIvCounter BEFORE use, fail-loud at 2^28.
  */
 export function counterToIv(counter: number): Bytes {
   const iv = new Uint8Array(GCM_IV_BYTES);

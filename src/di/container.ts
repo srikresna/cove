@@ -1,6 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { INoteRepository } from "../repositories/INoteRepository";
-import type { IWorkspaceRepository } from "../repositories/IWorkspaceRepository";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
 import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
@@ -12,7 +10,10 @@ import { type KdfDerive, VaultService } from "../services/VaultService";
 import { WorkspaceService } from "../services/WorkspaceService";
 import { CryptoVault } from "../services/vault/CryptoVault";
 import { DeviceBind } from "../services/vault/DeviceBind";
+import type { IBackupService } from "../services/vault/IBackupService";
 import { KeyringKeychainStore } from "../services/vault/KeyringKeychainStore";
+import { LocalStorageLegacyKeyStore } from "../services/vault/LocalStorageLegacyKeyStore";
+import { TauriBackupService } from "../services/vault/backup";
 
 // --- Vault singletons ---
 const kmsRepository = new SQLiteKmsRepository();
@@ -20,7 +21,7 @@ const migrationRepository = new SQLiteMigrationRepository();
 const keychainStore = new KeyringKeychainStore();
 const cryptoVault = new CryptoVault(kmsRepository);
 
-const noteRepository = new SQLiteNoteRepository(cryptoVault);
+const noteRepository = new SQLiteNoteRepository();
 const workspaceRepository = new SQLiteWorkspaceRepository();
 
 export const noteService: INoteService = new NoteService(noteRepository, cryptoVault);
@@ -45,11 +46,7 @@ export const vaultService = new VaultService(
   migrationRepository,
   deviceBind,
   deriveKeyFn,
+  new LocalStorageLegacyKeyStore(),
 );
 
-export const createNoteService = (repo: INoteRepository): INoteService =>
-  new NoteService(repo, cryptoVault);
-export const createWorkspaceService = (
-  wsRepo: IWorkspaceRepository,
-  noteRepo: INoteRepository,
-): IWorkspaceService => new WorkspaceService(wsRepo, noteRepo);
+export const backupService: IBackupService = new TauriBackupService();

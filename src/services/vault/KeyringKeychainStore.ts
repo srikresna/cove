@@ -1,17 +1,21 @@
-import { deletePassword, getPassword, setPassword } from "tauri-plugin-keyring-api";
+import { invoke } from "@tauri-apps/api/core";
 import type { IKeychainStore } from "./IKeychainStore";
 
-/** Real IKeychainStore backed by the OS credential store via tauri-plugin-keyring. */
+/**
+ * Real IKeychainStore backed by the OS credential store via scoped Rust
+ * commands (src-tauri/src/keychain.rs) — the service name and allowed entry
+ * names are enforced on the Rust side.
+ */
 export class KeyringKeychainStore implements IKeychainStore {
-  async get(service: string, user: string): Promise<string | null> {
-    return getPassword(service, user);
+  async get(user: string): Promise<string | null> {
+    return (await invoke<string | null>("keychain_get", { user })) ?? null;
   }
 
-  async set(service: string, user: string, value: string): Promise<void> {
-    await setPassword(service, user, value);
+  async set(user: string, value: string): Promise<void> {
+    await invoke("keychain_set", { user, value });
   }
 
-  async delete(service: string, user: string): Promise<void> {
-    await deletePassword(service, user);
+  async delete(user: string): Promise<void> {
+    await invoke("keychain_delete", { user });
   }
 }

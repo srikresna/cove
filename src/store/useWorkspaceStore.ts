@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
-import { Logger } from "../services/Logger";
+import { presentError } from "../services/errorPresenter";
+import { useNotificationStore } from "./useNotificationStore";
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -34,6 +35,16 @@ const getInitialDarkMode = (): boolean => {
   return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
 };
 
+/** Mirror of useNoteStore's discipline: every failure reaches the user as a toast. */
+function notifyError(err: unknown): void {
+  const p = presentError(err);
+  useNotificationStore.getState().pushToast({
+    kind: p.kind,
+    title: p.toastTitle,
+    description: p.toastDescription,
+  });
+}
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
@@ -62,12 +73,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const first = workspaces[0];
       set({ workspaces, activeWorkspaceId: first ? first.id : null });
     } catch (err) {
-      Logger.error("fetchWorkspaces store error", err);
+      notifyError(err);
     }
   },
 
   createWorkspace: async (name, emoji, color, description) => {
-    const previous = get().workspaces;
     try {
       const created = await workspaceService.createWorkspace(name, emoji, color, description);
       set((state) => ({
@@ -77,8 +87,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }));
       return created;
     } catch (err) {
-      Logger.error("createWorkspace store error", err);
-      set({ workspaces: previous, isCreateModalOpen: false });
+      // Keep the modal open so the user's input isn't thrown away on failure.
+      notifyError(err);
       return null;
     }
   },
@@ -92,8 +102,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await workspaceService.updateWorkspace(id, updates);
     } catch (err) {
-      Logger.error("updateWorkspace store error", err);
       set({ workspaces: previous });
+      notifyError(err);
     }
   },
 
@@ -106,8 +116,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await workspaceService.deleteWorkspace(id, current.length);
       set({ workspaces: filtered, activeWorkspaceId: nextActive });
     } catch (err) {
-      Logger.error("deleteWorkspace store error", err);
-      set({ workspaces: current });
+      notifyError(err);
     }
   },
 }));

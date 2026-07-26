@@ -2,16 +2,18 @@ import { EncryptionError, ValidationError } from "../errors/AppError";
 import type { IKmsRepository, KmsRecord } from "../repositories/IKmsRepository";
 import type { IMigrationRepository } from "../repositories/IMigrationRepository";
 import type { IVaultService, VaultStatus } from "./IVaultService";
+import { Logger } from "./Logger";
 import type { IDeviceBind } from "./vault/IDeviceBind";
 import type { IEncryptionService } from "./vault/IEncryptionService";
-import { type IKeychainStore, KEYRING_SERVICE, KEYRING_USERS } from "./vault/IKeychainStore";
+import { type IKeychainStore, KEYRING_USERS } from "./vault/IKeychainStore";
+import type { ILegacyKeyStore } from "./vault/ILegacyKeyStore";
 import {
   type Bytes,
-  PBKDF2_ITERATIONS,
   aesGcmDecrypt,
   base64ToBytes,
   bytesToBase64,
   computeIntegrityMac,
+  computeIntegrityMacDelimited,
   constantTimeEqual,
   deriveSubkey,
   encodeUtf8,
@@ -21,13 +23,16 @@ import {
   importHmacKey,
   unwrapDek,
   wrapDek,
+  zeroize,
 } from "./vault/crypto";
 import { validatePassphrase } from "./vault/vaultPolicy";
 
-const ARGON2ID_VERSION = 2;
+/** v3: length-prefixed MAC fields + kdfParamsJson bound into the envelope MAC. */
+const ENVELOPE_VERSION = 3;
 const ARGON2ID_ALG = "ARGON2ID";
 const ARGON2ID_PARAMS = JSON.stringify({ m_cost: 65536, t_cost: 3, p_cost: 4 });
-const LEGACY_STORAGE_KEY = "cove_device_sec_key";
+/** Argon2id envelopes carry no PBKDF2 iteration count; this fixed placeholder fills the MAC field. */
+const ARGON2ID_ENVELOPE_ITERATIONS = 0;
 const MIGRATION_BATCH = 50;
 
 /** KDF derivation function — injected so tests use JS WebCrypto while production uses Rust invoke. */
@@ -46,18 +51,33 @@ function hexToBytes(hex: string): Bytes {
   return out;
 }
 
+/**
+ * PBKDF2 iteration count for a legacy record's envelope MAC. Fails loud on
+ * malformed params — a silent default here could diverge from what the KDF
+ * actually ran with (the Rust side rejects malformed params the same way).
+ */
 function parseIterations(kdfParamsJson: string): number {
   try {
-    const parsed = JSON.parse(kdfParamsJson) as { iterations?: number };
-    return parsed.iterations ?? PBKDF2_ITERATIONS;
+    const parsed = JSON.parse(kdfParamsJson) as { iterations?: unknown };
+    if (typeof parsed.iterations === "number") return parsed.iterations;
   } catch {
-    return PBKDF2_ITERATIONS;
+    /* fall through to the loud error */
   }
+  throw new EncryptionError(
+    "malformed_payload",
+    "KDF parameters are malformed (missing iteration count).",
+  );
 }
 
 interface DerivedKeys {
   wrapKey: CryptoKey;
   macKey: CryptoKey;
+}
+
+interface Envelope {
+  saltB64: string;
+  wrappedB64: string;
+  integrityMacB64: string;
 }
 
 /**
@@ -66,8 +86,20 @@ interface DerivedKeys {
  * (OWASP first-choice KDF, via Rust). Existing PBKDF2 vaults are backward-compat.
  */
 export class VaultService implements IVaultService {
+  /**
+   * Raw DEK bytes for the unlocked session. Kept (in addition to the
+   * non-extractable CryptoKey in the encryption service) because keychain
+   * escrow ("Trust this device") must be able to device-wrap the DEK on
+   * demand; zeroized on lock and whenever it is replaced.
+   */
   private rawDek: Bytes | null = null;
-  private isUnlocking = false;
+  /**
+   * In-flight unlock/auto-unlock attempt. Concurrent callers queue behind it
+   * and then run their own attempt — nobody gets success semantics for an
+   * attempt that never verified their passphrase.
+   */
+  private unlockInFlight: Promise<unknown> | null = null;
+  private lockListeners: Array<() => void> = [];
 
   constructor(
     private readonly crypto: IEncryptionService,
@@ -76,16 +108,22 @@ export class VaultService implements IVaultService {
     private readonly migrationRepo: IMigrationRepository,
     private readonly deviceBind: IDeviceBind,
     private readonly deriveKeyFn: KdfDerive,
+    private readonly legacyKeys: ILegacyKeyStore,
   ) {}
 
   isUnlocked(): boolean {
     return this.crypto.isUnlocked();
   }
 
+  onLock(listener: () => void): void {
+    this.lockListeners.push(listener);
+  }
+
   async computeStatus(): Promise<VaultStatus> {
     const rec = await this.kms.get();
     if (!rec) return "uninitialized";
-    if (rec.migrationState === "in_progress") return "migration_in_progress";
+    // An interrupted legacy migration no longer gates the app behind a dead
+    // screen — the resume runs inside the next successful unlock instead.
     return this.crypto.isUnlocked() ? "unlocked" : "locked";
   }
 
@@ -96,8 +134,13 @@ export class VaultService implements IVaultService {
     kdfParamsJson: string,
   ): Promise<DerivedKeys> {
     const prk = await this.deriveKeyFn(passphrase, salt, kdfAlg, kdfParamsJson);
-    const wrapKey = await importAesGcmKey(await deriveSubkey(prk, "dek-wrap"));
-    const macKey = await importHmacKey(await deriveSubkey(prk, "integrity-mac"));
+    const wrapRaw = await deriveSubkey(prk, "dek-wrap");
+    const macRaw = await deriveSubkey(prk, "integrity-mac");
+    zeroize(prk);
+    const wrapKey = await importAesGcmKey(wrapRaw);
+    const macKey = await importHmacKey(macRaw);
+    zeroize(wrapRaw);
+    zeroize(macRaw);
     return { wrapKey, macKey };
   }
 
@@ -107,27 +150,34 @@ export class VaultService implements IVaultService {
     iterations: number,
     kdfVersion: number,
     kdfAlg: string,
+    kdfParamsJson: string,
     wrappedDekB64: string,
   ): Promise<string> {
-    const fields: Bytes[] = [
-      encodeUtf8(saltB64),
-      encodeUtf8(String(iterations)),
-      encodeUtf8(String(kdfVersion)),
-      encodeUtf8(kdfAlg),
-      encodeUtf8(wrappedDekB64),
-    ];
-    return bytesToBase64(await computeIntegrityMac(macKey, fields));
+    const fields = [saltB64, String(iterations), String(kdfVersion), kdfAlg, wrappedDekB64];
+    if (kdfVersion >= ENVELOPE_VERSION) {
+      // v3+: length-prefixed fields (no boundary ambiguity) and the raw KDF
+      // params bound in, so stored Argon2/PBKDF2 costs are tamper-evident.
+      return bytesToBase64(
+        await computeIntegrityMacDelimited(macKey, [...fields, kdfParamsJson].map(encodeUtf8)),
+      );
+    }
+    return bytesToBase64(await computeIntegrityMac(macKey, fields.map(encodeUtf8)));
+  }
+
+  private recIterations(rec: KmsRecord): number {
+    return rec.kdfAlg === ARGON2ID_ALG
+      ? ARGON2ID_ENVELOPE_ITERATIONS
+      : parseIterations(rec.kdfParamsJson);
   }
 
   private async setSessionDek(rawDek: Bytes, cryptoKey: CryptoKey): Promise<void> {
+    if (this.rawDek && this.rawDek !== rawDek) zeroize(this.rawDek);
     this.rawDek = rawDek;
     await this.crypto.setSessionKeys({ dek: cryptoKey });
   }
 
-  async setupPassphrase(passphrase: string): Promise<void> {
-    const check = validatePassphrase(passphrase);
-    if (!check.ok) throw new ValidationError(check.error ?? "Invalid passphrase");
-
+  /** Fresh salt + Argon2id-derived wrap/MAC keys + wrapped DEK + v3 envelope MAC. */
+  private async buildArgon2Envelope(passphrase: string, rawDek: Bytes): Promise<Envelope> {
     const salt = generateSalt();
     const saltB64 = bytesToBase64(salt);
     const { wrapKey, macKey } = await this.deriveKeys(
@@ -136,26 +186,38 @@ export class VaultService implements IVaultService {
       ARGON2ID_ALG,
       ARGON2ID_PARAMS,
     );
-    const dek = await generateDek();
-    const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, dek.rawKey));
+    const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, rawDek));
     const integrityMacB64 = await this.envelopeMac(
       macKey,
       saltB64,
-      0,
-      ARGON2ID_VERSION,
+      ARGON2ID_ENVELOPE_ITERATIONS,
+      ENVELOPE_VERSION,
       ARGON2ID_ALG,
+      ARGON2ID_PARAMS,
       wrappedB64,
     );
+    return { saltB64, wrappedB64, integrityMacB64 };
+  }
 
+  async setupPassphrase(passphrase: string): Promise<void> {
+    const check = validatePassphrase(passphrase);
+    if (!check.ok) throw new ValidationError(check.error ?? "Invalid passphrase");
+    if (await this.kms.get()) {
+      // Re-running setup would mint a fresh DEK and orphan every existing note.
+      throw new ValidationError("Vault is already initialized.");
+    }
+
+    const dek = await generateDek();
+    const env = await this.buildArgon2Envelope(passphrase, dek.rawKey);
     const now = Date.now();
     const rec: KmsRecord = {
-      kdfVersion: ARGON2ID_VERSION,
+      kdfVersion: ENVELOPE_VERSION,
       kdfAlg: ARGON2ID_ALG,
       kdfParamsJson: ARGON2ID_PARAMS,
-      saltB64,
+      saltB64: env.saltB64,
       ivCounter: 0,
-      wrappedDekLocalB64: wrappedB64,
-      integrityMacB64,
+      wrappedDekLocalB64: env.wrappedB64,
+      integrityMacB64: env.integrityMacB64,
       migrationState: "pending_migration",
       migrationCursor: null,
       createdAt: now,
@@ -164,41 +226,62 @@ export class VaultService implements IVaultService {
     await this.kms.save(rec);
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
 
-    const wrappedDek = await this.deviceBind.wrap(dek.rawKey);
-    await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(wrappedDek));
-
-    const legacyHex = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const legacyHex = this.legacyKeys.get();
     if (legacyHex) {
       try {
-        await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.legacyBridge, legacyHex);
+        // Bridge for crash resume: if setup dies mid-migration, the next
+        // unlock finds this key and finishes the job.
+        await this.keychain.set(KEYRING_USERS.legacyBridge, legacyHex);
       } catch {
         /* best-effort */
       }
       await this.kms.update({ migrationState: "in_progress" });
-      await this.migrateLegacy(hexToBytes(legacyHex));
-      await this.kms.update({ migrationState: "complete", migrationCursor: null });
-    } else {
-      await this.kms.update({ migrationState: "complete", migrationCursor: null });
+      const legacyRaw = hexToBytes(legacyHex);
+      await this.migrateLegacy(legacyRaw);
+      zeroize(legacyRaw);
     }
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
-    try {
-      await this.keychain.delete(KEYRING_SERVICE, KEYRING_USERS.legacyBridge);
-    } catch {
-      /* ignore */
-    }
+    await this.kms.update({ migrationState: "complete", migrationCursor: null });
+    await this.purgeLegacyKeyMaterial();
   }
 
   /**
-   * Resume an interrupted migration if kms.migrationState is not 'complete'.
-   * Called at unlock time. Uses the legacy bridge key from the keychain to
-   * re-encrypt remaining kmsVersion=0 notes under the session DEK.
+   * Crash-safe resume: if a legacy migration was interrupted (state stuck at
+   * 'pending_migration' or 'in_progress'), finish it now using the bridge key
+   * persisted in the keychain. Runs after every successful unlock, so a crash
+   * mid-migration can no longer strand the vault.
    */
-  async resumeMigrationIfPending(legacyRawKey: Bytes): Promise<void> {
+  private async completePendingMigration(): Promise<void> {
     const rec = await this.kms.get();
     if (!rec || rec.migrationState === "complete") return;
+    const legacyHex =
+      (await this.keychain.get(KEYRING_USERS.legacyBridge)) ?? this.legacyKeys.get();
+    if (!legacyHex) {
+      if ((await this.migrationRepo.countLegacy()) === 0) {
+        // Nothing left below the current key version — the interrupted run
+        // actually finished; only the state flip was lost.
+        await this.kms.update({ migrationState: "complete", migrationCursor: null });
+      } else {
+        Logger.warn("vault: interrupted migration but no bridge key; legacy rows left as-is", {
+          migrationState: rec.migrationState,
+        });
+      }
+      return;
+    }
     await this.kms.update({ migrationState: "in_progress" });
-    await this.migrateLegacy(legacyRawKey);
+    const legacyRaw = hexToBytes(legacyHex);
+    await this.migrateLegacy(legacyRaw);
+    zeroize(legacyRaw);
     await this.kms.update({ migrationState: "complete", migrationCursor: null });
+    await this.purgeLegacyKeyMaterial();
+  }
+
+  private async purgeLegacyKeyMaterial(): Promise<void> {
+    this.legacyKeys.remove();
+    try {
+      await this.keychain.delete(KEYRING_USERS.legacyBridge);
+    } catch {
+      /* best-effort */
+    }
   }
 
   private async migrateLegacy(legacyRawKey: Bytes): Promise<void> {
@@ -226,19 +309,27 @@ export class VaultService implements IVaultService {
   }
 
   async unlock(passphrase: string): Promise<void> {
-    if (this.isUnlocking) return;
-    this.isUnlocking = true;
+    while (this.unlockInFlight) {
+      await this.unlockInFlight.then(
+        () => {},
+        () => {},
+      );
+    }
+    const attempt = this.doUnlock(passphrase);
+    this.unlockInFlight = attempt;
     try {
-      await this.doUnlock(passphrase);
+      await attempt;
     } finally {
-      this.isUnlocking = false;
+      this.unlockInFlight = null;
     }
   }
 
-  private async doUnlock(passphrase: string): Promise<void> {
-    const rec = await this.kms.get();
-    if (!rec) throw new ValidationError("Vault is not initialized yet.");
-    const iterations = rec.kdfAlg === "ARGON2ID" ? 0 : parseIterations(rec.kdfParamsJson);
+  /**
+   * Verify a passphrase against the stored envelope and return the unwrapped
+   * DEK. This is the single passphrase oracle — unlock AND changePassphrase
+   * both go through it, so neither can skip verification via session state.
+   */
+  private async verifyPassphraseAndUnwrap(passphrase: string, rec: KmsRecord): Promise<Bytes> {
     const { wrapKey, macKey } = await this.deriveKeys(
       passphrase,
       base64ToBytes(rec.saltB64),
@@ -249,9 +340,10 @@ export class VaultService implements IVaultService {
     const expectedMac = await this.envelopeMac(
       macKey,
       rec.saltB64,
-      iterations,
+      this.recIterations(rec),
       rec.kdfVersion,
       rec.kdfAlg,
+      rec.kdfParamsJson,
       rec.wrappedDekLocalB64 ?? "",
     );
     if (!constantTimeEqual(base64ToBytes(rec.integrityMacB64), base64ToBytes(expectedMac))) {
@@ -261,155 +353,221 @@ export class VaultService implements IVaultService {
       );
     }
 
-    const wrappedB64 =
-      rec.wrappedDekLocalB64 ?? (await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup));
+    const wrappedB64 = rec.wrappedDekLocalB64 ?? (await this.keychain.get(KEYRING_USERS.dekBackup));
     if (!wrappedB64) {
       throw new EncryptionError(
         "key_unavailable",
         "No wrapped DEK available; recovery impossible.",
       );
     }
-    let rawDek: Bytes;
     try {
-      rawDek = await unwrapDek(wrapKey, base64ToBytes(wrappedB64));
+      return await unwrapDek(wrapKey, base64ToBytes(wrappedB64));
     } catch (cause) {
       throw new EncryptionError("decrypt_failed", "Wrong passphrase.", { cause });
     }
-    await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
   }
 
-  lock(): Promise<void> {
+  private async doUnlock(passphrase: string): Promise<void> {
+    const rec = await this.kms.get();
+    if (!rec) throw new ValidationError("Vault is not initialized yet.");
+    const rawDek = await this.verifyPassphraseAndUnwrap(passphrase, rec);
+    await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
+    if (await this.escrowActive()) {
+      // Refresh the escrow entry on every passphrase unlock: heals pre-DPAPI
+      // (raw) entries now that tryAutoUnlock refuses unwrapped blobs.
+      const wrapped = await this.deviceBind.wrap(rawDek);
+      await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
+    }
+    await this.completePendingMigration();
+  }
+
+  async lock(): Promise<void> {
+    if (this.rawDek) zeroize(this.rawDek);
     this.rawDek = null;
     this.crypto.clearSessionKeys();
-    return Promise.resolve();
+    for (const listener of this.lockListeners) listener();
   }
 
   async tryAutoUnlock(): Promise<boolean> {
-    if (this.isUnlocking) return false;
-    this.isUnlocking = true;
+    while (this.unlockInFlight) {
+      await this.unlockInFlight.then(
+        () => {},
+        () => {},
+      );
+    }
+    const attempt = this.doTryAutoUnlock();
+    this.unlockInFlight = attempt;
     try {
-      return await this.doTryAutoUnlock();
+      return await attempt;
     } finally {
-      this.isUnlocking = false;
+      this.unlockInFlight = null;
     }
   }
 
   private async doTryAutoUnlock(): Promise<boolean> {
     const rec = await this.kms.get();
     if (!rec) return false;
-    const backup = await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup);
+    const backup = await this.keychain.get(KEYRING_USERS.dekBackup);
     if (!backup) return false;
     try {
-      const wrapped = base64ToBytes(backup);
-      let rawDek: Bytes;
-      try {
-        rawDek = await this.deviceBind.unwrap(wrapped);
-      } catch {
-        rawDek = wrapped;
-      }
+      // No raw-blob fallback: a backup that fails device unwrap is treated as
+      // tampered/foreign, never silently accepted as a plaintext DEK.
+      const rawDek = await this.deviceBind.unwrap(base64ToBytes(backup));
       await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
+      await this.completePendingMigration();
       return true;
     } catch {
       return false;
     }
   }
 
+  private async escrowActive(): Promise<boolean> {
+    return (await this.keychain.get(KEYRING_USERS.dekBackup)) !== null;
+  }
+
+  async setKeychainEscrow(enabled: boolean): Promise<void> {
+    if (!enabled) {
+      await this.keychain.delete(KEYRING_USERS.dekBackup);
+      return;
+    }
+    if (!this.rawDek) {
+      throw new EncryptionError("key_unavailable", "Unlock the vault before trusting this device.");
+    }
+    const wrapped = await this.deviceBind.wrap(this.rawDek);
+    await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(wrapped));
+  }
+
   async changePassphrase(oldPassphrase: string, newPassphrase: string): Promise<void> {
-    await this.unlock(oldPassphrase);
-    if (!this.rawDek)
-      throw new EncryptionError("key_unavailable", "DEK not available for re-wrap.");
     const check = validatePassphrase(newPassphrase);
     if (!check.ok) throw new ValidationError(check.error ?? "Invalid new passphrase");
+    const rec = await this.kms.get();
+    if (!rec) throw new EncryptionError("key_unavailable", "Vault not initialized.");
 
-    const salt = generateSalt();
-    const saltB64 = bytesToBase64(salt);
-    const { wrapKey, macKey } = await this.deriveKeys(
-      newPassphrase,
-      salt,
-      ARGON2ID_ALG,
-      ARGON2ID_PARAMS,
-    );
-    const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, this.rawDek));
-    const integrityMacB64 = await this.envelopeMac(
-      macKey,
-      saltB64,
-      0,
-      ARGON2ID_VERSION,
-      ARGON2ID_ALG,
-      wrappedB64,
-    );
+    // Explicit old-passphrase verification against the stored envelope — never
+    // relies on unlock()'s session side effects (a concurrent unlock could
+    // have primed them without this passphrase ever being checked).
+    const rawDek = await this.verifyPassphraseAndUnwrap(oldPassphrase, rec);
 
-    const existing = await this.kms.get();
-    if (!existing) throw new EncryptionError("key_unavailable", "Vault not initialized.");
+    const env = await this.buildArgon2Envelope(newPassphrase, rawDek);
     const updated: KmsRecord = {
-      ...existing,
-      kdfVersion: ARGON2ID_VERSION,
+      ...rec,
+      kdfVersion: ENVELOPE_VERSION,
       kdfAlg: ARGON2ID_ALG,
-      saltB64,
       kdfParamsJson: ARGON2ID_PARAMS,
-      wrappedDekLocalB64: wrappedB64,
-      integrityMacB64,
+      saltB64: env.saltB64,
+      wrappedDekLocalB64: env.wrappedB64,
+      integrityMacB64: env.integrityMacB64,
       updatedAt: Date.now(),
     };
     await this.kms.save(updated);
-    const rewrapped = await this.deviceBind.wrap(this.rawDek);
-    await this.keychain.set(KEYRING_SERVICE, KEYRING_USERS.dekBackup, bytesToBase64(rewrapped));
+    if (await this.escrowActive()) {
+      const rewrapped = await this.deviceBind.wrap(rawDek);
+      await this.keychain.set(KEYRING_USERS.dekBackup, bytesToBase64(rewrapped));
+    }
+    await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
   }
 
   async recoverViaKeychain(newPassphrase: string): Promise<void> {
-    const backupB64 = await this.keychain.get(KEYRING_SERVICE, KEYRING_USERS.dekBackup);
+    const backupB64 = await this.keychain.get(KEYRING_USERS.dekBackup);
     if (!backupB64) {
       throw new EncryptionError("key_unavailable", "No keychain backup; recovery impossible.");
     }
     const check = validatePassphrase(newPassphrase);
     if (!check.ok) throw new ValidationError(check.error ?? "Invalid passphrase");
 
-    const rawDek = await this.deviceBind.unwrap(base64ToBytes(backupB64));
-    await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
-
-    const salt = generateSalt();
-    const saltB64 = bytesToBase64(salt);
-    const { wrapKey, macKey } = await this.deriveKeys(
-      newPassphrase,
-      salt,
-      ARGON2ID_ALG,
-      ARGON2ID_PARAMS,
-    );
-    const wrappedB64 = bytesToBase64(await wrapDek(wrapKey, rawDek));
-    const integrityMacB64 = await this.envelopeMac(
-      macKey,
-      saltB64,
-      0,
-      ARGON2ID_VERSION,
-      ARGON2ID_ALG,
-      wrappedB64,
-    );
-
+    const recoveredDek = await this.deviceBind.unwrap(base64ToBytes(backupB64));
     const existing = await this.kms.get();
-    const rec: KmsRecord = existing
-      ? {
-          ...existing,
-          kdfVersion: ARGON2ID_VERSION,
-          kdfAlg: ARGON2ID_ALG,
-          saltB64,
-          kdfParamsJson: ARGON2ID_PARAMS,
-          wrappedDekLocalB64: wrappedB64,
-          integrityMacB64,
-          updatedAt: Date.now(),
+    if (existing) {
+      // Normal recovery: same DEK under a new passphrase envelope. The
+      // persisted ivCounter is preserved, so the IV sequence keeps advancing.
+      const env = await this.buildArgon2Envelope(newPassphrase, recoveredDek);
+      await this.kms.save({
+        ...existing,
+        kdfVersion: ENVELOPE_VERSION,
+        kdfAlg: ARGON2ID_ALG,
+        kdfParamsJson: ARGON2ID_PARAMS,
+        saltB64: env.saltB64,
+        wrappedDekLocalB64: env.wrappedB64,
+        integrityMacB64: env.integrityMacB64,
+        updatedAt: Date.now(),
+      });
+      await this.setSessionDek(recoveredDek, await importAesGcmKey(recoveredDek));
+      await this.setKeychainEscrow(true);
+      await this.completePendingMigration();
+      return;
+    }
+    await this.recoverWithDekRotation(newPassphrase, recoveredDek);
+  }
+
+  /**
+   * kms row missing but a keychain DEK backup exists (partial DB corruption or
+   * tampering). The old DEK's IV counter is unknown, so reusing that DEK would
+   * risk AES-GCM nonce reuse against ciphertexts surviving in exported backups.
+   * Instead: mint a fresh DEK (counter restarts safely at 0) and re-encrypt
+   * every note from the old DEK to the new one. The old DEK is parked in the
+   * keychain bridge slot until the sweep finishes, so a crash mid-sweep loses
+   * no data — unswept rows fail loud and the old key is still recoverable.
+   */
+  private async recoverWithDekRotation(newPassphrase: string, oldRawDek: Bytes): Promise<void> {
+    try {
+      await this.keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldRawDek));
+    } catch {
+      /* best-effort crash bridge */
+    }
+    const oldKey = await importAesGcmKey(oldRawDek);
+    const dek = await generateDek();
+    const env = await this.buildArgon2Envelope(newPassphrase, dek.rawKey);
+    const now = Date.now();
+    await this.kms.save({
+      kdfVersion: ENVELOPE_VERSION,
+      kdfAlg: ARGON2ID_ALG,
+      kdfParamsJson: ARGON2ID_PARAMS,
+      saltB64: env.saltB64,
+      ivCounter: 0,
+      wrappedDekLocalB64: env.wrappedB64,
+      integrityMacB64: env.integrityMacB64,
+      migrationState: "complete",
+      migrationCursor: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    zeroize(oldRawDek);
+    await this.setSessionDek(dek.rawKey, dek.cryptoKey);
+    await this.reencryptAllNotes(oldKey);
+    await this.setKeychainEscrow(true);
+    try {
+      await this.keychain.delete(KEYRING_USERS.legacyBridge);
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  /** Rotation sweep: decrypt every row under `oldKey`, re-encrypt under the session DEK. */
+  private async reencryptAllNotes(oldKey: CryptoKey): Promise<void> {
+    let cursor: string | null = null;
+    for (;;) {
+      const batch = await this.migrationRepo.findAllBatch(cursor, MIGRATION_BATCH);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        cursor = row.id;
+        if (!row.content) continue;
+        try {
+          let plain: string;
+          try {
+            plain = await aesGcmDecrypt(oldKey, row.content, encodeUtf8(row.id));
+          } catch {
+            // Pre-AAD ciphertexts were encrypted without additionalData.
+            plain = await aesGcmDecrypt(oldKey, row.content);
+          }
+          const reencrypted = await this.crypto.encryptPayload(plain, row.id);
+          await this.migrationRepo.markMigrated(row.id, reencrypted);
+        } catch (err) {
+          await this.migrationRepo.recordFailure(
+            row.id,
+            err instanceof Error ? err.message : String(err),
+          );
         }
-      : {
-          kdfVersion: ARGON2ID_VERSION,
-          kdfAlg: ARGON2ID_ALG,
-          kdfParamsJson: ARGON2ID_PARAMS,
-          saltB64,
-          ivCounter: 0,
-          wrappedDekLocalB64: wrappedB64,
-          integrityMacB64,
-          migrationState: "complete",
-          migrationCursor: null,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-    await this.kms.save(rec);
+      }
+    }
   }
 }

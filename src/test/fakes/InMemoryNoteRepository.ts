@@ -1,40 +1,37 @@
-import type { Note } from "../../domain/note/Note";
 import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
-import type { INoteRepository } from "../../repositories/INoteRepository";
+import type { INoteRepository, NoteRecord } from "../../repositories/INoteRepository";
+import type { EncryptedPayload } from "../../services/vault/IEncryptionService";
 
+/**
+ * In-memory INoteRepository fake. Like the real SQLite adapter it stores
+ * whatever (encrypted) content it is handed and never decrypts — encryption
+ * lives in NoteService.
+ *
+ * NOTE: searchTitlesFts here does case-insensitive SUBSTRING matching, while
+ * the real FTS5 implementation does token-PREFIX matching with rank ordering
+ * ("oad" matches "Roadmap" only in this fake) and swallows errors returning [].
+ */
 export class InMemoryNoteRepository implements INoteRepository {
-  public notes: Note[] = [];
+  public notes: NoteRecord[] = [];
   public callLog: string[] = [];
   public shouldFail = false;
 
-  async getAllNotes(): Promise<Note[]> {
-    this.callLog.push("getAllNotes");
-    if (this.shouldFail) throw new Error("Fake repo error: getAllNotes");
-    return [...this.notes];
-  }
-
-  async getNotesMetadataByWorkspace(workspaceId: string): Promise<Note[]> {
+  async getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]> {
     this.callLog.push("getNotesMetadataByWorkspace");
     if (this.shouldFail) throw new Error("Fake repo error: getNotesMetadataByWorkspace");
     return this.notes
       .filter((n) => n.workspaceId === workspaceId)
-      .map((n) => ({ ...n, content: "" }));
+      .map((n) => ({ ...n, content: "" as EncryptedPayload }));
   }
 
-  async getNotesByWorkspace(workspaceId: string): Promise<Note[]> {
-    this.callLog.push("getNotesByWorkspace");
-    if (this.shouldFail) throw new Error("Fake repo error: getNotesByWorkspace");
-    return this.notes.filter((n) => n.workspaceId === workspaceId);
-  }
-
-  async getNoteById(id: string): Promise<Note | null> {
+  async getNoteById(id: string): Promise<NoteRecord | null> {
     this.callLog.push(`getNoteById:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: getNoteById");
     const found = this.notes.find((n) => n.id === id);
     return found ? { ...found } : null;
   }
 
-  async findRecentForSearch(limit: number): Promise<Note[]> {
+  async findRecentForSearch(limit: number): Promise<NoteRecord[]> {
     this.callLog.push(`findRecentForSearch:${limit}`);
     if (this.shouldFail) throw new Error("Fake repo error: findRecentForSearch");
     return [...this.notes]
@@ -43,22 +40,22 @@ export class InMemoryNoteRepository implements INoteRepository {
       .map((n) => ({ ...n }));
   }
 
-  async createNote(noteInput: Omit<Note, "createdAt" | "updatedAt">): Promise<Note> {
+  async createNote(noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord> {
     this.callLog.push(`createNote:${noteInput.id}`);
     if (this.shouldFail) throw new Error("Fake repo error: createNote");
     const now = Date.now();
-    const note: Note = { ...noteInput, createdAt: now, updatedAt: now };
+    const note: NoteRecord = { ...noteInput, createdAt: now, updatedAt: now };
     this.notes.unshift(note);
     return note;
   }
 
-  async updateNote(id: string, updates: Partial<Note>): Promise<Note> {
+  async updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord> {
     this.callLog.push(`updateNote:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: updateNote");
     const index = this.notes.findIndex((n) => n.id === id);
     const existing = this.notes[index];
     if (index === -1 || !existing) throw new Error(`Note not found: ${id}`);
-    const updated: Note = { ...existing, ...updates, updatedAt: Date.now() };
+    const updated: NoteRecord = { ...existing, ...updates, updatedAt: Date.now() };
     this.notes[index] = updated;
     return updated;
   }

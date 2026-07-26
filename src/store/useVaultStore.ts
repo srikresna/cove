@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { vaultService } from "../di/container";
 import type { VaultStatus } from "../services/IVaultService";
-import { useNoteStore } from "./useNoteStore";
 import { useSettingsStore } from "./useSettingsStore";
 
 interface VaultState {
@@ -13,6 +12,8 @@ interface VaultState {
   recover: (passphrase: string) => Promise<void>;
   tryAutoUnlock: () => Promise<boolean>;
   lock: () => Promise<void>;
+  /** "Trust this device": keychain DEK escrow + auto-unlock preference, kept in sync. */
+  setTrustDevice: (enabled: boolean) => Promise<void>;
 }
 
 const refreshStatus = async (): Promise<VaultStatus> => {
@@ -55,11 +56,13 @@ export const useVaultStore = create<VaultState>((set) => ({
     return ok;
   },
   lock: async () => {
+    // Plaintext purge happens inside the service's onLock listeners (H1 fix),
+    // so it also covers callers that bypass this store.
     await vaultService.lock();
-    // H1 fix: clear decrypted note content from memory on lock.
-    // The Zustand store persists across React unmounts; without this, decrypted
-    // note bodies remain reachable in JS heap after lock.
-    useNoteStore.setState({ notes: [], activeNoteId: null });
     set({ status: await refreshStatus() });
+  },
+  setTrustDevice: async (enabled) => {
+    await vaultService.setKeychainEscrow(enabled);
+    useSettingsStore.getState().setAutoUnlockOnLaunch(enabled);
   },
 }));

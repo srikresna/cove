@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { noteService } from "../di/container";
+import { noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
 import { presentError } from "../services/errorPresenter";
 import { useNotificationStore } from "./useNotificationStore";
@@ -24,185 +24,148 @@ interface NoteState {
   toggleFavoriteNote: (id: string) => Promise<void>;
 }
 
-export const useNoteStore = create<NoteState>((set, get) => ({
-  notes: [],
-  activeNoteId: null,
+/** Single error-presentation path: toast always, save-status only for save-flow ops. */
+function notifyError(err: unknown, opts: { saveStatus: boolean } = { saveStatus: true }): void {
+  const p = presentError(err);
+  if (opts.saveStatus) {
+    useSaveStatusStore.getState().setError(p.userMessage);
+  }
+  useNotificationStore.getState().pushToast({
+    kind: p.kind,
+    title: p.toastTitle,
+    description: p.toastDescription,
+  });
+}
 
-  setActiveNoteId: (id) => set({ activeNoteId: id }),
-
-  fetchNotes: async (workspaceId) => {
-    try {
-      const notes = await noteService.listMetadataByWorkspace(workspaceId);
-      const first = notes[0];
-      set({ notes, activeNoteId: first ? first.id : null });
-    } catch (err) {
-      const p = presentError(err);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-    }
-  },
-
-  loadActiveNoteContent: async (id) => {
-    try {
-      const note = await noteService.getNote(id);
-      if (note) {
-        set((state) => ({
-          notes: state.notes.map((n) => (n.id === id ? note : n)),
-        }));
-      }
-    } catch (err) {
-      const p = presentError(err);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-    }
-  },
-
-  createNote: async (workspaceId, title, content, icon) => {
+export const useNoteStore = create<NoteState>((set, get) => {
+  /** Shared optimistic toggle for boolean note flags. */
+  const toggleFlag = async (id: string, key: "isPinned" | "isFavorite"): Promise<void> => {
     const previousNotes = get().notes;
-    useSaveStatusStore.getState().setSaving();
-
-    try {
-      const created = await noteService.createNote(workspaceId, title, content, icon);
-      set((state) => ({
-        notes: [created, ...state.notes],
-        activeNoteId: created.id,
-      }));
-      useSaveStatusStore.getState().setSaved();
-      return created;
-    } catch (err) {
-      set({ notes: previousNotes });
-      const p = presentError(err);
-      useSaveStatusStore.getState().setError(p.userMessage);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-      return null;
-    }
-  },
-
-  updateNote: async (id, updates) => {
-    const previousNotes = get().notes;
-    const now = Date.now();
     set((state) => ({
-      notes: state.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now } : n)),
+      notes: state.notes.map((n) => (n.id === id ? { ...n, [key]: !n[key] } : n)),
     }));
     useSaveStatusStore.getState().setSaving();
 
     try {
-      if (updates.content !== undefined) {
-        await noteService.updateContent(id, updates.content);
+      if (key === "isPinned") {
+        await noteService.togglePin(id);
       } else {
-        await noteService.updateMetadata(id, updates);
+        await noteService.toggleFavorite(id);
       }
       useSaveStatusStore.getState().setSaved();
     } catch (err) {
       set({ notes: previousNotes });
-      const p = presentError(err);
-      useSaveStatusStore.getState().setError(p.userMessage);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
+      notifyError(err);
     }
-  },
+  };
 
-  deleteNote: async (id) => {
-    const previousNotes = get().notes;
-    const previousActive = get().activeNoteId;
-    const filtered = previousNotes.filter((n) => n.id !== id);
-    const nextActive = filtered[0]?.id || null;
+  return {
+    notes: [],
+    activeNoteId: null,
 
-    set({ notes: filtered, activeNoteId: nextActive });
-    useSaveStatusStore.getState().setSaving();
+    setActiveNoteId: (id) => set({ activeNoteId: id }),
 
-    try {
-      await noteService.deleteNote(id);
-      useSaveStatusStore.getState().setSaved();
-    } catch (err) {
-      set({ notes: previousNotes, activeNoteId: previousActive });
-      const p = presentError(err);
-      useSaveStatusStore.getState().setError(p.userMessage);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-    }
-  },
+    fetchNotes: async (workspaceId) => {
+      try {
+        const notes = await noteService.listMetadataByWorkspace(workspaceId);
+        const first = notes[0];
+        set({ notes, activeNoteId: first ? first.id : null });
+      } catch (err) {
+        notifyError(err, { saveStatus: false });
+      }
+    },
 
-  duplicateNote: async (id) => {
-    const previousNotes = get().notes;
-    useSaveStatusStore.getState().setSaving();
+    loadActiveNoteContent: async (id) => {
+      try {
+        const note = await noteService.getNote(id);
+        if (note) {
+          set((state) => ({
+            notes: state.notes.map((n) => (n.id === id ? note : n)),
+          }));
+        }
+      } catch (err) {
+        notifyError(err, { saveStatus: false });
+      }
+    },
 
-    try {
-      const duplicated = await noteService.duplicateNote(id);
+    createNote: async (workspaceId, title, content, icon) => {
+      useSaveStatusStore.getState().setSaving();
+      try {
+        const created = await noteService.createNote(workspaceId, title, content, icon);
+        set((state) => ({
+          notes: [created, ...state.notes],
+          activeNoteId: created.id,
+        }));
+        useSaveStatusStore.getState().setSaved();
+        return created;
+      } catch (err) {
+        notifyError(err);
+        return null;
+      }
+    },
+
+    updateNote: async (id, updates) => {
+      const previousNotes = get().notes;
+      const now = Date.now();
       set((state) => ({
-        notes: [duplicated, ...state.notes],
-        activeNoteId: duplicated.id,
+        notes: state.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now } : n)),
       }));
-      useSaveStatusStore.getState().setSaved();
-    } catch (err) {
-      set({ notes: previousNotes });
-      const p = presentError(err);
-      useSaveStatusStore.getState().setError(p.userMessage);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-    }
-  },
+      useSaveStatusStore.getState().setSaving();
 
-  togglePinNote: async (id) => {
-    const previousNotes = get().notes;
-    set((state) => ({
-      notes: state.notes.map((n) => (n.id === id ? { ...n, isPinned: !n.isPinned } : n)),
-    }));
-    useSaveStatusStore.getState().setSaving();
+      try {
+        if (updates.content !== undefined) {
+          await noteService.updateContent(id, updates.content);
+        } else {
+          await noteService.updateMetadata(id, updates);
+        }
+        useSaveStatusStore.getState().setSaved();
+      } catch (err) {
+        set({ notes: previousNotes });
+        notifyError(err);
+      }
+    },
 
-    try {
-      await noteService.togglePin(id);
-      useSaveStatusStore.getState().setSaved();
-    } catch (err) {
-      set({ notes: previousNotes });
-      const p = presentError(err);
-      useSaveStatusStore.getState().setError(p.userMessage);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-    }
-  },
+    deleteNote: async (id) => {
+      const previousNotes = get().notes;
+      const previousActive = get().activeNoteId;
+      const filtered = previousNotes.filter((n) => n.id !== id);
+      const nextActive = filtered[0]?.id || null;
 
-  toggleFavoriteNote: async (id) => {
-    const previousNotes = get().notes;
-    set((state) => ({
-      notes: state.notes.map((n) => (n.id === id ? { ...n, isFavorite: !n.isFavorite } : n)),
-    }));
-    useSaveStatusStore.getState().setSaving();
+      set({ notes: filtered, activeNoteId: nextActive });
+      useSaveStatusStore.getState().setSaving();
 
-    try {
-      await noteService.toggleFavorite(id);
-      useSaveStatusStore.getState().setSaved();
-    } catch (err) {
-      set({ notes: previousNotes });
-      const p = presentError(err);
-      useSaveStatusStore.getState().setError(p.userMessage);
-      useNotificationStore.getState().pushToast({
-        kind: p.kind,
-        title: p.toastTitle,
-        description: p.toastDescription,
-      });
-    }
-  },
-}));
+      try {
+        await noteService.deleteNote(id);
+        useSaveStatusStore.getState().setSaved();
+      } catch (err) {
+        set({ notes: previousNotes, activeNoteId: previousActive });
+        notifyError(err);
+      }
+    },
+
+    duplicateNote: async (id) => {
+      useSaveStatusStore.getState().setSaving();
+      try {
+        const duplicated = await noteService.duplicateNote(id);
+        set((state) => ({
+          notes: [duplicated, ...state.notes],
+          activeNoteId: duplicated.id,
+        }));
+        useSaveStatusStore.getState().setSaved();
+      } catch (err) {
+        notifyError(err);
+      }
+    },
+
+    togglePinNote: (id) => toggleFlag(id, "isPinned"),
+    toggleFavoriteNote: (id) => toggleFlag(id, "isFavorite"),
+  };
+});
+
+// H1 fix: purge decrypted note content from memory on EVERY lock, no matter
+// who initiated it (settings button, idle timer, beforeunload, future callers
+// of vaultService.lock()). Registered against the service so the invariant
+// cannot be bypassed by skipping the vault store.
+vaultService.onLock(() => {
+  useNoteStore.setState({ notes: [], activeNoteId: null });
+});

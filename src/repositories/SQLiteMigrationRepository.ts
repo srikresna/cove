@@ -25,6 +25,24 @@ export class SQLiteMigrationRepository implements IMigrationRepository {
     }
   }
 
+  async findAllBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    try {
+      const db = await this.getDb();
+      const rows = afterId
+        ? await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, content FROM notes WHERE id > ? ORDER BY id LIMIT ?",
+            [afterId, limit],
+          )
+        : await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, content FROM notes ORDER BY id LIMIT ?",
+            [limit],
+          );
+      return rows.map((r) => ({ id: String(r.id), content: String(r.content) }));
+    } catch (err) {
+      throw toPersistenceError("migration.findAllBatch", err);
+    }
+  }
+
   async markMigrated(id: string, encryptedContent: string): Promise<void> {
     try {
       const db = await this.getDb();

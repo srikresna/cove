@@ -10,11 +10,16 @@ import {
   makeNoteId,
 } from "../domain/note/notePolicy";
 import { VaultLockedError } from "../errors/AppError";
-import type { INoteRepository } from "../repositories/INoteRepository";
+import type { INoteRepository, NoteRecord } from "../repositories/INoteRepository";
 import { buildSnippet, extractPlainText } from "../utils/plainText";
 import type { INoteService } from "./INoteService";
 import type { IEncryptionService } from "./vault/IEncryptionService";
 
+/**
+ * Application-layer note operations. Encryption-at-rest happens HERE: content
+ * is encrypted before it reaches the repository and decrypted after it comes
+ * back, so the repository contract (NoteRecord) never sees plaintext.
+ */
 export class NoteService implements INoteService {
   constructor(
     private readonly notes: INoteRepository,
@@ -28,14 +33,22 @@ export class NoteService implements INoteService {
     }
   }
 
+  /** Decrypt a persisted record back into the plaintext domain Note. */
+  private async toNote(rec: NoteRecord): Promise<Note> {
+    return { ...rec, content: await this.crypto.decryptPayload(rec.content, rec.id) };
+  }
+
   async listMetadataByWorkspace(workspaceId: string): Promise<Note[]> {
     this.assertUnlocked();
-    return this.notes.getNotesMetadataByWorkspace(workspaceId);
+    const records = await this.notes.getNotesMetadataByWorkspace(workspaceId);
+    // Metadata-only records carry empty content; no decrypt cost.
+    return Promise.all(records.map((rec) => this.toNote(rec)));
   }
 
   async getNote(id: string): Promise<Note | null> {
     this.assertUnlocked();
-    return this.notes.getNoteById(id);
+    const rec = await this.notes.getNoteById(id);
+    return rec ? this.toNote(rec) : null;
   }
 
   async searchAcrossWorkspaces(query: string): Promise<NoteSearchHit[]> {
@@ -50,15 +63,15 @@ export class NoteService implements INoteService {
     // the snippet is built — no Note[] holding 100 decrypted bodies in memory.
     const candidates = await this.notes.findRecentForSearch(100);
     const bodyHits: NoteSearchHit[] = [];
-    for (const note of candidates) {
-      if (titleIds.has(note.id)) continue;
-      const plain = extractPlainText(note.content);
+    for (const rec of candidates) {
+      if (titleIds.has(rec.id)) continue;
+      const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
       if (plain.toLowerCase().includes(q)) {
         bodyHits.push({
-          id: note.id,
-          workspaceId: note.workspaceId,
-          title: note.title,
-          icon: note.icon,
+          id: rec.id,
+          workspaceId: rec.workspaceId,
+          title: rec.title,
+          icon: rec.icon,
           snippet: buildSnippet(plain, q),
         });
       }
@@ -73,16 +86,18 @@ export class NoteService implements INoteService {
     icon = DEFAULT_NOTE_ICON,
   ): Promise<Note> {
     this.assertUnlocked();
-    return this.notes.createNote({
-      id: makeNoteId(),
+    const id = makeNoteId();
+    const rec = await this.notes.createNote({
+      id,
       workspaceId,
       title,
-      content,
+      content: await this.crypto.encryptPayload(content, id),
       icon,
       coverColor: DEFAULT_NOTE_COVER_COLOR,
       isPinned: false,
       isFavorite: false,
     });
+    return { ...rec, content };
   }
 
   async updateMetadata(
@@ -92,12 +107,15 @@ export class NoteService implements INoteService {
     >,
   ): Promise<Note> {
     this.assertUnlocked();
-    return this.notes.updateNote(id, updates);
+    return this.toNote(await this.notes.updateNote(id, updates));
   }
 
   async updateContent(id: string, content: string): Promise<Note> {
     this.assertUnlocked();
-    return this.notes.updateNote(id, { content });
+    const rec = await this.notes.updateNote(id, {
+      content: await this.crypto.encryptPayload(content, id),
+    });
+    return { ...rec, content };
   }
 
   async deleteNote(id: string): Promise<void> {
@@ -107,7 +125,7 @@ export class NoteService implements INoteService {
 
   async duplicateNote(id: string): Promise<Note> {
     this.assertUnlocked();
-    const src = await this.notes.getNoteById(id);
+    const src = await this.getNote(id);
     if (!src) throw new NotFoundError("Note", id);
     const { title, content, icon } = duplicateNoteProps(src);
     return this.createNote(src.workspaceId, title, content, icon);
@@ -117,13 +135,13 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const n = await this.notes.getNoteById(id);
     if (!n) throw new NotFoundError("Note", id);
-    return this.notes.updateNote(id, { isPinned: !n.isPinned });
+    return this.toNote(await this.notes.updateNote(id, { isPinned: !n.isPinned }));
   }
 
   async toggleFavorite(id: string): Promise<Note> {
     this.assertUnlocked();
     const n = await this.notes.getNoteById(id);
     if (!n) throw new NotFoundError("Note", id);
-    return this.notes.updateNote(id, { isFavorite: !n.isFavorite });
+    return this.toNote(await this.notes.updateNote(id, { isFavorite: !n.isFavorite }));
   }
 }

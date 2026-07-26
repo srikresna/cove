@@ -1,6 +1,6 @@
 import { EncryptionError } from "../../errors/AppError";
 import type { IKmsRepository } from "../../repositories/IKmsRepository";
-import type { IEncryptionService } from "./IEncryptionService";
+import type { EncryptedPayload, IEncryptionService } from "./IEncryptionService";
 import {
   IV_EXHAUSTION_LIMIT,
   aesGcmDecrypt,
@@ -42,7 +42,7 @@ export class CryptoVault implements IEncryptionService {
     this.ivCounter = 0;
   }
 
-  async encryptPayload(plaintext: string, aad: string): Promise<string> {
+  async encryptPayload(plaintext: string, aad: string): Promise<EncryptedPayload> {
     if (!this.dek) {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot encrypt.");
     }
@@ -57,7 +57,8 @@ export class CryptoVault implements IEncryptionService {
     }
     // Persist BEFORE use so a crash can never lower the counter below an IV already emitted.
     await this.kms.setIvCounter(counter);
-    return aesGcmEncrypt(this.dek, plaintext, counterToIv(counter), encodeUtf8(aad));
+    const payload = await aesGcmEncrypt(this.dek, plaintext, counterToIv(counter), encodeUtf8(aad));
+    return payload as EncryptedPayload;
   }
 
   async decryptPayload(payloadB64: string, aad: string): Promise<string> {

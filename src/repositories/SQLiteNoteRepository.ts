@@ -1,31 +1,28 @@
-import type { Note } from "../domain/note/Note";
 import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
-import type { IEncryptionService } from "../services/vault/IEncryptionService";
-import type { INoteRepository } from "./INoteRepository";
+import type { EncryptedPayload } from "../services/vault/IEncryptionService";
+import type { INoteRepository, NoteRecord } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
-export class SQLiteNoteRepository implements INoteRepository {
-  constructor(private readonly crypto: IEncryptionService) {}
+/**
+ * Rows encrypted under the session DEK carry kmsVersion = 1; 0 marks pre-vault
+ * legacy rows still awaiting migration. Stamped on every content write so
+ * migration/rotation sweeps can tell the two apart.
+ */
+const KMS_VERSION_DEK = 1;
 
+export class SQLiteNoteRepository implements INoteRepository {
   private getDb() {
     return SQLiteDatabase.getInstance();
   }
 
-  private async mapRowToNote(
-    row: Record<string, unknown>,
-    opts: { decrypt: boolean },
-  ): Promise<Note> {
+  private mapRowToRecord(row: Record<string, unknown>): NoteRecord {
     return {
       id: String(row.id),
       workspaceId: String(row.workspaceId),
       title: String(row.title),
-      content: opts.decrypt
-        ? await this.crypto.decryptPayload(String(row.content ?? ""), String(row.id))
-        : row.content != null
-          ? String(row.content)
-          : "",
+      content: (row.content != null ? String(row.content) : "") as EncryptedPayload,
       icon: row.icon ? String(row.icon) : undefined,
       coverColor: row.coverColor ? String(row.coverColor) : undefined,
       isPinned: Boolean(row.isPinned),
@@ -35,45 +32,20 @@ export class SQLiteNoteRepository implements INoteRepository {
     };
   }
 
-  async getAllNotes(): Promise<Note[]> {
-    try {
-      const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT * FROM notes ORDER BY updatedAt DESC",
-      );
-      return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
-    } catch (err) {
-      throw toPersistenceError("getAllNotes", err);
-    }
-  }
-
-  async getNotesMetadataByWorkspace(workspaceId: string): Promise<Note[]> {
+  async getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]> {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
         "SELECT id, workspaceId, title, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
-      return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: false })));
+      return rows.map((row) => this.mapRowToRecord(row));
     } catch (err) {
       throw toPersistenceError("getNotesMetadataByWorkspace", err);
     }
   }
 
-  async getNotesByWorkspace(workspaceId: string): Promise<Note[]> {
-    try {
-      const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT * FROM notes WHERE workspaceId = ? ORDER BY updatedAt DESC",
-        [workspaceId],
-      );
-      return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
-    } catch (err) {
-      throw toPersistenceError("getNotesByWorkspace", err);
-    }
-  }
-
-  async getNoteById(id: string): Promise<Note | null> {
+  async getNoteById(id: string): Promise<NoteRecord | null> {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
@@ -81,20 +53,20 @@ export class SQLiteNoteRepository implements INoteRepository {
         [id],
       );
       if (!rows.length || !rows[0]) return null;
-      return this.mapRowToNote(rows[0], { decrypt: true });
+      return this.mapRowToRecord(rows[0]);
     } catch (err) {
       throw toPersistenceError("getNoteById", err);
     }
   }
 
-  async findRecentForSearch(limit: number): Promise<Note[]> {
+  async findRecentForSearch(limit: number): Promise<NoteRecord[]> {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
         "SELECT * FROM notes ORDER BY updatedAt DESC LIMIT ?",
         [limit],
       );
-      return Promise.all(rows.map((row) => this.mapRowToNote(row, { decrypt: true })));
+      return rows.map((row) => this.mapRowToRecord(row));
     } catch (err) {
       throw toPersistenceError("findRecentForSearch", err);
     }
@@ -119,12 +91,11 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
-  async createNote(noteInput: Omit<Note, "createdAt" | "updatedAt">): Promise<Note> {
+  async createNote(noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord> {
     const db = await this.getDb();
     const now = Date.now();
-    const encryptedContent = await this.crypto.encryptPayload(noteInput.content, noteInput.id);
 
-    const note: Note = {
+    const note: NoteRecord = {
       ...noteInput,
       createdAt: now,
       updatedAt: now,
@@ -133,17 +104,18 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute(
         `INSERT INTO notes
-        (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, kmsVersion, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.id,
           note.workspaceId,
           note.title,
-          encryptedContent,
+          note.content,
           note.icon || null,
           note.coverColor || null,
           note.isPinned ? 1 : 0,
           note.isFavorite ? 1 : 0,
+          KMS_VERSION_DEK,
           note.createdAt,
           note.updatedAt,
         ],
@@ -155,7 +127,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     return note;
   }
 
-  async updateNote(id: string, updates: Partial<Note>): Promise<Note> {
+  async updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord> {
     const db = await this.getDb();
     const now = Date.now();
 
@@ -171,9 +143,8 @@ export class SQLiteNoteRepository implements INoteRepository {
       params.push(updates.title);
     }
     if (updates.content !== undefined) {
-      const encrypted = await this.crypto.encryptPayload(updates.content, id);
-      setClauses.push("content = ?");
-      params.push(encrypted);
+      setClauses.push("content = ?", "kmsVersion = ?");
+      params.push(updates.content, KMS_VERSION_DEK);
     }
     if (updates.icon !== undefined) {
       setClauses.push("icon = ?");

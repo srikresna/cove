@@ -21,10 +21,16 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
       .map((id) => ({ id, content: this.rows.get(id)?.content ?? "" }));
   }
 
+  async findAllBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    const ids = [...this.rows.keys()].sort();
+    const filtered = afterId ? ids.filter((id) => id > afterId) : ids;
+    return filtered
+      .slice(0, limit)
+      .map((id) => ({ id, content: this.rows.get(id)?.content ?? "" }));
+  }
+
   async markMigrated(id: string, encryptedContent: string): Promise<void> {
-    const row = this.rows.get(id);
-    if (row) this.rows.set(id, { content: encryptedContent, migrated: true });
-    else this.rows.set(id, { content: encryptedContent, migrated: true });
+    this.rows.set(id, { content: encryptedContent, migrated: true });
   }
 
   async recordFailure(id: string, reason: string): Promise<void> {
