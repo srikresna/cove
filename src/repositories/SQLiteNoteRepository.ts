@@ -189,9 +189,13 @@ export class SQLiteNoteRepository implements INoteRepository {
     return existing;
   }
 
+  // Explicit link/tag cleanup: ON DELETE CASCADE needs foreign_keys=ON, which
+  // is connection-scoped — the pool may serve connections that never ran it.
   async deleteNote(id: string): Promise<void> {
     const db = await this.getDb();
     try {
+      await db.execute("DELETE FROM note_links WHERE sourceId = ? OR targetId = ?", [id, id]);
+      await db.execute("DELETE FROM note_tags WHERE noteId = ?", [id]);
       await db.execute("DELETE FROM notes WHERE id = ?", [id]);
     } catch (err) {
       throw toPersistenceError("deleteNote", err);
@@ -201,6 +205,14 @@ export class SQLiteNoteRepository implements INoteRepository {
   async deleteNotesByWorkspace(workspaceId: string): Promise<void> {
     const db = await this.getDb();
     try {
+      await db.execute(
+        "DELETE FROM note_links WHERE sourceId IN (SELECT id FROM notes WHERE workspaceId = ?) OR targetId IN (SELECT id FROM notes WHERE workspaceId = ?)",
+        [workspaceId, workspaceId],
+      );
+      await db.execute(
+        "DELETE FROM note_tags WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
+        [workspaceId],
+      );
       await db.execute("DELETE FROM notes WHERE workspaceId = ?", [workspaceId]);
     } catch (err) {
       throw toPersistenceError("deleteNotesByWorkspace", err);

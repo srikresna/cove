@@ -235,9 +235,10 @@
   text-decoration: none;
 }
 
-/* Bullets cycle shape by depth (disc → ring → diamond → hollow diamond) */
+/* Bullets cycle shape by depth (disc → ring → diamond → hollow diamond).
+   !important: BlockNote sets content:"•" via higher-specificity vendor rules. */
 .bn-block-content[data-content-type="bulletListItem"]::before {
-  content: "";
+  content: "" !important;
   width: 24px;
   height: 24px;
   flex-shrink: 0;

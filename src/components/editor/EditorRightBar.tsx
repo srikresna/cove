@@ -5,9 +5,12 @@ import { MESSAGES } from "../../constants/messages";
 import { noteService } from "../../di/container";
 import { cn } from "../../lib/utils";
 import type { NoteMeta } from "../../services/INoteService";
+import { presentError } from "../../services/errorPresenter";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
+import { walkBlocks } from "../../utils/blockTree";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -25,46 +28,25 @@ interface EditorRightBarProps {
 }
 
 function extractHeadings(content: string): TocItem[] {
-  if (!content) return [];
-  let blocks: unknown;
-  try {
-    blocks = JSON.parse(content);
-  } catch {
-    return [];
-  }
   const items: TocItem[] = [];
-  const visit = (nodes: unknown): void => {
-    if (!Array.isArray(nodes)) return;
-    for (const node of nodes) {
-      const block = node as {
-        id?: unknown;
-        type?: unknown;
-        props?: { level?: unknown };
-        content?: unknown;
-        children?: unknown;
-      };
-      if (block?.type === "heading" && typeof block.id === "string") {
-        const text = Array.isArray(block.content)
-          ? block.content
-              .map((c) => {
-                const inline = c as { text?: unknown };
-                return typeof inline?.text === "string" ? inline.text : "";
-              })
-              .join("")
-              .trim()
-          : "";
-        if (text) {
-          items.push({
-            id: block.id,
-            text,
-            level: typeof block.props?.level === "number" ? block.props.level : 1,
-          });
-        }
-      }
-      visit(block?.children);
-    }
-  };
-  visit(blocks);
+  walkBlocks(content, (block) => {
+    if (block.type !== "heading" || typeof block.id !== "string") return;
+    const text = Array.isArray(block.content)
+      ? block.content
+          .map((c) => {
+            const inline = c as { text?: unknown };
+            return typeof inline?.text === "string" ? inline.text : "";
+          })
+          .join("")
+          .trim()
+      : "";
+    if (!text) return;
+    items.push({
+      id: block.id,
+      text,
+      level: typeof block.props?.level === "number" ? block.props.level : 1,
+    });
+  });
   return items;
 }
 
@@ -89,7 +71,15 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
     noteService
       .backlinksOf(note.id)
       .then(setBacklinks)
-      .catch(() => setBacklinks([]));
+      .catch((err) => {
+        setBacklinks([]);
+        const p = presentError(err);
+        useNotificationStore.getState().pushToast({
+          kind: p.kind,
+          title: p.toastTitle,
+          description: p.toastDescription,
+        });
+      });
   }, [note.id]);
 
   const updateActiveHeading = useCallback(() => {

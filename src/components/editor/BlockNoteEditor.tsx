@@ -38,6 +38,8 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
     () => localStorage.getItem(RIGHTBAR_KEY) === "true",
   );
   const lastLoadedContentRef = useRef<string>("");
+  const contentTimer = useRef<NodeJS.Timeout | null>(null);
+  const pendingContentRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const editor = useCreateBlockNote({ schema: coveSchema });
@@ -73,6 +75,15 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
 
     loadInitialContent();
   }, [note.content, editor]);
+
+  useEffect(() => {
+    return () => {
+      if (contentTimer.current) clearTimeout(contentTimer.current);
+      // Flush a pending debounced save so switching notes never loses input.
+      const pending = pendingContentRef.current;
+      if (pending) updateNote(note.id, { content: pending });
+    };
+  }, [note.id, updateNote]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -156,7 +167,12 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
                 onChange={() => {
                   const blocksJson = JSON.stringify(editor.document);
                   lastLoadedContentRef.current = blocksJson;
-                  updateNote(note.id, { content: blocksJson });
+                  pendingContentRef.current = blocksJson;
+                  if (contentTimer.current) clearTimeout(contentTimer.current);
+                  contentTimer.current = setTimeout(() => {
+                    pendingContentRef.current = null;
+                    updateNote(note.id, { content: blocksJson });
+                  }, 500);
                 }}
               >
                 <SuggestionMenuController triggerCharacter="@" getItems={getLinkSuggestions} />

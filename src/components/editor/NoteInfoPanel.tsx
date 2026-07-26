@@ -76,9 +76,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [query, setQuery] = useState("");
   const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
-  const updateNote = useNoteStore((s) => s.updateNote);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const moveNoteToWorkspace = useNoteStore((s) => s.moveNoteToWorkspace);
   const pushToast = useNotificationStore((s) => s.pushToast);
 
   const workspace = workspaces.find((w) => w.id === note.workspaceId);
@@ -131,10 +129,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
 
   const moveToWorkspace = (workspaceId: string) => {
     if (workspaceId === note.workspaceId) return;
-    void updateNote(note.id, { workspaceId }).then(() => {
-      setActiveWorkspace(workspaceId);
-      setActiveNoteId(note.id);
-    });
+    void moveNoteToWorkspace(note.id, workspaceId);
   };
 
   const trimmed = query.trim();
@@ -221,7 +216,9 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
                         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span className="truncate">Create "{trimmed}"</span>
+                        <span className="truncate">
+                          {MESSAGES.INFO_CREATE_TAG_PREFIX} "{trimmed}"
+                        </span>
                       </button>
                     )}
                   </div>

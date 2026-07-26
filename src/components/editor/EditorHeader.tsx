@@ -215,11 +215,17 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           )}
         />
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
-          <span>{wordCount} words</span>
+          <span>
+            {wordCount} {MESSAGES.META_WORDS}
+          </span>
           <span aria-hidden="true">·</span>
-          <span>{characterCount} characters</span>
+          <span>
+            {characterCount} {MESSAGES.META_CHARACTERS}
+          </span>
           <span aria-hidden="true">·</span>
-          <span>Updated {formattedDate}</span>
+          <span>
+            {MESSAGES.META_UPDATED_PREFIX} {formattedDate}
+          </span>
           <SaveStatusBadge />
         </div>
 

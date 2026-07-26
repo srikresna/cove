@@ -6,10 +6,20 @@ import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { noteService } from "../../di/container";
 import type { NoteMeta } from "../../services/INoteService";
+import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 
-const metaCache = new Map<string, NoteMeta | null>();
+// Short TTL: dedupes lookups across the chips of one document without pinning
+// a renamed cross-workspace target to its old title for the whole session.
+const META_TTL_MS = 30_000;
+const metaCache = new Map<string, { meta: NoteMeta | null; at: number }>();
+
+function cachedMeta(noteId: string): NoteMeta | null | undefined {
+  const entry = metaCache.get(noteId);
+  if (!entry || Date.now() - entry.at > META_TTL_MS) return undefined;
+  return entry.meta;
+}
 
 const NoteLinkChip: React.FC<{ noteId: string; fallbackTitle: string }> = ({
   noteId,
@@ -19,19 +29,21 @@ const NoteLinkChip: React.FC<{ noteId: string; fallbackTitle: string }> = ({
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const [fetched, setFetched] = useState<NoteMeta | null | undefined>(metaCache.get(noteId));
+  const [fetched, setFetched] = useState<NoteMeta | null | undefined>(cachedMeta(noteId));
 
   useEffect(() => {
-    if (storeNote || metaCache.has(noteId)) return;
+    if (storeNote || cachedMeta(noteId) !== undefined) return;
     let cancelled = false;
     noteService
       .getLinkTargets([noteId])
       .then((metas) => {
         const meta = metas[0] ?? null;
-        metaCache.set(noteId, meta);
+        metaCache.set(noteId, { meta, at: Date.now() });
         if (!cancelled) setFetched(meta);
       })
-      .catch(() => {
+      .catch((err) => {
+        // No toast: many chips can fail at once (e.g. right after a lock).
+        Logger.warn("noteLink: could not resolve link target", err, { noteId });
         if (!cancelled) setFetched(null);
       });
     return () => {

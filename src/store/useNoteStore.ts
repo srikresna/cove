@@ -4,6 +4,7 @@ import type { Note } from "../domain/note/Note";
 import { presentError } from "../services/errorPresenter";
 import { useNotificationStore } from "./useNotificationStore";
 import { useSaveStatusStore } from "./useSaveStatusStore";
+import { useWorkspaceStore } from "./useWorkspaceStore";
 
 interface NoteState {
   notes: Note[];
@@ -21,6 +22,7 @@ interface NoteState {
     icon?: string,
   ) => Promise<Note | null>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
+  moveNoteToWorkspace: (id: string, workspaceId: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
   togglePinNote: (id: string) => Promise<void>;
@@ -125,6 +127,22 @@ export const useNoteStore = create<NoteState>((set, get) => {
         useSaveStatusStore.getState().setSaved();
       } catch (err) {
         set({ notes: previousNotes });
+        notifyError(err);
+      }
+    },
+
+    moveNoteToWorkspace: async (id, workspaceId) => {
+      useSaveStatusStore.getState().setSaving();
+      try {
+        // No optimistic patch: mutating workspaceId in place would unmatch the
+        // active note and flash the editor before the workspace switches.
+        await noteService.updateMetadata(id, { workspaceId });
+        useWorkspaceStore.getState().setActiveWorkspace(workspaceId);
+        await get().fetchNotes(workspaceId);
+        set({ activeNoteId: id });
+        await get().loadActiveNoteContent(id);
+        useSaveStatusStore.getState().setSaved();
+      } catch (err) {
         notifyError(err);
       }
     },
