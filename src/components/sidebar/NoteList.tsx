@@ -7,6 +7,7 @@ import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { Button } from "../ui/button";
 import { NoteItem } from "./NoteItem";
 
 export const NoteList: React.FC = () => {
@@ -118,17 +119,17 @@ export const NoteList: React.FC = () => {
   return (
     <div className="space-y-3 h-full flex flex-col">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-marker-orange">
-          {MESSAGES.NOTES_HEADER} ({workspaceNotes.length})
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          {MESSAGES.NOTES_HEADER} <span className="font-mono">({workspaceNotes.length})</span>
         </span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="iconSm"
           aria-label={MESSAGES.CREATE_NEW_NOTE}
           onClick={handleCreate}
-          className="p-1 rounded-[8px] bg-cream-paper border border-charcoal text-charcoal shadow-paper-lift hover:scale-105 transition-transform outline-none"
         >
-          <Plus className="w-3.5 h-3.5 text-marker-orange" aria-hidden="true" />
-        </button>
+          <Plus className="w-4 h-4" aria-hidden="true" />
+        </Button>
       </div>
 
       <div ref={parentRef} className="flex-1 overflow-y-auto relative space-y-1 pr-1">
@@ -156,7 +157,7 @@ export const NoteList: React.FC = () => {
                 }}
               >
                 {item.type === "header" ? (
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 py-1">
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {item.title}
                   </div>
                 ) : (

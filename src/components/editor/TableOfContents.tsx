@@ -1,6 +1,7 @@
 import { AlignLeft, ListFilter } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { Button } from "../ui/button";
 
 interface TocItem {
   id: string;
@@ -54,32 +55,34 @@ export const TableOfContents: React.FC<TableOfContentsProps> = ({ editorRef }) =
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between p-2.5 rounded-[12px] bg-dew-drop border border-charcoal">
-        <div className="flex items-center gap-2 text-xs font-bold text-cocoa-ink">
-          <AlignLeft className="w-4 h-4 text-marker-orange" />
-          <span>Table of Contents ({items.length})</span>
+      <div className="flex items-center justify-between rounded-md border bg-card px-2.5 py-1.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+          <AlignLeft className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <span>
+            Table of Contents{" "}
+            <span className="font-mono text-muted-foreground">({items.length})</span>
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-1 rounded-md hover:bg-cream-paper text-charcoal transition-colors"
-        >
-          <ListFilter className="w-3.5 h-3.5" />
-        </button>
+        <Button variant="ghost" size="iconSm" onClick={() => setIsOpen(!isOpen)}>
+          <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
+        </Button>
       </div>
 
       {isOpen && (
-        <div className="mt-2 p-2 rounded-[12px] bg-cream-paper border border-charcoal shadow-sm space-y-1">
+        <div className="mt-2 space-y-0.5 rounded-md border bg-card p-2">
           {items.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => scrollToHeading(item.id)}
-              className="w-full text-left px-2 py-1 rounded-[6px] hover:bg-dew-drop text-xs text-charcoal font-medium truncate transition-colors flex items-center gap-2"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               style={{ paddingLeft: `${(item.level - 1) * 12 + 8}px` }}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-marker-orange flex-shrink-0" />
+              <span
+                className="h-1 w-1 flex-shrink-0 rounded-full bg-primary/60"
+                aria-hidden="true"
+              />
               <span className="truncate">{item.text}</span>
             </button>
           ))}

@@ -8,6 +8,7 @@ import { DeleteNoteDialog } from "./components/modals/DeleteNoteDialog";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
+import { Button } from "./components/ui/button";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import type { Note } from "./domain/note/Note";
@@ -64,14 +65,14 @@ export const AppContent: React.FC = () => {
   }, [isDarkMode]);
 
   return (
-    <div className="flex h-screen w-screen bg-cream-paper overflow-hidden relative font-gelica">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
       <Sidebar />
 
-      <main className="flex-1 h-full flex flex-col relative z-10 overflow-hidden bg-cream-paper">
+      <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-background">
         {activeNote ? (
           <Suspense
             fallback={
-              <div className="flex-1 flex items-center justify-center text-sm font-medium text-slate-400">
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 Loading editor…
               </div>
             }
@@ -79,41 +80,42 @@ export const AppContent: React.FC = () => {
             <BlockNoteEditor key={activeNote.id} note={activeNote} />
           </Suspense>
         ) : workspaces.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
             <div
-              className="w-16 h-16 rounded-[20px] bg-dew-drop border-[1.5px] border-charcoal text-cocoa-ink flex items-center justify-center text-3xl shadow-card-subtle mb-4"
+              className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
               aria-hidden="true"
             >
               🗂️
             </div>
-            <h2 className="text-2xl font-extrabold text-cocoa-ink mb-2">
+            <h2 className="mb-2 font-display text-2xl font-medium tracking-tight text-foreground">
               {MESSAGES.NO_WORKSPACE_TITLE}
             </h2>
-            <p className="text-sm text-slate-500 max-w-sm mb-6">{MESSAGES.NO_WORKSPACE_DESC}</p>
-            <button
-              type="button"
+            <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+              {MESSAGES.NO_WORKSPACE_DESC}
+            </p>
+            <Button
               aria-label={MESSAGES.CREATE_WORKSPACE_TITLE}
               onClick={() => setCreateModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-cocoa-ink text-sm font-bold shadow-paper-lift hover:scale-105 transition-transform"
             >
-              <Plus className="w-4 h-4 text-marker-orange" aria-hidden="true" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
               <span>{MESSAGES.CREATE_WORKSPACE_TITLE}</span>
-            </button>
+            </Button>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
             <div
-              className="w-16 h-16 rounded-[20px] bg-dew-drop border-[1.5px] border-charcoal text-cocoa-ink flex items-center justify-center text-3xl shadow-card-subtle mb-4"
+              className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
               aria-hidden="true"
             >
               📝
             </div>
-            <h2 className="text-2xl font-extrabold text-cocoa-ink mb-2">
+            <h2 className="mb-2 font-display text-2xl font-medium tracking-tight text-foreground">
               {MESSAGES.NO_NOTE_SELECTED_TITLE}
             </h2>
-            <p className="text-sm text-slate-500 max-w-sm mb-6">{MESSAGES.NO_NOTE_SELECTED_DESC}</p>
-            <button
-              type="button"
+            <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+              {MESSAGES.NO_NOTE_SELECTED_DESC}
+            </p>
+            <Button
               aria-label={MESSAGES.CREATE_NEW_NOTE}
               onClick={() => {
                 if (activeWorkspaceId) {
@@ -125,11 +127,10 @@ export const AppContent: React.FC = () => {
                   );
                 }
               }}
-              className="flex items-center gap-2 px-6 py-3 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-cocoa-ink text-sm font-bold shadow-paper-lift hover:scale-105 transition-transform"
             >
-              <Plus className="w-4 h-4 text-marker-orange" aria-hidden="true" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
               <span>{MESSAGES.CREATE_NEW_NOTE}</span>
-            </button>
+            </Button>
           </div>
         )}
       </main>

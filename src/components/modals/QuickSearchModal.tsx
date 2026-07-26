@@ -1,6 +1,5 @@
-import * as Dialog from "@radix-ui/react-dialog";
 import { Command } from "cmdk";
-import { ArrowRight, Search, X } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -10,6 +9,7 @@ import { presentError } from "../../services/errorPresenter";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -74,80 +74,73 @@ export const QuickSearchModal: React.FC = () => {
   const trimmed = query.trim();
 
   return (
-    <Dialog.Root open={isQuickSearchOpen} onOpenChange={setQuickSearchOpen}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-charcoal/40 backdrop-blur-sm" />
-        <Dialog.Content className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg bg-cream-paper rounded-[16px] border-[1.5px] border-charcoal shadow-card-subtle overflow-hidden outline-none">
-          <Command className="w-full" shouldFilter={false}>
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-charcoal/20">
-              <Search className="w-5 h-5 text-marker-orange" aria-hidden="true" />
-              <Command.Input
-                value={query}
-                onValueChange={setQuery}
-                placeholder={MESSAGES.QUICK_SEARCH_PLACEHOLDER}
-                className="flex-1 bg-transparent outline-none text-sm font-semibold text-cocoa-ink placeholder-slate-400"
-              />
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  aria-label="Close search modal"
-                  className="p-1 rounded-lg text-charcoal hover:bg-dew-drop outline-none"
-                >
-                  <X className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </Dialog.Close>
-            </div>
+    <Dialog open={isQuickSearchOpen} onOpenChange={setQuickSearchOpen}>
+      <DialogContent
+        className="top-[18%] max-w-lg -translate-y-0 gap-0 overflow-hidden p-0"
+        hideClose
+      >
+        <DialogTitle className="sr-only">{MESSAGES.QUICK_SEARCH_PLACEHOLDER}</DialogTitle>
+        <Command className="w-full" shouldFilter={false}>
+          <div className="flex items-center gap-3 border-b px-4 py-3">
+            <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Command.Input
+              value={query}
+              onValueChange={setQuery}
+              placeholder={MESSAGES.QUICK_SEARCH_PLACEHOLDER}
+              className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
 
-            <Command.List className="max-h-80 overflow-y-auto p-2 space-y-1">
-              {!trimmed && (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  {MESSAGES.QUICK_SEARCH_PLACEHOLDER}
-                </div>
-              )}
-              {trimmed && loading && (
-                <div className="p-8 text-center text-xs text-slate-400">Searching…</div>
-              )}
-              {trimmed && !loading && hits.length === 0 && (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  {MESSAGES.QUICK_SEARCH_EMPTY}
-                </div>
-              )}
-              {hits.map((hit) => {
-                const ws = workspaces.find((w) => w.id === hit.workspaceId);
-                return (
-                  <Command.Item
-                    key={hit.id}
-                    value={`${hit.title} ${hit.snippet}`}
-                    onSelect={() => openHit(hit)}
-                    className="w-full flex items-start gap-3 p-3 rounded-[12px] hover:bg-dew-drop border border-transparent hover:border-charcoal text-left cursor-pointer outline-none aria-selected:bg-dew-drop aria-selected:border-charcoal"
+          <Command.List className="max-h-80 overflow-y-auto p-2">
+            {!trimmed && (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {MESSAGES.QUICK_SEARCH_PLACEHOLDER}
+              </div>
+            )}
+            {trimmed && loading && (
+              <div className="p-8 text-center text-sm text-muted-foreground">Searching…</div>
+            )}
+            {trimmed && !loading && hits.length === 0 && (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {MESSAGES.QUICK_SEARCH_EMPTY}
+              </div>
+            )}
+            {hits.map((hit) => {
+              const ws = workspaces.find((w) => w.id === hit.workspaceId);
+              return (
+                <Command.Item
+                  key={hit.id}
+                  value={`${hit.title} ${hit.snippet}`}
+                  onSelect={() => openHit(hit)}
+                  className="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 text-left outline-none transition-colors aria-selected:bg-accent"
+                >
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-base"
+                    aria-hidden="true"
                   >
-                    <span className="text-xl flex-shrink-0" aria-hidden="true">
-                      {hit.icon || "📝"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-cocoa-ink truncate">
-                        {hit.title || MESSAGES.UNTITLED_NOTE}
-                      </div>
-                      {hit.snippet && (
-                        <div className="text-[11px] text-slate-500 truncate">{hit.snippet}</div>
-                      )}
-                      <div className="mt-0.5">
-                        <span className="px-1.5 py-0.5 rounded-[6px] bg-cream-paper border border-charcoal text-[10px] font-semibold">
-                          {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
-                        </span>
-                      </div>
+                    {hit.icon || "📝"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {hit.title || MESSAGES.UNTITLED_NOTE}
                     </div>
-                    <ArrowRight
-                      className="w-4 h-4 text-marker-orange opacity-40"
-                      aria-hidden="true"
-                    />
-                  </Command.Item>
-                );
-              })}
-            </Command.List>
-          </Command>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+                    {hit.snippet && (
+                      <div className="truncate text-xs text-muted-foreground">{hit.snippet}</div>
+                    )}
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
+                    </span>
+                  </div>
+                  <ArrowRight
+                    className="h-4 w-4 shrink-0 text-muted-foreground/50"
+                    aria-hidden="true"
+                  />
+                </Command.Item>
+              );
+            })}
+          </Command.List>
+        </Command>
+      </DialogContent>
+    </Dialog>
   );
 };

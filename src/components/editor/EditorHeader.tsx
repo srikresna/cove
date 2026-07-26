@@ -1,12 +1,15 @@
-import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker from "emoji-picker-react";
 import { ArrowRightLeft, Copy, Maximize2, Minimize2, Pin, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
+import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import type { Note } from "../../types";
+import { Button } from "../ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { SaveStatusBadge } from "./SaveStatusBadge";
 
 interface EditorHeaderProps {
@@ -30,6 +33,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 }) => {
   const { updateNote, requestDeleteNote, duplicateNote, togglePinNote, toggleFavoriteNote } =
     useNoteStore();
+  const saveStatus = useSaveStatusStore((s) => s.status);
 
   const [title, setTitle] = useState(note.title);
   const titleTimer = useRef<NodeJS.Timeout | null>(null);
@@ -64,152 +68,133 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
     minute: "2-digit",
   }).format(note.updatedAt);
 
+  const accent = note.coverColor || "#0e7c66";
+
   return (
     <div className="mb-6 space-y-4">
       <div
-        className="h-24 w-full rounded-[16px] border-[1.5px] border-charcoal transition-all duration-300 relative group overflow-hidden shadow-card-subtle flex items-end p-3"
-        style={{
-          background: `linear-gradient(135deg, ${note.coverColor || "#ff6f1e"} 0%, #fdfbf9 100%), ${note.coverColor || "#ff6f1e"}`,
-        }}
+        className="group relative flex h-20 w-full items-end overflow-hidden rounded-lg border p-3"
+        style={{ background: `linear-gradient(135deg, ${accent}2e 0%, transparent 75%)` }}
       >
-        <div className="flex items-center justify-between w-full">
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <button
-                type="button"
-                aria-label={MESSAGES.CHANGE_ACCENT}
-                className="px-3 py-1 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-xs font-semibold text-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform outline-none"
-              >
+        <div className="flex w-full items-center justify-between">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" aria-label={MESSAGES.CHANGE_ACCENT}>
                 {MESSAGES.CHANGE_ACCENT}
-              </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                sideOffset={8}
-                align="start"
-                className="z-50 flex gap-2 p-2 rounded-[16px] bg-cream-paper border-[1.5px] border-charcoal shadow-card-subtle outline-none"
-              >
-                {COVER_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-label={`Select cover accent color ${color}`}
-                    onClick={() => updateNote(note.id, { coverColor: color })}
-                    className="w-6 h-6 rounded-full transition-transform hover:scale-125 border border-charcoal"
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="flex w-auto gap-2 p-2">
+              {COVER_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`Select cover accent color ${color}`}
+                  onClick={() => updateNote(note.id, { coverColor: color })}
+                  className={cn(
+                    "h-6 w-6 rounded-full border transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    note.coverColor === color && "ring-2 ring-ring ring-offset-1",
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </PopoverContent>
+          </Popover>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label={isFullWidth ? "Standard Width" : "Wide Width"}
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}
               onClick={onToggleFullWidth}
-              className="p-1.5 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform text-xs flex items-center gap-1 font-semibold px-2.5"
             >
-              <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" />
+              <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
               <span>{isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}</span>
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               aria-label={isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}
               onClick={onToggleFullscreen}
-              className="p-1.5 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform text-xs flex items-center gap-1 font-semibold px-2.5"
             >
               {isFullscreen ? (
-                <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" />
+                <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
               ) : (
-                <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
               )}
               <span>{isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="flex items-start justify-between gap-4 pl-[54px] pr-0">
-        <div className="relative">
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <button
-                type="button"
-                aria-label="Change Note Emoji Icon"
-                className="text-4xl p-2 rounded-[16px] bg-cream-paper border-[1.5px] border-charcoal shadow-paper-lift hover:scale-105 active:scale-95 transition-transform flex items-center justify-center min-w-[56px] min-h-[56px] outline-none"
-              >
-                {note.icon || "📝"}
-              </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                sideOffset={8}
-                align="start"
-                className="z-50 shadow-card-subtle rounded-[16px] overflow-hidden border-[1.5px] border-charcoal bg-cream-paper outline-none"
-              >
-                <EmojiPicker
-                  onEmojiClick={(emojiData) => {
-                    updateNote(note.id, { icon: emojiData.emoji });
-                  }}
-                  autoFocusSearch={true}
-                  width={340}
-                  height={400}
-                />
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
-        </div>
+      <div className="flex items-start justify-between gap-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Change Note Emoji Icon"
+              className="flex h-14 w-14 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {note.icon || "📝"}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto overflow-hidden p-0">
+            <EmojiPicker
+              onEmojiClick={(emojiData) => {
+                updateNote(note.id, { icon: emojiData.emoji });
+              }}
+              autoFocusSearch={true}
+              width={340}
+              height={400}
+            />
+          </PopoverContent>
+        </Popover>
 
-        <div className="flex items-center gap-1.5 bg-dew-drop p-1.5 rounded-[20px] border-[1.5px] border-charcoal">
-          <button
-            type="button"
+        <div className="flex items-center gap-0.5 rounded-md border bg-card p-0.5 shadow-sm">
+          <Button
+            variant="ghost"
+            size="iconSm"
             aria-label={note.isPinned ? MESSAGES.UNPIN_NOTE : MESSAGES.PIN_NOTE}
             onClick={() => togglePinNote(note.id)}
-            className={`p-2 rounded-[14px] transition-all hover:scale-105 active:scale-95 ${
-              note.isPinned
-                ? "bg-marker-orange text-cream-paper font-bold"
-                : "text-charcoal hover:bg-cream-paper"
-            }`}
+            className={cn(note.isPinned ? "text-primary" : "text-muted-foreground")}
           >
-            <Pin className="w-4 h-4" aria-hidden="true" />
-          </button>
+            <Pin className="h-4 w-4" aria-hidden="true" />
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="iconSm"
             aria-label={note.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}
             onClick={() => toggleFavoriteNote(note.id)}
-            className={`p-2 rounded-[14px] transition-all hover:scale-105 active:scale-95 ${
-              note.isFavorite
-                ? "bg-marker-orange text-cream-paper font-bold"
-                : "text-charcoal hover:bg-cream-paper"
-            }`}
+            className={cn(note.isFavorite ? "text-warm" : "text-muted-foreground")}
           >
-            <Star className="w-4 h-4" aria-hidden="true" />
-          </button>
+            <Star className="h-4 w-4" aria-hidden="true" />
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="iconSm"
             aria-label={MESSAGES.DUPLICATE_NOTE}
             onClick={() => duplicateNote(note.id)}
-            className="p-2 rounded-[14px] text-charcoal hover:bg-cream-paper transition-all hover:scale-105 active:scale-95"
+            className="text-muted-foreground"
           >
-            <Copy className="w-4 h-4" aria-hidden="true" />
-          </button>
+            <Copy className="h-4 w-4" aria-hidden="true" />
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="iconSm"
             aria-label={MESSAGES.DELETE_NOTE}
             onClick={() => requestDeleteNote(note.id)}
-            className="p-2 rounded-[14px] text-charcoal hover:text-red-600 hover:bg-red-50 transition-all hover:scale-105 active:scale-95"
+            className="text-muted-foreground hover:text-destructive"
           >
-            <Trash2 className="w-4 h-4" aria-hidden="true" />
-          </button>
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
       </div>
 
-      <div className="pl-[54px] pr-0">
+      <div>
         <label htmlFor="note-title-input" className="sr-only">
           Note Title
         </label>
@@ -220,15 +205,21 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           onChange={handleTitleChange}
           placeholder={MESSAGES.UNTITLED_NOTE}
           aria-label="Note Title"
-          className="w-full text-3xl sm:text-4xl font-extrabold bg-transparent outline-none border-b-[2px] border-transparent focus:border-marker-orange transition-colors py-1 text-cocoa-ink placeholder-slate-300"
+          className="w-full bg-transparent py-1 font-display text-3xl font-medium tracking-tight text-foreground outline-none placeholder:text-muted-foreground/50 sm:text-4xl"
         />
-        <div className="flex items-center gap-4 mt-2 text-xs font-medium text-slate-500 flex-wrap">
+        <div
+          aria-hidden="true"
+          className={cn(
+            "waterline w-full transition-opacity duration-500",
+            saveStatus === "saving" ? "animate-ripple opacity-100" : "opacity-50",
+          )}
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
           <span>{wordCount} words</span>
-          <span>•</span>
+          <span aria-hidden="true">·</span>
           <span>{characterCount} characters</span>
-          <span>•</span>
+          <span aria-hidden="true">·</span>
           <span>Updated {formattedDate}</span>
-          <span>•</span>
           <SaveStatusBadge />
         </div>
       </div>

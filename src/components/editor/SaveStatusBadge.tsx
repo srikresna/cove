@@ -8,27 +8,28 @@ export const SaveStatusBadge: React.FC = () => {
   if (status === "idle") return null;
 
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] bg-dew-drop border border-charcoal text-[11px] font-bold text-cocoa-ink">
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden="true">·</span>
       {status === "saving" && (
         <>
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-marker-orange" aria-hidden="true" />
-          <span>Saving...</span>
+          <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden="true" />
+          <span>Saving…</span>
         </>
       )}
 
       {status === "saved" && (
         <>
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
+          <CheckCircle2 className="h-3 w-3 text-primary" aria-hidden="true" />
           <span>Saved</span>
         </>
       )}
 
       {status === "error" && (
         <>
-          <AlertCircle className="w-3.5 h-3.5 text-red-600" aria-hidden="true" />
-          <span className="text-red-600">{errorMessage || "Save Failed"}</span>
+          <AlertCircle className="h-3 w-3 text-destructive" aria-hidden="true" />
+          <span className="text-destructive">{errorMessage || "Save Failed"}</span>
         </>
       )}
-    </div>
+    </span>
   );
 };

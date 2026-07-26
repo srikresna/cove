@@ -1,51 +1,69 @@
+import tailwindcssAnimate from "tailwindcss-animate";
+
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  darkMode: 'class',
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        cream: {
-          paper: '#fdfbf9',
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
-        charcoal: '#171717',
-        cocoa: {
-          ink: '#2b1a07',
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
-        dew: {
-          drop: '#f7efe9',
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
-        marker: {
-          orange: '#ff6f1e',
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
-        burnt: {
-          sienna: '#ce500a',
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
-        sticker: {
-          sky: '#3b82f6',
-          bubblegum: '#ff66cf',
-          sprout: '#22c55e',
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
-        shadow: {
-          mist: '#bebcbb',
-        }
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        warm: {
+          DEFAULT: "hsl(var(--warm))",
+          foreground: "hsl(var(--warm-foreground))",
+        },
       },
       fontFamily: {
-        gelica: ['Outfit', 'sans-serif'],
-        geist: ['Inter', 'sans-serif'],
-      },
-      boxShadow: {
-        'paper-lift': '0px 1px 2px 0px rgba(0, 0, 0, 0.25)',
-        'card-subtle': '0px 2px 20px 0px rgba(0, 0, 0, 0.06)',
+        sans: ["Inter Variable", "Inter", "system-ui", "sans-serif"],
+        display: ["Newsreader", "Georgia", "serif"],
+        mono: ["JetBrains Mono Variable", "ui-monospace", "monospace"],
       },
       borderRadius: {
-        'pill': '20px',
-        'card': '12px',
-        'footer': '56px',
-      }
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        ripple: {
+          "0%": { "background-position-x": "0px" },
+          "100%": { "background-position-x": "28px" },
+        },
+      },
+      animation: {
+        ripple: "ripple 0.9s linear infinite",
+      },
     },
   },
-  plugins: [],
-}
+  plugins: [tailwindcssAnimate],
+};

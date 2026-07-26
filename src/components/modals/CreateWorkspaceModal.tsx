@@ -1,12 +1,23 @@
-import * as Dialog from "@radix-ui/react-dialog";
-import * as Popover from "@radix-ui/react-popover";
 import EmojiPicker from "emoji-picker-react";
-import { Plus, Smile, X } from "lucide-react";
+import { Plus, Smile } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
+import { cn } from "../../lib/utils";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export const CreateWorkspaceModal: React.FC = () => {
   const { isCreateModalOpen, setCreateModalOpen, createWorkspace } = useWorkspaceStore();
@@ -32,150 +43,110 @@ export const CreateWorkspaceModal: React.FC = () => {
   };
 
   return (
-    <Dialog.Root open={isCreateModalOpen} onOpenChange={setCreateModalOpen}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-charcoal/40 backdrop-blur-sm" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md bg-cream-paper rounded-[16px] border-[1.5px] border-charcoal shadow-card-subtle p-6 space-y-5 outline-none">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-[8px] border border-charcoal flex items-center justify-center text-lg shadow-sm"
-                style={{ backgroundColor: `${selectedColor}30` }}
-                aria-hidden="true"
-              >
-                {selectedEmoji}
-              </div>
-              <Dialog.Title className="text-lg font-extrabold text-cocoa-ink">
-                {MESSAGES.CREATE_WORKSPACE_TITLE}
-              </Dialog.Title>
+    <Dialog open={isCreateModalOpen} onOpenChange={setCreateModalOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-lg"
+              style={{ backgroundColor: `${selectedColor}30` }}
+              aria-hidden="true"
+            >
+              {selectedEmoji}
             </div>
-            <Dialog.Close asChild>
-              <button
-                type="button"
-                aria-label="Close modal"
-                className="p-1.5 rounded-[12px] text-charcoal hover:bg-dew-drop outline-none"
-              >
-                <X className="w-4 h-4" aria-hidden="true" />
-              </button>
-            </Dialog.Close>
+            <DialogTitle>{MESSAGES.CREATE_WORKSPACE_TITLE}</DialogTitle>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-name-input">{MESSAGES.WORKSPACE_NAME_LABEL}</Label>
+            <Input
+              id="ws-name-input"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Side Hustle, Study Notes..."
+            />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="ws-name-input"
-                className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5"
-              >
-                {MESSAGES.WORKSPACE_NAME_LABEL}
-              </label>
-              <input
-                id="ws-name-input"
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Side Hustle, Study Notes..."
-                className="w-full px-4 py-2.5 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal focus:border-marker-orange outline-none text-xs font-semibold text-cocoa-ink transition-colors"
-              />
-            </div>
-
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
-                {MESSAGES.WORKSPACE_EMOJI_LABEL}
-              </span>
-              <Popover.Root>
-                <Popover.Trigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Choose Emoji Icon"
-                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal text-xs font-bold text-cocoa-ink outline-none hover:bg-cream-paper transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl" aria-hidden="true">
-                        {selectedEmoji}
-                      </span>
-                      <span>Choose Emoji Icon</span>
-                    </div>
-                    <Smile className="w-4 h-4 text-marker-orange" aria-hidden="true" />
-                  </button>
-                </Popover.Trigger>
-                <Popover.Portal>
-                  <Popover.Content
-                    sideOffset={8}
-                    className="z-50 shadow-card-subtle rounded-[16px] overflow-hidden border-[1.5px] border-charcoal bg-cream-paper outline-none"
-                  >
-                    <EmojiPicker
-                      onEmojiClick={(emojiData) => setSelectedEmoji(emojiData.emoji)}
-                      autoFocusSearch={true}
-                      width={340}
-                      height={360}
-                    />
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
-            </div>
-
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5">
-                {MESSAGES.WORKSPACE_COLOR_LABEL}
-              </span>
-              <div className="flex gap-2">
-                {COVER_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-label={`Select accent color ${color}`}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-7 h-7 rounded-full transition-transform ${
-                      selectedColor === color
-                        ? "scale-125 ring-2 ring-charcoal ring-offset-2"
-                        : "hover:scale-110"
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="ws-desc-input"
-                className="block text-[10px] font-bold uppercase tracking-wider text-marker-orange mb-1.5"
-              >
-                {MESSAGES.WORKSPACE_DESC_LABEL}
-              </label>
-              <input
-                id="ws-desc-input"
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Short description of this workspace"
-                className="w-full px-4 py-2.5 rounded-[12px] bg-dew-drop border-[1.5px] border-charcoal focus:border-marker-orange outline-none text-xs font-semibold text-cocoa-ink transition-colors"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  aria-label={MESSAGES.CANCEL}
-                  className="px-4 py-2 rounded-[20px] text-xs font-bold text-charcoal hover:bg-dew-drop"
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {MESSAGES.WORKSPACE_EMOJI_LABEL}
+            </span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between"
+                  aria-label="Choose Emoji Icon"
                 >
-                  {MESSAGES.CANCEL}
-                </button>
-              </Dialog.Close>
-              <button
-                type="submit"
-                aria-label={MESSAGES.CREATE_WORKSPACE_BUTTON}
-                className="flex items-center gap-2 px-5 py-2 rounded-[20px] bg-cream-paper border-[1.5px] border-charcoal text-charcoal text-xs font-bold shadow-paper-lift hover:scale-105 transition-transform"
-              >
-                <Plus className="w-3.5 h-3.5 text-marker-orange" aria-hidden="true" />
-                <span>{MESSAGES.CREATE_WORKSPACE_BUTTON}</span>
-              </button>
+                  <span className="flex items-center gap-3">
+                    <span className="text-xl" aria-hidden="true">
+                      {selectedEmoji}
+                    </span>
+                    <span>Choose Emoji Icon</span>
+                  </span>
+                  <Smile className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent sideOffset={8} className="overflow-hidden">
+                <EmojiPicker
+                  onEmojiClick={(emojiData) => setSelectedEmoji(emojiData.emoji)}
+                  autoFocusSearch={true}
+                  width={340}
+                  height={360}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {MESSAGES.WORKSPACE_COLOR_LABEL}
+            </span>
+            <div className="flex gap-2">
+              {COVER_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`Select accent color ${color}`}
+                  onClick={() => setSelectedColor(color)}
+                  className={cn(
+                    "h-7 w-7 rounded-full ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    selectedColor === color && "ring-2 ring-ring ring-offset-2",
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
             </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-desc-input">{MESSAGES.WORKSPACE_DESC_LABEL}</Label>
+            <Input
+              id="ws-desc-input"
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Short description of this workspace"
+            />
+          </div>
+
+          <DialogFooter className="pt-2">
+            <DialogClose asChild>
+              <Button variant="ghost" aria-label={MESSAGES.CANCEL}>
+                {MESSAGES.CANCEL}
+              </Button>
+            </DialogClose>
+            <Button type="submit" aria-label={MESSAGES.CREATE_WORKSPACE_BUTTON}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              <span>{MESSAGES.CREATE_WORKSPACE_BUTTON}</span>
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
