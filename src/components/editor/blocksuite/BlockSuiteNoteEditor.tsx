@@ -1,8 +1,9 @@
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import type { Note } from "../../../types";
+import { countWordsAndChars } from "../../../utils/plainText";
 import { TooltipProvider } from "../../ui/tooltip";
 import { EditorHeader } from "../EditorHeader";
 import { EditorTopbar } from "../EditorTopbar";
@@ -15,6 +16,10 @@ interface BlockSuiteNoteEditorProps {
 export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note }) => {
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { wordCount, characterCount } = useMemo(
+    () => countWordsAndChars(note.content),
+    [note.content],
+  );
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -35,8 +40,8 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
       <div className="flex h-full w-full flex-col">
         <EditorTopbar
           note={note}
-          wordCount={0}
-          characterCount={0}
+          wordCount={wordCount}
+          characterCount={characterCount}
           isFullWidth={isFullWidth}
           isFullscreen={isFullscreen}
           isRightBarOpen={false}

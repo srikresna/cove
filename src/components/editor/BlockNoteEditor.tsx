@@ -9,7 +9,7 @@ import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
-import { extractPlainText } from "../../utils/plainText";
+import { countWordsAndChars } from "../../utils/plainText";
 import { TooltipProvider } from "../ui/tooltip";
 import { EditorHeader } from "./EditorHeader";
 import { EditorRightBar } from "./EditorRightBar";
@@ -21,12 +21,6 @@ interface BlockNoteEditorProps {
 }
 
 const RIGHTBAR_KEY = "cove-rightbar-open";
-
-function countWordsAndChars(contentStr: string): { wordCount: number; characterCount: number } {
-  const cleanText = extractPlainText(contentStr).trim();
-  const words = cleanText ? cleanText.split(/\s+/).filter(Boolean) : [];
-  return { wordCount: words.length, characterCount: cleanText.length };
-}
 
 export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
   const { updateNote } = useNoteStore();

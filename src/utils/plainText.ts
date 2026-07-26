@@ -1,5 +1,9 @@
+import { extractBlockSuitePlainText } from "../services/editor/blockSuiteContent";
+
 export function extractPlainText(content: string): string {
   if (!content) return "";
+  const blockSuiteText = extractBlockSuitePlainText(content);
+  if (blockSuiteText !== null) return blockSuiteText;
   try {
     const trimmed = content.trim();
     if (trimmed.startsWith("[")) {
@@ -28,6 +32,15 @@ export function extractPlainText(content: string): string {
   } catch {
     return content.replace(/<[^>]*>/g, " ");
   }
+}
+
+export function countWordsAndChars(content: string): {
+  wordCount: number;
+  characterCount: number;
+} {
+  const cleanText = extractPlainText(content).trim();
+  const words = cleanText ? cleanText.split(/\s+/).filter(Boolean) : [];
+  return { wordCount: words.length, characterCount: cleanText.length };
 }
 
 export function buildSnippet(text: string, query: string, maxLen = 80): string {

@@ -1,3 +1,4 @@
+import { extractBlockSuiteLinkIds } from "../services/editor/blockSuiteContent";
 import { walkBlocks } from "./blockTree";
 
 interface InlineNode {
@@ -6,6 +7,8 @@ interface InlineNode {
 }
 
 export function extractNoteLinkIds(content: string): string[] {
+  const blockSuiteIds = extractBlockSuiteLinkIds(content);
+  if (blockSuiteIds !== null) return blockSuiteIds;
   const ids = new Set<string>();
   walkBlocks(content, (block) => {
     if (!Array.isArray(block.content)) return;
