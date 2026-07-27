@@ -63,10 +63,12 @@ export default defineConfig({
   ],
   clearScreen: false,
   // Never prebundle BlockSuite: the plugin above serves its compiled dist
-  // directly. Listing it also rotates the dev ?v= hash, which invalidates
-  // webview-cached module bodies from before the accessor-lowering fix.
+  // directly. Its transitive CJS-only deps must be prebundled explicitly,
+  // though — served raw they have no ESM default export (vitejs.dev:
+  // "exclude'd deps with CJS sub-dependencies go in include").
   optimizeDeps: {
     exclude: ["@blocksuite/affine", "@toeverything/theme"],
+    include: ["extend", "lz-string", "bytes", "debug"],
   },
   server: {
     port: 1420,
