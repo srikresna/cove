@@ -30,10 +30,13 @@ function blocksuiteDist(): Plugin {
       }
       return null;
     },
-    // Their dist keeps `accessor` fields (decorators proposal), which Rollup's
-    // parser rejects — lower them to es2022 before Rollup sees the code.
+    // Their dist keeps `accessor` fields (decorators proposal), which neither
+    // Rollup's parser nor the WebView2 engine accepts — lower to es2022 before
+    // anything downstream sees the code. Dev module ids carry ?v= queries, so
+    // match on the bare path.
     async transform(code, id) {
-      if (!id.includes("@blocksuite") || !id.endsWith(".js")) return null;
+      const path = id.split("?")[0] ?? id;
+      if (!path.includes("@blocksuite") || !path.endsWith(".js")) return null;
       if (!code.includes("accessor")) return null;
       const result = await transform(code, { loader: "js", target: "es2022" });
       return { code: result.code, map: result.map || null };
