@@ -62,6 +62,12 @@ export default defineConfig({
       : []),
   ],
   clearScreen: false,
+  // Never prebundle BlockSuite: the plugin above serves its compiled dist
+  // directly. Listing it also rotates the dev ?v= hash, which invalidates
+  // webview-cached module bodies from before the accessor-lowering fix.
+  optimizeDeps: {
+    exclude: ["@blocksuite/affine", "@toeverything/theme"],
+  },
   server: {
     port: 1420,
     strictPort: true,
