@@ -14,6 +14,9 @@ interface NotificationState {
   dismissToast: (id: string) => void;
 }
 
+// Cap the visible stack so an error storm can't pile up dozens of cards.
+const MAX_TOASTS = 5;
+
 export const useNotificationStore = create<NotificationState>((set) => ({
   toasts: [],
 
@@ -21,7 +24,15 @@ export const useNotificationStore = create<NotificationState>((set) => ({
     const id = crypto.randomUUID();
     const newToast: ToastItem = { ...toast, id };
 
-    set((state) => ({ toasts: [...state.toasts, newToast] }));
+    set((state) => {
+      // Dedup an identical in-flight toast, then cap to the most recent N.
+      const duplicate = state.toasts.some(
+        (t) =>
+          t.kind === toast.kind && t.title === toast.title && t.description === toast.description,
+      );
+      if (duplicate) return state;
+      return { toasts: [...state.toasts, newToast].slice(-MAX_TOASTS) };
+    });
 
     const duration = toast.durationMs ?? 4000;
     if (duration > 0) {

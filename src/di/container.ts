@@ -10,6 +10,7 @@ import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceReposi
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
 import type { ITagService } from "../services/ITagService";
+import type { IVaultService } from "../services/IVaultService";
 import type { IWorkspaceService } from "../services/IWorkspaceService";
 import { NoteService } from "../services/NoteService";
 import { PropertyService } from "../services/PropertyService";
@@ -53,7 +54,7 @@ const deriveKeyFn: KdfDerive = async (passphrase, salt, kdfAlg, params) => {
   });
   return new Uint8Array(result);
 };
-export const vaultService = new VaultService(
+export const vaultService: IVaultService = new VaultService(
   cryptoVault,
   kmsRepository,
   keychainStore,

@@ -32,8 +32,7 @@ export const AppContent: React.FC = () => {
     workspaces,
     setCreateModalOpen,
   } = useWorkspaceStore();
-  const { notes, activeNoteId, setActiveNoteId, createNote, fetchNotes, loadActiveNoteContent } =
-    useNoteStore();
+  const { notes, activeNoteId, createNote, fetchNotes, loadActiveNoteContent } = useNoteStore();
   const purgeExpiredTrash = useNoteStore((s) => s.purgeExpiredTrash);
 
   useEffect(() => {
@@ -59,14 +58,6 @@ export const AppContent: React.FC = () => {
     notes.find((n) => n.id === activeNoteId && n.workspaceId === activeWorkspaceId) ||
     firstWorkspaceNote ||
     null;
-
-  const firstNoteId = firstWorkspaceNote?.id;
-
-  useEffect(() => {
-    if (!activeNote && firstNoteId) {
-      setActiveNoteId(firstNoteId);
-    }
-  }, [activeNote, firstNoteId, setActiveNoteId]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);

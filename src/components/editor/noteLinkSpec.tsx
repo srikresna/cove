@@ -4,7 +4,7 @@ import { FileText } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { noteService } from "../../di/container";
+import { noteService, vaultService } from "../../di/container";
 import type { NoteMeta } from "../../services/INoteService";
 import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
@@ -118,3 +118,6 @@ export const coveSchema = BlockNoteSchema.create({
 });
 
 export type CoveEditor = typeof coveSchema.BlockNoteEditor;
+
+// Plaintext link metadata must not outlive the session key.
+vaultService.onLock(() => metaCache.clear());
