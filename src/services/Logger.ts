@@ -19,16 +19,35 @@ function serializeError(err: unknown): Record<string, unknown> | string {
   return String(err);
 }
 
+const LEVEL_ORDER: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+};
+
+// Gate noisy debug logs (which can leak internal ids) below info, and route each
+// level to its matching console sink so severity is preserved for tooling.
+const MIN_LEVEL: LogLevel = "info";
+
 function emit(entry: LogEntry): void {
+  if (LEVEL_ORDER[entry.level] < LEVEL_ORDER[MIN_LEVEL]) return;
   const payload = {
     ...entry,
     error: entry.error ? serializeError(entry.error) : undefined,
   };
 
   const jsonStr = JSON.stringify(payload);
+  const sink =
+    entry.level === "error"
+      ? console.error
+      : entry.level === "warn"
+        ? console.warn
+        : entry.level === "info"
+          ? console.info
+          : console.debug;
 
-  // biome-ignore lint/suspicious/noConsole: Logger is the single console sink
-  console.log(jsonStr);
+  sink(jsonStr);
 }
 
 export const Logger = {

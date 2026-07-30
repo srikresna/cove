@@ -1,4 +1,3 @@
-import { coverAad } from "../domain/note/notePolicy";
 import { EncryptionError, PersistenceError, ValidationError } from "../errors/AppError";
 import type { IKmsRepository, KmsRecord } from "../repositories/IKmsRepository";
 import type { IMigrationRepository } from "../repositories/IMigrationRepository";
@@ -8,6 +7,7 @@ import type { IDeviceBind } from "./vault/IDeviceBind";
 import type { IEncryptionService } from "./vault/IEncryptionService";
 import { type IKeychainStore, KEYRING_USERS } from "./vault/IKeychainStore";
 import type { ILegacyKeyStore } from "./vault/ILegacyKeyStore";
+import { coverAad } from "./vault/aad";
 import {
   type Bytes,
   aesGcmDecrypt,

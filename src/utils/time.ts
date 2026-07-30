@@ -1,3 +1,4 @@
+import { APP_LOCALE } from "../constants/app";
 import { MESSAGES } from "../constants/messages";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -8,7 +9,7 @@ export function formatRelativeDay(timestamp: number, now = Date.now()): string {
   if (days <= 0) return MESSAGES.TIME_TODAY;
   if (days === 1) return MESSAGES.TIME_YESTERDAY;
   if (days < 7) return `${days} ${MESSAGES.TIME_DAYS_AGO_SUFFIX}`;
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -16,7 +17,7 @@ export function formatRelativeDay(timestamp: number, now = Date.now()): string {
 }
 
 export function formatFullTimestamp(timestamp: number): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(APP_LOCALE, {
     month: "short",
     day: "numeric",
     year: "numeric",

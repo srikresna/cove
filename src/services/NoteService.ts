@@ -4,7 +4,6 @@ import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import {
   DEFAULT_NOTE_TITLE,
   EMPTY_NOTE_CONTENT,
-  coverAad,
   duplicateNoteProps,
   makeNoteId,
   trashPurgeCutoff,
@@ -16,6 +15,7 @@ import { extractNoteLinkIds } from "../utils/noteLinks";
 import { buildSnippet, extractPlainText } from "../utils/plainText";
 import type { INoteService, NoteMeta } from "./INoteService";
 import type { IEncryptionService } from "./vault/IEncryptionService";
+import { coverAad } from "./vault/aad";
 
 function toMeta(rec: NoteRecord): NoteMeta {
   return { id: rec.id, workspaceId: rec.workspaceId, title: rec.title, icon: rec.icon };
