@@ -15,11 +15,7 @@ import { extractNoteLinkIds } from "../utils/noteLinks";
 import { buildSnippet, extractPlainText } from "../utils/plainText";
 import type { INoteService, NoteMeta } from "./INoteService";
 import type { IEncryptionService } from "./vault/IEncryptionService";
-import { coverAad } from "./vault/aad";
-
-function toMeta(rec: NoteRecord): NoteMeta {
-  return { id: rec.id, workspaceId: rec.workspaceId, title: rec.title, icon: rec.icon };
-}
+import { coverAad, titleAad } from "./vault/aad";
 
 export class NoteService implements INoteService {
   constructor(
@@ -34,8 +30,28 @@ export class NoteService implements INoteService {
     }
   }
 
+  private async decryptTitle(rec: NoteRecord): Promise<string> {
+    // titleKmsVersion 0 = pre-H6 plaintext (not yet migrated); >=1 = encrypted
+    // under the session DEK with the title AAD.
+    if (rec.titleKmsVersion < 1) return String(rec.title);
+    return this.crypto.decryptPayload(rec.title, titleAad(rec.id));
+  }
+
   private async toNote(rec: NoteRecord): Promise<Note> {
-    return { ...rec, content: await this.crypto.decryptPayload(rec.content, rec.id) };
+    return {
+      ...rec,
+      title: await this.decryptTitle(rec),
+      content: await this.crypto.decryptPayload(rec.content, rec.id),
+    };
+  }
+
+  private async toMeta(rec: NoteRecord): Promise<NoteMeta> {
+    return {
+      id: rec.id,
+      workspaceId: rec.workspaceId,
+      title: await this.decryptTitle(rec),
+      icon: rec.icon,
+    };
   }
 
   async listMetadataByWorkspace(workspaceId: string): Promise<Note[]> {
@@ -54,28 +70,29 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    const titleHits = await this.notes.searchTitlesFts(q, 50);
-    const titleIds = new Set(titleHits.map((h) => h.id));
+    // Titles are encrypted at rest, so there is no full-text index: decrypt title
+    // and body for each recent note and match either (decrypt-on-search).
     const candidates = await this.notes.findRecentForSearch(100);
-    const bodyHits: NoteSearchHit[] = [];
+    const hits: NoteSearchHit[] = [];
     for (const rec of candidates) {
-      if (titleIds.has(rec.id)) continue;
       try {
+        const title = await this.decryptTitle(rec);
         const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
-        if (plain.toLowerCase().includes(q)) {
-          bodyHits.push({
+        const matchesBody = plain.toLowerCase().includes(q);
+        if (title.toLowerCase().includes(q) || matchesBody) {
+          hits.push({
             id: rec.id,
             workspaceId: rec.workspaceId,
-            title: rec.title,
+            title,
             icon: rec.icon,
-            snippet: buildSnippet(plain, q),
+            snippet: matchesBody ? buildSnippet(plain, q) : "",
           });
         }
       } catch {
         // A single corrupt/undecodable note must not abort the whole search.
       }
     }
-    return [...titleHits, ...bodyHits];
+    return hits;
   }
 
   async createNote(
@@ -89,7 +106,8 @@ export class NoteService implements INoteService {
     const rec = await this.notes.createNote({
       id,
       workspaceId,
-      title,
+      title: await this.crypto.encryptPayload(title, titleAad(id)),
+      titleKmsVersion: 1,
       content: await this.crypto.encryptPayload(content, id),
       icon,
       coverColor: undefined,
@@ -97,7 +115,7 @@ export class NoteService implements INoteService {
       isFavorite: false,
     });
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
-    return { ...rec, content };
+    return { ...rec, content, title };
   }
 
   async updateMetadata(
@@ -110,7 +128,13 @@ export class NoteService implements INoteService {
     >,
   ): Promise<Note> {
     this.assertUnlocked();
-    return this.toNote(await this.notes.updateNote(id, updates));
+    const { title, ...rest } = updates;
+    const recUpdates: Partial<NoteRecord> = { ...rest };
+    if (title !== undefined) {
+      recUpdates.title = await this.crypto.encryptPayload(title, titleAad(id));
+      recUpdates.titleKmsVersion = 1;
+    }
+    return this.toNote(await this.notes.updateNote(id, recUpdates));
   }
 
   async updateContent(id: string, content: string): Promise<Note> {
@@ -126,13 +150,13 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const sources = await this.links.backlinksOf(id);
     const records = await this.notes.getMetaByIds(sources);
-    return records.map(toMeta);
+    return Promise.all(records.map((rec) => this.toMeta(rec)));
   }
 
   async getLinkTargets(ids: string[]): Promise<NoteMeta[]> {
     this.assertUnlocked();
     const records = await this.notes.getMetaByIds(ids);
-    return records.map(toMeta);
+    return Promise.all(records.map((rec) => this.toMeta(rec)));
   }
 
   async deleteNote(id: string): Promise<void> {
@@ -153,7 +177,13 @@ export class NoteService implements INoteService {
   async listTrash(): Promise<Note[]> {
     this.assertUnlocked();
     const records = await this.notes.listTrashed();
-    return records.map((rec) => ({ ...rec, content: "" }));
+    return Promise.all(
+      records.map(async (rec) => ({
+        ...rec,
+        title: await this.decryptTitle(rec),
+        content: "",
+      })),
+    );
   }
 
   async purgeExpiredTrash(now = Date.now()): Promise<number> {

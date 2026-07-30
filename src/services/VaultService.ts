@@ -7,7 +7,7 @@ import type { IDeviceBind } from "./vault/IDeviceBind";
 import type { IEncryptionService } from "./vault/IEncryptionService";
 import { type IKeychainStore, KEYRING_USERS } from "./vault/IKeychainStore";
 import type { ILegacyKeyStore } from "./vault/ILegacyKeyStore";
-import { coverAad } from "./vault/aad";
+import { coverAad, titleAad } from "./vault/aad";
 import {
   type Bytes,
   aesGcmDecrypt,
@@ -319,7 +319,8 @@ export class VaultService implements IVaultService {
       zeroize(oldRaw);
       const failed =
         (await this.reencryptAllNotes(oldKey, rec.migrationCursor)) +
-        (await this.reencryptAllCovers(oldKey));
+        (await this.reencryptAllCovers(oldKey)) +
+        (await this.reencryptAllTitles(oldKey));
       if (failed === 0) {
         await this.kms.update({ migrationState: "complete", migrationCursor: null });
         await this.purgeLegacyKeyMaterial();
@@ -462,6 +463,77 @@ export class VaultService implements IVaultService {
     } catch (err) {
       Logger.warn("vault: migration resume failed; will retry at next unlock", err);
     }
+    try {
+      await this.migrateTitles();
+    } catch (err) {
+      Logger.warn("vault: title encryption migration failed; will retry at next unlock", err);
+    }
+  }
+
+  // H6: encrypt plaintext note titles (titleKmsVersion 0 -> 1) under the session
+  // DEK. Runs on every unlock until done; resumable via the per-row flag so an
+  // interrupt still leaves plaintext titles readable (decryptTitle falls back).
+  private async migrateTitles(): Promise<number> {
+    let cursor: string | null = null;
+    let failed = 0;
+    for (;;) {
+      const batch = await this.migrationRepo.findTitleBatch(cursor, MIGRATION_BATCH);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        cursor = row.id;
+        try {
+          const encrypted = await this.crypto.encryptPayload(row.content, titleAad(row.id));
+          await this.migrationRepo.markTitleMigrated(row.id, encrypted);
+        } catch (err) {
+          if (isSystemicMigrationError(err)) throw err;
+          failed += 1;
+          await this.migrationRepo.recordFailure(
+            row.id,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+    }
+    if (failed > 0) Logger.warn("vault: title encryption migration recorded failures", { failed });
+    return failed;
+  }
+
+  // DEK rotation must reencrypt every title under the new key: titles already
+  // encrypted (v1) decrypt under oldKey then reencrypt; plaintext titles (v0)
+  // encrypt directly. Mirrors reencryptAllNotes / reencryptAllCovers.
+  private async reencryptAllTitles(oldKey: CryptoKey): Promise<number> {
+    let cursor: string | null = null;
+    let failed = 0;
+    for (;;) {
+      const batch = await this.migrationRepo.findAllTitlesBatch(cursor, MIGRATION_BATCH);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        cursor = row.id;
+        try {
+          let plain: string;
+          if (row.titleKmsVersion >= 1) {
+            try {
+              plain = await aesGcmDecrypt(oldKey, row.title, encodeUtf8(titleAad(row.id)));
+            } catch {
+              // Pre-AAD ciphertexts (encrypted before title AAD binding).
+              plain = await aesGcmDecrypt(oldKey, row.title);
+            }
+          } else {
+            plain = row.title;
+          }
+          const reencrypted = await this.crypto.encryptPayload(plain, titleAad(row.id));
+          await this.migrationRepo.markTitleMigrated(row.id, reencrypted);
+        } catch (err) {
+          if (isSystemicMigrationError(err)) throw err;
+          failed += 1;
+          await this.migrationRepo.recordFailure(
+            row.id,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+    }
+    return failed;
   }
 
   // Serialized behind in-flight unlocks: zeroizing this.rawDek mid-attempt
@@ -631,7 +703,9 @@ export class VaultService implements IVaultService {
     await this.resetIvHighWaterMark();
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
     const failed =
-      (await this.reencryptAllNotes(oldKey, null)) + (await this.reencryptAllCovers(oldKey));
+      (await this.reencryptAllNotes(oldKey, null)) +
+      (await this.reencryptAllCovers(oldKey)) +
+      (await this.reencryptAllTitles(oldKey));
     if (failed === 0) {
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
       await this.purgeLegacyKeyMaterial();

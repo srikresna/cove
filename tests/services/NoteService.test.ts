@@ -44,7 +44,8 @@ describe("NoteService", () => {
     fakeRepo.notes.push({
       id: "note-1",
       workspaceId: "ws-1",
-      title: "Test Note",
+      title: enc("Test Note"),
+      titleKmsVersion: 0,
       content: enc("Secret content"),
       isPinned: false,
       isFavorite: false,
@@ -148,7 +149,8 @@ describe("NoteService", () => {
     fakeRepo.notes.push({
       id: "note-1",
       workspaceId: "ws-1",
-      title: "Test",
+      title: enc("Test"),
+      titleKmsVersion: 0,
       content: enc(""),
       isPinned: false,
       isFavorite: false,
@@ -186,7 +188,8 @@ describe("NoteService", () => {
     fakeRepo.notes.push({
       id: "note-1",
       workspaceId: "ws-1",
-      title: "Original",
+      title: enc("Original"),
+      titleKmsVersion: 0,
       content: enc("Hello World"),
       icon: "🎨",
       isPinned: false,
@@ -216,7 +219,8 @@ describe("NoteService", () => {
     fakeRepo.notes.push({
       id: "note-1",
       workspaceId: "ws-1",
-      title: "Test",
+      title: enc("Test"),
+      titleKmsVersion: 0,
       content: enc(""),
       isPinned: false,
       isFavorite: false,
@@ -286,7 +290,8 @@ describe("NoteService", () => {
     fakeRepo.notes.push({
       id: "n-search",
       workspaceId: "ws-1",
-      title: "Roadmap",
+      title: enc("Roadmap"),
+      titleKmsVersion: 0,
       content: enc(
         '[{"type":"paragraph","content":[{"type":"text","text":"Launch the encrypted vault feature soon"}]}]',
       ),

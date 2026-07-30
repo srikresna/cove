@@ -1,5 +1,5 @@
 import { toPersistenceError } from "../errors/errorMappers";
-import type { IMigrationRepository, LegacyRow } from "./IMigrationRepository";
+import type { IMigrationRepository, LegacyRow, TitleRow } from "./IMigrationRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
 export class SQLiteMigrationRepository implements IMigrationRepository {
@@ -82,6 +82,58 @@ export class SQLiteMigrationRepository implements IMigrationRepository {
       ]);
     } catch (err) {
       throw toPersistenceError("migration.markMigrated", err);
+    }
+  }
+
+  async findTitleBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    try {
+      const db = await this.getDb();
+      const rows = afterId
+        ? await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, title AS content FROM notes WHERE titleKmsVersion = 0 AND id > ? ORDER BY id LIMIT ?",
+            [afterId, limit],
+          )
+        : await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, title AS content FROM notes WHERE titleKmsVersion = 0 ORDER BY id LIMIT ?",
+            [limit],
+          );
+      return rows.map((r) => ({ id: String(r.id), content: String(r.content) }));
+    } catch (err) {
+      throw toPersistenceError("migration.findTitleBatch", err);
+    }
+  }
+
+  async markTitleMigrated(id: string, encryptedTitle: string): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("UPDATE notes SET title = ?, titleKmsVersion = 1 WHERE id = ?", [
+        encryptedTitle,
+        id,
+      ]);
+    } catch (err) {
+      throw toPersistenceError("migration.markTitleMigrated", err);
+    }
+  }
+
+  async findAllTitlesBatch(afterId: string | null, limit: number): Promise<TitleRow[]> {
+    try {
+      const db = await this.getDb();
+      const rows = afterId
+        ? await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, title, titleKmsVersion FROM notes WHERE id > ? ORDER BY id LIMIT ?",
+            [afterId, limit],
+          )
+        : await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, title, titleKmsVersion FROM notes ORDER BY id LIMIT ?",
+            [limit],
+          );
+      return rows.map((r) => ({
+        id: String(r.id),
+        title: String(r.title),
+        titleKmsVersion: Number(r.titleKmsVersion ?? 0),
+      }));
+    } catch (err) {
+      throw toPersistenceError("migration.findAllTitlesBatch", err);
     }
   }
 

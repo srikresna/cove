@@ -244,5 +244,22 @@ export class SQLiteDatabase {
       );
       await db.execute("PRAGMA user_version = 10");
     }
+
+    if (version < 11) {
+      // H6: encrypt note titles at rest. titleKmsVersion flags per-row state
+      // (0 = plaintext legacy, 1 = encrypted) so the read path decrypts gracefully
+      // and a batched migration can resume after an interrupt. Encrypted titles
+      // cannot be FTS-indexed, so the title full-text index is dropped and search
+      // falls back to decrypt-on-search.
+      const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      if (!noteCols.some((c) => c.name === "titleKmsVersion")) {
+        await db.execute("ALTER TABLE notes ADD COLUMN titleKmsVersion INTEGER NOT NULL DEFAULT 0");
+      }
+      await db.execute("DROP TRIGGER IF EXISTS notes_fts_ai");
+      await db.execute("DROP TRIGGER IF EXISTS notes_fts_ad");
+      await db.execute("DROP TRIGGER IF EXISTS notes_fts_au");
+      await db.execute("DROP TABLE IF EXISTS notes_fts");
+      await db.execute("PRAGMA user_version = 11");
+    }
   }
 }

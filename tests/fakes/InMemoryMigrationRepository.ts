@@ -1,9 +1,18 @@
-import type { IMigrationRepository, LegacyRow } from "@/repositories/IMigrationRepository";
+import type {
+  IMigrationRepository,
+  LegacyRow,
+  TitleRow,
+} from "@/repositories/IMigrationRepository";
 
 export class InMemoryMigrationRepository implements IMigrationRepository {
   private rows = new Map<string, { content: string; migrated: boolean }>();
   private coverRows = new Map<string, string>();
+  private titleRows = new Map<string, { title: string; titleKmsVersion: number }>();
   private failures = new Map<string, string>();
+
+  seedTitle(id: string, title: string, titleKmsVersion = 0): void {
+    this.titleRows.set(id, { title, titleKmsVersion });
+  }
 
   seed(id: string, content: string): void {
     this.rows.set(id, { content, migrated: false });
@@ -45,6 +54,29 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
 
   async markMigrated(id: string, encryptedContent: string): Promise<void> {
     this.rows.set(id, { content: encryptedContent, migrated: true });
+  }
+
+  async findTitleBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    const ids = [...this.titleRows.keys()]
+      .filter((id) => (this.titleRows.get(id)?.titleKmsVersion ?? 0) < 1)
+      .sort();
+    const filtered = afterId ? ids.filter((id) => id > afterId) : ids;
+    return filtered
+      .slice(0, limit)
+      .map((id) => ({ id, content: this.titleRows.get(id)?.title ?? "" }));
+  }
+
+  async markTitleMigrated(id: string, encryptedTitle: string): Promise<void> {
+    this.titleRows.set(id, { title: encryptedTitle, titleKmsVersion: 1 });
+  }
+
+  async findAllTitlesBatch(afterId: string | null, limit: number): Promise<TitleRow[]> {
+    const ids = [...this.titleRows.keys()].sort();
+    const filtered = afterId ? ids.filter((id) => id > afterId) : ids;
+    return filtered.slice(0, limit).map((id) => {
+      const r = this.titleRows.get(id);
+      return { id, title: r?.title ?? "", titleKmsVersion: r?.titleKmsVersion ?? 0 };
+    });
   }
 
   async recordFailure(id: string, reason: string): Promise<void> {

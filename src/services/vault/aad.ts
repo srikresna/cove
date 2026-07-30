@@ -11,3 +11,7 @@
 
 /** AAD for a note's cover image — must differ from the content AAD (bare id). */
 export const coverAad = (noteId: string): string => `cover:${noteId}`;
+
+/** AAD for a note's title — distinct from content/cover so a title ciphertext
+ *  cannot be replayed as note content or a cover image. */
+export const titleAad = (noteId: string): string => `title:${noteId}`;

@@ -1,4 +1,3 @@
-import type { NoteSearchHit } from "@/domain/note/NoteSearchHit";
 import type { INoteRepository, NoteRecord } from "@/repositories/INoteRepository";
 import type { EncryptedPayload } from "@/services/vault/IEncryptionService";
 
@@ -117,21 +116,5 @@ export class InMemoryNoteRepository implements INoteRepository {
     this.callLog.push(`findExpiredTrash:${cutoff}`);
     if (this.shouldFail) throw new Error("Fake repo error: findExpiredTrash");
     return this.notes.filter((n) => n.deletedAt != null && n.deletedAt < cutoff).map((n) => n.id);
-  }
-
-  async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {
-    this.callLog.push(`searchTitlesFts:${query}`);
-    if (this.shouldFail) throw new Error("Fake repo error: searchTitlesFts");
-    const q = query.toLowerCase();
-    return this.notes
-      .filter((n) => n.deletedAt == null && n.title.toLowerCase().includes(q))
-      .slice(0, limit)
-      .map((n) => ({
-        id: n.id,
-        workspaceId: n.workspaceId,
-        title: n.title,
-        icon: n.icon,
-        snippet: "",
-      }));
   }
 }

@@ -1,26 +1,11 @@
-import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
-import { Logger } from "../services/Logger";
 import type { EncryptedPayload } from "../services/vault/IEncryptionService";
 import type { INoteRepository, NoteRecord } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
 // 1 = encrypted under the session DEK; 0 = pre-vault legacy row awaiting migration.
 const KMS_VERSION_DEK = 1;
-
-// FTS5 treats a raw query as query-syntax (operators, column filters, phrase
-// quotes), so a title containing `"`, `(`, `:` or operator words throws a syntax
-// error that would silently yield zero results. Wrap each token as a phrase so
-// the user's literal text is matched; returns "" when nothing usable remains.
-function sanitizeFtsQuery(query: string): string {
-  const phrases: string[] = [];
-  for (const token of query.trim().split(/\s+/)) {
-    const escaped = token.replace(/"/g, "");
-    if (escaped) phrases.push(`"${escaped}"`);
-  }
-  return phrases.join(" ");
-}
 
 export class SQLiteNoteRepository implements INoteRepository {
   private getDb() {
@@ -31,7 +16,8 @@ export class SQLiteNoteRepository implements INoteRepository {
     return {
       id: String(row.id),
       workspaceId: String(row.workspaceId),
-      title: String(row.title),
+      title: String(row.title) as EncryptedPayload,
+      titleKmsVersion: Number(row.titleKmsVersion ?? 0),
       content: (row.content != null ? String(row.content) : "") as EncryptedPayload,
       icon: row.icon ? String(row.icon) : undefined,
       coverColor: row.coverColor ? String(row.coverColor) : undefined,
@@ -48,7 +34,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
+        "SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -63,7 +49,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       const db = await this.getDb();
       const placeholders = ids.map(() => "?").join(", ");
       const rows = await db.select<Array<Record<string, unknown>>>(
-        `SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
+        `SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
         ids,
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -99,30 +85,6 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
-  async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {
-    const ftsQuery = sanitizeFtsQuery(query);
-    if (!ftsQuery) return [];
-    try {
-      const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT n.id, n.workspaceId, n.title, n.icon FROM notes_fts f JOIN notes n ON n.id = f.note_id WHERE notes_fts MATCH ? AND n.deletedAt IS NULL ORDER BY rank LIMIT ?",
-        [ftsQuery, limit],
-      );
-      return rows.map((r) => ({
-        id: String(r.id),
-        workspaceId: String(r.workspaceId),
-        title: String(r.title),
-        icon: r.icon ? String(r.icon) : undefined,
-        snippet: "",
-      }));
-    } catch (err) {
-      // FTS may be unavailable (SQLite build without FTS5) or the index corrupt;
-      // degrade to empty rather than aborting search. Body search still runs.
-      Logger.warn("searchTitlesFts failed; returning empty results", err, { query });
-      return [];
-    }
-  }
-
   async createNote(noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord> {
     const db = await this.getDb();
     const now = Date.now();
@@ -136,12 +98,13 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute(
         `INSERT INTO notes
-        (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, kmsVersion, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workspaceId, title, titleKmsVersion, content, icon, coverColor, isPinned, isFavorite, kmsVersion, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.id,
           note.workspaceId,
           note.title,
+          note.titleKmsVersion,
           note.content,
           note.icon || null,
           note.coverColor || null,
@@ -171,8 +134,8 @@ export class SQLiteNoteRepository implements INoteRepository {
       params.push(updates.workspaceId);
     }
     if (updates.title !== undefined) {
-      setClauses.push("title = ?");
-      params.push(updates.title);
+      setClauses.push("title = ?", "titleKmsVersion = ?");
+      params.push(updates.title, KMS_VERSION_DEK);
     }
     if (updates.content !== undefined) {
       setClauses.push("content = ?", "kmsVersion = ?");
