@@ -125,7 +125,7 @@ export const MESSAGES = {
   VAULT_SET_BUTTON: "Create Vault",
   VAULT_SET_MISMATCH: "Passphrases do not match.",
   VAULT_DISCLOSURE:
-    'Notes are encrypted with AES-256-GCM. The key is derived from your passphrase (Argon2id, memory-hard) and held in memory only while unlocked. Enabling "Trust this device" in Settings keeps a device-bound recovery copy in your OS keychain (trusted-device recovery, not zero-knowledge).',
+    'Note content and cover images are encrypted with AES-256-GCM. The key is derived from your passphrase (Argon2id, memory-hard) and held in memory only while unlocked. Titles, workspace names, tags, and timestamps are stored unencrypted so notes can be listed and searched without unlocking — anyone with the database file can read them. Enabling "Trust this device" in Settings keeps a device-bound recovery copy in your OS keychain (trusted-device recovery, not zero-knowledge).',
   SETTINGS_TITLE: "Settings",
   SETTINGS_CLOSE: "Close settings",
   SETTINGS_DARK_MODE_LABEL: "Dark mode",
