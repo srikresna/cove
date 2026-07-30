@@ -69,7 +69,12 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   onToggleFullscreen,
   onToggleRightBar,
 }) => {
-  const { trashNote, duplicateNote, togglePinNote, toggleFavoriteNote } = useNoteStore();
+  // Stable action references: selecting them individually avoids re-rendering the
+  // toolbar on every notes-array mutation (e.g. each debounced save while typing).
+  const trashNote = useNoteStore((s) => s.trashNote);
+  const duplicateNote = useNoteStore((s) => s.duplicateNote);
+  const togglePinNote = useNoteStore((s) => s.togglePinNote);
+  const toggleFavoriteNote = useNoteStore((s) => s.toggleFavoriteNote);
 
   const formattedDate = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",

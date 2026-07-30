@@ -23,8 +23,8 @@ interface BlockNoteEditorProps {
 const RIGHTBAR_KEY = "cove-rightbar-open";
 
 export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
-  const { updateNote } = useNoteStore();
-  const { isDarkMode } = useWorkspaceStore();
+  const updateNote = useNoteStore((s) => s.updateNote);
+  const isDarkMode = useWorkspaceStore((s) => s.isDarkMode);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRightBarOpen, setRightBarOpen] = useState(

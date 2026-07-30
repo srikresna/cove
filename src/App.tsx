@@ -24,15 +24,17 @@ const BlockSuiteNoteEditor = lazy(
 );
 
 export const AppContent: React.FC = () => {
-  const {
-    activeWorkspaceId,
-    isDarkMode,
-    editorEngine,
-    fetchWorkspaces,
-    workspaces,
-    setCreateModalOpen,
-  } = useWorkspaceStore();
-  const { notes, activeNoteId, createNote, fetchNotes, loadActiveNoteContent } = useNoteStore();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const isDarkMode = useWorkspaceStore((s) => s.isDarkMode);
+  const editorEngine = useWorkspaceStore((s) => s.editorEngine);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
+  const setCreateModalOpen = useWorkspaceStore((s) => s.setCreateModalOpen);
+  const notes = useNoteStore((s) => s.notes);
+  const activeNoteId = useNoteStore((s) => s.activeNoteId);
+  const createNote = useNoteStore((s) => s.createNote);
+  const fetchNotes = useNoteStore((s) => s.fetchNotes);
+  const loadActiveNoteContent = useNoteStore((s) => s.loadActiveNoteContent);
   const purgeExpiredTrash = useNoteStore((s) => s.purgeExpiredTrash);
 
   useEffect(() => {

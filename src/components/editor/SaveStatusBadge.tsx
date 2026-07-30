@@ -3,7 +3,8 @@ import type React from "react";
 import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 
 export const SaveStatusBadge: React.FC = () => {
-  const { status, errorMessage } = useSaveStatusStore();
+  const status = useSaveStatusStore((s) => s.status);
+  const errorMessage = useSaveStatusStore((s) => s.errorMessage);
 
   if (status === "idle") return null;
 

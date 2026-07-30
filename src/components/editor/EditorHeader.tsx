@@ -47,7 +47,9 @@ const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove 
 );
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth }) => {
-  const { updateNote, uploadCoverImage, removeCoverImage } = useNoteStore();
+  const updateNote = useNoteStore((s) => s.updateNote);
+  const uploadCoverImage = useNoteStore((s) => s.uploadCoverImage);
+  const removeCoverImage = useNoteStore((s) => s.removeCoverImage);
   const coverImage = useNoteStore((s) => s.activeCoverImage);
   const saveStatus = useSaveStatusStore((s) => s.status);
 
