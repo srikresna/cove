@@ -1,8 +1,5 @@
-import type { PropertyDefinition } from "../../domain/property/Property";
-import type {
-  IPropertyRepository,
-  NotePropertyRecord,
-} from "../../repositories/IPropertyRepository";
+import type { PropertyDefinition } from "@/domain/property/Property";
+import type { IPropertyRepository, NotePropertyRecord } from "@/repositories/IPropertyRepository";
 
 export class InMemoryPropertyRepository implements IPropertyRepository {
   public definitions: PropertyDefinition[] = [];

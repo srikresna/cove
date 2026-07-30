@@ -1,6 +1,5 @@
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
 import { SetPassphraseScreen } from "./SetPassphraseScreen";
 import { UnlockScreen } from "./UnlockScreen";
@@ -15,18 +14,10 @@ export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
   const status = useVaultStore((s) => s.status);
   const init = useVaultStore((s) => s.init);
   const [view, setView] = useState<"main" | "recover">("main");
-  const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
-  const tryAutoUnlock = useVaultStore((s) => s.tryAutoUnlock);
 
   useEffect(() => {
     init();
   }, [init]);
-
-  useEffect(() => {
-    if (status === "locked" && autoUnlockOnLaunch) {
-      void tryAutoUnlock();
-    }
-  }, [status, autoUnlockOnLaunch, tryAutoUnlock]);
 
   useEffect(() => {
     const lock = () => {

@@ -10,5 +10,5 @@ export interface IWorkspaceService {
     description?: string,
   ): Promise<Workspace>;
   updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace>;
-  deleteWorkspace(id: string, currentWorkspacesCount: number): Promise<void>;
+  deleteWorkspace(id: string): Promise<void>;
 }

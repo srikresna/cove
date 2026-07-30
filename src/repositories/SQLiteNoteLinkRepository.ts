@@ -1,5 +1,6 @@
 import { toPersistenceError } from "../errors/errorMappers";
 import type { INoteLinkRepository } from "./INoteLinkRepository";
+import type { SqlStatement } from "./SQLiteDatabase";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
 export class SQLiteNoteLinkRepository implements INoteLinkRepository {
@@ -8,17 +9,19 @@ export class SQLiteNoteLinkRepository implements INoteLinkRepository {
   }
 
   async replaceForSource(sourceId: string, targetIds: string[]): Promise<void> {
-    try {
-      const db = await this.getDb();
-      await db.execute("DELETE FROM note_links WHERE sourceId = ?", [sourceId]);
-      const targets = [...new Set(targetIds)].filter((id) => id && id !== sourceId);
-      for (const targetId of targets) {
+    const targets = [...new Set(targetIds)].filter((id) => id && id !== sourceId);
+    // DELETE + all INSERTs run as one transaction so a failure can never leave the
+    // note with zero or partial links.
+    const statements: SqlStatement[] = [
+      { sql: "DELETE FROM note_links WHERE sourceId = ?", params: [sourceId] },
+      ...targets.map((targetId) => ({
         // OR IGNORE: the target may have been deleted since the link was typed.
-        await db.execute(
-          "INSERT OR IGNORE INTO note_links (sourceId, targetId) SELECT ?, id FROM notes WHERE id = ?",
-          [sourceId, targetId],
-        );
-      }
+        sql: "INSERT OR IGNORE INTO note_links (sourceId, targetId) SELECT ?, id FROM notes WHERE id = ?",
+        params: [sourceId, targetId],
+      })),
+    ];
+    try {
+      await SQLiteDatabase.runTransaction(statements);
     } catch (err) {
       throw toPersistenceError("links.replaceForSource", err);
     }

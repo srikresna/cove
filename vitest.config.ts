@@ -11,9 +11,9 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    globals: false,
+    setupFiles: ["./tests/setup.ts"],
+    include: ["tests/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["node_modules", "src-tauri", "dist"],
     coverage: {
       provider: "v8",

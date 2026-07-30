@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
-import * as Y from "yjs";
 import {
   extractBlockSuiteHeadings,
   extractBlockSuiteLinkIds,
   extractBlockSuitePlainText,
-} from "./blockSuiteContent";
-import { packBlockSuiteContent } from "./contentFormat";
-import { encodeDocSnapshot } from "./yjsCodec";
+} from "@/services/editor/blockSuiteContent";
+import { packBlockSuiteContent } from "@/services/editor/contentFormat";
+import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
+import { describe, expect, it } from "vitest";
+import * as Y from "yjs";
 
 function makeBlock(
   blocks: Y.Map<unknown>,

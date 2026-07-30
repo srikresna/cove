@@ -127,7 +127,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const nextActive = filtered[0]?.id ?? null;
 
     try {
-      await workspaceService.deleteWorkspace(id, current.length);
+      await workspaceService.deleteWorkspace(id);
       set({ workspaces: filtered, activeWorkspaceId: nextActive });
     } catch (err) {
       notifyError(err);

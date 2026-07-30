@@ -1,5 +1,11 @@
+import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
 import { PersistenceError } from "../errors/AppError";
+
+export interface SqlStatement {
+  sql: string;
+  params?: unknown[];
+}
 
 export class SQLiteDatabase {
   private static instance: Promise<Database> | null = null;
@@ -44,6 +50,21 @@ export class SQLiteDatabase {
     SQLiteDatabase.suspended = false;
   }
 
+  // Runs statements as ONE atomic transaction on a dedicated single connection
+  // with foreign_keys ON. The plugin-sql pool may route each `execute` to a
+  // different connection, so multi-statement writes cannot rely on BEGIN/COMMIT
+  // through the pool — this guarantees all-or-nothing semantics (rollback on any
+  // failure) and lets ON DELETE CASCADE fire within the unit of work.
+  static async runTransaction(statements: SqlStatement[]): Promise<void> {
+    if (SQLiteDatabase.suspended) {
+      throw new PersistenceError(
+        "db.transaction",
+        "Database is suspended while a backup is being restored.",
+      );
+    }
+    await invoke("run_sql_transaction", { statements });
+  }
+
   // tauri-plugin-sql's pool may route each execute to a different connection,
   // so multi-statement transactions are unsafe except the inline BEGIN/COMMIT
   // in the v2 block (accepted risk: recreate-table must be atomic).
@@ -83,27 +104,24 @@ export class SQLiteDatabase {
     if (version < 2) {
       const cols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
       if (cols.some((c) => c.name === "folderId")) {
-        await db.execute("BEGIN TRANSACTION");
-        try {
-          await db.execute(
-            "CREATE TABLE notes_new (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, icon TEXT, coverColor TEXT, isPinned INTEGER NOT NULL DEFAULT 0, isFavorite INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
-          );
-          await db.execute(
-            "INSERT INTO notes_new (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt) SELECT id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes",
-          );
-          await db.execute("DROP TABLE notes");
-          await db.execute("ALTER TABLE notes_new RENAME TO notes");
-          await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_notes_workspace_updated ON notes(workspaceId, updatedAt DESC, id DESC)",
-          );
-          await db.execute("PRAGMA user_version = 2");
-          await db.execute("COMMIT");
-        } catch (err) {
-          try {
-            await db.execute("ROLLBACK");
-          } catch {}
-          throw err;
-        }
+        // Recreate-table must be atomic: interrupted between DROP and RENAME the
+        // notes table is gone with no rollback. Run it as a single real
+        // transaction on a dedicated connection — the pool's BEGIN/COMMIT is not
+        // reliable across pooled connections.
+        await SQLiteDatabase.runTransaction([
+          {
+            sql: "CREATE TABLE notes_new (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, icon TEXT, coverColor TEXT, isPinned INTEGER NOT NULL DEFAULT 0, isFavorite INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
+          },
+          {
+            sql: "INSERT INTO notes_new (id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt) SELECT id, workspaceId, title, content, icon, coverColor, isPinned, isFavorite, createdAt, updatedAt FROM notes",
+          },
+          { sql: "DROP TABLE notes" },
+          { sql: "ALTER TABLE notes_new RENAME TO notes" },
+          {
+            sql: "CREATE INDEX IF NOT EXISTS idx_notes_workspace_updated ON notes(workspaceId, updatedAt DESC, id DESC)",
+          },
+          { sql: "PRAGMA user_version = 2" },
+        ]);
       } else {
         await db.execute("PRAGMA user_version = 2");
       }

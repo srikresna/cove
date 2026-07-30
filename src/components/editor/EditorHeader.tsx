@@ -53,6 +53,8 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
 
   const [title, setTitle] = useState(note.title);
   const titleTimer = useRef<NodeJS.Timeout | null>(null);
+  const pendingTitleRef = useRef<string | null>(null);
+  const commitTitleRef = useRef<() => void>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,21 +64,39 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
+    pendingTitleRef.current = newTitle;
 
     if (titleTimer.current) {
       clearTimeout(titleTimer.current);
     }
 
     titleTimer.current = setTimeout(() => {
+      titleTimer.current = null;
+      pendingTitleRef.current = null;
       updateNote(note.id, { title: newTitle });
     }, 300);
   };
 
+  // Flush a pending debounced title save (clears the timer and persists the last
+  // keystroke). Held in a ref so both onBlur and the unmount cleanup share one
+  // always-fresh implementation without re-subscribing effects.
+  commitTitleRef.current = () => {
+    if (titleTimer.current) {
+      clearTimeout(titleTimer.current);
+      titleTimer.current = null;
+    }
+    const pending = pendingTitleRef.current;
+    if (pending !== null) {
+      pendingTitleRef.current = null;
+      void updateNote(note.id, { title: pending });
+    }
+  };
+
+  // Switching notes re-keys the editor subtree and unmounts this header; flush
+  // the pending title so the final keystroke is never silently dropped.
   useEffect(() => {
     return () => {
-      if (titleTimer.current) {
-        clearTimeout(titleTimer.current);
-      }
+      commitTitleRef.current?.();
     };
   }, []);
 
@@ -247,6 +267,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
           type="text"
           value={title}
           onChange={handleTitleChange}
+          onBlur={() => commitTitleRef.current?.()}
           placeholder={MESSAGES.UNTITLED_NOTE}
           aria-label="Note Title"
           className="mt-2 w-full bg-transparent font-display text-[40px] font-bold leading-[50px] tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"

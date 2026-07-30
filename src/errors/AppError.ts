@@ -73,7 +73,8 @@ export type EncryptionErrorReason =
   | "decrypt_failed"
   | "encrypt_failed"
   | "malformed_payload"
-  | "iv_exhausted";
+  | "iv_exhausted"
+  | "iv_rewind";
 
 export class EncryptionError extends AppError {
   readonly category = "encryption" as const;

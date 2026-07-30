@@ -5,7 +5,7 @@ use keyring::Entry;
 const SERVICE: &str = "com.cove.notes";
 
 /// Must match KEYRING_USERS on the TS side (src/services/vault/IKeychainStore.ts).
-const ALLOWED_USERS: [&str; 2] = ["dek-backup", "legacy-dek-bridge"];
+const ALLOWED_USERS: [&str; 3] = ["dek-backup", "legacy-dek-bridge", "iv-highwatermark"];
 
 fn entry_for(user: &str) -> Result<Entry, String> {
     if !ALLOWED_USERS.contains(&user) {

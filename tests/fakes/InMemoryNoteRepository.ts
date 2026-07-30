@@ -1,6 +1,6 @@
-import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
-import type { INoteRepository, NoteRecord } from "../../repositories/INoteRepository";
-import type { EncryptedPayload } from "../../services/vault/IEncryptionService";
+import type { NoteSearchHit } from "@/domain/note/NoteSearchHit";
+import type { INoteRepository, NoteRecord } from "@/repositories/INoteRepository";
+import type { EncryptedPayload } from "@/services/vault/IEncryptionService";
 
 export class InMemoryNoteRepository implements INoteRepository {
   public notes: NoteRecord[] = [];

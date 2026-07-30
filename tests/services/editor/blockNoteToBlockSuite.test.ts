@@ -1,6 +1,6 @@
+import { convertBlockNoteContent } from "@/services/editor/blockNoteToBlockSuite";
+import { packBlockSuiteContent } from "@/services/editor/contentFormat";
 import { describe, expect, it } from "vitest";
-import { convertBlockNoteContent } from "./blockNoteToBlockSuite";
-import { packBlockSuiteContent } from "./contentFormat";
 
 describe("blockNoteToBlockSuite", () => {
   it("converts paragraphs, headings, and styled inline text", () => {

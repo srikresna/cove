@@ -1,6 +1,6 @@
 import * as Y from "yjs";
 import { unpackBlockSuiteContent } from "./contentFormat";
-import { docFromSnapshot } from "./yjsCodec";
+import { tryDocFromSnapshot } from "./yjsCodec";
 
 type YBlock = Y.Map<unknown>;
 
@@ -50,7 +50,8 @@ function blocksInTreeOrder(blocks: Y.Map<unknown>): YBlock[] {
 export function extractBlockSuiteParagraphs(content: string): string[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;
-  const doc = docFromSnapshot(update);
+  const doc = tryDocFromSnapshot(update);
+  if (!doc) return null;
   const parts: string[] = [];
   for (const block of blocksInTreeOrder(doc.getMap("blocks"))) {
     const title = textOf(block, "prop:title");
@@ -80,7 +81,8 @@ const HEADING_LEVELS: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4, h5:
 export function extractBlockSuiteHeadings(content: string): BlockSuiteHeading[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;
-  const doc = docFromSnapshot(update);
+  const doc = tryDocFromSnapshot(update);
+  if (!doc) return null;
   const items: BlockSuiteHeading[] = [];
   for (const block of blocksInTreeOrder(doc.getMap("blocks"))) {
     const type = block.get("prop:type");
@@ -102,7 +104,8 @@ interface ReferenceDelta {
 export function extractBlockSuiteLinkIds(content: string): string[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;
-  const doc = docFromSnapshot(update);
+  const doc = tryDocFromSnapshot(update);
+  if (!doc) return null;
   const ids = new Set<string>();
   for (const block of doc.getMap("blocks").values()) {
     if (!(block instanceof Y.Map)) continue;

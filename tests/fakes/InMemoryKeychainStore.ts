@@ -1,4 +1,4 @@
-import type { IKeychainStore } from "../../services/vault/IKeychainStore";
+import type { IKeychainStore } from "@/services/vault/IKeychainStore";
 
 export class InMemoryKeychainStore implements IKeychainStore {
   private store = new Map<string, string>();

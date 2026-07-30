@@ -1,12 +1,13 @@
+import { applySnapshot, docFromSnapshot, encodeDocSnapshot } from "@/services/editor/yjsCodec";
+import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import type { EncryptedPayload, IEncryptionService } from "../vault/IEncryptionService";
-import { applySnapshot, docFromSnapshot, encodeDocSnapshot } from "./yjsCodec";
 
 const envelopeCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
   clearSessionKeys: () => {},
+  getIvCounter: () => 0,
   encryptPayload: async (p: string, aad: string) => `enc[${aad}]:${p}` as EncryptedPayload,
   decryptPayload: async (c: string, aad: string) => {
     const prefix = `enc[${aad}]:`;

@@ -96,9 +96,12 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
   }
 
   async deleteWorkspace(id: string): Promise<void> {
-    const db = await this.getDb();
     try {
-      await db.execute("DELETE FROM workspaces WHERE id = ?", [id]);
+      // foreign_keys=ON transaction: ON DELETE CASCADE removes the workspace's
+      // notes and their links/tags/covers/properties atomically in one statement.
+      await SQLiteDatabase.runTransaction([
+        { sql: "DELETE FROM workspaces WHERE id = ?", params: [id] },
+      ]);
     } catch (err) {
       throw toPersistenceError("deleteWorkspace", err);
     }

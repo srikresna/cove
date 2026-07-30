@@ -1,4 +1,4 @@
-import type { INoteLinkRepository } from "../../repositories/INoteLinkRepository";
+import type { INoteLinkRepository } from "@/repositories/INoteLinkRepository";
 
 export class InMemoryNoteLinkRepository implements INoteLinkRepository {
   public links = new Map<string, Set<string>>();

@@ -18,3 +18,17 @@ export function docFromSnapshot(snapshotB64: string): Y.Doc {
   applySnapshot(doc, snapshotB64);
   return doc;
 }
+
+/**
+ * Rebuilds a fresh doc from a base64 snapshot, or null if the snapshot is
+ * missing, truncated, or otherwise undecodable. Centralizing the decode-failure
+ * path here means one corrupt note degrades gracefully (empty extraction)
+ * instead of throwing and aborting search/save for every note.
+ */
+export function tryDocFromSnapshot(snapshotB64: string): Y.Doc | null {
+  try {
+    return docFromSnapshot(snapshotB64);
+  } catch {
+    return null;
+  }
+}

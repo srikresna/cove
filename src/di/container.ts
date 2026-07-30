@@ -42,10 +42,7 @@ export const tagService: ITagService = new TagService(tagRepository);
 export const propertyService: IPropertyService = new PropertyService(
   new SQLitePropertyRepository(),
 );
-export const workspaceService: IWorkspaceService = new WorkspaceService(
-  workspaceRepository,
-  noteRepository,
-);
+export const workspaceService: IWorkspaceService = new WorkspaceService(workspaceRepository);
 const deviceBind = new DeviceBind();
 const deriveKeyFn: KdfDerive = async (passphrase, salt, kdfAlg, params) => {
   const result = await invoke<number[]>("derive_key_kdf", {

@@ -1,8 +1,8 @@
+import { TAG_COLORS } from "@/domain/tag/Tag";
+import { ValidationError } from "@/errors/AppError";
+import { TagService } from "@/services/TagService";
 import { describe, expect, it } from "vitest";
-import { TAG_COLORS } from "../domain/tag/Tag";
-import { ValidationError } from "../errors/AppError";
-import { InMemoryTagRepository } from "../test/fakes/InMemoryTagRepository";
-import { TagService } from "./TagService";
+import { InMemoryTagRepository } from "../fakes/InMemoryTagRepository";
 
 describe("TagService", () => {
   it("creates a tag with the next palette color and attaches it to the note", async () => {

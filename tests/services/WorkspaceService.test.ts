@@ -1,15 +1,12 @@
+import { BusinessRuleError, NotFoundError } from "@/domain/errors";
+import { WorkspaceService } from "@/services/WorkspaceService";
 import { describe, expect, it } from "vitest";
-import { BusinessRuleError, NotFoundError } from "../domain/errors";
-import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
-import { InMemoryWorkspaceRepository } from "../test/fakes/InMemoryWorkspaceRepository";
-import { WorkspaceService } from "./WorkspaceService";
-import type { EncryptedPayload } from "./vault/IEncryptionService";
+import { InMemoryWorkspaceRepository } from "../fakes/InMemoryWorkspaceRepository";
 
 describe("WorkspaceService", () => {
   it("getAllWorkspaces, getWorkspace, createWorkspace, updateWorkspace work as expected", async () => {
     const wsRepo = new InMemoryWorkspaceRepository();
-    const noteRepo = new InMemoryNoteRepository();
-    const service = new WorkspaceService(wsRepo, noteRepo);
+    const service = new WorkspaceService(wsRepo);
 
     const created = await service.createWorkspace(
       "Side Hustle",
@@ -31,8 +28,7 @@ describe("WorkspaceService", () => {
 
   it("deleteWorkspace throws BusinessRuleError when deleting the last workspace", async () => {
     const wsRepo = new InMemoryWorkspaceRepository();
-    const noteRepo = new InMemoryNoteRepository();
-    const service = new WorkspaceService(wsRepo, noteRepo);
+    const service = new WorkspaceService(wsRepo);
 
     wsRepo.workspaces.push({
       id: "ws-1",
@@ -42,51 +38,35 @@ describe("WorkspaceService", () => {
       createdAt: 1000,
     });
 
-    await expect(service.deleteWorkspace("ws-1", 1)).rejects.toThrow(BusinessRuleError);
+    await expect(service.deleteWorkspace("ws-1")).rejects.toThrow(BusinessRuleError);
   });
 
-  it("deleteWorkspace cascades note deletion and deletes workspace when count > 1", async () => {
+  // Note cascade is enforced at the DB layer (ON DELETE CASCADE on a
+  // foreign_keys=ON transaction connection), so it is not asserted here.
+  it("deleteWorkspace removes the workspace when more than one exists", async () => {
     const wsRepo = new InMemoryWorkspaceRepository();
-    const noteRepo = new InMemoryNoteRepository();
-    const service = new WorkspaceService(wsRepo, noteRepo);
+    const service = new WorkspaceService(wsRepo);
 
     wsRepo.workspaces.push(
       { id: "ws-1", name: "First", emoji: "💼", color: "#ff6f1e", createdAt: 1000 },
       { id: "ws-2", name: "Second", emoji: "🚀", color: "#ff70a6", createdAt: 2000 },
     );
 
-    noteRepo.notes.push({
-      id: "note-1",
-      workspaceId: "ws-1",
-      title: "Note in ws 1",
-      content: "" as EncryptedPayload,
-      isPinned: false,
-      isFavorite: false,
-      createdAt: 1000,
-      updatedAt: 2000,
-    });
-
-    await service.deleteWorkspace("ws-1", 2);
+    await service.deleteWorkspace("ws-1");
 
     expect(wsRepo.workspaces).toHaveLength(1);
-    const first = wsRepo.workspaces[0];
-    expect(first).toBeDefined();
-    if (first) {
-      expect(first.id).toBe("ws-2");
-    }
-    expect(noteRepo.notes).toHaveLength(0);
+    expect(wsRepo.workspaces[0]?.id).toBe("ws-2");
   });
 
   it("deleteWorkspace throws NotFoundError if workspace does not exist", async () => {
     const wsRepo = new InMemoryWorkspaceRepository();
-    const noteRepo = new InMemoryNoteRepository();
-    const service = new WorkspaceService(wsRepo, noteRepo);
+    const service = new WorkspaceService(wsRepo);
 
     wsRepo.workspaces.push(
       { id: "ws-1", name: "First", emoji: "💼", color: "#ff6f1e", createdAt: 1000 },
       { id: "ws-2", name: "Second", emoji: "🚀", color: "#ff70a6", createdAt: 2000 },
     );
 
-    await expect(service.deleteWorkspace("non-existent", 2)).rejects.toThrow(NotFoundError);
+    await expect(service.deleteWorkspace("non-existent")).rejects.toThrow(NotFoundError);
   });
 });

@@ -60,15 +60,19 @@ export class NoteService implements INoteService {
     const bodyHits: NoteSearchHit[] = [];
     for (const rec of candidates) {
       if (titleIds.has(rec.id)) continue;
-      const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
-      if (plain.toLowerCase().includes(q)) {
-        bodyHits.push({
-          id: rec.id,
-          workspaceId: rec.workspaceId,
-          title: rec.title,
-          icon: rec.icon,
-          snippet: buildSnippet(plain, q),
-        });
+      try {
+        const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
+        if (plain.toLowerCase().includes(q)) {
+          bodyHits.push({
+            id: rec.id,
+            workspaceId: rec.workspaceId,
+            title: rec.title,
+            icon: rec.icon,
+            snippet: buildSnippet(plain, q),
+          });
+        }
+      } catch {
+        // A single corrupt/undecodable note must not abort the whole search.
       }
     }
     return [...titleHits, ...bodyHits];

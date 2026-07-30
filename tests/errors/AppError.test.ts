@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
 import {
   BusinessRuleError,
   EncryptionError,
   NotFoundError,
   PersistenceError,
   ValidationError,
-} from "./AppError";
-import { toAppError, toPersistenceError } from "./errorMappers";
+} from "@/errors/AppError";
+import { toAppError, toPersistenceError } from "@/errors/errorMappers";
+import { describe, expect, it } from "vitest";
 
 describe("AppError hierarchy", () => {
   it("preserves categories and stack trace", () => {

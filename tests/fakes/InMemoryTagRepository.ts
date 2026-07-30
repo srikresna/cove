@@ -1,5 +1,5 @@
-import type { Tag } from "../../domain/tag/Tag";
-import type { ITagRepository } from "../../repositories/ITagRepository";
+import type { Tag } from "@/domain/tag/Tag";
+import type { ITagRepository } from "@/repositories/ITagRepository";
 
 export class InMemoryTagRepository implements ITagRepository {
   public tags: Tag[] = [];

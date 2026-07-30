@@ -162,6 +162,56 @@ export class VaultService implements IVaultService {
     if (this.rawDek && this.rawDek !== rawDek) zeroize(this.rawDek);
     this.rawDek = rawDek;
     await this.crypto.setSessionKeys({ dek: cryptoKey });
+    await this.enforceIvHighWaterMark();
+  }
+
+  // Defense against at-rest tamper/rollback of the deterministic IV counter: the
+  // device-bound keychain holds a high-water-mark of the largest counter this DEK
+  // has emitted. If the persisted counter is below it, the DB was rewound (e.g. a
+  // snapshot rollback), which would risk AES-GCM nonce reuse under a stable DEK —
+  // refuse to encrypt rather than reuse IVs. A MAC over the *current* counter only
+  // proves self-consistency; it cannot detect a rollback to a prior valid pair, so
+  // the monotonic witness must live outside the attacker-controlled DB file.
+  private async enforceIvHighWaterMark(): Promise<void> {
+    const hwmStr = await this.readIvHighWaterMark();
+    if (hwmStr == null) return; // fresh device — trust the persisted value
+    const hwm = Number.parseInt(hwmStr, 10);
+    if (!Number.isFinite(hwm)) return;
+    const current = this.crypto.getIvCounter();
+    if (current < hwm) {
+      throw new EncryptionError(
+        "iv_rewind",
+        "IV counter rewind detected (database may have been rolled back); refusing AES-GCM nonce reuse.",
+      );
+    }
+    // Advance the mark so the session's starting counter is recorded even before a
+    // lock, narrowing the window for an undetected mid-session rewind.
+    if (current > hwm) {
+      await this.writeIvHighWaterMark(current).catch(() => {});
+    }
+  }
+
+  private async readIvHighWaterMark(): Promise<string | null> {
+    try {
+      return await this.keychain.get(KEYRING_USERS.ivHighWaterMark);
+    } catch (err) {
+      Logger.warn("vault: iv high-water-mark read failed; skipping rewind check", err);
+      return null;
+    }
+  }
+
+  private async writeIvHighWaterMark(counter: number): Promise<void> {
+    await this.keychain.set(KEYRING_USERS.ivHighWaterMark, String(counter));
+  }
+
+  // A freshly minted DEK resets the IV space on purpose, so the mark from any
+  // prior DEK must not gate the new counter sequence.
+  private async resetIvHighWaterMark(): Promise<void> {
+    try {
+      await this.keychain.delete(KEYRING_USERS.ivHighWaterMark);
+    } catch (err) {
+      Logger.warn("vault: iv high-water-mark reset failed", err);
+    }
   }
 
   private async buildArgon2Envelope(passphrase: string, rawDek: Bytes): Promise<Envelope> {
@@ -211,6 +261,7 @@ export class VaultService implements IVaultService {
       updatedAt: now,
     };
     await this.kms.save(rec);
+    await this.resetIvHighWaterMark();
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
 
     const legacyHex = this.legacyKeys.get();
@@ -422,6 +473,12 @@ export class VaultService implements IVaultService {
         () => {},
       );
     }
+    // Record the highest counter emitted so a future at-rest rollback is detectable.
+    if (this.crypto.isUnlocked()) {
+      await this.writeIvHighWaterMark(this.crypto.getIvCounter()).catch((err) =>
+        Logger.warn("vault: iv high-water-mark persist on lock failed", err),
+      );
+    }
     if (this.rawDek) zeroize(this.rawDek);
     this.rawDek = null;
     this.crypto.clearSessionKeys();
@@ -571,6 +628,7 @@ export class VaultService implements IVaultService {
       updatedAt: now,
     });
     zeroize(oldRawDek);
+    await this.resetIvHighWaterMark();
     await this.setSessionDek(dek.rawKey, dek.cryptoKey);
     const failed =
       (await this.reencryptAllNotes(oldKey, null)) + (await this.reencryptAllCovers(oldKey));

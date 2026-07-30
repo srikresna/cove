@@ -1,15 +1,11 @@
 import { BusinessRuleError, NotFoundError } from "../domain/errors";
 import { canDeleteLastWorkspace } from "../domain/note/notePolicy";
 import type { Workspace } from "../domain/workspace/Workspace";
-import type { INoteRepository } from "../repositories/INoteRepository";
 import type { IWorkspaceRepository } from "../repositories/IWorkspaceRepository";
 import type { IWorkspaceService } from "./IWorkspaceService";
 
 export class WorkspaceService implements IWorkspaceService {
-  constructor(
-    private readonly workspaces: IWorkspaceRepository,
-    private readonly notes: INoteRepository,
-  ) {}
+  constructor(private readonly workspaces: IWorkspaceRepository) {}
 
   async getAllWorkspaces(): Promise<Workspace[]> {
     return this.workspaces.getAllWorkspaces();
@@ -38,15 +34,19 @@ export class WorkspaceService implements IWorkspaceService {
     return this.workspaces.updateWorkspace(id, updates);
   }
 
-  async deleteWorkspace(id: string, currentWorkspacesCount: number): Promise<void> {
-    if (!canDeleteLastWorkspace(currentWorkspacesCount)) {
+  async deleteWorkspace(id: string): Promise<void> {
+    // Enforce the business rule from the authoritative source (the repository),
+    // never a caller-supplied count that may be stale.
+    const all = await this.workspaces.getAllWorkspaces();
+    if (!canDeleteLastWorkspace(all.length)) {
       throw new BusinessRuleError("Cannot delete the only remaining workspace.");
     }
 
     const ws = await this.workspaces.getWorkspaceById(id);
     if (!ws) throw new NotFoundError("Workspace", id);
 
-    await this.notes.deleteNotesByWorkspace(id);
+    // Deleting the workspace cascades to its notes and their children atomically
+    // (ON DELETE CASCADE on a foreign_keys=ON transaction connection).
     await this.workspaces.deleteWorkspace(id);
   }
 }

@@ -7,4 +7,5 @@ export interface IKeychainStore {
 export const KEYRING_USERS = {
   dekBackup: "dek-backup",
   legacyBridge: "legacy-dek-bridge",
+  ivHighWaterMark: "iv-highwatermark",
 } as const;

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   aesGcmDecrypt,
   aesGcmEncrypt,
@@ -17,7 +16,8 @@ import {
   importHmacKey,
   unwrapDek,
   wrapDek,
-} from "./crypto";
+} from "@/services/vault/crypto";
+import { describe, expect, it } from "vitest";
 
 describe("vault/crypto base64", () => {
   it("round-trips bytes through base64", () => {

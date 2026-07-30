@@ -195,41 +195,23 @@ export class SQLiteNoteRepository implements INoteRepository {
     return existing;
   }
 
-  // Explicit link/tag/cover cleanup: ON DELETE CASCADE needs foreign_keys=ON,
-  // which is connection-scoped — the pool may serve connections that never ran it.
+  // Single statement on a foreign_keys=ON transaction connection: the schema's
+  // ON DELETE CASCADE removes note_links/tags/covers/properties atomically.
   async deleteNote(id: string): Promise<void> {
-    const db = await this.getDb();
     try {
-      await db.execute("DELETE FROM note_links WHERE sourceId = ? OR targetId = ?", [id, id]);
-      await db.execute("DELETE FROM note_tags WHERE noteId = ?", [id]);
-      await db.execute("DELETE FROM note_covers WHERE noteId = ?", [id]);
-      await db.execute("DELETE FROM note_properties WHERE noteId = ?", [id]);
-      await db.execute("DELETE FROM notes WHERE id = ?", [id]);
+      await SQLiteDatabase.runTransaction([
+        { sql: "DELETE FROM notes WHERE id = ?", params: [id] },
+      ]);
     } catch (err) {
       throw toPersistenceError("deleteNote", err);
     }
   }
 
   async deleteNotesByWorkspace(workspaceId: string): Promise<void> {
-    const db = await this.getDb();
     try {
-      await db.execute(
-        "DELETE FROM note_links WHERE sourceId IN (SELECT id FROM notes WHERE workspaceId = ?) OR targetId IN (SELECT id FROM notes WHERE workspaceId = ?)",
-        [workspaceId, workspaceId],
-      );
-      await db.execute(
-        "DELETE FROM note_tags WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
-        [workspaceId],
-      );
-      await db.execute(
-        "DELETE FROM note_covers WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
-        [workspaceId],
-      );
-      await db.execute(
-        "DELETE FROM note_properties WHERE noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
-        [workspaceId],
-      );
-      await db.execute("DELETE FROM notes WHERE workspaceId = ?", [workspaceId]);
+      await SQLiteDatabase.runTransaction([
+        { sql: "DELETE FROM notes WHERE workspaceId = ?", params: [workspaceId] },
+      ]);
     } catch (err) {
       throw toPersistenceError("deleteNotesByWorkspace", err);
     }

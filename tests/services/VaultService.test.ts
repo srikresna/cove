@@ -1,14 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { EncryptionError, ValidationError } from "../errors/AppError";
-import { IdentityDeviceBind } from "../test/fakes/IdentityDeviceBind";
-import { InMemoryKeychainStore } from "../test/fakes/InMemoryKeychainStore";
-import { InMemoryKmsRepository } from "../test/fakes/InMemoryKmsRepository";
-import { InMemoryLegacyKeyStore } from "../test/fakes/InMemoryLegacyKeyStore";
-import { InMemoryMigrationRepository } from "../test/fakes/InMemoryMigrationRepository";
-import { type KdfDerive, VaultService } from "./VaultService";
-import { CryptoVault } from "./vault/CryptoVault";
-import type { IDeviceBind } from "./vault/IDeviceBind";
-import { KEYRING_USERS } from "./vault/IKeychainStore";
+import { EncryptionError, ValidationError } from "@/errors/AppError";
+import { type KdfDerive, VaultService } from "@/services/VaultService";
+import { CryptoVault } from "@/services/vault/CryptoVault";
+import type { IDeviceBind } from "@/services/vault/IDeviceBind";
+import { KEYRING_USERS } from "@/services/vault/IKeychainStore";
 import {
   type Bytes,
   aesGcmEncrypt,
@@ -18,7 +12,13 @@ import {
   encodeUtf8,
   generateDek,
   importAesGcmKey,
-} from "./vault/crypto";
+} from "@/services/vault/crypto";
+import { describe, expect, it } from "vitest";
+import { IdentityDeviceBind } from "../fakes/IdentityDeviceBind";
+import { InMemoryKeychainStore } from "../fakes/InMemoryKeychainStore";
+import { InMemoryKmsRepository } from "../fakes/InMemoryKmsRepository";
+import { InMemoryLegacyKeyStore } from "../fakes/InMemoryLegacyKeyStore";
+import { InMemoryMigrationRepository } from "../fakes/InMemoryMigrationRepository";
 
 const PW = "correct horse battery 99";
 const PW2 = "new strong passphrase 22";

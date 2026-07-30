@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   BusinessRuleError,
   ConcurrencyError,
@@ -6,8 +5,9 @@ import {
   NotFoundError,
   PersistenceError,
   ValidationError,
-} from "../errors/AppError";
-import { presentError } from "./errorPresenter";
+} from "@/errors/AppError";
+import { presentError } from "@/services/errorPresenter";
+import { describe, expect, it } from "vitest";
 
 describe("errorPresenter", () => {
   it("presents not_found error", () => {

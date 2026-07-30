@@ -28,9 +28,11 @@ export class TauriBackupService implements IBackupService {
     await this.db.suspend();
     try {
       await invoke("restore_database", { sourcePath: path });
-    } catch (err) {
+    } finally {
+      // Always release the suspend so the pool can reopen — on success against
+      // the swapped file, on error against the original. (The caller still reloads
+      // on success because every in-memory store is now stale.)
       this.db.resume();
-      throw err;
     }
   }
 }

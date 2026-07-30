@@ -1,5 +1,5 @@
-import type { Workspace } from "../../domain/workspace/Workspace";
-import type { IWorkspaceRepository } from "../../repositories/IWorkspaceRepository";
+import type { Workspace } from "@/domain/workspace/Workspace";
+import type { IWorkspaceRepository } from "@/repositories/IWorkspaceRepository";
 
 export class InMemoryWorkspaceRepository implements IWorkspaceRepository {
   public workspaces: Workspace[] = [];

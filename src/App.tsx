@@ -84,19 +84,29 @@ export const AppContent: React.FC = () => {
 
       <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
         {activeNote ? (
-          <Suspense
-            fallback={
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                Loading editor…
-              </div>
-            }
-          >
-            {useBlockSuite ? (
-              <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
-            ) : (
-              <BlockNoteEditor key={activeNote.id} note={activeNote} />
-            )}
-          </Suspense>
+          useBlockSuite && activeNote.content === "" ? (
+            // Content arrives async (metadata list returns content=""); never mount
+            // the BlockSuite editor against an empty doc — it would seed blank and,
+            // once initializedDocs locks it in, the real snapshot could be lost on
+            // the first debounced save.
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              Loading editor…
+            </div>
+          ) : (
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                  Loading editor…
+                </div>
+              }
+            >
+              {useBlockSuite ? (
+                <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
+              ) : (
+                <BlockNoteEditor key={activeNote.id} note={activeNote} />
+              )}
+            </Suspense>
+          )
         ) : workspaces.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
             <div

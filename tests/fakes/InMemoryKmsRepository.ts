@@ -1,4 +1,4 @@
-import type { IKmsRepository, KmsPatch, KmsRecord } from "../../repositories/IKmsRepository";
+import type { IKmsRepository, KmsPatch, KmsRecord } from "@/repositories/IKmsRepository";
 
 export class InMemoryKmsRepository implements IKmsRepository {
   private record: KmsRecord | null = null;

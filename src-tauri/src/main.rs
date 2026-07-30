@@ -5,6 +5,7 @@ mod crypto;
 mod dpapi;
 mod keychain;
 mod restore;
+mod transaction;
 
 use std::panic;
 use tauri::Manager;
@@ -34,7 +35,8 @@ fn main() {
         keychain::keychain_set,
         keychain::keychain_delete,
         backup::backup_database,
-        restore::restore_database
+        restore::restore_database,
+        transaction::run_sql_transaction
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");

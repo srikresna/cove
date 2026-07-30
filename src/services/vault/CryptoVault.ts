@@ -19,6 +19,10 @@ export class CryptoVault implements IEncryptionService {
     return this.dek !== null;
   }
 
+  getIvCounter(): number {
+    return this.ivCounter;
+  }
+
   async setSessionKeys(keys: { dek: CryptoKey }): Promise<void> {
     this.dek = keys.dek;
     const rec = await this.kms.get();

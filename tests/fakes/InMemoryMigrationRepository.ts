@@ -1,4 +1,4 @@
-import type { IMigrationRepository, LegacyRow } from "../../repositories/IMigrationRepository";
+import type { IMigrationRepository, LegacyRow } from "@/repositories/IMigrationRepository";
 
 export class InMemoryMigrationRepository implements IMigrationRepository {
   private rows = new Map<string, { content: string; migrated: boolean }>();

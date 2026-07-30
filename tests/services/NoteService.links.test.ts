@@ -1,14 +1,15 @@
+import { NoteService } from "@/services/NoteService";
+import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
+import { extractNoteLinkIds } from "@/utils/noteLinks";
 import { describe, expect, it } from "vitest";
-import { InMemoryNoteLinkRepository } from "../test/fakes/InMemoryNoteLinkRepository";
-import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
-import { extractNoteLinkIds } from "../utils/noteLinks";
-import { NoteService } from "./NoteService";
-import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
+import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
+import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
 
 const unlockedCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
   clearSessionKeys: () => {},
+  getIvCounter: () => 0,
   encryptPayload: async (p: string) => p as EncryptedPayload,
   decryptPayload: async (c: string) => c,
 };

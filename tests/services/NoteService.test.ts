@@ -1,15 +1,16 @@
+import { NotFoundError } from "@/domain/errors";
+import { VaultLockedError } from "@/errors/AppError";
+import { NoteService } from "@/services/NoteService";
+import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
 import { describe, expect, it } from "vitest";
-import { NotFoundError } from "../domain/errors";
-import { VaultLockedError } from "../errors/AppError";
-import { InMemoryNoteLinkRepository } from "../test/fakes/InMemoryNoteLinkRepository";
-import { InMemoryNoteRepository } from "../test/fakes/InMemoryNoteRepository";
-import { NoteService } from "./NoteService";
-import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
+import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
+import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
 
 const unlockedCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
   clearSessionKeys: () => {},
+  getIvCounter: () => 0,
   encryptPayload: async (p: string) => p as EncryptedPayload,
   decryptPayload: async (c: string) => c,
 };
@@ -18,6 +19,7 @@ const envelopeCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
   clearSessionKeys: () => {},
+  getIvCounter: () => 0,
   encryptPayload: async (p: string, aad: string) => `enc[${aad}]:${p}` as EncryptedPayload,
   decryptPayload: async (c: string, aad: string) => {
     if (!c) return "";

@@ -1,4 +1,4 @@
-import type { ILegacyKeyStore } from "../../services/vault/ILegacyKeyStore";
+import type { ILegacyKeyStore } from "@/services/vault/ILegacyKeyStore";
 
 export class InMemoryLegacyKeyStore implements ILegacyKeyStore {
   constructor(private value: string | null = null) {}

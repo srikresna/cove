@@ -1,8 +1,8 @@
+import { NotFoundError } from "@/domain/errors";
+import { ValidationError } from "@/errors/AppError";
+import { PropertyService } from "@/services/PropertyService";
 import { describe, expect, it } from "vitest";
-import { NotFoundError } from "../domain/errors";
-import { ValidationError } from "../errors/AppError";
-import { InMemoryPropertyRepository } from "../test/fakes/InMemoryPropertyRepository";
-import { PropertyService } from "./PropertyService";
+import { InMemoryPropertyRepository } from "../fakes/InMemoryPropertyRepository";
 
 describe("PropertyService", () => {
   it("creates definitions; status starts with the default option set", async () => {
