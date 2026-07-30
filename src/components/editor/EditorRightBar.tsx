@@ -10,7 +10,6 @@ import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
-import { walkBlocks } from "../../utils/blockTree";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -36,28 +35,7 @@ interface EditorRightBarProps {
 }
 
 function extractHeadings(content: string): TocItem[] {
-  const blockSuiteHeadings = extractBlockSuiteHeadings(content);
-  if (blockSuiteHeadings !== null) return blockSuiteHeadings;
-  const items: TocItem[] = [];
-  walkBlocks(content, (block) => {
-    if (block.type !== "heading" || typeof block.id !== "string") return;
-    const text = Array.isArray(block.content)
-      ? block.content
-          .map((c) => {
-            const inline = c as { text?: unknown };
-            return typeof inline?.text === "string" ? inline.text : "";
-          })
-          .join("")
-          .trim()
-      : "";
-    if (!text) return;
-    items.push({
-      id: block.id,
-      text,
-      level: typeof block.props?.level === "number" ? block.props.level : 1,
-    });
-  });
-  return items;
+  return extractBlockSuiteHeadings(content) ?? [];
 }
 
 const INDENT_BY_LEVEL: Record<number, string> = { 1: "pl-2", 2: "pl-4", 3: "pl-6" };
@@ -97,8 +75,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
     const center = container.getBoundingClientRect().top + container.clientHeight / 2;
     let current: string | null = headings[0]?.id ?? null;
     for (const h of headings) {
-      // data-id is BlockNote's block attribute, data-block-id is BlockSuite's.
-      const el = container.querySelector(`[data-id="${h.id}"], [data-block-id="${h.id}"]`);
+      const el = container.querySelector(`[data-block-id="${h.id}"]`);
       if (!el) continue;
       const rect = el.getBoundingClientRect();
       if (rect.top < center + rect.height) current = h.id;
@@ -115,7 +92,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
   }, [scrollRef, updateActiveHeading]);
 
   const scrollToHeading = (id: string) => {
-    const el = scrollRef.current?.querySelector(`[data-id="${id}"], [data-block-id="${id}"]`);
+    const el = scrollRef.current?.querySelector(`[data-block-id="${id}"]`);
     if (!(el instanceof HTMLElement)) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.add("cove-block-flash");

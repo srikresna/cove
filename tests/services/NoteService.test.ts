@@ -1,10 +1,38 @@
 import { NotFoundError } from "@/domain/errors";
 import { VaultLockedError } from "@/errors/AppError";
 import { NoteService } from "@/services/NoteService";
+import { packBlockSuiteContent } from "@/services/editor/contentFormat";
+import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
 import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
 import { describe, expect, it } from "vitest";
+import * as Y from "yjs";
 import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
 import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
+
+/** Build a BlockSuite envelope with a single paragraph of body text. */
+function blockSuiteWithText(text: string): string {
+  const doc = new Y.Doc();
+  const blocks = doc.getMap("blocks");
+  const page = new Y.Map();
+  blocks.set("page", page);
+  page.set("sys:id", "page");
+  page.set("sys:flavour", "affine:page");
+  page.set("sys:children", Y.Array.from(["note"]));
+  const note = new Y.Map();
+  blocks.set("note", note);
+  note.set("sys:id", "note");
+  note.set("sys:flavour", "affine:note");
+  note.set("sys:children", Y.Array.from(["p"]));
+  const p = new Y.Map();
+  blocks.set("p", p);
+  p.set("sys:id", "p");
+  p.set("sys:flavour", "affine:paragraph");
+  p.set("sys:children", Y.Array.from([]));
+  const t = new Y.Text();
+  p.set("prop:text", t);
+  t.insert(0, text);
+  return packBlockSuiteContent(encodeDocSnapshot(doc));
+}
 
 const unlockedCrypto: IEncryptionService = {
   isUnlocked: () => true,
@@ -292,9 +320,7 @@ describe("NoteService", () => {
       workspaceId: "ws-1",
       title: enc("Roadmap"),
       titleKmsVersion: 0,
-      content: enc(
-        '[{"type":"paragraph","content":[{"type":"text","text":"Launch the encrypted vault feature soon"}]}]',
-      ),
+      content: enc(blockSuiteWithText("Launch the encrypted vault feature soon")),
       icon: "🚀",
       isPinned: false,
       isFavorite: false,

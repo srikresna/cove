@@ -16,9 +16,6 @@ export const MESSAGES = {
   COVER_TOO_LARGE: "Cover image is too large (max 15 MB).",
   ICON_ADD: "Add icon",
   ICON_REMOVE: "Remove icon",
-  SETTINGS_EDITOR_ENGINE_LABEL: "BlockSuite editor (beta)",
-  SETTINGS_EDITOR_ENGINE_DESC:
-    "New editing engine with canvas, databases, and premium blocks. Notes created with it always reopen in BlockSuite; existing notes stay on the classic editor.",
   TAGS_HEADER: "Tags",
   LIBRARY_HEADER: "Library",
   PROP_ADD: "Add a property",

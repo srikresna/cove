@@ -12,14 +12,10 @@ import { Button } from "./components/ui/button";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import type { Note } from "./domain/note/Note";
-import { isBlockSuiteContent } from "./services/editor/contentFormat";
 import { useNoteStore } from "./store/useNoteStore";
 import { useUIStore } from "./store/useUIStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
-const BlockNoteEditor = lazy(() =>
-  import("./components/editor/BlockNoteEditor").then((m) => ({ default: m.BlockNoteEditor })),
-);
 const BlockSuiteNoteEditor = lazy(
   () => import("./components/editor/blocksuite/BlockSuiteNoteEditor"),
 );
@@ -29,7 +25,6 @@ export const AppContent: React.FC = () => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
   const isDarkMode = useUIStore((s) => s.isDarkMode);
-  const editorEngine = useUIStore((s) => s.editorEngine);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const notes = useNoteStore((s) => s.notes);
   const activeNoteId = useNoteStore((s) => s.activeNoteId);
@@ -68,21 +63,17 @@ export const AppContent: React.FC = () => {
     document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
   }, [isDarkMode]);
 
-  const useBlockSuite =
-    activeNote != null &&
-    (editorEngine === "blocksuite" || isBlockSuiteContent(activeNote.content));
-
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
       <Sidebar />
 
       <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
         {activeNote ? (
-          useBlockSuite && activeNote.content === "" ? (
+          activeNote.content === "" ? (
             // Content arrives async (metadata list returns content=""); never mount
-            // the BlockSuite editor against an empty doc — it would seed blank and,
-            // once initializedDocs locks it in, the real snapshot could be lost on
-            // the first debounced save.
+            // the editor against an empty doc — it would seed blank and, once
+            // initializedDocs locks it in, the real snapshot could be lost on the
+            // first debounced save.
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
               Loading editor…
             </div>
@@ -94,11 +85,7 @@ export const AppContent: React.FC = () => {
                 </div>
               }
             >
-              {useBlockSuite ? (
-                <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
-              ) : (
-                <BlockNoteEditor key={activeNote.id} note={activeNote} />
-              )}
+              <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
             </Suspense>
           )
         ) : workspaces.length === 0 ? (
