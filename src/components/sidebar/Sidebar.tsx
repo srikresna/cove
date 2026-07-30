@@ -4,6 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {
@@ -23,8 +24,9 @@ import { WorkspaceRail } from "./WorkspaceRail";
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDeleteWorkspaceOpen, setDeleteWorkspaceOpen] = useState(false);
-  const { workspaces, activeWorkspaceId, setQuickSearchOpen, setCreateModalOpen, deleteWorkspace } =
-    useWorkspaceStore();
+  const { workspaces, activeWorkspaceId, deleteWorkspace } = useWorkspaceStore();
+  const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
+  const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const notes = useNoteStore((s) => s.notes);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];

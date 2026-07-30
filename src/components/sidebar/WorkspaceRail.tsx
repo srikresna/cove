@@ -2,6 +2,7 @@ import { PanelLeftClose, PanelLeftOpen, Plus, Settings, Trash2 } from "lucide-re
 import type React from "react";
 import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
+import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
@@ -14,14 +15,10 @@ const tile =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onToggleCollapsed }) => {
-  const {
-    workspaces,
-    activeWorkspaceId,
-    setActiveWorkspace,
-    setCreateModalOpen,
-    setSettingsOpen,
-    setTrashOpen,
-  } = useWorkspaceStore();
+  const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore();
+  const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
+  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const setTrashOpen = useUIStore((s) => s.setTrashOpen);
 
   return (
     <div className="flex h-full w-[52px] flex-shrink-0 flex-col items-center gap-2 py-3">

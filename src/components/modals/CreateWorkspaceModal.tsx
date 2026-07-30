@@ -5,6 +5,7 @@ import { useState } from "react";
 import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
+import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import {
@@ -20,7 +21,9 @@ import { Label } from "../ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export const CreateWorkspaceModal: React.FC = () => {
-  const { isCreateModalOpen, setCreateModalOpen, createWorkspace } = useWorkspaceStore();
+  const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const isCreateModalOpen = useUIStore((s) => s.isCreateModalOpen);
+  const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedEmoji, setSelectedEmoji] = useState("🚀");

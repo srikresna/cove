@@ -3,6 +3,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { formatRelativeDay } from "../../utils/time";
 import { Button } from "../ui/button";
@@ -11,7 +12,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 export const TrashDialog: React.FC = () => {
-  const { isTrashOpen, setTrashOpen, workspaces } = useWorkspaceStore();
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const isTrashOpen = useUIStore((s) => s.isTrashOpen);
+  const setTrashOpen = useUIStore((s) => s.setTrashOpen);
   const trashedNotes = useNoteStore((s) => s.trashedNotes);
   const fetchTrash = useNoteStore((s) => s.fetchTrash);
   const restoreNote = useNoteStore((s) => s.restoreNote);

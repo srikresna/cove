@@ -2,25 +2,12 @@ import { create } from "zustand";
 import { workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
 import { notifyError } from "./notify";
-
-export type EditorEngine = "blocknote" | "blocksuite";
+import { useUIStore } from "./useUIStore";
 
 interface WorkspaceState {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
-  isCreateModalOpen: boolean;
-  isQuickSearchOpen: boolean;
-  isSettingsOpen: boolean;
-  isDarkMode: boolean;
-  editorEngine: EditorEngine;
-  setEditorEngine: (engine: EditorEngine) => void;
   setActiveWorkspace: (id: string) => void;
-  setCreateModalOpen: (open: boolean) => void;
-  setQuickSearchOpen: (open: boolean) => void;
-  setSettingsOpen: (open: boolean) => void;
-  isTrashOpen: boolean;
-  setTrashOpen: (open: boolean) => void;
-  toggleDarkMode: () => void;
   fetchWorkspaces: () => Promise<void>;
   createWorkspace: (
     name: string,
@@ -32,45 +19,11 @@ interface WorkspaceState {
   deleteWorkspace: (id: string) => Promise<void>;
 }
 
-const getInitialDarkMode = (): boolean => {
-  return localStorage.getItem("cove_theme") === "dark";
-};
-
-const EDITOR_ENGINE_KEY = "cove_editor_engine";
-
-const getInitialEditorEngine = (): EditorEngine => {
-  return localStorage.getItem(EDITOR_ENGINE_KEY) === "blocksuite" ? "blocksuite" : "blocknote";
-};
-
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
-  isCreateModalOpen: false,
-  isQuickSearchOpen: false,
-  isSettingsOpen: false,
-  isTrashOpen: false,
-  isDarkMode: getInitialDarkMode(),
-  editorEngine: getInitialEditorEngine(),
 
-  setEditorEngine: (engine) => {
-    localStorage.setItem(EDITOR_ENGINE_KEY, engine);
-    set({ editorEngine: engine });
-  },
-
-  setActiveWorkspace: (id) => {
-    set({ activeWorkspaceId: id });
-  },
-
-  setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
-  setQuickSearchOpen: (open) => set({ isQuickSearchOpen: open }),
-  setSettingsOpen: (open) => set({ isSettingsOpen: open }),
-  setTrashOpen: (open) => set({ isTrashOpen: open }),
-  toggleDarkMode: () =>
-    set((state) => {
-      const nextMode = !state.isDarkMode;
-      localStorage.setItem("cove_theme", nextMode ? "dark" : "light");
-      return { isDarkMode: nextMode };
-    }),
+  setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
 
   fetchWorkspaces: async () => {
     try {
@@ -88,8 +41,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set((state) => ({
         workspaces: [...state.workspaces, created],
         activeWorkspaceId: created.id,
-        isCreateModalOpen: false,
       }));
+      // Close the create-workspace modal once creation succeeds.
+      useUIStore.getState().setCreateModalOpen(false);
       return created;
     } catch (err) {
       notifyError(err);

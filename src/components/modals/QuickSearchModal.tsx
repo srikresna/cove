@@ -8,6 +8,7 @@ import type { Note } from "../../domain/note/Note";
 import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { extractParagraphs } from "../../utils/plainText";
 import { formatFullTimestamp } from "../../utils/time";
@@ -73,8 +74,9 @@ const PreviewPane: React.FC<{ preview: PreviewData | null; hasHits: boolean }> =
 };
 
 export const QuickSearchModal: React.FC = () => {
-  const { isQuickSearchOpen, setQuickSearchOpen, workspaces, setActiveWorkspace } =
-    useWorkspaceStore();
+  const { workspaces, setActiveWorkspace } = useWorkspaceStore();
+  const isQuickSearchOpen = useUIStore((s) => s.isQuickSearchOpen);
+  const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
   const { setActiveNoteId } = useNoteStore();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<NoteSearchHit[]>([]);

@@ -7,7 +7,7 @@ import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
 import { Logger } from "../../services/Logger";
 import { useNoteStore } from "../../store/useNoteStore";
-import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { useUIStore } from "../../store/useUIStore";
 import type { Note } from "../../types";
 import { countWordsAndChars } from "../../utils/plainText";
 import { TooltipProvider } from "../ui/tooltip";
@@ -24,7 +24,7 @@ const RIGHTBAR_KEY = "cove-rightbar-open";
 
 export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({ note }) => {
   const updateNote = useNoteStore((s) => s.updateNote);
-  const isDarkMode = useWorkspaceStore((s) => s.isDarkMode);
+  const isDarkMode = useUIStore((s) => s.isDarkMode);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRightBarOpen, setRightBarOpen] = useState(

@@ -6,8 +6,8 @@ import { backupService } from "../../di/container";
 import { notifyError } from "../../store/notify";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
+import { useUIStore } from "../../store/useUIStore";
 import { useVaultStore } from "../../store/useVaultStore";
-import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Switch } from "../ui/switch";
@@ -22,7 +22,7 @@ export const SettingsModal: React.FC = () => {
     toggleDarkMode,
     editorEngine,
     setEditorEngine,
-  } = useWorkspaceStore();
+  } = useUIStore();
   const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
   const setTrustDevice = useVaultStore((s) => s.setTrustDevice);
   const lock = useVaultStore((s) => s.lock);

@@ -14,6 +14,7 @@ import { MESSAGES } from "./constants/messages";
 import type { Note } from "./domain/note/Note";
 import { isBlockSuiteContent } from "./services/editor/contentFormat";
 import { useNoteStore } from "./store/useNoteStore";
+import { useUIStore } from "./store/useUIStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
 const BlockNoteEditor = lazy(() =>
@@ -25,11 +26,11 @@ const BlockSuiteNoteEditor = lazy(
 
 export const AppContent: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const isDarkMode = useWorkspaceStore((s) => s.isDarkMode);
-  const editorEngine = useWorkspaceStore((s) => s.editorEngine);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
-  const setCreateModalOpen = useWorkspaceStore((s) => s.setCreateModalOpen);
+  const isDarkMode = useUIStore((s) => s.isDarkMode);
+  const editorEngine = useUIStore((s) => s.editorEngine);
+  const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const notes = useNoteStore((s) => s.notes);
   const activeNoteId = useNoteStore((s) => s.activeNoteId);
   const createNote = useNoteStore((s) => s.createNote);
