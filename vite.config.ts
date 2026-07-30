@@ -1,55 +1,43 @@
-import { existsSync } from "node:fs";
+import { transform } from "esbuild";
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
-import { transform } from "esbuild";
 import { visualizer } from "rollup-plugin-visualizer";
-import { type Plugin, defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+import wasm from "vite-plugin-wasm";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
-// BlockSuite's package exports point at raw .ts sources, which Rollup cannot
-// parse. Redirect every @blocksuite import to the compiled dist JS instead
-// (tsconfig paths do the same for type checking).
-function blocksuiteDist(): Plugin {
+/**
+ * BlockSuite source uses the `accessor` keyword (TC39 stage 3 class fields).
+ * Rollup's parser cannot handle it; esbuild downgrades it with target < es2022.
+ * This only runs on .ts files that contain `accessor` — minimal overhead.
+ */
+function accessorTransformPlugin(): Plugin {
   return {
-    name: "cove:blocksuite-dist",
+    name: "cove:accessor-transform",
     enforce: "pre",
-    resolveId(source) {
-      const match = /^@blocksuite\/([^/]+)(?:\/(.+))?$/.exec(source);
-      if (!match) return null;
-      const [, pkg, sub] = match;
-      const base = resolve(rootDir, "node_modules", "@blocksuite", pkg, "dist");
-      const candidates = sub
-        ? [resolve(base, `${sub}.js`), resolve(base, sub, "index.js"), resolve(base, sub)]
-        : [resolve(base, "index.js")];
-      for (const candidate of candidates) {
-        if (candidate.endsWith(".js") && existsSync(candidate)) {
-          return candidate;
-        }
-      }
-      return null;
-    },
-    // Their dist keeps `accessor` fields (decorators proposal), which neither
-    // Rollup's parser nor the WebView2 engine accepts — lower to es2022 before
-    // anything downstream sees the code. Dev module ids carry ?v= queries, so
-    // match on the bare path.
     async transform(code, id) {
-      const path = id.split("?")[0] ?? id;
-      if (!path.includes("@blocksuite") || !path.endsWith(".js")) return null;
-      if (!code.includes("accessor")) return null;
-      const result = await transform(code, { loader: "js", target: "es2022" });
-      return { code: result.code, map: result.map || null };
+      if (!id.includes("blocksuite") && !id.includes("Affine")) return;
+      if (!id.endsWith(".ts")) return;
+      if (!code.includes("accessor ")) return;
+      try {
+        const result = await transform(code, { loader: "ts", target: "es2021" });
+        return { code: result.code };
+      } catch {
+        return null;
+      }
     },
   };
 }
 
 export default defineConfig({
   plugins: [
-    blocksuiteDist(),
+    accessorTransformPlugin(),
+    vanillaExtractPlugin(),
+    wasm(),
     react(),
-    // Bundle analysis is opt-in (ANALYZE=1 bun run build) so routine builds
-    // don't regenerate a 2MB stats.html in the repo root.
     ...(process.env.ANALYZE
       ? [
           visualizer({
@@ -62,43 +50,41 @@ export default defineConfig({
       : []),
   ],
   clearScreen: false,
-  // Never prebundle BlockSuite: the plugin above serves its compiled dist
-  // directly. Its transitive CJS-only deps must be prebundled explicitly,
-  // though — served raw they have no ESM default export (vitejs.dev:
-  // "exclude'd deps with CJS sub-dependencies go in include").
   optimizeDeps: {
-    exclude: ["@blocksuite/affine", "@toeverything/theme"],
-    include: ["extend", "lz-string", "bytes", "debug"],
+    entries: ["index.html", "src/components/editor/blocksuite/**/*.{ts,tsx}"],
+    exclude: ["@vanilla-extract/css", "@vanilla-extract/private"],
   },
   server: {
     port: 1420,
     strictPort: true,
+    fs: {
+      // Allow Vite to serve BlockSuite source from the sibling AFFiNE repo.
+      allow: [rootDir, resolve(rootDir, "Affine")],
+    },
   },
   build: {
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("@blocksuite")) {
+          if (id.includes("node_modules") || id.includes("Affine")) {
+            if (
+              id.includes("@blocksuite") ||
+              id.includes("Affine\\blocksuite") ||
+              id.includes("Affine/blocksuite")
+            )
               return "vendor-blocksuite";
-            }
-            if (id.includes("node_modules/yjs/")) {
-              return "vendor-yjs";
-            }
-            if (id.includes("@radix-ui") || id.includes("cmdk")) {
+            if (id.includes("yjs")) return "vendor-yjs";
+            if (id.includes("@radix-ui") || id.includes("cmdk"))
               return "vendor-ui-primitives";
-            }
-            if (id.includes("lucide-react") || id.includes("framer-motion")) {
+            if (id.includes("lucide-react") || id.includes("framer-motion"))
               return "vendor-icons-animation";
-            }
             if (
               id.includes("node_modules/react/") ||
               id.includes("node_modules/react-dom/") ||
               id.includes("node_modules/scheduler/")
-            ) {
+            )
               return "vendor-react";
-            }
           }
         },
       },

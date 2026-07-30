@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/link-blocksuite.mjs && node scripts/update-blocksuite-exports.mjs",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "check": "biome check src tests",
     "format": "biome format --write src tests",
@@ -19,7 +20,6 @@
     "verify": "biome check ./src && tsc --noEmit && vitest run --coverage && vite build"
   },
   "dependencies": {
-    "@blocksuite/affine": "0.22.4",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource/instrument-serif": "^5.3.0",
@@ -56,15 +56,18 @@
     "@types/node": "^22.13.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@vanilla-extract/vite-plugin": "^5.2.6",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.28.1",
     "jsdom": "^25.0.1",
     "postcss": "^8.5.1",
     "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
+    "vite-plugin-wasm": "^3.6.0",
     "vitest": "^2.1.9"
   }
 }
