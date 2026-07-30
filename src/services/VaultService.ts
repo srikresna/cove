@@ -4,13 +4,14 @@ import type { IMigrationRepository } from "../repositories/IMigrationRepository"
 import type { IVaultService, VaultStatus } from "./IVaultService";
 import { Logger } from "./Logger";
 import type { IDeviceBind } from "./vault/IDeviceBind";
-import type { IEncryptionService } from "./vault/IEncryptionService";
+import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
 import { type IKeychainStore, KEYRING_USERS } from "./vault/IKeychainStore";
 import type { ILegacyKeyStore } from "./vault/ILegacyKeyStore";
-import { coverAad, titleAad } from "./vault/aad";
+import { blobAad, coverAad, titleAad } from "./vault/aad";
 import {
   type Bytes,
   aesGcmDecrypt,
+  aesGcmDecryptBytes,
   base64ToBytes,
   bytesToBase64,
   computeIntegrityMac,
@@ -320,7 +321,8 @@ export class VaultService implements IVaultService {
       const failed =
         (await this.reencryptAllNotes(oldKey, rec.migrationCursor)) +
         (await this.reencryptAllCovers(oldKey)) +
-        (await this.reencryptAllTitles(oldKey));
+        (await this.reencryptAllTitles(oldKey)) +
+        (await this.reencryptAllBlobs(oldKey));
       if (failed === 0) {
         await this.kms.update({ migrationState: "complete", migrationCursor: null });
         await this.purgeLegacyKeyMaterial();
@@ -705,7 +707,8 @@ export class VaultService implements IVaultService {
     const failed =
       (await this.reencryptAllNotes(oldKey, null)) +
       (await this.reencryptAllCovers(oldKey)) +
-      (await this.reencryptAllTitles(oldKey));
+      (await this.reencryptAllTitles(oldKey)) +
+      (await this.reencryptAllBlobs(oldKey));
     if (failed === 0) {
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
       await this.purgeLegacyKeyMaterial();
@@ -782,6 +785,41 @@ export class VaultService implements IVaultService {
           failed += 1;
           await this.migrationRepo.recordFailure(
             aad,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+    }
+    return failed;
+  }
+
+  // DEK rotation must reencrypt every stored blob under the new key. Blobs are
+  // binary (random-IV ciphertext), so this uses the byte crypto path. Idempotent
+  // skip if a blob already decrypts under the new (session) DEK.
+  private async reencryptAllBlobs(oldKey: CryptoKey): Promise<number> {
+    let cursor: string | null = null;
+    let failed = 0;
+    for (;;) {
+      const batch = await this.migrationRepo.findAllBlobBatch(cursor, MIGRATION_BATCH);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        cursor = row.id;
+        const aad = blobAad(row.id);
+        try {
+          const plain = await aesGcmDecryptBytes(oldKey, row.content, encodeUtf8(aad));
+          const reencrypted = await this.crypto.encryptBlob(plain, aad);
+          await this.migrationRepo.markBlobMigrated(row.id, reencrypted);
+        } catch (err) {
+          if (isSystemicMigrationError(err)) throw err;
+          try {
+            await this.crypto.decryptBlob(row.content as EncryptedPayload, aad);
+            continue;
+          } catch (err2) {
+            if (isSystemicMigrationError(err2)) throw err2;
+          }
+          failed += 1;
+          await this.migrationRepo.recordFailure(
+            row.id,
             err instanceof Error ? err.message : String(err),
           );
         }

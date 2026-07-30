@@ -3,7 +3,7 @@ import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store"
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
 import { Text } from "@blocksuite/affine/store";
 import { TestWorkspace } from "@blocksuite/affine/store/test";
-import { vaultService } from "../../../di/container";
+import { blobSource, vaultService } from "../../../di/container";
 import { unpackBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { applySnapshot } from "../../../services/editor/yjsCodec";
 
@@ -23,7 +23,7 @@ export function getViewManager(): ViewExtensionManager {
 function getWorkspace(): TestWorkspace {
   if (!workspace) {
     const storeManager = new StoreExtensionManager(getInternalStoreExtensions());
-    workspace = new TestWorkspace({ id: "cove" });
+    workspace = new TestWorkspace({ id: "cove", blobSources: { main: blobSource } });
     workspace.storeExtensions = storeManager.get("store");
     workspace.meta.initialize();
   }

@@ -15,6 +15,9 @@ export interface IMigrationRepository {
   findAllCoverBatch(afterId: string | null, limit: number): Promise<LegacyRow[]>;
   markMigrated(id: string, encryptedContent: string): Promise<void>;
   markCoverMigrated(noteId: string, encryptedPayload: string): Promise<void>;
+  /** All stored blobs (for DEK rotation: reencrypt every blob under the new key). */
+  findAllBlobBatch(afterId: string | null, limit: number): Promise<LegacyRow[]>;
+  markBlobMigrated(id: string, encryptedPayload: string): Promise<void>;
   /** Batch of notes whose title is still plaintext (pre-H6), awaiting encryption. */
   findTitleBatch(afterId: string | null, limit: number): Promise<LegacyRow[]>;
   markTitleMigrated(id: string, encryptedTitle: string): Promise<void>;

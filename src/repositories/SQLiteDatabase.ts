@@ -261,5 +261,18 @@ export class SQLiteDatabase {
       await db.execute("DROP TABLE IF EXISTS notes_fts");
       await db.execute("PRAGMA user_version = 11");
     }
+
+    if (version < 12) {
+      // BlockSuite-native: persistent, vault-encrypted image/attachment blobs.
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS note_blobs (
+          id TEXT PRIMARY KEY,
+          payload TEXT NOT NULL,
+          kmsVersion INTEGER NOT NULL DEFAULT 1,
+          updatedAt INTEGER NOT NULL
+        )
+      `);
+      await db.execute("PRAGMA user_version = 12");
+    }
   }
 }

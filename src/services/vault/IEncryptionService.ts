@@ -1,4 +1,5 @@
 import type { EncryptedPayload } from "../../domain/EncryptedPayload";
+import type { Bytes } from "./crypto";
 
 export type { EncryptedPayload };
 
@@ -10,4 +11,7 @@ export interface IEncryptionService {
   decryptPayload(payloadB64: string, aad: string): Promise<string>;
   /** Current deterministic IV counter (== persisted value once session keys are loaded). */
   getIvCounter(): number;
+  /** Encrypt raw bytes (image/attachment blobs) with a random IV under the DEK. */
+  encryptBlob(plaintext: Bytes, aad: string): Promise<EncryptedPayload>;
+  decryptBlob(payload: EncryptedPayload, aad: string): Promise<Bytes>;
 }

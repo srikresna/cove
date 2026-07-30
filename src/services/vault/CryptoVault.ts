@@ -2,9 +2,12 @@ import { EncryptionError } from "../../errors/AppError";
 import type { IKmsRepository } from "../../repositories/IKmsRepository";
 import type { EncryptedPayload, IEncryptionService } from "./IEncryptionService";
 import {
+  type Bytes,
   IV_EXHAUSTION_LIMIT,
   aesGcmDecrypt,
+  aesGcmDecryptBytes,
   aesGcmEncrypt,
+  aesGcmEncryptBytes,
   counterToIv,
   encodeUtf8,
 } from "./crypto";
@@ -73,6 +76,25 @@ export class CryptoVault implements IEncryptionService {
           { cause },
         );
       }
+    }
+  }
+
+  async encryptBlob(plaintext: Bytes, aad: string): Promise<EncryptedPayload> {
+    if (!this.dek) {
+      throw new EncryptionError("key_unavailable", "Vault is locked; cannot encrypt.");
+    }
+    // Random IV per blob (not the deterministic counter) — see crypto.aesGcmEncryptBytes.
+    return (await aesGcmEncryptBytes(this.dek, plaintext, encodeUtf8(aad))) as EncryptedPayload;
+  }
+
+  async decryptBlob(payload: EncryptedPayload, aad: string): Promise<Bytes> {
+    if (!this.dek) {
+      throw new EncryptionError("key_unavailable", "Vault is locked; cannot decrypt.");
+    }
+    try {
+      return await aesGcmDecryptBytes(this.dek, payload, encodeUtf8(aad));
+    } catch (cause) {
+      throw new EncryptionError("decrypt_failed", "Could not decrypt blob.", { cause });
     }
   }
 }

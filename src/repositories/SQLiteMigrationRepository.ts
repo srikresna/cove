@@ -73,6 +73,36 @@ export class SQLiteMigrationRepository implements IMigrationRepository {
     }
   }
 
+  async findAllBlobBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    try {
+      const db = await this.getDb();
+      const rows = afterId
+        ? await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, payload AS content FROM note_blobs WHERE id > ? ORDER BY id LIMIT ?",
+            [afterId, limit],
+          )
+        : await db.select<Array<Record<string, unknown>>>(
+            "SELECT id, payload AS content FROM note_blobs ORDER BY id LIMIT ?",
+            [limit],
+          );
+      return rows.map((r) => ({ id: String(r.id), content: String(r.content) }));
+    } catch (err) {
+      throw toPersistenceError("migration.findAllBlobBatch", err);
+    }
+  }
+
+  async markBlobMigrated(id: string, encryptedPayload: string): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("UPDATE note_blobs SET payload = ?, kmsVersion = 1 WHERE id = ?", [
+        encryptedPayload,
+        id,
+      ]);
+    } catch (err) {
+      throw toPersistenceError("migration.markBlobMigrated", err);
+    }
+  }
+
   async markMigrated(id: string, encryptedContent: string): Promise<void> {
     try {
       const db = await this.getDb();

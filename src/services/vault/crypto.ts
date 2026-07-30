@@ -209,3 +209,45 @@ export async function aesGcmDecrypt(
   );
   return new TextDecoder().decode(pt);
 }
+
+// Byte-oriented AES-GCM for binary blobs (images/attachments). Uses a RANDOM IV
+// per call (not the deterministic counter): blobs are write-once (sourceId is
+// the sha of the bytes), so a fresh random 96-bit IV is safe (NIST SP 800-38D
+// §8.2.2) and does not consume the counter budget shared by content/title/cover.
+export async function aesGcmEncryptBytes(
+  key: CryptoKey,
+  plaintext: Bytes,
+  aad?: Bytes,
+): Promise<string> {
+  const iv = randomBytes(GCM_IV_BYTES);
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt(
+      aad ? { name: "AES-GCM", iv, additionalData: aad } : { name: "AES-GCM", iv },
+      key,
+      plaintext,
+    ),
+  );
+  const out = new Uint8Array(GCM_IV_BYTES + ct.byteLength);
+  out.set(iv, 0);
+  out.set(ct, GCM_IV_BYTES);
+  return bytesToBase64(out);
+}
+
+export async function aesGcmDecryptBytes(
+  key: CryptoKey,
+  payloadB64: string,
+  aad?: Bytes,
+): Promise<Bytes> {
+  const combined = base64ToBytes(payloadB64);
+  if (combined.byteLength < GCM_IV_BYTES + GCM_TAG_BYTES) {
+    throw new Error("payload too short");
+  }
+  const iv = combined.subarray(0, GCM_IV_BYTES);
+  const ct = combined.subarray(GCM_IV_BYTES);
+  const pt = await crypto.subtle.decrypt(
+    aad ? { name: "AES-GCM", iv, additionalData: aad } : { name: "AES-GCM", iv },
+    key,
+    ct,
+  );
+  return new Uint8Array(pt);
+}

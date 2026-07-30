@@ -13,6 +13,8 @@ const unlockedCrypto: IEncryptionService = {
   setSessionKeys: async () => {},
   clearSessionKeys: () => {},
   getIvCounter: () => 0,
+  encryptBlob: async () => "" as EncryptedPayload,
+  decryptBlob: async () => new Uint8Array(0),
   encryptPayload: async (p: string) => p as EncryptedPayload,
   decryptPayload: async (c: string) => c,
 };

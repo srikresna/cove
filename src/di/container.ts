@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
@@ -22,6 +23,7 @@ import { DeviceBind } from "../services/vault/DeviceBind";
 import type { IBackupService } from "../services/vault/IBackupService";
 import { KeyringKeychainStore } from "../services/vault/KeyringKeychainStore";
 import { LocalStorageLegacyKeyStore } from "../services/vault/LocalStorageLegacyKeyStore";
+import { SqliteBlobSource } from "../services/vault/SqliteBlobSource";
 import { TauriBackupService } from "../services/vault/backup";
 
 const kmsRepository = new SQLiteKmsRepository();
@@ -33,6 +35,10 @@ const noteRepository = new SQLiteNoteRepository();
 const workspaceRepository = new SQLiteWorkspaceRepository();
 const noteLinkRepository = new SQLiteNoteLinkRepository();
 const tagRepository = new SQLiteTagRepository();
+const blobRepository = new SQLiteBlobRepository();
+
+// Persistent, vault-encrypted BlobSource for BlockSuite images/attachments.
+export const blobSource = new SqliteBlobSource(blobRepository, cryptoVault);
 
 export const noteService: INoteService = new NoteService(
   noteRepository,
