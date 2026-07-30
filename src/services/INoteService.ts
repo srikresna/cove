@@ -12,6 +12,8 @@ export interface INoteService {
   getNote(id: string): Promise<Note | null>;
   searchAcrossWorkspaces(query: string): Promise<NoteSearchHit[]>;
   createNote(workspaceId: string, title?: string, content?: string, icon?: string): Promise<Note>;
+  /** Create a note with a caller-supplied ID (for BlockSuite "new doc" sync). */
+  createNoteWithId(workspaceId: string, id: string, title?: string): Promise<Note>;
   updateMetadata(
     id: string,
     updates: Partial<

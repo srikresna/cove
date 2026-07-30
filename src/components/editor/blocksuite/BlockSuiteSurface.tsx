@@ -39,10 +39,17 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     viewport.style.height = "100%";
     if (mode === "edgeless") {
       viewport.style.position = "relative";
-      viewport.style.overflow = "clip";
+      viewport.style.overflow = "hidden";
     }
     viewport.append(host);
     container.append(viewport);
+
+    // Activate the event dispatcher — it starts inactive and only activates on
+    // pointerenter if no outside element holds focus (the title input often
+    // does). Focusing the host ensures drag/click interactions work immediately.
+    requestAnimationFrame(() => {
+      host.focus();
+    });
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;

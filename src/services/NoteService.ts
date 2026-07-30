@@ -118,6 +118,29 @@ export class NoteService implements INoteService {
     return { ...rec, content, title };
   }
 
+  /** Create a note with a caller-supplied ID (for BlockSuite "new doc" sync). */
+  async createNoteWithId(
+    workspaceId: string,
+    id: string,
+    title = DEFAULT_NOTE_TITLE,
+  ): Promise<Note> {
+    this.assertUnlocked();
+    const content = EMPTY_NOTE_CONTENT;
+    const rec = await this.notes.createNote({
+      id,
+      workspaceId,
+      title: await this.crypto.encryptPayload(title, titleAad(id)),
+      titleKmsVersion: 1,
+      content: await this.crypto.encryptPayload(content, id),
+      icon: undefined,
+      coverColor: undefined,
+      isPinned: false,
+      isFavorite: false,
+    });
+    await this.links.replaceForSource(id, extractNoteLinkIds(content));
+    return { ...rec, content, title };
+  }
+
   async updateMetadata(
     id: string,
     updates: Partial<
