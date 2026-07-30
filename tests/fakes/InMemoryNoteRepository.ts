@@ -108,8 +108,9 @@ export class InMemoryNoteRepository implements INoteRepository {
   async setDeleted(id: string, deletedAt: number | null): Promise<void> {
     this.callLog.push(`setDeleted:${id}:${deletedAt}`);
     if (this.shouldFail) throw new Error("Fake repo error: setDeleted");
-    const note = this.notes.find((n) => n.id === id);
-    if (note) note.deletedAt = deletedAt ?? undefined;
+    this.notes = this.notes.map((n) =>
+      n.id === id ? { ...n, deletedAt: deletedAt ?? undefined } : n,
+    );
   }
 
   async findExpiredTrash(cutoff: number): Promise<string[]> {

@@ -1,8 +1,8 @@
 export interface Tag {
-  id: string;
-  name: string;
-  color: string;
-  createdAt: number;
+  readonly id: string;
+  readonly name: string;
+  readonly color: string;
+  readonly createdAt: number;
 }
 
 export const TAG_COLORS = [

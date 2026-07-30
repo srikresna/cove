@@ -1,7 +1,4 @@
-import {
-  extractBlockSuiteParagraphs,
-  extractBlockSuitePlainText,
-} from "../services/editor/blockSuiteContent";
+import { extractBlockSuiteParagraphs } from "../services/editor/blockSuiteContent";
 import { walkBlocks } from "./blockTree";
 
 function inlineText(content: unknown): string {
@@ -35,36 +32,10 @@ export function extractParagraphs(content: string): string[] {
 
 export function extractPlainText(content: string): string {
   if (!content) return "";
-  const blockSuiteText = extractBlockSuitePlainText(content);
-  if (blockSuiteText !== null) return blockSuiteText;
-  try {
-    const trimmed = content.trim();
-    if (trimmed.startsWith("[")) {
-      const blocks = JSON.parse(trimmed) as unknown;
-      if (Array.isArray(blocks)) {
-        let text = "";
-        for (const block of blocks) {
-          const inlineContent = block?.content;
-          if (inlineContent && Array.isArray(inlineContent)) {
-            for (const inline of inlineContent) {
-              if (
-                inline &&
-                typeof inline === "object" &&
-                "text" in inline &&
-                typeof inline.text === "string"
-              ) {
-                text += `${inline.text} `;
-              }
-            }
-          }
-        }
-        return text;
-      }
-    }
-    return content.replace(/<[^>]*>/g, " ");
-  } catch {
-    return content.replace(/<[^>]*>/g, " ");
-  }
+  // Single source of truth: reuse the preview extractor so body search, word
+  // counts, and the QuickSearch preview can never drift apart. (Previously this
+  // duplicated the inline extraction with a different separator and no trim.)
+  return extractParagraphs(content).join(" ").replace(/\s+/g, " ").trim();
 }
 
 export function countWordsAndChars(content: string): {

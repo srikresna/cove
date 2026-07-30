@@ -1,5 +1,5 @@
 import type { Tag } from "../domain/tag/Tag";
-import { makeTagId, nextTagColor, normalizeTagName } from "../domain/tag/Tag";
+import { nextTagColor, normalizeTagName } from "../domain/tag/Tag";
 import { ValidationError } from "../errors/AppError";
 import type { ITagRepository } from "../repositories/ITagRepository";
 import type { ITagService } from "./ITagService";
@@ -23,16 +23,10 @@ export class TagService implements ITagService {
     const normalized = normalizeTagName(name);
     if (!normalized) throw new ValidationError("Tag name cannot be empty.");
 
-    let tag = await this.tags.findByName(normalized);
-    if (!tag) {
-      tag = {
-        id: makeTagId(),
-        name: normalized,
-        color: nextTagColor(await this.tags.count()),
-        createdAt: Date.now(),
-      };
-      await this.tags.create(tag);
-    }
+    const tag = await this.tags.findOrCreateByName(
+      normalized,
+      nextTagColor(await this.tags.count()),
+    );
     await this.tags.addToNote(noteId, tag.id);
     return tag;
   }

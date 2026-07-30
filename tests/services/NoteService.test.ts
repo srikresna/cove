@@ -261,8 +261,9 @@ describe("NoteService", () => {
 
     await service.trashNote(expired.id);
     await service.trashNote(fresh.id);
-    const record = fakeRepo.notes.find((n) => n.id === expired.id);
-    if (record) record.deletedAt = Date.now() - 31 * 24 * 60 * 60 * 1000;
+    fakeRepo.notes = fakeRepo.notes.map((n) =>
+      n.id === expired.id ? { ...n, deletedAt: Date.now() - 31 * 24 * 60 * 60 * 1000 } : n,
+    );
 
     const purged = await service.purgeExpiredTrash();
     expect(purged).toBe(1);

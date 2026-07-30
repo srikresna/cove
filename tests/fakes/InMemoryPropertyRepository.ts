@@ -1,4 +1,4 @@
-import type { PropertyDefinition } from "@/domain/property/Property";
+import type { PropertyDefinition, PropertyOption } from "@/domain/property/Property";
 import type { IPropertyRepository, NotePropertyRecord } from "@/repositories/IPropertyRepository";
 
 export class InMemoryPropertyRepository implements IPropertyRepository {
@@ -14,8 +14,15 @@ export class InMemoryPropertyRepository implements IPropertyRepository {
   }
 
   async updateOptions(id: string, optionsJson: string): Promise<void> {
-    const def = this.definitions.find((d) => d.id === id);
-    if (def) def.options = JSON.parse(optionsJson);
+    const options = JSON.parse(optionsJson) as PropertyOption[];
+    this.definitions = this.definitions.map((d) => (d.id === id ? { ...d, options } : d));
+  }
+
+  async appendOption(id: string, optionJson: string): Promise<void> {
+    const option = JSON.parse(optionJson) as PropertyOption;
+    this.definitions = this.definitions.map((d) =>
+      d.id === id ? { ...d, options: [...d.options, option] } : d,
+    );
   }
 
   async deleteDefinition(id: string): Promise<void> {

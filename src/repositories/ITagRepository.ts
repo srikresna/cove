@@ -3,6 +3,7 @@ import type { Tag } from "../domain/tag/Tag";
 export interface ITagRepository {
   listAll(): Promise<Tag[]>;
   findByName(name: string): Promise<Tag | null>;
+  findOrCreateByName(name: string, color: string): Promise<Tag>;
   create(tag: Tag): Promise<void>;
   count(): Promise<number>;
   tagsForNote(noteId: string): Promise<Tag[]>;

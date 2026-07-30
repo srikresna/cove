@@ -15,6 +15,7 @@ import { normalizeTagName } from "../domain/tag/Tag";
 import { ValidationError } from "../errors/AppError";
 import type { IPropertyRepository } from "../repositories/IPropertyRepository";
 import type { IPropertyService } from "./IPropertyService";
+import { Logger } from "./Logger";
 
 export class PropertyService implements IPropertyService {
   constructor(private readonly properties: IPropertyRepository) {}
@@ -68,7 +69,7 @@ export class PropertyService implements IPropertyService {
       name: normalized,
       color: nextOptionColor(def.options.length),
     };
-    await this.properties.updateOptions(definitionId, JSON.stringify([...def.options, option]));
+    await this.properties.appendOption(definitionId, JSON.stringify(option));
     return option;
   }
 
@@ -83,7 +84,16 @@ export class PropertyService implements IPropertyService {
       const type = typeById.get(record.propertyId);
       if (!type) continue;
       const value = deserializePropertyValue(record.valueJson, type);
-      if (value) values.set(record.propertyId, value);
+      if (value) {
+        values.set(record.propertyId, value);
+      } else {
+        // Surface silent data drift (corrupt/truncated JSON or schema mismatch)
+        // instead of dropping the value with no trace.
+        Logger.warn("property: dropped undecodable value", {
+          noteId,
+          propertyId: record.propertyId,
+        });
+      }
     }
     return values;
   }

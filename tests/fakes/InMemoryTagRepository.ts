@@ -1,4 +1,4 @@
-import type { Tag } from "@/domain/tag/Tag";
+import { type Tag, makeTagId } from "@/domain/tag/Tag";
 import type { ITagRepository } from "@/repositories/ITagRepository";
 
 export class InMemoryTagRepository implements ITagRepository {
@@ -11,6 +11,14 @@ export class InMemoryTagRepository implements ITagRepository {
 
   async findByName(name: string): Promise<Tag | null> {
     return this.tags.find((t) => t.name.toLowerCase() === name.toLowerCase()) ?? null;
+  }
+
+  async findOrCreateByName(name: string, color: string): Promise<Tag> {
+    const existing = this.tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { ...existing };
+    const tag: Tag = { id: makeTagId(), name, color, createdAt: Date.now() };
+    this.tags.push(tag);
+    return { ...tag };
   }
 
   async create(tag: Tag): Promise<void> {

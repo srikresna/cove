@@ -1,4 +1,5 @@
-import type { Tag } from "../domain/tag/Tag";
+import { type Tag, makeTagId } from "../domain/tag/Tag";
+import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
 import type { ITagRepository } from "./ITagRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
@@ -39,6 +40,30 @@ export class SQLiteTagRepository implements ITagRepository {
       return rows[0] ? rowToTag(rows[0]) : null;
     } catch (err) {
       throw toPersistenceError("tags.findByName", err);
+    }
+  }
+
+  async findOrCreateByName(name: string, color: string): Promise<Tag> {
+    try {
+      const db = await this.getDb();
+      // Atomic find-or-create: INSERT OR IGNORE on UNIQUE(name), then read the
+      // canonical row. Closes the find-then-create race that surfaced UNIQUE
+      // violations as generic PersistenceErrors when two callers raced on a name.
+      await db.execute(
+        "INSERT OR IGNORE INTO tags (id, name, color, createdAt) VALUES (?, ?, ?, ?)",
+        [makeTagId(), name, color, Date.now()],
+      );
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT id, name, color, createdAt FROM tags WHERE name = ? COLLATE NOCASE",
+        [name],
+      );
+      const row = rows[0];
+      if (!row) {
+        throw new PersistenceError("tags.findOrCreateByName", "tag missing after upsert");
+      }
+      return rowToTag(row);
+    } catch (err) {
+      throw toPersistenceError("tags.findOrCreateByName", err);
     }
   }
 

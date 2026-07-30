@@ -1,12 +1,26 @@
 import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
+import { Logger } from "../services/Logger";
 import type { EncryptedPayload } from "../services/vault/IEncryptionService";
 import type { INoteRepository, NoteRecord } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
 // 1 = encrypted under the session DEK; 0 = pre-vault legacy row awaiting migration.
 const KMS_VERSION_DEK = 1;
+
+// FTS5 treats a raw query as query-syntax (operators, column filters, phrase
+// quotes), so a title containing `"`, `(`, `:` or operator words throws a syntax
+// error that would silently yield zero results. Wrap each token as a phrase so
+// the user's literal text is matched; returns "" when nothing usable remains.
+function sanitizeFtsQuery(query: string): string {
+  const phrases: string[] = [];
+  for (const token of query.trim().split(/\s+/)) {
+    const escaped = token.replace(/"/g, "");
+    if (escaped) phrases.push(`"${escaped}"`);
+  }
+  return phrases.join(" ");
+}
 
 export class SQLiteNoteRepository implements INoteRepository {
   private getDb() {
@@ -86,11 +100,13 @@ export class SQLiteNoteRepository implements INoteRepository {
   }
 
   async searchTitlesFts(query: string, limit: number): Promise<NoteSearchHit[]> {
+    const ftsQuery = sanitizeFtsQuery(query);
+    if (!ftsQuery) return [];
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
         "SELECT n.id, n.workspaceId, n.title, n.icon FROM notes_fts f JOIN notes n ON n.id = f.note_id WHERE notes_fts MATCH ? AND n.deletedAt IS NULL ORDER BY rank LIMIT ?",
-        [`${query}*`, limit],
+        [ftsQuery, limit],
       );
       return rows.map((r) => ({
         id: String(r.id),
@@ -99,7 +115,10 @@ export class SQLiteNoteRepository implements INoteRepository {
         icon: r.icon ? String(r.icon) : undefined,
         snippet: "",
       }));
-    } catch {
+    } catch (err) {
+      // FTS may be unavailable (SQLite build without FTS5) or the index corrupt;
+      // degrade to empty rather than aborting search. Body search still runs.
+      Logger.warn("searchTitlesFts failed; returning empty results", err, { query });
       return [];
     }
   }

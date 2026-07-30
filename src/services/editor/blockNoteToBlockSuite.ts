@@ -89,9 +89,11 @@ function convertBlock(block: BlockNoteBlock): ConvertedBlock[] {
 
   switch (block.type) {
     case "heading": {
-      const level = typeof block.props?.level === "number" ? block.props.level : 1;
-      const type = level === 2 ? "h2" : level === 3 ? "h3" : "h1";
-      return [{ flavour: "affine:paragraph", props: { type }, deltas, children }];
+      // Preserve every heading level BlockSuite supports (h1-h6); clamping to the
+      // valid range avoids flattening h4-h6 down to h1 on BlockNote migration.
+      const rawLevel = typeof block.props?.level === "number" ? block.props.level : 1;
+      const level = Math.min(Math.max(Math.trunc(rawLevel) || 1, 1), 6);
+      return [{ flavour: "affine:paragraph", props: { type: `h${level}` }, deltas, children }];
     }
     case "quote":
       return [{ flavour: "affine:paragraph", props: { type: "quote" }, deltas, children }];

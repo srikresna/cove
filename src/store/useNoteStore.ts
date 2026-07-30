@@ -138,10 +138,15 @@ export const useNoteStore = create<NoteState>((set, get) => {
       useSaveStatusStore.getState().setSaving();
 
       try {
-        if (updates.content !== undefined) {
-          await noteService.updateContent(id, updates.content);
-        } else {
-          await noteService.updateMetadata(id, updates);
+        // Persist content AND metadata together — the optimistic patch above
+        // already applied every field locally, so dropping any non-content field
+        // here would silently lose it on reload.
+        const { content, ...metadata } = updates;
+        if (content !== undefined) {
+          await noteService.updateContent(id, content);
+        }
+        if (Object.keys(metadata).length > 0) {
+          await noteService.updateMetadata(id, metadata);
         }
         useSaveStatusStore.getState().setSaved();
       } catch (err) {

@@ -17,17 +17,17 @@ export const PROPERTY_TYPES = [
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
 export interface PropertyOption {
-  id: string;
-  name: string;
-  color: string;
+  readonly id: string;
+  readonly name: string;
+  readonly color: string;
 }
 
 export interface PropertyDefinition {
-  id: string;
-  name: string;
-  type: PropertyType;
-  options: PropertyOption[];
-  createdAt: number;
+  readonly id: string;
+  readonly name: string;
+  readonly type: PropertyType;
+  readonly options: PropertyOption[];
+  readonly createdAt: number;
 }
 
 /** Typed value per property type; persisted as JSON. */

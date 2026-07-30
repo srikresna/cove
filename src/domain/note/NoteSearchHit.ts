@@ -1,7 +1,7 @@
 export interface NoteSearchHit {
-  id: string;
-  workspaceId: string;
-  title: string;
-  icon?: string;
-  snippet: string;
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly title: string;
+  readonly icon?: string;
+  readonly snippet: string;
 }
