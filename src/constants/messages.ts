@@ -1,8 +1,8 @@
-import { TRASH_RETENTION_DAYS } from "../domain/note/notePolicy";
+import { DEFAULT_NOTE_TITLE, TRASH_RETENTION_DAYS } from "../domain/note/notePolicy";
 
 export const MESSAGES = {
   APP_NAME: "Cove Notes",
-  UNTITLED_NOTE: "Untitled Note",
+  UNTITLED_NOTE: DEFAULT_NOTE_TITLE,
   NO_NOTE_SELECTED_TITLE: "No Note Selected",
   NO_NOTE_SELECTED_DESC:
     "Select a note from the left sidebar or create a fresh one to start capturing your thoughts!",

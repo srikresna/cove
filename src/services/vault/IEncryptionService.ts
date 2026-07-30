@@ -1,4 +1,6 @@
-export type EncryptedPayload = string & { readonly __encrypted: unique symbol };
+import type { EncryptedPayload } from "../../domain/EncryptedPayload";
+
+export type { EncryptedPayload };
 
 export interface IEncryptionService {
   isUnlocked(): boolean;

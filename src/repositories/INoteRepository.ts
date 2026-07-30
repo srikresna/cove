@@ -1,5 +1,5 @@
+import type { EncryptedPayload } from "../domain/EncryptedPayload";
 import type { Note } from "../domain/note/Note";
-import type { EncryptedPayload } from "../services/vault/IEncryptionService";
 
 export interface NoteRecord extends Omit<Note, "content" | "title"> {
   content: EncryptedPayload;

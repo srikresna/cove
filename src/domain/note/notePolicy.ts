@@ -1,7 +1,8 @@
-import { DEFAULT_NOTE_CONTENT, DEFAULT_NOTE_TITLE } from "../../constants/app";
 import type { Note } from "./Note";
 
-export { DEFAULT_NOTE_TITLE, DEFAULT_NOTE_CONTENT as EMPTY_NOTE_CONTENT };
+export const DEFAULT_NOTE_TITLE = "Untitled Note";
+export const DEFAULT_NOTE_CONTENT = '[{"type":"paragraph","content":[]}]';
+export { DEFAULT_NOTE_CONTENT as EMPTY_NOTE_CONTENT };
 
 export const makeNoteId = (): string => crypto.randomUUID();
 
