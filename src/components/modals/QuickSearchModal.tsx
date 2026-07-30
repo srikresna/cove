@@ -6,9 +6,8 @@ import { MESSAGES } from "../../constants/messages";
 import { noteService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
-import { presentError } from "../../services/errorPresenter";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { useNotificationStore } from "../../store/useNotificationStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { extractParagraphs } from "../../utils/plainText";
 import { formatFullTimestamp } from "../../utils/time";
@@ -118,12 +117,7 @@ export const QuickSearchModal: React.FC = () => {
         setHits(await noteService.searchAcrossWorkspaces(q));
       } catch (err) {
         setHits([]);
-        const p = presentError(err);
-        useNotificationStore.getState().pushToast({
-          kind: p.kind,
-          title: p.toastTitle,
-          description: p.toastDescription,
-        });
+        notifyError(err);
       } finally {
         setLoading(false);
       }

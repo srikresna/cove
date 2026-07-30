@@ -27,9 +27,8 @@ import type {
 } from "../../domain/property/Property";
 import { PROPERTY_TYPES, hasOptions } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
-import { presentError } from "../../services/errorPresenter";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { useNotificationStore } from "../../store/useNotificationStore";
 import type { Note } from "../../types";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -200,15 +199,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   const [newName, setNewName] = useState("");
   const notes = useNoteStore((s) => s.notes);
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
-  const pushToast = useNotificationStore((s) => s.pushToast);
-
-  const notifyError = useCallback(
-    (err: unknown) => {
-      const p = presentError(err);
-      pushToast({ kind: p.kind, title: p.toastTitle, description: p.toastDescription });
-    },
-    [pushToast],
-  );
 
   const reload = useCallback(() => {
     Promise.all([propertyService.listDefinitions(), propertyService.valuesForNote(note.id)])
@@ -217,7 +207,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         setValues(vals);
       })
       .catch(notifyError);
-  }, [note.id, notifyError]);
+  }, [note.id]);
 
   useEffect(() => {
     reload();

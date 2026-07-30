@@ -6,9 +6,8 @@ import { noteService } from "../../di/container";
 import { cn } from "../../lib/utils";
 import type { NoteMeta } from "../../services/INoteService";
 import { extractBlockSuiteHeadings } from "../../services/editor/blockSuiteContent";
-import { presentError } from "../../services/errorPresenter";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { useNotificationStore } from "../../store/useNotificationStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { walkBlocks } from "../../utils/blockTree";
@@ -88,12 +87,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({ note, scrollRef,
       .then(setBacklinks)
       .catch((err) => {
         setBacklinks([]);
-        const p = presentError(err);
-        useNotificationStore.getState().pushToast({
-          kind: p.kind,
-          title: p.toastTitle,
-          description: p.toastDescription,
-        });
+        notifyError(err);
       });
   }, [note.id]);
 

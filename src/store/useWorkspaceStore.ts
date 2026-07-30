@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import { workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
-import { presentError } from "../services/errorPresenter";
-import { useNotificationStore } from "./useNotificationStore";
+import { notifyError } from "./notify";
 
 export type EditorEngine = "blocknote" | "blocksuite";
 
@@ -42,15 +41,6 @@ const EDITOR_ENGINE_KEY = "cove_editor_engine";
 const getInitialEditorEngine = (): EditorEngine => {
   return localStorage.getItem(EDITOR_ENGINE_KEY) === "blocksuite" ? "blocksuite" : "blocknote";
 };
-
-function notifyError(err: unknown): void {
-  const p = presentError(err);
-  useNotificationStore.getState().pushToast({
-    kind: p.kind,
-    title: p.toastTitle,
-    description: p.toastDescription,
-  });
-}
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],

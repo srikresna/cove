@@ -5,9 +5,8 @@ import { MESSAGES } from "../../constants/messages";
 import { tagService } from "../../di/container";
 import type { Tag } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
-import { presentError } from "../../services/errorPresenter";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { useNotificationStore } from "../../store/useNotificationStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
@@ -79,21 +78,12 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
   const [query, setQuery] = useState("");
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const moveNoteToWorkspace = useNoteStore((s) => s.moveNoteToWorkspace);
-  const pushToast = useNotificationStore((s) => s.pushToast);
 
   const workspace = workspaces.find((w) => w.id === note.workspaceId);
 
-  const notifyError = useCallback(
-    (err: unknown) => {
-      const p = presentError(err);
-      pushToast({ kind: p.kind, title: p.toastTitle, description: p.toastDescription });
-    },
-    [pushToast],
-  );
-
   const refreshTags = useCallback(() => {
     tagService.tagsForNote(note.id).then(setTags).catch(notifyError);
-  }, [note.id, notifyError]);
+  }, [note.id]);
 
   useEffect(() => {
     refreshTags();

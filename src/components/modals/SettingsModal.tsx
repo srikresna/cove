@@ -3,7 +3,7 @@ import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { backupService } from "../../di/container";
-import { presentError } from "../../services/errorPresenter";
+import { notifyError } from "../../store/notify";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
@@ -31,11 +31,6 @@ export const SettingsModal: React.FC = () => {
   const [isChangePassOpen, setChangePassOpen] = useState(false);
   const [pendingRestorePath, setPendingRestorePath] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
-
-  const notifyError = (err: unknown) => {
-    const p = presentError(err);
-    pushToast({ kind: p.kind, title: p.toastTitle, description: p.toastDescription });
-  };
 
   const handleTrustDeviceToggle = async () => {
     try {

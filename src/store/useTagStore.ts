@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import { tagService, vaultService } from "../di/container";
 import type { Tag } from "../domain/tag/Tag";
-import { presentError } from "../services/errorPresenter";
-import { useNotificationStore } from "./useNotificationStore";
+import { notifyError } from "./notify";
 
 interface TagState {
   tags: Tag[];
@@ -13,15 +12,6 @@ interface TagState {
   setTagFilter: (tagId: string | null) => Promise<void>;
   /** Re-sync tag list and the active filter after note-tag mutations. */
   refresh: () => Promise<void>;
-}
-
-function notifyError(err: unknown): void {
-  const p = presentError(err);
-  useNotificationStore.getState().pushToast({
-    kind: p.kind,
-    title: p.toastTitle,
-    description: p.toastDescription,
-  });
 }
 
 export const useTagStore = create<TagState>((set, get) => ({
