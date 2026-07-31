@@ -91,6 +91,13 @@
 
 /* ── BlockSuite surface: bridge Cove tokens onto --affine-* variables ── */
 
+/* Container query: the drag-handle widget uses @container viewport to position
+   itself. Without this the handle never appears. */
+.affine-page-viewport {
+  container-name: viewport;
+  container-type: inline-size;
+}
+
 .affine-page-viewport,
 .affine-edgeless-viewport {
   --affine-font-family: "Instrument Serif", "Inter Variable", Georgia, serif;

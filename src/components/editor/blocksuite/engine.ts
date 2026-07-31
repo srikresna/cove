@@ -1,3 +1,4 @@
+import "@blocksuite/affine/effects";
 import { StoreExtensionManager, ViewExtensionManager } from "@blocksuite/affine/ext-loader";
 import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store";
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";

@@ -37,11 +37,22 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     const viewport = document.createElement("div");
     viewport.className = mode === "edgeless" ? "affine-edgeless-viewport" : "affine-page-viewport";
     viewport.style.height = "100%";
+    // BlockSuite theme CSS resolves via [data-theme]; the viewport needs its own
+    // for scoped variable resolution.
+    viewport.dataset.theme = document.documentElement.dataset.theme ?? "light";
     if (mode === "edgeless") {
+      // Edgeless needs a positioned, clipped inner container for hit-testing
+      // and panning — the host must not be a direct child of the viewport.
       viewport.style.position = "relative";
-      viewport.style.overflow = "hidden";
+      const inner = document.createElement("div");
+      inner.style.position = "relative";
+      inner.style.overflow = "clip";
+      inner.style.height = "100%";
+      inner.append(host);
+      viewport.append(inner);
+    } else {
+      viewport.append(host);
     }
-    viewport.append(host);
     container.append(viewport);
 
     // Activate the event dispatcher — it starts inactive and only activates on
