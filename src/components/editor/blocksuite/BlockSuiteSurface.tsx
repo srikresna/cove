@@ -1,8 +1,18 @@
 import "@toeverything/theme/style.css";
 import "@toeverything/theme/fonts.css";
+import {
+  CommunityCanvasTextFonts,
+  DocModeProvider,
+  EditorSettingExtension,
+  FeatureFlagService,
+  FontConfigExtension,
+} from "@blocksuite/affine/shared/services";
+import type { ExtensionType } from "@blocksuite/affine/store";
+import type { DocMode } from "@blocksuite/affine/model";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import type { DocMode } from "../../../domain/note/Note";
+import { signal } from "@preact/signals-core";
+import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
@@ -13,17 +23,35 @@ const SAVE_DEBOUNCE_MS = 800;
 
 interface BlockSuiteSurfaceProps {
   note: Note;
-  mode: DocMode;
+  mode: CoveDocMode;
 }
 
 /**
- * Mounts the BlockSuite editor using the `affine-editor-container` web component
- * — the exact same element the AFFiNE playground uses. The container handles
- * viewport CSS (container queries for drag handle), data-theme from ThemeProvider,
- * the 3-layer DOM structure (viewport → inner container → host), mode switching,
- * and the full Lit lifecycle. This replaces the previous manual BlockStdScope +
- * imperative DOM approach which was missing critical setup.
+ * Builds the common service extensions the editor needs (same pattern as the
+ * AFFiNE playground's getTestCommonExtensions). Without these, the drag handle,
+ * doc-mode switching, and font rendering don't work.
  */
+function buildCommonExtensions(mode: DocMode): ExtensionType[] {
+  const modeSignal = signal<DocMode>(mode);
+  return [
+    FontConfigExtension(CommunityCanvasTextFonts),
+    EditorSettingExtension({ setting$: signal({}) }),
+    {
+      name: "cove-doc-mode",
+      setup: (di: { override: (token: unknown, factory: () => unknown) => void }) => {
+        di.override(DocModeProvider, () => ({
+          getPrimaryMode$: () => modeSignal,
+          getPrimaryMode: () => modeSignal.value,
+          setPrimaryMode: (_docId: string, m: DocMode) => {
+            modeSignal.value = m;
+          },
+          onPrimaryModeChange: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }),
+        }));
+      },
+    },
+  ];
+}
+
 export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const noteId = note.id;
@@ -35,13 +63,24 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     if (!container) return;
 
     const doc = openNoteDoc(noteId, initialContent.current);
+    const store = doc.getStore();
 
-    // Create the editor container — registered globally by engine.ts.
+    // Enable advanced block visibility (drag handle, add-block button, etc.)
+    // Without this flag, the drag handle widget stays hidden.
+    try {
+      store.get(FeatureFlagService).setFlag("enable_advanced_block_visibility", true);
+    } catch {
+      // FeatureFlagService might not be registered yet.
+    }
+
+    // Build the editor with common service extensions (same as the playground).
+    const commonExtensions = buildCommonExtensions(mode as DocMode);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const editor = document.createElement("affine-editor-container") as any;
-    editor.doc = doc.getStore();
-    editor.pageSpecs = [...getViewManager().get("page")];
-    editor.edgelessSpecs = [...getViewManager().get("edgeless")];
+    editor.doc = store;
+    editor.pageSpecs = [...getViewManager().get("page"), ...commonExtensions];
+    editor.edgelessSpecs = [...getViewManager().get("edgeless"), ...commonExtensions];
     editor.mode = mode;
     editor.autofocus = true;
     container.append(editor);
