@@ -82,15 +82,8 @@ function getWorkspace(): TestWorkspace {
 export function openNoteDoc(noteId: string, content: string): CoveDoc {
   const ws = getWorkspace();
   coveOwnedDocIds.add(noteId);
-  const existedBefore = ws.getDoc(noteId) != null;
-  const doc = existedBefore ? ws.getDoc(noteId)! : ws.createDoc(noteId);
+  const doc = ws.getDoc(noteId) ?? ws.createDoc(noteId);
   if (!initializedDocs.has(noteId)) {
-    if (existedBefore) {
-      // Doc was created externally (BlockSuite @-popover "new doc"). It already
-      // has content — don't overwrite with DB content, just mark initialized.
-      initializedDocs.add(noteId);
-      return doc;
-    }
     const snapshotB64 = unpackBlockSuiteContent(content);
     if (snapshotB64) {
       doc.load();

@@ -1,6 +1,5 @@
 import "@toeverything/theme/style.css";
 import "@toeverything/theme/fonts.css";
-import { FeatureFlagService } from "@blocksuite/affine/shared/services";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import type { DocMode } from "../../../domain/note/Note";
@@ -28,19 +27,10 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     if (!container) return;
 
     const doc = openNoteDoc(noteId, initialContent.current);
-    const store = doc.getStore();
-
-    // Enable the feature flag that controls drag handle / add-block visibility.
-    // This is the key difference between Cove and the AFFiNE playground setup.
-    try {
-      store.get(FeatureFlagService).setFlag("enable_advanced_block_visibility", true);
-    } catch {
-      // FeatureFlagService might not be registered yet.
-    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const editor = document.createElement("affine-editor-container") as any;
-    editor.doc = store;
+    editor.doc = doc.getStore();
     editor.pageSpecs = [...getViewManager().get("page")];
     editor.edgelessSpecs = [...getViewManager().get("edgeless")];
     editor.mode = mode;
