@@ -23,6 +23,22 @@ const initializedDocs = new Set<string>();
 // IDs of docs Cove opened itself (vs BlockSuite-initiated "new doc" creates).
 const coveOwnedDocIds = new Set<string>();
 
+/**
+ * Registers existing Cove notes as lightweight doc metadata in the BlockSuite
+ * workspace so the @-mention / linked-doc popover can find them. Without this,
+ * only notes that have been opened in the editor appear in the @-mention search.
+ */
+export function registerExistingNotes(ids: string[]): void {
+  const ws = workspace;
+  if (!ws) return;
+  for (const id of ids) {
+    if (coveOwnedDocIds.has(id)) continue;
+    if (ws.getDoc(id)) continue;
+    coveOwnedDocIds.add(id);
+    ws.createDoc(id);
+  }
+}
+
 export function getViewManager(): ViewExtensionManager {
   if (!viewManager) {
     viewManager = new ViewExtensionManager(getInternalViewExtensions());
