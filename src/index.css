@@ -91,6 +91,12 @@
 
 /* ── BlockSuite surface: match TestAffineEditorContainer CSS exactly ── */
 
+/* Hide the container's built-in doc-title — Cove renders its own title via
+   EditorHeader (with icon picker, cover image, etc.). */
+doc-title {
+  display: none;
+}
+
 .affine-page-viewport,
 .affine-edgeless-viewport {
   --affine-font-family: "Instrument Serif", "Inter Variable", Georgia, serif;

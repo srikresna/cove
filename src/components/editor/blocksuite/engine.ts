@@ -9,11 +9,11 @@ import { applySnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 
-// Register the affine-editor-container web component — the same element the
-// AFFiNE playground uses. It wraps BlockStdScope with proper viewport CSS,
-// data-theme, container queries, and lifecycle management.
-import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
-registerEditorContainer();
+// Register ALL BlockSuite custom elements (drag handle, slash menu, edgeless
+// widgets, block components, etc.) by calling every package's effects() function.
+// BlockSuite v0.27.0 doesn't self-register via @customElement — it uses per-
+// package effects() that must be explicitly called.
+import "./register-effects";
 
 type CoveDoc = NonNullable<ReturnType<TestWorkspace["getDoc"]>>;
 
