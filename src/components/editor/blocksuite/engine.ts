@@ -32,7 +32,7 @@ function getWorkspace(): TestWorkspace {
     workspace.meta.initialize();
     // Intercept BlockSuite's "new doc" creation (@-popover / slash menu) and
     // sync it to Cove's DB so the note persists + appears in the sidebar.
-    workspace.meta.docMetaAdded.on(async (docId: string) => {
+    workspace.meta.docMetaAdded.subscribe(async (docId: string) => {
       if (coveOwnedDocIds.has(docId)) return; // Cove opened this doc itself
       coveOwnedDocIds.add(docId);
       const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
