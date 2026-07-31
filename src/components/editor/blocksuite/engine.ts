@@ -1,6 +1,7 @@
 import { StoreExtensionManager, ViewExtensionManager } from "@blocksuite/affine/ext-loader";
 import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store";
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
+import { FeatureFlagService } from "@blocksuite/affine/shared/services";
 import { Text } from "@blocksuite/affine/store";
 import { TestWorkspace } from "@blocksuite/affine/store/test";
 import { blobSource, noteService, vaultService } from "../../../di/container";
@@ -100,6 +101,13 @@ export function openNoteDoc(noteId: string, content: string): CoveDoc {
       });
     }
     doc.getStore().resetHistory();
+    // Enable the feature flag that controls drag handle + add-block visibility.
+    // Set AFTER doc initialization to avoid interfering with block seeding.
+    try {
+      doc.getStore().get(FeatureFlagService).setFlag("enable_advanced_block_visibility", true);
+    } catch {
+      // FeatureFlagService might not be available for some doc types.
+    }
     initializedDocs.add(noteId);
   }
   return doc;
