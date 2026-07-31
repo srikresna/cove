@@ -91,6 +91,14 @@
 
 /* ── BlockSuite surface: match TestAffineEditorContainer CSS exactly ── */
 
+/* The affine-editor-container custom element defaults to display:inline (HTML
+   spec for unknown elements) which gives it 0 height — the drag handle, edgeless
+   viewport, and all position-aware widgets break. Force block + full height. */
+affine-editor-container {
+  display: block;
+  height: 100%;
+}
+
 /* Hide the container's built-in doc-title — Cove renders its own title via
    EditorHeader (with icon picker, cover image, etc.). */
 doc-title {
