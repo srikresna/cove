@@ -1,4 +1,3 @@
-import "@blocksuite/affine/effects";
 import { StoreExtensionManager, ViewExtensionManager } from "@blocksuite/affine/ext-loader";
 import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store";
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
@@ -9,6 +8,12 @@ import { unpackBlockSuiteContent } from "../../../services/editor/contentFormat"
 import { applySnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
+
+// Register the affine-editor-container web component — the same element the
+// AFFiNE playground uses. It wraps BlockStdScope with proper viewport CSS,
+// data-theme, container queries, and lifecycle management.
+import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
+registerEditorContainer();
 
 type CoveDoc = NonNullable<ReturnType<TestWorkspace["getDoc"]>>;
 

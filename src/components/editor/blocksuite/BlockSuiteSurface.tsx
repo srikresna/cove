@@ -1,7 +1,5 @@
 import "@toeverything/theme/style.css";
 import "@toeverything/theme/fonts.css";
-import { ThemeProvider } from "@blocksuite/affine/shared/services";
-import { BlockStdScope } from "@blocksuite/affine/std";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import type { DocMode } from "../../../domain/note/Note";
@@ -19,17 +17,12 @@ interface BlockSuiteSurfaceProps {
 }
 
 /**
- * Mounts the BlockSuite editor, mirroring the structure of the AFFiNE playground's
- * TestAffineEditorContainer exactly:
- *
- *   <div class="affine-page-viewport" data-theme="...">
- *     <div class="page-editor playground-page-editor-container">
- *       host (BlockStdScope.render())
- *     </div>
- *   </div>
- *
- * The 3-layer structure + CSS container-queries + data-theme from ThemeProvider
- * are load-bearing for widgets (drag handle, slash menu, edgeless interaction).
+ * Mounts the BlockSuite editor using the `affine-editor-container` web component
+ * — the exact same element the AFFiNE playground uses. The container handles
+ * viewport CSS (container queries for drag handle), data-theme from ThemeProvider,
+ * the 3-layer DOM structure (viewport → inner container → host), mode switching,
+ * and the full Lit lifecycle. This replaces the previous manual BlockStdScope +
+ * imperative DOM approach which was missing critical setup.
  */
 export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,43 +35,18 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     if (!container) return;
 
     const doc = openNoteDoc(noteId, initialContent.current);
-    const scope = new BlockStdScope({
-      store: doc.getStore(),
-      extensions: getViewManager().get(mode),
-    });
-    const host = scope.render();
 
-    // Read theme from BlockSuite's ThemeProvider (NOT Cove's dark mode — BlockSuite
-    // has its own theme service that feeds [data-theme]).
-    let theme = "light";
-    try {
-      const themeService = scope.get(ThemeProvider);
-      theme = mode === "page" ? themeService.app$.value : themeService.edgeless$.value;
-    } catch {
-      // ThemeProvider might not be available immediately.
-    }
+    // Create the editor container — registered globally by engine.ts.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const editor = document.createElement("affine-editor-container") as any;
+    editor.doc = doc.getStore();
+    editor.pageSpecs = [...getViewManager().get("page")];
+    editor.edgelessSpecs = [...getViewManager().get("edgeless")];
+    editor.mode = mode;
+    editor.autofocus = true;
+    container.append(editor);
 
-    // --- Match TestAffineEditorContainer.render() structure exactly ---
-    const viewport = document.createElement("div");
-    viewport.className = mode === "edgeless" ? "affine-edgeless-viewport" : "affine-page-viewport";
-    viewport.dataset.theme = theme;
-
-    // Inner editor container — the class name is load-bearing for widget CSS.
-    const inner = document.createElement("div");
-    inner.className =
-      mode === "edgeless"
-        ? "edgeless-editor-container"
-        : "page-editor playground-page-editor-container";
-    inner.append(host);
-    viewport.append(inner);
-    container.append(viewport);
-
-    // Focus the editor for interaction (the event dispatcher starts inactive).
-    requestAnimationFrame(() => {
-      host.focus();
-    });
-
-    // --- Debounced save on doc update ---
+    // Debounced save on doc update.
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;
     const flush = () => {
@@ -98,7 +66,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
       doc.spaceDoc.off("update", onUpdate);
       if (timer) clearTimeout(timer);
       if (pending) flush();
-      viewport.remove();
+      editor.remove();
     };
   }, [noteId, mode]);
 
