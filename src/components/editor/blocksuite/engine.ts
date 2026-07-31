@@ -59,8 +59,12 @@ function getWorkspace(): TestWorkspace {
       coveOwnedDocIds.add(docId);
       const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
       if (!activeWs) return;
+      // Read the title BlockSuite assigned to the new doc (user typed it in the
+      // @-popover / slash-menu "Create doc" input).
+      const meta = workspace?.meta.getDocMeta(docId);
+      const title = meta?.title ?? undefined;
       try {
-        await noteService.createNoteWithId(activeWs, docId);
+        await noteService.createNoteWithId(activeWs, docId, title);
         await useNoteStore.getState().fetchNotes(activeWs);
       } catch {
         // Best-effort: if DB sync fails, the doc still exists in-memory.
@@ -77,8 +81,15 @@ function getWorkspace(): TestWorkspace {
 export function openNoteDoc(noteId: string, content: string): CoveDoc {
   const ws = getWorkspace();
   coveOwnedDocIds.add(noteId);
-  const doc = ws.getDoc(noteId) ?? ws.createDoc(noteId);
+  const existedBefore = ws.getDoc(noteId) != null;
+  const doc = existedBefore ? ws.getDoc(noteId)! : ws.createDoc(noteId);
   if (!initializedDocs.has(noteId)) {
+    if (existedBefore) {
+      // Doc was created externally (BlockSuite @-popover "new doc"). It already
+      // has content — don't overwrite with DB content, just mark initialized.
+      initializedDocs.add(noteId);
+      return doc;
+    }
     const snapshotB64 = unpackBlockSuiteContent(content);
     if (snapshotB64) {
       doc.load();
