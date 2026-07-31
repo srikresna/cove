@@ -83,7 +83,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
         const notes = await noteService.listMetadataByWorkspace(workspaceId);
         // Register all notes in the BlockSuite workspace so @-mention search
         // can find them (not just notes that have been opened in the editor).
-        registerExistingNotes(notes.map((n) => n.id));
+        registerExistingNotes(notes.map((n) => ({ id: n.id, title: n.title })));
         const first = notes[0];
         set({ notes, activeNoteId: first ? first.id : null, activeCoverImage: null });
       } catch (err) {

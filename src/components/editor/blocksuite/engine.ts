@@ -26,18 +26,27 @@ const initializedDocs = new Set<string>();
 const coveOwnedDocIds = new Set<string>();
 
 /**
- * Registers existing Cove notes as lightweight doc metadata in the BlockSuite
- * workspace so the @-mention / linked-doc popover can find them. Without this,
- * only notes that have been opened in the editor appear in the @-mention search.
+ * Registers existing Cove notes in the BlockSuite workspace with their titles so
+ * the @-mention / linked-doc popover can find them by name.
  */
-export function registerExistingNotes(ids: string[]): void {
+export function registerExistingNotes(notes: Array<{ id: string; title: string }>): void {
   const ws = workspace;
   if (!ws) return;
-  for (const id of ids) {
+  for (const { id, title } of notes) {
     if (coveOwnedDocIds.has(id)) continue;
     if (ws.getDoc(id)) continue;
     coveOwnedDocIds.add(id);
-    ws.createDoc(id);
+    // Create the doc WITH the title set on the page block — this is what the
+    // linked-doc search reads. Without a title, all notes show "Untitled".
+    const doc = ws.createDoc(id);
+    doc.load(() => {
+      const store = doc.getStore();
+      const rootId = store.addBlock("affine:page", { title: new Text(title) });
+      store.addBlock("affine:surface", {}, rootId);
+      const noteBlockId = store.addBlock("affine:note", {}, rootId);
+      store.addBlock("affine:paragraph", {}, noteBlockId);
+    });
+    doc.getStore().resetHistory();
   }
 }
 
@@ -86,13 +95,14 @@ export function openNoteDoc(noteId: string, content: string): CoveDoc {
   const doc = ws.getDoc(noteId) ?? ws.createDoc(noteId);
   if (!initializedDocs.has(noteId)) {
     const snapshotB64 = unpackBlockSuiteContent(content);
+    const store = doc.getStore();
+    const hasExistingBlocks = store.rootIds.length > 0;
     if (snapshotB64) {
+      // Real BlockSuite content from DB — apply it (overwrites any placeholder blocks).
       doc.load();
       applySnapshot(doc.spaceDoc, snapshotB64);
-    } else {
-      // Non-envelope content (a brand-new note, or a pre-BlockSuite note): seed
-      // an empty BlockSuite doc. The first save writes the real snapshot.
-      const store = doc.getStore();
+    } else if (!hasExistingBlocks) {
+      // No content AND no existing blocks — create default structure.
       doc.load(() => {
         const rootId = store.addBlock("affine:page", { title: new Text() });
         store.addBlock("affine:surface", {}, rootId);
@@ -100,6 +110,7 @@ export function openNoteDoc(noteId: string, content: string): CoveDoc {
         store.addBlock("affine:paragraph", {}, noteBlockId);
       });
     }
+    // else: doc has placeholder blocks from registerExistingNotes (title + paragraph) — keep as-is.
     doc.getStore().resetHistory();
     // Enable the feature flag that controls drag handle + add-block visibility.
     // Set AFTER doc initialization to avoid interfering with block seeding.
