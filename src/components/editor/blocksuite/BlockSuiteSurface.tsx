@@ -1,8 +1,20 @@
 import "@toeverything/theme/style.css";
 import "@toeverything/theme/fonts.css";
+import {
+  CommunityCanvasTextFonts,
+  type DocModeProvider,
+  DocModeProvider as DocModeProviderToken,
+  EditorSettingExtension,
+  FontConfigExtension,
+  GeneralSettingSchema,
+} from "@blocksuite/affine/shared/services";
+import type { ExtensionType } from "@blocksuite/affine/store";
+import type { DocMode } from "@blocksuite/affine/model";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import type { DocMode } from "../../../domain/note/Note";
+import { signal } from "@preact/signals-core";
+import { Subject } from "rxjs";
+import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
@@ -13,7 +25,48 @@ const SAVE_DEBOUNCE_MS = 800;
 
 interface BlockSuiteSurfaceProps {
   note: Note;
-  mode: DocMode;
+  mode: CoveDocMode;
+}
+
+// Per-doc RxJS subjects for DocModeProvider.onPrimaryModeChange.
+const modeSubjects = new Map<string, Subject<DocMode>>();
+function getModeSubject(docId: string): Subject<DocMode> {
+  let s = modeSubjects.get(docId);
+  if (!s) {
+    s = new Subject<DocMode>();
+    modeSubjects.set(docId, s);
+  }
+  return s;
+}
+
+/**
+ * Builds common service extensions matching the AFFiNE playground setup.
+ * DocModeProvider is CRITICAL: without it, `widget.mode` is undefined, and the
+ * drag handle's `_canEditing` check always fails (mode !== 'page').
+ */
+function buildCommonExtensions(): ExtensionType[] {
+  // DocModeProvider instance (NOT a factory — di.override expects the instance).
+  const docModeService: DocModeProvider = {
+    getPrimaryMode: () => "page" as DocMode,
+    setPrimaryMode: (docId: string, mode: DocMode) => {
+      getModeSubject(docId).next(mode);
+    },
+    getPrimaryMode$: () => signal("page" as DocMode),
+    onPrimaryModeChange: (docId: string) => getModeSubject(docId),
+  };
+
+  return [
+    FontConfigExtension(CommunityCanvasTextFonts),
+    EditorSettingExtension({
+      setting$: signal({ ...GeneralSettingSchema.default }),
+    }),
+    {
+      name: "cove-services",
+      setup: (di: { override: (token: unknown, value: unknown) => void }) => {
+        di.override(DocModeProviderToken, docModeService);
+      },
+    },
+  ];
 }
 
 export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode }) => {
@@ -27,45 +80,16 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     if (!container) return;
 
     const doc = openNoteDoc(noteId, initialContent.current);
+    const common = buildCommonExtensions();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const editor = document.createElement("affine-editor-container") as any;
     editor.doc = doc.getStore();
-    editor.pageSpecs = [...getViewManager().get("page")];
-    editor.edgelessSpecs = [...getViewManager().get("edgeless")];
+    editor.pageSpecs = [...getViewManager().get("page"), ...common];
+    editor.edgelessSpecs = [...getViewManager().get("edgeless"), ...common];
     editor.mode = mode;
     editor.autofocus = true;
     container.append(editor);
-
-    // DIAGNOSTIC: check drag handle widget + inner container + pointer events.
-    requestAnimationFrame(() => {
-      const handle = editor.querySelector("affine-drag-handle-widget");
-      const pageRoot = editor.querySelector("affine-page-root");
-      // Check inner container (the actual visible handle, display:none until pointermove)
-      const innerDivs = handle?.querySelectorAll?.("div");
-      const innerInfo = innerDivs?.[0]
-        ? {
-            display: getComputedStyle(innerDivs[0] as Element).display,
-            width: getComputedStyle(innerDivs[0] as Element).width,
-            height: getComputedStyle(innerDivs[0] as Element).height,
-          }
-        : "no inner divs";
-      // biome-ignore lint/suspicious/noConsole: diagnostic
-      console.log("[drag-handle-diag]", {
-        handleExists: !!handle,
-        pageRootExists: !!pageRoot,
-        innerContainer: innerInfo,
-        rect: handle?.getBoundingClientRect?.(),
-      });
-    });
-
-    // DIAGNOSTIC: verify pointer events reach the editor area
-    const onPointerMove = (e: PointerEvent) => {
-      // biome-ignore lint/suspicious/noConsole: diagnostic
-      console.log("[pointer-diag] pointermove reached container at", e.clientX, e.clientY);
-      container.removeEventListener("pointermove", onPointerMove);
-    };
-    container.addEventListener("pointermove", onPointerMove);
 
     // Debounced save on doc update.
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -85,7 +109,6 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
 
     return () => {
       doc.spaceDoc.off("update", onUpdate);
-      container.removeEventListener("pointermove", onPointerMove);
       if (timer) clearTimeout(timer);
       if (pending) flush();
       editor.remove();
