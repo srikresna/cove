@@ -128,7 +128,7 @@ doc-title {
   container-type: inline-size;
   --affine-background-primary-color: transparent;
   --affine-editor-width: 100%;
-  --affine-editor-side-padding: 24px;
+  --affine-editor-side-padding: 48px;
   background: transparent;
 }
 .affine-page-viewport * {
