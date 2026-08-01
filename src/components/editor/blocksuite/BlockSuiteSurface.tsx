@@ -1,5 +1,6 @@
 import "@toeverything/theme/style.css";
 import "@toeverything/theme/fonts.css";
+import { RefNodeSlotsProvider } from "@blocksuite/affine/inlines/reference";
 import {
   type DocModeProvider,
   DocModeProvider as DocModeProviderToken,
@@ -13,6 +14,7 @@ import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
+import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import type { Note } from "../../../types";
 import { getViewManager, openNoteDoc } from "./engine";
 
@@ -92,6 +94,22 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     editor.autofocus = true;
     container.append(editor);
 
+    // Navigate to a linked note when the user clicks a @-mention reference.
+    // BlockSuite fires docLinkClicked via RefNodeSlotsProvider.
+    const refSlots = editor.std?.get?.(RefNodeSlotsProvider);
+    const navSub = refSlots?.docLinkClicked?.subscribe?.(({ pageId: targetId }: { pageId: string }) => {
+      // Find which workspace the target note belongs to and navigate there.
+      const noteStore = useNoteStore.getState();
+      const wsStore = useWorkspaceStore.getState();
+      // Check if the note is in the current note list; if not, find its workspace.
+      const allNotes = noteStore.notes;
+      const targetNote = allNotes.find((n) => n.id === targetId);
+      if (targetNote && targetNote.workspaceId !== wsStore.activeWorkspaceId) {
+        wsStore.setActiveWorkspace(targetNote.workspaceId);
+      }
+      noteStore.setActiveNoteId(targetId);
+    });
+
     // Debounced save on doc update.
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;
@@ -110,6 +128,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
 
     return () => {
       doc.spaceDoc.off("update", onUpdate);
+      navSub?.unsubscribe?.();
       if (timer) clearTimeout(timer);
       if (pending) flush();
       editor.remove();

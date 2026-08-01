@@ -23,15 +23,36 @@ let workspace: TestWorkspace | null = null;
 const initializedDocs = new Set<string>();
 // IDs of docs Cove opened itself (vs BlockSuite-initiated "new doc" creates).
 const coveOwnedDocIds = new Set<string>();
+// IDs registered as lightweight metadata (for @-mention search). Tracked so we
+// can remove them when switching workspaces — only current-workspace notes show.
+const registeredMetaIds = new Set<string>();
 
 /**
  * Registers existing Cove notes in the BlockSuite workspace with their titles so
- * the @-mention / linked-doc popover can find them by name.
+ * the @-mention / linked-doc popover can find them by name. Removes previously
+ * registered notes that are no longer in the current set (workspace switch).
  */
 export function registerExistingNotes(notes: Array<{ id: string; title: string }>): void {
   // Ensure workspace exists (fetchNotes may run before the editor mounts).
   const ws = getWorkspace();
+  const newIds = new Set(notes.map((n) => n.id));
+
+  // Remove previously registered notes that are NOT in the new set and NOT
+  // currently open in the editor — keeps @-mention scoped to current workspace.
+  for (const oldId of registeredMetaIds) {
+    if (!newIds.has(oldId) && !initializedDocs.has(oldId)) {
+      try {
+        ws.removeDoc(oldId);
+      } catch {
+        // Doc might be in use — skip.
+      }
+      coveOwnedDocIds.delete(oldId);
+    }
+  }
+  registeredMetaIds.clear();
+
   for (const { id, title } of notes) {
+    registeredMetaIds.add(id);
     if (coveOwnedDocIds.has(id)) continue;
     if (ws.getDoc(id)) continue;
     coveOwnedDocIds.add(id);
