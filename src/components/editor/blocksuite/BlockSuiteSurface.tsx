@@ -64,13 +64,7 @@ function buildCommonExtensions(): ExtensionType[] {
     {
       name: "cove-doc-mode",
       setup: (di: { override: (token: unknown, value: unknown) => void }) => {
-        // biome-ignore lint/suspicious/noConsole: diagnostic
-        console.log("[docmode-diag] token defined:", !!DocModeProviderToken, "override exists:", typeof di.override);
-        if (DocModeProviderToken && typeof di.override === "function") {
-          di.override(DocModeProviderToken, docModeService);
-          // biome-ignore lint/suspicious/noConsole: diagnostic
-          console.log("[docmode-diag] override called");
-        }
+        di.override(DocModeProviderToken, () => docModeService);
       },
     },
   ];
