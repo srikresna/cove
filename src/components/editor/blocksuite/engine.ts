@@ -1,7 +1,6 @@
 import { StoreExtensionManager, ViewExtensionManager } from "@blocksuite/affine/ext-loader";
 import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store";
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
-import { FeatureFlagService } from "@blocksuite/affine/shared/services";
 import { Text } from "@blocksuite/affine/store";
 import { TestWorkspace } from "@blocksuite/affine/store/test";
 import { blobSource, noteService, vaultService } from "../../../di/container";
@@ -47,6 +46,9 @@ export function registerExistingNotes(notes: Array<{ id: string; title: string }
       store.addBlock("affine:paragraph", {}, noteBlockId);
     });
     doc.getStore().resetHistory();
+    // CRITICAL: the linked-doc @-mention widget reads titles from workspace.meta,
+    // NOT from the page block. Without this, all notes show "Untitled".
+    ws.meta.setDocMeta(id, { title });
   }
 }
 
@@ -112,13 +114,6 @@ export function openNoteDoc(noteId: string, content: string): CoveDoc {
     }
     // else: doc has placeholder blocks from registerExistingNotes (title + paragraph) — keep as-is.
     doc.getStore().resetHistory();
-    // Enable the feature flag that controls drag handle + add-block visibility.
-    // Set AFTER doc initialization to avoid interfering with block seeding.
-    try {
-      doc.getStore().get(FeatureFlagService).setFlag("enable_advanced_block_visibility", true);
-    } catch {
-      // FeatureFlagService might not be available for some doc types.
-    }
     initializedDocs.add(noteId);
   }
   return doc;

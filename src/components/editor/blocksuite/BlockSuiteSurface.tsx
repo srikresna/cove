@@ -37,6 +37,19 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     editor.autofocus = true;
     container.append(editor);
 
+    // DIAGNOSTIC: check if drag handle widget exists in the DOM after render.
+    requestAnimationFrame(() => {
+      const handle = editor.querySelector("affine-drag-handle-widget");
+      const pageRoot = editor.querySelector("affine-page-root");
+      // biome-ignore lint/suspicious/noConsole: diagnostic
+      console.log("[drag-handle-diag]", {
+        handleExists: !!handle,
+        pageRootExists: !!pageRoot,
+        handleConnected: handle?.isConnected,
+        handleDisplay: handle ? getComputedStyle(handle).display : "N/A",
+      });
+    });
+
     // Debounced save on doc update.
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;
