@@ -120,6 +120,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
       useSaveStatusStore.getState().setSaving();
       try {
         const created = await noteService.createNote(workspaceId, title, content, icon);
+        // Register the new note in BlockSuite workspace so @-mention can find it.
+        registerExistingNotes([{ id: created.id, title: created.title }]);
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
