@@ -1,12 +1,8 @@
 import "@toeverything/theme/style.css";
 import "@toeverything/theme/fonts.css";
 import {
-  CommunityCanvasTextFonts,
   type DocModeProvider,
   DocModeProvider as DocModeProviderToken,
-  EditorSettingExtension,
-  FontConfigExtension,
-  GeneralSettingSchema,
 } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
 import type { DocMode } from "@blocksuite/affine/model";
@@ -46,9 +42,9 @@ function getModeSubject(docId: string): SimpleSubject<DocMode> {
 }
 
 /**
- * Builds common service extensions matching the AFFiNE playground setup.
- * DocModeProvider is CRITICAL: without it, `widget.mode` is undefined, and the
- * drag handle's `_canEditing` check always fails (mode !== 'page').
+ * ONLY DocModeProvider — FontConfig + EditorSetting removed to isolate the
+ * typing-break issue. DocModeProvider provides widget.mode = 'page' which the
+ * drag handle's _canEditing check requires.
  */
 function buildCommonExtensions(): ExtensionType[] {
   const docModeService: DocModeProvider = {
@@ -59,10 +55,8 @@ function buildCommonExtensions(): ExtensionType[] {
   };
 
   return [
-    FontConfigExtension(CommunityCanvasTextFonts),
-    EditorSettingExtension({ setting$: signal({ ...GeneralSettingSchema.default }) }),
     {
-      name: "cove-services",
+      name: "cove-doc-mode",
       setup: (di: { override: (token: unknown, value: unknown) => void }) => {
         di.override(DocModeProviderToken, docModeService);
       },
