@@ -204,7 +204,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
         </div>
       )}
 
-      <div className={cn("w-full px-6", !isFullWidth && "mx-auto max-w-3xl", !hasCover && "pt-10")}>
+      <div className={cn("w-full px-12", !isFullWidth && "mx-auto max-w-3xl", !hasCover && "pt-10")}>
         {hasIcon && (
           <Popover>
             <PopoverTrigger asChild>
