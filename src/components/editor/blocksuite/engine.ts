@@ -29,8 +29,8 @@ const coveOwnedDocIds = new Set<string>();
  * the @-mention / linked-doc popover can find them by name.
  */
 export function registerExistingNotes(notes: Array<{ id: string; title: string }>): void {
-  const ws = workspace;
-  if (!ws) return;
+  // Ensure workspace exists (fetchNotes may run before the editor mounts).
+  const ws = getWorkspace();
   for (const { id, title } of notes) {
     if (coveOwnedDocIds.has(id)) continue;
     if (ws.getDoc(id)) continue;
