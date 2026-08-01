@@ -37,18 +37,35 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     editor.autofocus = true;
     container.append(editor);
 
-    // DIAGNOSTIC: check if drag handle widget exists in the DOM after render.
+    // DIAGNOSTIC: check drag handle widget + inner container + pointer events.
     requestAnimationFrame(() => {
       const handle = editor.querySelector("affine-drag-handle-widget");
       const pageRoot = editor.querySelector("affine-page-root");
+      // Check inner container (the actual visible handle, display:none until pointermove)
+      const innerDivs = handle?.querySelectorAll?.("div");
+      const innerInfo = innerDivs?.[0]
+        ? {
+            display: getComputedStyle(innerDivs[0] as Element).display,
+            width: getComputedStyle(innerDivs[0] as Element).width,
+            height: getComputedStyle(innerDivs[0] as Element).height,
+          }
+        : "no inner divs";
       // biome-ignore lint/suspicious/noConsole: diagnostic
       console.log("[drag-handle-diag]", {
         handleExists: !!handle,
         pageRootExists: !!pageRoot,
-        handleConnected: handle?.isConnected,
-        handleDisplay: handle ? getComputedStyle(handle).display : "N/A",
+        innerContainer: innerInfo,
+        rect: handle?.getBoundingClientRect?.(),
       });
     });
+
+    // DIAGNOSTIC: verify pointer events reach the editor area
+    const onPointerMove = (e: PointerEvent) => {
+      // biome-ignore lint/suspicious/noConsole: diagnostic
+      console.log("[pointer-diag] pointermove reached container at", e.clientX, e.clientY);
+      container.removeEventListener("pointermove", onPointerMove);
+    };
+    container.addEventListener("pointermove", onPointerMove);
 
     // Debounced save on doc update.
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -68,6 +85,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
 
     return () => {
       doc.spaceDoc.off("update", onUpdate);
+      container.removeEventListener("pointermove", onPointerMove);
       if (timer) clearTimeout(timer);
       if (pending) flush();
       editor.remove();
