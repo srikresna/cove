@@ -48,10 +48,16 @@ function getModeSubject(docId: string): SimpleSubject<DocMode> {
  */
 function buildCommonExtensions(): ExtensionType[] {
   const docModeService: DocModeProvider = {
+    // Primary mode (doc-level default)
     getPrimaryMode: () => "page" as DocMode,
     setPrimaryMode: (docId: string, mode: DocMode) => getModeSubject(docId).next(mode),
     getPrimaryMode$: () => signal("page" as DocMode),
     onPrimaryModeChange: (docId: string) => getModeSubject(docId),
+    // Editor mode (what the editor currently shows — used by drag handle, toolbar, blocks)
+    getEditorMode: () => "page" as DocMode,
+    setEditorMode: (_mode: DocMode) => {},
+    getEditorMode$: () => signal("page" as DocMode),
+    onEditorModeChange: () => new SimpleSubject<DocMode>(),
   };
 
   return [
