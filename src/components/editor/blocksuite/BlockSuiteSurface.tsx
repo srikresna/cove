@@ -13,7 +13,6 @@ import type { DocMode } from "@blocksuite/affine/model";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { signal } from "@preact/signals-core";
-import { Subject } from "rxjs";
 import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
@@ -28,14 +27,21 @@ interface BlockSuiteSurfaceProps {
   mode: CoveDocMode;
 }
 
-// Per-doc RxJS subjects for DocModeProvider.onPrimaryModeChange.
-const modeSubjects = new Map<string, Subject<DocMode>>();
-function getModeSubject(docId: string): Subject<DocMode> {
-  let s = modeSubjects.get(docId);
-  if (!s) {
-    s = new Subject<DocMode>();
-    modeSubjects.set(docId, s);
+/** Minimal Subject-like — avoids importing rxjs (not hoisted to top-level node_modules). */
+class SimpleSubject<T> {
+  private subs: Array<(value: T) => void> = [];
+  subscribe(fn: (value: T) => void) {
+    this.subs.push(fn);
+    return { unsubscribe: () => { this.subs = this.subs.filter((s) => s !== fn); } };
   }
+  next(value: T) { this.subs.forEach((fn) => fn(value)); }
+  complete() { this.subs = []; }
+}
+
+const modeSubjects = new Map<string, SimpleSubject<DocMode>>();
+function getModeSubject(docId: string): SimpleSubject<DocMode> {
+  let s = modeSubjects.get(docId);
+  if (!s) { s = new SimpleSubject<DocMode>(); modeSubjects.set(docId, s); }
   return s;
 }
 
@@ -45,21 +51,16 @@ function getModeSubject(docId: string): Subject<DocMode> {
  * drag handle's `_canEditing` check always fails (mode !== 'page').
  */
 function buildCommonExtensions(): ExtensionType[] {
-  // DocModeProvider instance (NOT a factory — di.override expects the instance).
   const docModeService: DocModeProvider = {
     getPrimaryMode: () => "page" as DocMode,
-    setPrimaryMode: (docId: string, mode: DocMode) => {
-      getModeSubject(docId).next(mode);
-    },
+    setPrimaryMode: (docId: string, mode: DocMode) => getModeSubject(docId).next(mode),
     getPrimaryMode$: () => signal("page" as DocMode),
     onPrimaryModeChange: (docId: string) => getModeSubject(docId),
   };
 
   return [
     FontConfigExtension(CommunityCanvasTextFonts),
-    EditorSettingExtension({
-      setting$: signal({ ...GeneralSettingSchema.default }),
-    }),
+    EditorSettingExtension({ setting$: signal({ ...GeneralSettingSchema.default }) }),
     {
       name: "cove-services",
       setup: (di: { override: (token: unknown, value: unknown) => void }) => {
