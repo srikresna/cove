@@ -102,6 +102,7 @@ doc-title {
 
 .affine-page-viewport,
 .affine-edgeless-viewport {
+  --affine-editor-side-padding: 24px;
   --affine-font-family: Helvetica;
   --affine-font-code-family: Helvetica;
   --affine-text-primary-color: hsl(var(--foreground));
