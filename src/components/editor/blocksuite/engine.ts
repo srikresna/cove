@@ -96,7 +96,7 @@ export function openNoteDoc(noteId: string, content: string): CoveDoc {
   if (!initializedDocs.has(noteId)) {
     const snapshotB64 = unpackBlockSuiteContent(content);
     const store = doc.getStore();
-    const hasExistingBlocks = store.rootIds.length > 0;
+    const hasExistingBlocks = (store.rootIds?.length ?? 0) > 0;
     if (snapshotB64) {
       // Real BlockSuite content from DB — apply it (overwrites any placeholder blocks).
       doc.load();
