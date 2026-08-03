@@ -1,10 +1,10 @@
-import { transform } from "esbuild";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import react from "@vitejs/plugin-react";
+import { transform } from "esbuild";
 import { visualizer } from "rollup-plugin-visualizer";
-import { defineConfig, type Plugin } from "vite";
+import { type Plugin, defineConfig } from "vite";
 import wasm from "vite-plugin-wasm";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
@@ -50,6 +50,58 @@ export default defineConfig({
       : []),
   ],
   clearScreen: false,
+  resolve: {
+    // ── Single-copy resolution for BlockSuite's core libraries ────────────
+    // Cove consumes BlockSuite through symlinks into ./AFFiNE. Without this,
+    // Vite resolves `yjs`/`@preact/signals-core` per-file: Cove's own imports
+    // (src/**) hit cove/node_modules while BlockSuite hits Affine/node_modules.
+    // Two physical copies at runtime is catastrophic for CRDTs and signals:
+    // separate copies mean signal/effect subscriptions never connect (toolbar
+    // active-state, renderer refresh) and Y.applyUpdate/encodeStateAsUpdate
+    // mutate doc.spaceDoc across the boundary → corrupted surface.
+    //
+    // IMPORTANT: we alias to AFFINE's copies, not Cove's. BlockSuite 0.27 is
+    // built and tested against yjs 13.6.21 / @preact/signals-core 1.8.0. Running
+    // it against Cove's newer copies (signals 1.14.4) changed signal-propagation
+    // semantics enough that BlockSuite's toolbar flag `refresh()` chain (which
+    // toggles a flag bit off→on inside a batch to force re-render) became a
+    // no-op — so the toolbar content never re-rendered on element property
+    // changes (stroke style / shape style active-state stayed stale until
+    // reselect). Pinning to the versions BlockSuite expects fixes that.
+    // Regex matches the bare package + subpaths but NOT lookalikes (yjs-webrtc).
+    alias: [
+      {
+        find: "@affine/templates/stickers",
+        replacement: resolve(
+          rootDir,
+          "AFFiNE/packages/frontend/templates/stickers-templates.gen.ts",
+        ),
+      },
+      {
+        find: "@affine/templates/edgeless",
+        replacement: resolve(
+          rootDir,
+          "AFFiNE/packages/frontend/templates/edgeless-templates.gen.ts",
+        ),
+      },
+      {
+        find: /^yjs(?=\/|$)/,
+        replacement: resolve(rootDir, "AFFiNE/node_modules/yjs"),
+      },
+      {
+        find: /^@preact\/signals-core(?=\/|$)/,
+        replacement: resolve(rootDir, "node_modules/@preact/signals-core"),
+      },
+    ],
+    dedupe: [
+      "@blocksuite/global",
+      "@blocksuite/std",
+      "@blocksuite/store",
+      "@blocksuite/sync",
+      "@preact/signals-core",
+      "yjs",
+    ],
+  },
   optimizeDeps: {
     entries: ["index.html", "src/components/editor/blocksuite/**/*.{ts,tsx}"],
     exclude: ["@vanilla-extract/css", "@vanilla-extract/private"],
@@ -59,7 +111,7 @@ export default defineConfig({
     strictPort: true,
     fs: {
       // Allow Vite to serve BlockSuite source from the sibling AFFiNE repo.
-      allow: [rootDir, resolve(rootDir, "Affine")],
+      allow: [rootDir, resolve(rootDir, "AFFiNE")],
     },
   },
   build: {
@@ -75,8 +127,7 @@ export default defineConfig({
             )
               return "vendor-blocksuite";
             if (id.includes("yjs")) return "vendor-yjs";
-            if (id.includes("@radix-ui") || id.includes("cmdk"))
-              return "vendor-ui-primitives";
+            if (id.includes("@radix-ui") || id.includes("cmdk")) return "vendor-ui-primitives";
             if (id.includes("lucide-react") || id.includes("framer-motion"))
               return "vendor-icons-animation";
             if (

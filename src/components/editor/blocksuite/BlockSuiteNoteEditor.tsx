@@ -10,6 +10,7 @@ import { EditorHeader } from "../EditorHeader";
 import { EditorRightBar } from "../EditorRightBar";
 import { EditorTopbar } from "../EditorTopbar";
 import { BlockSuiteSurface } from "./BlockSuiteSurface";
+import { EditorErrorBoundary } from "./EditorErrorBoundary";
 
 const RIGHTBAR_KEY = "cove-rightbar-open";
 
@@ -74,7 +75,9 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
         <div className="flex min-h-0 w-full flex-1">
           <div className="relative h-full min-w-0 flex-1">
             {mode === "edgeless" ? (
-              <BlockSuiteSurface note={note} mode="edgeless" />
+              <EditorErrorBoundary resetKey={`${note.id}:edgeless`}>
+                <BlockSuiteSurface note={note} mode="edgeless" />
+              </EditorErrorBoundary>
             ) : (
               <div ref={scrollRef} className="h-full w-full overflow-y-auto">
                 <EditorHeader note={note} isFullWidth={isFullWidth} />
@@ -85,7 +88,9 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
                     !isFullWidth && "mx-auto max-w-3xl",
                   )}
                 >
-                  <BlockSuiteSurface note={note} mode="page" />
+                  <EditorErrorBoundary resetKey={`${note.id}:page`}>
+                    <BlockSuiteSurface note={note} mode="page" />
+                  </EditorErrorBoundary>
                 </div>
               </div>
             )}

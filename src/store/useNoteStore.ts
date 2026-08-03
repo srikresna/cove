@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { MESSAGES } from "../constants/messages";
-import { noteService, vaultService } from "../di/container";
-import { registerExistingNotes } from "../components/editor/blocksuite/engine";
+import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
 import { presentError } from "../services/errorPresenter";
 import { processCoverImage } from "../utils/coverImage";
@@ -83,7 +82,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
         const notes = await noteService.listMetadataByWorkspace(workspaceId);
         // Register all notes in the BlockSuite workspace so @-mention search
         // can find them (not just notes that have been opened in the editor).
-        registerExistingNotes(notes.map((n) => ({ id: n.id, title: n.title })));
+        blockSuiteEditorService.registerExistingNotes(
+          notes.map((n) => ({ id: n.id, title: n.title })),
+        );
         const first = notes[0];
         set({ notes, activeNoteId: first ? first.id : null, activeCoverImage: null });
       } catch (err) {
@@ -121,7 +122,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       try {
         const created = await noteService.createNote(workspaceId, title, content, icon);
         // Register the new note in BlockSuite workspace so @-mention can find it.
-        registerExistingNotes([{ id: created.id, title: created.title }]);
+        blockSuiteEditorService.registerExistingNotes([{ id: created.id, title: created.title }]);
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
@@ -298,4 +299,13 @@ export const useNoteStore = create<NoteState>((set, get) => {
 // no matter who initiated it — the invariant cannot be bypassed via the store.
 vaultService.onLock(() => {
   useNoteStore.setState({ notes: [], activeNoteId: null, activeCoverImage: null });
+});
+
+// Sync BlockSuite-initiated doc creation (@-popover / slash menu "create doc")
+// into Cove's DB. The service calls this for docs it did NOT open itself.
+blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
+  const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
+  if (!activeWs) return;
+  await noteService.createNoteWithId(activeWs, docId, title);
+  await useNoteStore.getState().fetchNotes(activeWs);
 });

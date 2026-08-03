@@ -45,9 +45,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Instrument Serif", "Inter Variable", "Georgia", "serif"],
-        display: ["Instrument Serif", "Georgia", "serif"],
-        mono: ["JetBrains Mono Variable", "ui-monospace", "monospace"],
+        sans: ["Helvetica"],
+        display: ["Helvetica"],
+        mono: ["Helvetica"],
       },
       borderRadius: {
         lg: "var(--radius)",

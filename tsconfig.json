@@ -20,7 +20,9 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@preact/signals-core": ["node_modules/@preact/signals-core"],
+      "yjs": ["AFFiNE/node_modules/yjs"]
     }
   },
   "include": ["src"]

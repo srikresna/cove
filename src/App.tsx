@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { Suspense, lazy, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PeekViewModal } from "./components/editor/blocksuite/peek/PeekViewModal";
 import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
@@ -144,6 +145,7 @@ export const AppContent: React.FC = () => {
       <SettingsModal />
       <TrashDialog />
       <ToastContainer />
+      <PeekViewModal />
     </div>
   );
 };

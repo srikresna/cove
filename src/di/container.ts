@@ -8,6 +8,8 @@ import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
 import { SQLitePropertyRepository } from "../repositories/SQLitePropertyRepository";
 import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
+import { BlockSuiteEditorService } from "../services/blocksuite/BlockSuiteEditorService";
+import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuiteEditorService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
 import type { ITagService } from "../services/ITagService";
@@ -74,3 +76,10 @@ export const backupService: IBackupService = new TauriBackupService({
   suspend: () => SQLiteDatabase.suspend(),
   resume: () => SQLiteDatabase.resume(),
 });
+
+// BlockSuite workspace/view-manager lifecycle. Decrypted note content lives in
+// these Y docs, so they must die with the session key — wire reset() on lock.
+export const blockSuiteEditorService: IBlockSuiteEditorService = new BlockSuiteEditorService({
+  blobSource,
+});
+vaultService.onLock(() => blockSuiteEditorService.reset());
