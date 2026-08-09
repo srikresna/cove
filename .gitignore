@@ -13,6 +13,7 @@ docs/
 .remember
 .kilo
 .claude
+.serena
 
 # secrets / env
 .env
