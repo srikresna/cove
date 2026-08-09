@@ -1,0 +1,47 @@
+import type { AffineInlineEditor, AffineTextAttributes } from '@blocksuite/affine-shared/types';
+import { ShadowlessElement } from '@blocksuite/std';
+import { type AttributeRenderer, type InlineMarkdownMatch, type InlineRangeProvider, type VLine } from '@blocksuite/std/inline';
+import type { DeltaInsert } from '@blocksuite/store';
+import { Text } from '@blocksuite/store';
+import { type TemplateResult } from 'lit';
+import * as Y from 'yjs';
+import { z } from 'zod';
+declare const RichText_base: typeof ShadowlessElement & import("@blocksuite/global/utils").Constructor<import("@blocksuite/global/lit").DisposableClass>;
+export declare class RichText extends RichText_base {
+    #private;
+    static styles: import("lit").CSSResult;
+    private readonly _inlineEditor$;
+    private readonly _onCopy;
+    private readonly _onCut;
+    private readonly _onPaste;
+    private readonly _onStackItemAdded;
+    private readonly _onStackItemPopped;
+    private get _yText();
+    get inlineEditor(): AffineInlineEditor | null;
+    get inlineEditorContainer(): HTMLDivElement;
+    private _init;
+    private _unmount;
+    connectedCallback(): void;
+    getUpdateComplete(): Promise<boolean>;
+    render(): TemplateResult<1>;
+    updated(changedProperties: Map<string | number | symbol, unknown>): void;
+    private accessor _inlineEditorContainer;
+    accessor attributeRenderer: AttributeRenderer | undefined;
+    accessor attributesSchema: z.ZodSchema | undefined;
+    accessor embedChecker: <TextAttributes extends AffineTextAttributes = AffineTextAttributes>(delta: DeltaInsert<TextAttributes>) => boolean;
+    accessor enableAutoScrollHorizontally: boolean;
+    accessor enableClipboard: boolean;
+    accessor enableFormat: boolean;
+    accessor enableUndoRedo: boolean;
+    accessor inlineEventSource: HTMLElement | undefined;
+    accessor inlineRangeProvider: InlineRangeProvider | undefined;
+    accessor markdownMatches: InlineMarkdownMatch<AffineTextAttributes>[];
+    accessor readonly: boolean;
+    accessor undoManager: Y.UndoManager;
+    accessor verticalScrollContainerGetter: (() => HTMLElement | null) | undefined;
+    accessor vLineRenderer: ((vLine: VLine) => TemplateResult) | undefined;
+    accessor wrapText: boolean;
+    accessor yText: Y.Text | Text;
+}
+export {};
+//# sourceMappingURL=rich-text.d.ts.map

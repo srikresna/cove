@@ -1,0 +1,10 @@
+export declare const EMBED_IFRAME_DEFAULT_WIDTH_IN_SURFACE = 752;
+export declare const EMBED_IFRAME_DEFAULT_HEIGHT_IN_SURFACE = 116;
+export declare const EMBED_IFRAME_DEFAULT_CONTAINER_BORDER_RADIUS = 8;
+export declare const DEFAULT_IFRAME_HEIGHT = 152;
+export declare const DEFAULT_IFRAME_WIDTH = "100%";
+export declare const LINK_CREATE_POPUP_OFFSET = 4;
+export declare const IDLE_CARD_DEFAULT_HEIGHT = 48;
+export declare const LOADING_CARD_DEFAULT_HEIGHT = 114;
+export declare const ERROR_CARD_DEFAULT_HEIGHT = 114;
+//# sourceMappingURL=consts.d.ts.map

@@ -1,0 +1,26 @@
+import { BaseSelection, SelectionExtension } from '@blocksuite/store';
+import z from 'zod';
+const BlockSelectionSchema = z.object({
+    blockId: z.string(),
+});
+export class BlockSelection extends BaseSelection {
+    static { this.group = 'note'; }
+    static { this.type = 'block'; }
+    static fromJSON(json) {
+        const result = BlockSelectionSchema.parse(json);
+        return new BlockSelection(result);
+    }
+    equals(other) {
+        if (other instanceof BlockSelection) {
+            return this.blockId === other.blockId;
+        }
+        return false;
+    }
+    toJSON() {
+        return {
+            type: 'block',
+            blockId: this.blockId,
+        };
+    }
+}
+export const BlockSelectionExtension = SelectionExtension(BlockSelection);

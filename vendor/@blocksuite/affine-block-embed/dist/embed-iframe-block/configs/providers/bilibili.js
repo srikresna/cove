@@ -1,0 +1,81 @@
+import { EmbedIframeConfigExtension } from '@blocksuite/affine-shared/services';
+import { validateEmbedIframeUrl, } from '../../utils';
+const BILIBILI_DEFAULT_WIDTH_IN_SURFACE = 800;
+const BILIBILI_DEFAULT_HEIGHT_IN_SURFACE = 450;
+const BILIBILI_DEFAULT_HEIGHT_IN_NOTE = 450;
+const BILIBILI_DEFAULT_WIDTH_PERCENT = 100;
+const bilibiliValidationOptions = {
+    protocols: ['https:'],
+    hostnames: ['player.bilibili.com', 'www.bilibili.com', 'bilibili.com'],
+};
+const biliPlayerValidationOptions = {
+    protocols: ['https:'],
+    hostnames: ['player.bilibili.com'],
+};
+const AV_REGEX = /av([0-9]+)/i;
+const BV_REGEX = /(BV[0-9A-Za-z]{10})/;
+const extractAvid = (url) => {
+    const match = url.match(AV_REGEX);
+    return match ? match[1] : undefined;
+};
+const extractBvid = (url) => {
+    const match = url.match(BV_REGEX);
+    return match ? match[1] : undefined;
+};
+const buildBiliPlayerEmbedUrl = (url) => {
+    // If the user pasted the embed URL directly, keep it
+    if (isValidBiliPlayerUrl(url)) {
+        return url;
+    }
+    const avid = extractAvid(url);
+    if (avid) {
+        const params = new URLSearchParams({
+            aid: avid,
+            autoplay: '0',
+        });
+        return `https://player.bilibili.com/player.html?${params.toString()}`;
+    }
+    const bvid = extractBvid(url);
+    if (bvid) {
+        const params = new URLSearchParams({
+            bvid,
+            autoplay: '0',
+        });
+        return `https://player.bilibili.com/player.html?${params.toString()}`;
+    }
+    return undefined;
+};
+function isValidBiliPlayerUrl(url) {
+    try {
+        if (!validateEmbedIframeUrl(url, biliPlayerValidationOptions)) {
+            return false;
+        }
+        const parsedUrl = new URL(url);
+        return (parsedUrl.pathname === '/player.html' &&
+            (!!parsedUrl.searchParams.get('aid') ||
+                !!parsedUrl.searchParams.get('bvid')));
+    }
+    catch {
+        return false;
+    }
+}
+export const bilibiliConfig = {
+    name: 'bilibili',
+    match: (url) => isValidBiliPlayerUrl(url) ||
+        (validateEmbedIframeUrl(url, bilibiliValidationOptions) &&
+            (!!extractAvid(url) || !!extractBvid(url))),
+    buildOEmbedUrl: buildBiliPlayerEmbedUrl,
+    useOEmbedUrlDirectly: true,
+    validateIframeUrl: (iframeUrl) => isValidBiliPlayerUrl(iframeUrl),
+    options: {
+        widthInSurface: BILIBILI_DEFAULT_WIDTH_IN_SURFACE,
+        heightInSurface: BILIBILI_DEFAULT_HEIGHT_IN_SURFACE,
+        heightInNote: BILIBILI_DEFAULT_HEIGHT_IN_NOTE,
+        widthPercent: BILIBILI_DEFAULT_WIDTH_PERCENT,
+        allow: 'clipboard-write; encrypted-media; picture-in-picture',
+        sandbox: 'allow-same-origin allow-scripts',
+        style: 'border: none; border-radius: 8px;',
+        allowFullscreen: true,
+    },
+};
+export const BilibiliEmbedConfig = EmbedIframeConfigExtension(bilibiliConfig);

@@ -1,0 +1,40 @@
+import type { ConnectorElementModel, ShapeElementModel } from '@blocksuite/affine-model';
+import { NoteBlockModel } from '@blocksuite/affine-model';
+import { type BlockComponent, type BlockStdScope } from '@blocksuite/std';
+import { LitElement, nothing } from 'lit';
+declare const EdgelessAutoCompletePanel_base: typeof LitElement & import("@blocksuite/global/utils").Constructor<import("@blocksuite/global/lit").DisposableClass>;
+export declare class EdgelessAutoCompletePanel extends EdgelessAutoCompletePanel_base {
+    static styles: import("lit").CSSResult;
+    private _overlay;
+    get gfx(): import("@blocksuite/std/gfx").GfxController;
+    constructor(position: [number, number], edgeless: BlockComponent, currentSource: ShapeElementModel | NoteBlockModel, connector: ConnectorElementModel);
+    get crud(): import("@blocksuite/affine-block-surface").EdgelessCRUDExtension;
+    get surface(): import("@blocksuite/affine-block-surface").SurfaceBlockComponent | null;
+    private _addFrame;
+    private _addNote;
+    private _addShape;
+    private _addText;
+    private _autoComplete;
+    private _connectorExist;
+    private _generateTarget;
+    private _getCurrentSourceInfo;
+    private _getPanelPosition;
+    private _getTargetXYWH;
+    private _removeOverlay;
+    private _showFrameOverlay;
+    private _showNoteOverlay;
+    private _showOverlay;
+    private _showShapeOverlay;
+    private _showTextOverlay;
+    connectedCallback(): void;
+    disconnectedCallback(): void;
+    firstUpdated(): void;
+    render(): typeof nothing | import("lit-html").TemplateResult<1>;
+    accessor connector: ConnectorElementModel;
+    accessor currentSource: ShapeElementModel | NoteBlockModel;
+    accessor edgeless: BlockComponent;
+    accessor position: [number, number];
+    accessor std: BlockStdScope;
+}
+export {};
+//# sourceMappingURL=auto-complete-panel.d.ts.map

@@ -1,0 +1,33 @@
+import { ViewExtensionProvider, } from '@blocksuite/affine-ext-loader';
+import { ConnectionOverlay } from './connector-manager';
+import { ConnectorTool } from './connector-tool';
+import { effects } from './effects';
+import { ConnectorFilter } from './element-transform';
+import { ConnectorDomRendererExtension, ConnectorElementRendererExtension, } from './renderer';
+import { connectorToolbarExtension } from './toolbar/config';
+import { connectorQuickTool } from './toolbar/quick-tool';
+import { ConnectorElementView, ConnectorInteraction } from './view/view';
+export class ConnectorViewExtension extends ViewExtensionProvider {
+    constructor() {
+        super(...arguments);
+        this.name = 'affine-connector-gfx';
+    }
+    effect() {
+        super.effect();
+        effects();
+    }
+    setup(context) {
+        super.setup(context);
+        context.register(ConnectorElementView);
+        context.register(ConnectorElementRendererExtension);
+        context.register(ConnectorDomRendererExtension);
+        if (this.isEdgeless(context.scope)) {
+            context.register(ConnectorTool);
+            context.register(ConnectorFilter);
+            context.register(connectorQuickTool);
+            context.register(connectorToolbarExtension);
+            context.register(ConnectionOverlay);
+            context.register(ConnectorInteraction);
+        }
+    }
+}

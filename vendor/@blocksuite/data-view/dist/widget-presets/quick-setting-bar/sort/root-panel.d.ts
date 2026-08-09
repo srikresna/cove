@@ -1,0 +1,27 @@
+import { type PopupTarget } from '@blocksuite/affine-components/context-menu';
+import { ShadowlessElement } from '@blocksuite/std';
+import type { Middleware } from '@floating-ui/dom';
+import type { SortUtils } from '../../../core/sort/utils.js';
+declare const SortRootView_base: typeof ShadowlessElement & import("@blocksuite/global/utils").Constructor<import("@blocksuite/global/lit").DisposableClass>;
+export declare class SortRootView extends SortRootView_base {
+    static styles: import("lit").CSSResult;
+    accessor sortUtils: SortUtils;
+    items$: import("@preact/signals-core").ReadonlySignal<string[]>;
+    sortContext: import("../../../core/utils/wc-dnd/sort/sort-context.js").SortContext;
+    render(): import("lit-html").TemplateResult<1>;
+}
+declare global {
+    interface HTMLElementTagNameMap {
+        'sort-root-view': SortRootView;
+    }
+}
+export declare const popSortRoot: (target: PopupTarget, props: {
+    sortUtils: SortUtils;
+    title?: {
+        text: string;
+        onBack?: () => void;
+        onClose?: () => void;
+    };
+}, middleware?: Array<Middleware | null | undefined | false>) => void;
+export {};
+//# sourceMappingURL=root-panel.d.ts.map

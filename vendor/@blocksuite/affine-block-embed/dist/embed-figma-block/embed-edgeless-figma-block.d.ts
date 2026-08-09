@@ -1,0 +1,7 @@
+import { EmbedFigmaBlockComponent } from './embed-figma-block.js';
+declare const EmbedEdgelessBlockComponent_base: typeof EmbedFigmaBlockComponent & (new (...args: any[]) => import("@blocksuite/std").GfxBlockComponent);
+export declare class EmbedEdgelessBlockComponent extends EmbedEdgelessBlockComponent_base {
+}
+export declare const EmbedFigmaBlockInteraction: import("@blocksuite/store").ExtensionType;
+export {};
+//# sourceMappingURL=embed-edgeless-figma-block.d.ts.map

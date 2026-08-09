@@ -1,0 +1,37 @@
+import { createIdentifier } from '@blocksuite/global/di';
+import { BlockSuiteError, ErrorCode } from '@blocksuite/global/exceptions';
+import { GfxControllerIdentifier, } from '@blocksuite/std/gfx';
+import { Extension } from '@blocksuite/store';
+/**
+ * An overlay is a layer covered on top of elements,
+ * can be used for rendering non-CRDT state indicators.
+ */
+export class Overlay extends Extension {
+    static { this.overlayName = ''; }
+    constructor(gfx) {
+        super();
+        this.gfx = gfx;
+        this._renderer = null;
+    }
+    static setup(di) {
+        if (!this.overlayName) {
+            throw new BlockSuiteError(ErrorCode.ValueNotExists, `The overlay constructor '${this.name}' should have a static 'overlayName' property.`);
+        }
+        di.addImpl(OverlayIdentifier(this.overlayName), this, [
+            GfxControllerIdentifier,
+        ]);
+    }
+    clear() {
+        this.refresh();
+    }
+    dispose() { }
+    refresh() {
+        if (this._renderer) {
+            this._renderer.refresh();
+        }
+    }
+    setRenderer(renderer) {
+        this._renderer = renderer;
+    }
+}
+export const OverlayIdentifier = createIdentifier('Overlay');

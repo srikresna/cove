@@ -1,0 +1,11 @@
+export const deleteSelectedModelsCommand = (ctx, next) => {
+    const models = ctx.selectedModels;
+    if (!models) {
+        console.error('`selectedModels` is required, you need to use `getSelectedModels` command before adding this command to the pipeline.');
+        return;
+    }
+    models.forEach(model => {
+        ctx.std.store.deleteBlock(model);
+    });
+    return next();
+};

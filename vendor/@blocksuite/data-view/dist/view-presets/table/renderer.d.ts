@@ -1,0 +1,4 @@
+import './pc-virtual/effect.js';
+import './pc/effect.js';
+export declare const tableViewMeta: import("../../index.js").ViewMeta<"table", import("./define.js").TableViewData>;
+//# sourceMappingURL=renderer.d.ts.map

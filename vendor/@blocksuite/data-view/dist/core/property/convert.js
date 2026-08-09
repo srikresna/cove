@@ -1,0 +1,7 @@
+export const createPropertyConvert = (from, to, convert) => {
+    return {
+        from: from.type,
+        to: to.type,
+        convert,
+    };
+};

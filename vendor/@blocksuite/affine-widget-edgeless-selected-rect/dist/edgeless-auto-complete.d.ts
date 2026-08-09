@@ -1,0 +1,44 @@
+import { type ConnectionOverlay } from '@blocksuite/affine-gfx-connector';
+import type { NoteBlockModel } from '@blocksuite/affine-model';
+import { ShapeElementModel } from '@blocksuite/affine-model';
+import type { SelectedRect } from '@blocksuite/affine-shared/types';
+import { type BlockComponent, type BlockStdScope } from '@blocksuite/std';
+import { LitElement, nothing } from 'lit';
+declare const EdgelessAutoComplete_base: typeof LitElement & import("@blocksuite/global/utils").Constructor<import("@blocksuite/global/lit").DisposableClass>;
+export declare class EdgelessAutoComplete extends EdgelessAutoComplete_base {
+    static styles: import("lit").CSSResult;
+    private get _surface();
+    private _autoCompleteOverlay;
+    private readonly _onPointerDown;
+    private _pathGenerator;
+    private _timer;
+    get canShowAutoComplete(): boolean;
+    get connectionOverlay(): ConnectionOverlay;
+    get crud(): import("@blocksuite/affine-block-surface").EdgelessCRUDExtension;
+    get gfx(): import("@blocksuite/std/gfx").GfxController;
+    private _addConnector;
+    private _addMindmapNode;
+    private _computeLine;
+    private _computeNextBound;
+    private _createAutoCompletePanel;
+    private _generateElementOnClick;
+    private _getConnectedElements;
+    private _getMindmapButtons;
+    private _initOverlay;
+    private _renderArrow;
+    private _renderMindMapButtons;
+    private _showNextShape;
+    connectedCallback(): void;
+    firstUpdated(): void;
+    private _canAutoComplete;
+    removeOverlay(): void;
+    render(): typeof nothing | import("lit-html").TemplateResult<1>;
+    private accessor _isHover;
+    private accessor _isMoving;
+    accessor current: ShapeElementModel | NoteBlockModel;
+    accessor edgeless: BlockComponent;
+    accessor selectedRect: SelectedRect;
+    accessor std: BlockStdScope;
+}
+export {};
+//# sourceMappingURL=edgeless-auto-complete.d.ts.map

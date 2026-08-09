@@ -1,0 +1,10 @@
+import { createIdentifier } from '@blocksuite/global/di';
+export const BlockServiceIdentifier = createIdentifier('BlockService');
+export const BlockFlavourIdentifier = createIdentifier('BlockFlavour');
+export const CommandIdentifier = createIdentifier('Commands');
+export const ConfigIdentifier = createIdentifier('Config');
+export const BlockViewIdentifier = createIdentifier('BlockView');
+export const WidgetViewIdentifier = createIdentifier('WidgetView');
+export const LifeCycleWatcherIdentifier = createIdentifier('LifeCycleWatcher');
+export const StdIdentifier = createIdentifier('Std');
+export const KeymapIdentifier = createIdentifier('Keymap');

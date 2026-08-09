@@ -1,0 +1,24 @@
+import { TextSelection } from '@blocksuite/std';
+export const clearAndSelectFirstModelCommand = (ctx, next) => {
+    const models = ctx.selectedModels;
+    if (!models) {
+        console.error('`selectedModels` is required, you need to use `getSelectedModels` command before adding this command to the pipeline.');
+        return;
+    }
+    if (models.length > 0) {
+        const firstModel = models[0];
+        if (firstModel.text) {
+            firstModel.text.clear();
+            const selection = ctx.std.selection.create(TextSelection, {
+                from: {
+                    blockId: firstModel.id,
+                    index: 0,
+                    length: 0,
+                },
+                to: null,
+            });
+            ctx.std.selection.setGroup('note', [selection]);
+        }
+    }
+    return next();
+};

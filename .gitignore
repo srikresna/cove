@@ -1,5 +1,5 @@
 node_modules
-dist
+/dist
 dist-isolation
 src-tauri/target
 src-tauri/gen

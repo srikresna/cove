@@ -1,0 +1,2 @@
+export declare function getAttachmentFileIconRC(filetype: string): (props: import("react").SVGProps<SVGSVGElement>) => import("react/jsx-runtime").JSX.Element;
+//# sourceMappingURL=file-icons-rc.d.ts.map

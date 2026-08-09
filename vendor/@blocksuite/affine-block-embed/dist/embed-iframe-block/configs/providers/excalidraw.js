@@ -1,0 +1,33 @@
+import { EmbedIframeConfigExtension } from '@blocksuite/affine-shared/services';
+import { validateEmbedIframeUrl, } from '../../utils';
+const EXCALIDRAW_DEFAULT_WIDTH_IN_SURFACE = 640;
+const EXCALIDRAW_DEFAULT_HEIGHT_IN_SURFACE = 480;
+const EXCALIDRAW_DEFAULT_HEIGHT_IN_NOTE = 480;
+const EXCALIDRAW_DEFAULT_WIDTH_PERCENT = 100;
+const excalidrawUrlValidationOptions = {
+    protocols: ['https:'],
+    hostnames: ['excalidraw.com'],
+};
+export const excalidrawConfig = {
+    name: 'excalidraw',
+    match: (url) => validateEmbedIframeUrl(url, excalidrawUrlValidationOptions),
+    buildOEmbedUrl: (url) => {
+        const match = validateEmbedIframeUrl(url, excalidrawUrlValidationOptions);
+        if (!match) {
+            return undefined;
+        }
+        return url;
+    },
+    useOEmbedUrlDirectly: true,
+    validateIframeUrl: (iframeUrl) => validateEmbedIframeUrl(iframeUrl, excalidrawUrlValidationOptions),
+    options: {
+        widthInSurface: EXCALIDRAW_DEFAULT_WIDTH_IN_SURFACE,
+        heightInSurface: EXCALIDRAW_DEFAULT_HEIGHT_IN_SURFACE,
+        heightInNote: EXCALIDRAW_DEFAULT_HEIGHT_IN_NOTE,
+        widthPercent: EXCALIDRAW_DEFAULT_WIDTH_PERCENT,
+        allow: 'clipboard-read; clipboard-write',
+        style: 'border: none; border-radius: 8px;',
+        allowFullscreen: true,
+    },
+};
+export const ExcalidrawEmbedConfig = EmbedIframeConfigExtension(excalidrawConfig);
