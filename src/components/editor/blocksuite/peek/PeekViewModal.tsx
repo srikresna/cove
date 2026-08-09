@@ -1,6 +1,7 @@
 import { Bound } from "@blocksuite/affine/global/gfx";
 import { GfxControllerIdentifier } from "@blocksuite/affine/std/gfx";
-import type { TestAffineEditorContainer } from "@blocksuite/integration-test";
+import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-test";
+type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
 import { Check, Copy, Expand, Loader2, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";

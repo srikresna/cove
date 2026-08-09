@@ -52,54 +52,15 @@ export default defineConfig({
   clearScreen: false,
   resolve: {
     // ── Single-copy resolution for BlockSuite's core libraries ────────────
-    // Cove consumes BlockSuite through symlinks into ./AFFiNE. Without this,
-    // Vite resolves `yjs`/`@preact/signals-core` per-file: Cove's own imports
-    // (src/**) hit cove/node_modules while BlockSuite hits Affine/node_modules.
-    // Two physical copies at runtime is catastrophic for CRDTs and signals:
-    // separate copies mean signal/effect subscriptions never connect (toolbar
-    // active-state, renderer refresh) and Y.applyUpdate/encodeStateAsUpdate
-    // mutate doc.spaceDoc across the boundary → corrupted surface.
-    //
-    // IMPORTANT: we alias to AFFINE's copies, not Cove's. BlockSuite 0.27 is
-    // built and tested against yjs 13.6.21 / @preact/signals-core 1.8.0. Running
-    // it against Cove's newer copies (signals 1.14.4) changed signal-propagation
-    // semantics enough that BlockSuite's toolbar flag `refresh()` chain (which
-    // toggles a flag bit off→on inside a batch to force re-render) became a
-    // no-op — so the toolbar content never re-rendered on element property
-    // changes (stroke style / shape style active-state stayed stale until
-    // reselect). Pinning to the versions BlockSuite expects fixes that.
-    // Regex matches the bare package + subpaths but NOT lookalikes (yjs-webrtc).
+    // With vendored BlockSuite packages in ./vendor/ (junctions in
+    // node_modules/@blocksuite/), all transitive deps (yjs, rxjs, pdfmake, …)
+    // resolve from Cove's own node_modules — no more AFFiNE/ directory needed.
+    // Only @preact/signals-core is pinned to Cove's copy for signal-propagation
+    // compatibility with BlockSuite 0.27.
     alias: [
-      {
-        find: "@affine/templates/stickers",
-        replacement: resolve(
-          rootDir,
-          "AFFiNE/packages/frontend/templates/stickers-templates.gen.ts",
-        ),
-      },
-      {
-        find: "@affine/templates/edgeless",
-        replacement: resolve(
-          rootDir,
-          "AFFiNE/packages/frontend/templates/edgeless-templates.gen.ts",
-        ),
-      },
-      {
-        find: /^yjs(?=\/|$)/,
-        replacement: resolve(rootDir, "AFFiNE/node_modules/yjs"),
-      },
       {
         find: /^@preact\/signals-core(?=\/|$)/,
         replacement: resolve(rootDir, "node_modules/@preact/signals-core"),
-      },
-      // pdfmake is a transitive dep of @blocksuite/affine-shared (the PDF
-      // adapter). It lives in AFFiNE/node_modules; alias it there so Cove can
-      // reach the SAME singleton instance the adapter uses — letting us
-      // re-point pdfMake.fonts at local fonts before PDF export (the adapter
-      // otherwise hard-codes CORS-blocked cdn.affine.pro font URLs).
-      {
-        find: /^pdfmake(?=\/|$)/,
-        replacement: resolve(rootDir, "AFFiNE/node_modules/pdfmake"),
       },
     ],
     dedupe: [

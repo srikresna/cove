@@ -55,13 +55,7 @@ The app opens at `http://localhost:1420` inside a Tauri desktop window.
 
 ### BlockSuite Vendoring
 
-Cove consumes BlockSuite from a local checkout of the [AFFiNE monorepo](https://github.com/toeverything/AFFiNE) via symlink junctions. The `AFFiNE/` directory is **gitignored** (too large for the repo). To set up BlockSuite locally:
-
-1. Clone AFFiNE into `./AFFiNE/` (or symlink it).
-2. Build BlockSuite packages: `cd AFFiNE && pnpm install && pnpm build`.
-3. Run `node scripts/link-blocksuite.mjs && node scripts/update-blocksuite-exports.mjs` (this is automatic via `postinstall`).
-
-Without `AFFiNE/`, `bun install` will fail at the postinstall step.
+Cove ships BlockSuite 0.27.0 as **pre-built vendored packages** in `vendor/@blocksuite/` (committed to the repo, ~43MB). The `postinstall` script (`scripts/link-blocksuite.mjs`) creates Windows junctions from `node_modules/@blocksuite/` → `vendor/@blocksuite/` so Vite/tsc resolve them naturally. No external BlockSuite source or AFFiNE checkout is needed.
 
 ## Scripts
 
@@ -98,9 +92,9 @@ src-tauri/
 ├── capabilities/      # Tauri permission config
 └── Cargo.toml         # Rust dependencies
 scripts/
-├── link-blocksuite.mjs        # Postinstall: symlink @blocksuite/* → AFFiNE/blocksuite/*
-└── update-blocksuite-exports.mjs  # Postinstall: patch BlockSuite package exports
+├── link-blocksuite.mjs        # Postinstall: junction vendor/@blocksuite/* → node_modules/
 tests/                 # Vitest test suite (services, repositories, errors)
+vendor/                # Pre-built BlockSuite 0.27.0 dist packages (committed)
 ```
 
 ## Architecture

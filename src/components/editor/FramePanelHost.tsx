@@ -44,7 +44,7 @@ export const FramePanelHost: React.FC<{
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !editor || !hasRenderer) return;
-    const panel = new FramePanel();
+    const panel = new FramePanel() as FramePanel & HTMLElement;
     panel.host = editor;
     panel.fitPadding = [50, 380, 50, 50];
     container.append(panel);

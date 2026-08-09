@@ -14,7 +14,11 @@ import { GfxControllerIdentifier } from "@blocksuite/affine/std/gfx";
 import type { ExtensionType } from "@blocksuite/affine/store";
 import type { DeepPartial } from "@blocksuite/global/utils";
 import type { EditorHost } from "@blocksuite/std";
-import type { TestAffineEditorContainer } from "@blocksuite/integration-test";
+import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-test";
+// The vendored dist .d.ts for TestAffineEditorContainer doesn't fully resolve
+// the LitElement→HTMLElement inheritance chain; intersect with HTMLElement so
+// .style, .querySelector, .append etc. are available to tsc.
+type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
 import { effect, signal } from "@preact/signals-core";
 import type React from "react";
 import { useEffect, useRef } from "react";

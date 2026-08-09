@@ -20,7 +20,7 @@ export const OutlinePanelHost: React.FC<{ editor: EditorHost | null }> = ({ edit
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !editor) return;
-    const panel = new OutlinePanel();
+    const panel = new OutlinePanel() as OutlinePanel & HTMLElement;
     panel.editor = editor;
     panel.fitPadding = [20, 20, 20, 20];
     container.append(panel);

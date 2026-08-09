@@ -1,85 +1,63 @@
 /**
- * Links all @blocksuite/* packages from the AFFiNE repo into Cove's node_modules.
+ * Links vendored @blocksuite/* + @affine/templates packages from ./vendor/ into
+ * node_modules/ via Windows junctions. Run automatically via `postinstall`.
  *
- * The AFFiNE repo (D:\remote\cove\Affine) contains BlockSuite v0.27.0 as source
- * (no dist/). Its packages declare exports → ./src/*.ts, designed to be consumed
- * by Vite directly (like the AFFiNE playground does). This script creates junction
- * links in node_modules/@blocksuite/* pointing to the AFFiNE source directories,
- * so Vite + tsc resolve @blocksuite/* to the live source.
+ * The vendor/ directory contains pre-built BlockSuite 0.27.0 dist packages
+ * (committed to the repo). This script makes them resolvable by Vite/tsc by
+ * creating junction links in node_modules/ — bun install doesn't manage these
+ * packages (they're not in package.json), so it may prune them; this script
+ * re-creates them on every install.
  *
  * Usage: node scripts/link-blocksuite.mjs
- *
- * Prerequisites:
- *   1. yarn install in D:\remote\cove\Affine (installs BlockSuite's external deps)
- *   2. Remove @blocksuite/affine from package.json + npm install (removes old npm pkgs)
  */
-import { readdirSync, readFileSync, existsSync, rmSync, mkdirSync, symlinkSync, lstatSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { readdirSync, existsSync, rmSync, mkdirSync, symlinkSync } from "node:fs";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const coveRoot = resolve(scriptDir, "..");
-const affineBsRoot = resolve(coveRoot, "Affine", "blocksuite");
-const nmBlocksuite = resolve(coveRoot, "node_modules", "@blocksuite");
+const vendorDir = join(coveRoot, "vendor");
 
-/** Recursively find all packages with @blocksuite/ names under a directory. */
-function findBlockSuitePackages(dir, results = []) {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return results;
-  }
-  for (const entry of entries) {
+/** Create junctions for all packages under vendor/@<scope>/<name> → node_modules/@<scope>/<name>. */
+function linkScope(scope) {
+  const vendorScope = join(vendorDir, scope);
+  if (!existsSync(vendorScope)) return { linked: 0, failed: 0 };
+
+  const nmScope = join(coveRoot, "node_modules", scope);
+  if (!existsSync(nmScope)) mkdirSync(nmScope, { recursive: true });
+
+  let linked = 0;
+  let failed = 0;
+  for (const entry of readdirSync(vendorScope, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") continue;
-    const fullPath = join(dir, entry.name);
-    const pkgJsonPath = join(fullPath, "package.json");
-    if (existsSync(pkgJsonPath)) {
-      try {
-        const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
-        if (typeof pkg.name === "string" && pkg.name.startsWith("@blocksuite/")) {
-          results.push({ name: pkg.name, dir: fullPath });
-        }
-      } catch {
-        // invalid package.json — skip
-      }
+    const source = join(vendorScope, entry.name);
+    if (!existsSync(join(source, "package.json"))) continue;
+    const linkPath = join(nmScope, entry.name);
+    // Only remove + recreate the specific package dir (preserve npm-installed
+    // packages in the same scope, e.g. @blocksuite/icons from npm).
+    if (existsSync(linkPath)) rmSync(linkPath, { recursive: true, force: true });
+    try {
+      symlinkSync(source, linkPath, "junction");
+      linked++;
+    } catch (err) {
+      console.error(`  FAIL: ${scope}/${entry.name}: ${err.message}`);
+      failed++;
     }
-    // Recurse
-    findBlockSuitePackages(fullPath, results);
   }
-  return results;
+  return { linked, failed };
 }
 
-console.log("Scanning AFFiNE repo for @blocksuite/* packages...");
-const packages = findBlockSuitePackages(affineBsRoot);
-console.log(`Found ${packages.length} packages.`);
+console.log("Linking vendored packages from ./vendor/ ...");
 
-// Sort for deterministic output
-packages.sort((a, b) => a.name.localeCompare(b.name));
+let totalLinked = 0;
+let totalFailed = 0;
 
-// Wipe existing node_modules/@blocksuite (removes old npm-installed packages)
-if (existsSync(nmBlocksuite)) {
-  console.log(`\nRemoving existing ${nmBlocksuite} ...`);
-  rmSync(nmBlocksuite, { recursive: true, force: true });
-}
-mkdirSync(nmBlocksuite, { recursive: true });
-
-// Create junctions
-let linked = 0;
-let failed = 0;
-for (const { name, dir } of packages) {
-  const shortName = name.replace("@blocksuite/", "");
-  const linkPath = join(nmBlocksuite, shortName);
-  try {
-    // "junction" works on Windows without admin privileges (directories only)
-    symlinkSync(dir, linkPath, "junction");
-    linked++;
-  } catch (err) {
-    console.error(`  FAIL: ${name} → ${dir}: ${err.message}`);
-    failed++;
-  }
+for (const scope of ["@blocksuite", "@affine"]) {
+  const { linked, failed } = linkScope(scope);
+  totalLinked += linked;
+  totalFailed += failed;
+  if (linked > 0) console.log(`  ${scope}: ${linked} linked`);
 }
 
-console.log(`\nDone: ${linked} linked, ${failed} failed.`);
-if (failed > 0) process.exit(1);
+console.log(`\nDone: ${totalLinked} linked, ${totalFailed} failed.`);
+if (totalFailed > 0) process.exit(1);

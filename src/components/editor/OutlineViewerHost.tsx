@@ -15,7 +15,7 @@ export const OutlineViewerHost: React.FC<{ editor: EditorHost | null }> = ({ edi
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !editor) return;
-    const viewer = new OutlineViewer();
+    const viewer = new OutlineViewer() as OutlineViewer & HTMLElement;
     viewer.editor = editor;
     viewer.toggleOutlinePanel = null;
     container.append(viewer);
