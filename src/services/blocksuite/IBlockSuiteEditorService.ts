@@ -1,4 +1,5 @@
 import type { ViewExtensionManager } from "@blocksuite/affine/ext-loader";
+import type { ExtensionType } from "@blocksuite/affine/store";
 import type { BlockSuiteDoc, BlockSuiteStore } from "../editor/BlockTreeNormalizer";
 
 /**
@@ -36,6 +37,8 @@ export const DEFAULT_CANVAS_PREFS: CanvasPrefs = {
 export interface IBlockSuiteEditorService {
   /** The shared view extension manager (peek-view service wired in). */
   getViewManager(): ViewExtensionManager;
+  /** Cached view extension specs for a scope (avoids rebuilding on every mount). */
+  getViewSpecs(scope: "page" | "edgeless"): ExtensionType[];
   /** One BlockSuite doc per Cove note. The in-memory doc is the source of
    *  truth once opened; a persisted snapshot only seeds the first load. */
   openNoteDoc(noteId: string, content: string): BlockSuiteDoc;
@@ -49,6 +52,11 @@ export interface IBlockSuiteEditorService {
   isWorkspaceAlive(): boolean;
   /** Disposes the workspace + every doc. Called on vault lock. */
   reset(): void;
+
+  /** Export an open note as Markdown/HTML/PDF (triggers a browser download). */
+  exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<void>;
+  /** Import a Markdown file as a new note doc; returns the new doc id. */
+  importMarkdownFile(file: File): Promise<string | undefined>;
 
   /** Inject the live canvas-feature-flag provider (called by the settings store). */
   provideCanvasPrefs(provider: () => CanvasPrefs): void;

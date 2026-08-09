@@ -119,10 +119,6 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
         store.transact(() => {
           for (const id of dupes) elements.delete(id);
         });
-        // eslint-disable-next-line no-console
-        console.log(
-          `[cove-normalize] removed ${dupes.length} duplicate surface elements (was ${elements.size + dupes.length}, now ${elements.size})`,
-        );
       }
     }
   }

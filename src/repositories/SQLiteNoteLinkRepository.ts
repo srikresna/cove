@@ -39,4 +39,17 @@ export class SQLiteNoteLinkRepository implements INoteLinkRepository {
       throw toPersistenceError("links.backlinksOf", err);
     }
   }
+
+  async outgoingLinksOf(sourceId: string): Promise<string[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ targetId: string }>>(
+        "SELECT targetId FROM note_links WHERE sourceId = ? ORDER BY targetId",
+        [sourceId],
+      );
+      return rows.map((r) => String(r.targetId));
+    } catch (err) {
+      throw toPersistenceError("links.outgoingLinksOf", err);
+    }
+  }
 }

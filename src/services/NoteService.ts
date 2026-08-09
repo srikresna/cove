@@ -176,6 +176,13 @@ export class NoteService implements INoteService {
     return Promise.all(records.map((rec) => this.toMeta(rec)));
   }
 
+  async outgoingLinksOf(id: string): Promise<NoteMeta[]> {
+    this.assertUnlocked();
+    const targets = await this.links.outgoingLinksOf(id);
+    const records = await this.notes.getMetaByIds(targets);
+    return Promise.all(records.map((rec) => this.toMeta(rec)));
+  }
+
   async getLinkTargets(ids: string[]): Promise<NoteMeta[]> {
     this.assertUnlocked();
     const records = await this.notes.getMetaByIds(ids);

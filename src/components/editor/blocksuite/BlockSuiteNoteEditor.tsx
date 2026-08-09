@@ -1,5 +1,6 @@
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
+import type { EditorHost } from "@blocksuite/std";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
@@ -9,6 +10,7 @@ import { TooltipProvider } from "../../ui/tooltip";
 import { EditorHeader } from "../EditorHeader";
 import { EditorRightBar } from "../EditorRightBar";
 import { EditorTopbar } from "../EditorTopbar";
+import { OutlineViewerHost } from "../OutlineViewerHost";
 import { BlockSuiteSurface } from "./BlockSuiteSurface";
 import { EditorErrorBoundary } from "./EditorErrorBoundary";
 
@@ -26,6 +28,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     () => localStorage.getItem(RIGHTBAR_KEY) === "true",
   );
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [editorHost, setEditorHost] = useState<EditorHost | null>(null);
   const mode = note.docMode ?? "page";
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),
@@ -55,28 +58,30 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-full w-full flex-col">
-        <EditorTopbar
-          note={note}
-          wordCount={wordCount}
-          characterCount={characterCount}
-          isFullWidth={isFullWidth}
-          isFullscreen={isFullscreen}
-          isRightBarOpen={isRightBarOpen}
-          docMode={mode}
-          onToggleDocMode={() =>
-            updateNote(note.id, { docMode: mode === "edgeless" ? "page" : "edgeless" })
-          }
-          onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
-          onToggleFullscreen={toggleFullscreen}
-          onToggleRightBar={toggleRightBar}
-        />
+      <div className="flex h-full w-full">
+        {/* Left column: topbar + editor. The right bar sits beside the topbar
+            (full height), matching AFFiNE's sidebar layout — not below it. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <EditorTopbar
+            note={note}
+            wordCount={wordCount}
+            characterCount={characterCount}
+            isFullWidth={isFullWidth}
+            isFullscreen={isFullscreen}
+            isRightBarOpen={isRightBarOpen}
+            docMode={mode}
+            onToggleDocMode={() =>
+              updateNote(note.id, { docMode: mode === "edgeless" ? "page" : "edgeless" })
+            }
+            onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
+            onToggleFullscreen={toggleFullscreen}
+            onToggleRightBar={toggleRightBar}
+          />
 
-        <div className="flex min-h-0 w-full flex-1">
-          <div className="relative h-full min-w-0 flex-1">
+          <div className="relative h-full min-h-0 min-w-0 flex-1">
             {mode === "edgeless" ? (
               <EditorErrorBoundary resetKey={`${note.id}:edgeless`}>
-                <BlockSuiteSurface note={note} mode="edgeless" />
+                <BlockSuiteSurface note={note} mode="edgeless" onEditorReady={setEditorHost} />
               </EditorErrorBoundary>
             ) : (
               <div ref={scrollRef} className="h-full w-full overflow-y-auto">
@@ -89,17 +94,23 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
                   )}
                 >
                   <EditorErrorBoundary resetKey={`${note.id}:page`}>
-                    <BlockSuiteSurface note={note} mode="page" />
+                    <BlockSuiteSurface note={note} mode="page" onEditorReady={setEditorHost} />
                   </EditorErrorBoundary>
                 </div>
+
+                <OutlineViewerHost editor={editorHost} />
               </div>
             )}
           </div>
-
-          {isRightBarOpen && mode === "page" && (
-            <EditorRightBar note={note} scrollRef={scrollRef} onClose={toggleRightBar} />
-          )}
         </div>
+
+        <EditorRightBar
+          note={note}
+          scrollRef={scrollRef}
+          onClose={toggleRightBar}
+          editorHost={editorHost}
+          open={isRightBarOpen}
+        />
       </div>
     </TooltipProvider>
   );

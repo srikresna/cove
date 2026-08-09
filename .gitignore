@@ -9,3 +9,24 @@ src-tauri/gen
 coverage
 stats.html
 AFFiNE/
+docs/
+.remember
+.kilo
+.claude
+
+# secrets / env
+.env
+.env.*
+!.env.example
+
+# OS
+Thumbs.db
+desktop.ini
+
+# editors
+.vscode/
+.idea/
+
+# build artifacts
+*.tsbuildinfo
+.cache/

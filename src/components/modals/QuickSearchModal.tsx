@@ -77,6 +77,8 @@ export const QuickSearchModal: React.FC = () => {
   const { workspaces, setActiveWorkspace } = useWorkspaceStore();
   const isQuickSearchOpen = useUIStore((s) => s.isQuickSearchOpen);
   const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
+  const pickerResolve = useUIStore((s) => s.pickerResolve);
+  const resolvePicker = useUIStore((s) => s.resolvePicker);
   const { setActiveNoteId } = useNoteStore();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<NoteSearchHit[]>([]);
@@ -155,16 +157,29 @@ export const QuickSearchModal: React.FC = () => {
   }, [highlightedId]);
 
   const openHit = (hit: NoteSearchHit) => {
+    // Picker mode (invoked by BlockSuite's QuickSearchProvider): resolve with
+    // the doc id instead of navigating to it.
+    if (pickerResolve) {
+      resolvePicker(hit.id);
+      return;
+    }
     const ws = workspaces.find((w) => w.id === hit.workspaceId);
     if (ws) setActiveWorkspace(ws.id);
     setActiveNoteId(hit.id);
     setQuickSearchOpen(false);
   };
 
+  const onOpenChange = (open: boolean) => {
+    // If a picker is pending and the user cancels, resolve with null so the
+    // awaiting promise never hangs.
+    if (!open && pickerResolve) resolvePicker(null);
+    else setQuickSearchOpen(open);
+  };
+
   const trimmed = query.trim();
 
   return (
-    <Dialog open={isQuickSearchOpen} onOpenChange={setQuickSearchOpen}>
+    <Dialog open={isQuickSearchOpen} onOpenChange={onOpenChange}>
       <DialogContent
         className="top-[12%] max-w-3xl -translate-y-0 gap-0 overflow-hidden p-0"
         hideClose

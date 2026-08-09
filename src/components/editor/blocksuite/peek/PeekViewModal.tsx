@@ -62,7 +62,7 @@ export const PeekViewModal: React.FC = () => {
     editor = document.createElement("affine-editor-container") as TestAffineEditorContainer;
     editor.doc = store;
     editor.edgelessSpecs = [
-      ...blockSuiteEditorService.getViewManager().get("edgeless"),
+      ...blockSuiteEditorService.getViewSpecs("edgeless"),
       ...buildCommonExtensions("edgeless"),
     ];
     editor.mode = "edgeless";

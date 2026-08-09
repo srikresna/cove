@@ -13,8 +13,9 @@ import {
 import { GfxControllerIdentifier } from "@blocksuite/affine/std/gfx";
 import type { ExtensionType } from "@blocksuite/affine/store";
 import type { DeepPartial } from "@blocksuite/global/utils";
+import type { EditorHost } from "@blocksuite/std";
 import type { TestAffineEditorContainer } from "@blocksuite/integration-test";
-import { signal } from "@preact/signals-core";
+import { effect, signal } from "@preact/signals-core";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
@@ -23,7 +24,9 @@ import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import { blockSuiteEditorService } from "../../../di/container";
+import { coveNotificationExtension, coveQuickSearchExtension } from "../../../services/blocksuite/coveBlockSuiteProviders";
 import { registerEdgelessTemplates } from "../../../services/blocksuite/edgelessTemplates";
+import { consumePresentation } from "../../../services/blocksuite/presentationIntent";
 import type { Note } from "../../../types";
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -31,6 +34,9 @@ const SAVE_DEBOUNCE_MS = 800;
 interface BlockSuiteSurfaceProps {
   note: Note;
   mode: CoveDocMode;
+  /** Fired with the editor host once the surface is ready, and null on unmount.
+   *  Lets the parent mount host-dependent panels (e.g. the native OutlinePanel). */
+  onEditorReady?: (host: EditorHost | null) => void;
 }
 
 /**
@@ -93,7 +99,7 @@ export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
   ];
 }
 
-export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode }) => {
+export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode, onEditorReady }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const noteId = note.id;
   const initialContent = useRef(note.content);
@@ -105,15 +111,14 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
 
     const doc = blockSuiteEditorService.openNoteDoc(noteId, initialContent.current);
     const common = buildCommonExtensions(mode);
-    const viewManager = blockSuiteEditorService.getViewManager();
-    const pageSpecs = viewManager.get("page");
-    const edgelessSpecs = viewManager.get("edgeless");
+    const pageSpecs = blockSuiteEditorService.getViewSpecs("page");
+    const edgelessSpecs = blockSuiteEditorService.getViewSpecs("edgeless");
     registerEdgelessTemplates();
 
     const editor = document.createElement("affine-editor-container") as TestAffineEditorContainer;
     editor.doc = doc.getStore();
-    editor.pageSpecs = [...pageSpecs, ...common];
-    editor.edgelessSpecs = [...edgelessSpecs, ...common];
+    editor.pageSpecs = [...pageSpecs, ...common, coveNotificationExtension, coveQuickSearchExtension];
+    editor.edgelessSpecs = [...edgelessSpecs, ...common, coveNotificationExtension, coveQuickSearchExtension];
     editor.mode = mode;
     editor.autofocus = true;
     // Tool handlers assume both the surface model and renderer component exist.
@@ -121,12 +126,12 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
     // click cannot create root-level frames/media before those dependencies exist.
     editor.style.pointerEvents = "none";
     container.append(editor);
-    const mountT0 = performance.now();
 
     let readyFrame = 0;
     let readyTries = 0;
     let disposed = false;
     let autoCompleteApplied = false;
+    let stopPresentationWatch: (() => void) | null = null;
     const disableBrokenAutoComplete = () => {
       if (autoCompleteApplied) return;
       const selectedRect = editor.querySelector("edgeless-selected-rect");
@@ -143,22 +148,48 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
       if (disposed) return;
       try {
         const gfx = editor.std?.get?.(GfxControllerIdentifier);
-        if (gfx?.surface && gfx.surfaceComponent) {
+        // Page root has no GfxController — page is ready once the host/std are
+        // built. Edgeless readiness needs the tool controller (gfx.tool), which
+        // FramePanel's presentation depends on — wait for it so onEditorReady
+        // surfaces a fully-initialized edgeless host.
+        const ready =
+          mode === "edgeless" ? Boolean(gfx?.tool) : Boolean(editor.host?.std);
+        if (ready) {
           disableBrokenAutoComplete();
           editor.style.pointerEvents = "";
-          // eslint-disable-next-line no-console
-          console.log(
-            "[cove-mount]",
-            mode,
-            "ready in",
-            `${(performance.now() - mountT0).toFixed(0)}ms`,
-          );
+          onEditorReady?.(editor.host ?? null);
+          // CSS presentation "fullscreen": the browser fullscreen API is
+          // gesture-blocked in Tauri and window setFullscreen is a visual
+          // no-op on Windows, so instead float the editor over Cove's chrome
+          // whenever the frameNavigator (presentation) tool is active.
+          if (gfx?.tool && !stopPresentationWatch) {
+            const gfxTool = gfx.tool;
+            stopPresentationWatch = effect(() => {
+              const presenting = gfxTool.currentToolName$.value === "frameNavigator";
+              editor.style.position = presenting ? "fixed" : "";
+              editor.style.inset = presenting ? "0" : "";
+              editor.style.zIndex = presenting ? "99999" : "";
+              editor.style.background = presenting ? "#000" : "";
+            });
+            // Honor a presentation request initiated from page mode: flip to
+            // edgeless was done by the caller; here we activate PresentTool now
+            // that the tool controller is ready.
+            if (consumePresentation(noteId)) {
+              void import("@blocksuite/affine/blocks/frame").then(({ PresentTool }) => {
+                try {
+                  gfxTool.setTool(PresentTool, { mode: "fit" });
+                } catch {
+                  // tool/controller disposed between ready and activation
+                }
+              });
+            }
+          }
           return;
         }
       } catch {
         // Lit has not created the std/host yet.
       }
-      if (++readyTries < 120) readyFrame = requestAnimationFrame(enableWhenReady);
+      if (++readyTries < 200) readyFrame = requestAnimationFrame(enableWhenReady);
     };
     void editor.updateComplete.then(enableWhenReady);
 
@@ -180,23 +211,33 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
       },
     );
 
-    // Debounced save on doc update. A content snapshot is only written when it
-    // actually changed since the last successful save — many Yjs transactions
-    // (e.g. captureSync checkpoints, empty transacts) can fire `update` without
-    // altering the serialized doc, so re-encoding then no-op-writing would be
-    // wasted work on large edgeless docs.
+    // Debounced save on doc update. The encoding (encodeDocSnapshot →
+    // Y.encodeStateAsUpdate) traverses the CRDT state synchronously — for large
+    // edgeless docs this can freeze the main thread for 50–100ms. Deferring it
+    // to an idle callback keeps animation frames (presentation, canvas drag)
+    // smooth. A snapshot is only written when it actually changed since the
+    // last save — many Yjs transactions fire `update` without altering the
+    // serialized doc.
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;
     let lastSavedSnapshot: string | null = null;
     const flush = () => {
-      pending = false;
-      // A vault lock disposes the workspace and every Y.Doc with it. Encoding a
-      // disposed doc throws / corrupts the snapshot, so abort the save entirely.
-      if (!blockSuiteEditorService.isWorkspaceAlive()) return;
-      const snapshot = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
-      if (snapshot === lastSavedSnapshot) return;
-      lastSavedSnapshot = snapshot;
-      void useNoteStore.getState().updateNote(noteId, { content: snapshot });
+      const doEncode = () => {
+        pending = false;
+        if (!blockSuiteEditorService.isWorkspaceAlive()) return;
+        const snapshot = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
+        if (snapshot === lastSavedSnapshot) return;
+        lastSavedSnapshot = snapshot;
+        void useNoteStore.getState().updateNote(noteId, { content: snapshot });
+      };
+      // Defer the expensive encoding to an idle period (fallback: setTimeout
+      // 0). pending stays true until encoding completes, so rapid edits during
+      // the defer coalesce into one encode.
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(doEncode, { timeout: 3000 });
+      } else {
+        setTimeout(doEncode, 0);
+      }
     };
     const onUpdate = () => {
       pending = true;
@@ -209,11 +250,13 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
       disposed = true;
       cancelAnimationFrame(readyFrame);
       widgetObserver.disconnect();
+      stopPresentationWatch?.();
       doc.spaceDoc.off("update", onUpdate);
       navSub?.unsubscribe?.();
       if (timer) clearTimeout(timer);
       if (pending) flush();
       editor.remove();
+      onEditorReady?.(null);
     };
   }, [noteId, mode]);
 

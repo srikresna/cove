@@ -6,6 +6,7 @@ import { FeatureFlagService } from "@blocksuite/affine/shared/services";
 import { TestWorkspace } from "@blocksuite/affine/store/test";
 import type { BlobSource } from "@blocksuite/sync";
 import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
+import type { ExtensionType } from "@blocksuite/affine/store";
 import { unpackBlockSuiteContent } from "../editor/contentFormat";
 import {
   type BlockSuiteDoc,
@@ -38,6 +39,10 @@ interface BlockSuiteEditorServiceDeps {
 export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private workspace: TestWorkspace | null = null;
   private viewManager: ViewExtensionManager | null = null;
+  // Cached view extension specs — ExtensionManager.get(scope) rebuilds on every
+  // call; caching avoids that cost across editor mounts (main surface + peek).
+  private cachedPageSpecs: ExtensionType[] | null = null;
+  private cachedEdgelessSpecs: ExtensionType[] | null = null;
   // Doc ids that have been fully loaded (snapshot applied + normalized).
   private readonly initializedDocs = new Set<string>();
   // Doc ids Cove opened itself (vs BlockSuite-initiated "new doc" creates).
@@ -58,17 +63,20 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   getViewManager(): ViewExtensionManager {
     if (!this.viewManager) {
       this.viewManager = new ViewExtensionManager(getInternalViewExtensions());
-      // Wire the peek-view service into every editor built from this manager.
-      // FoundationViewExtension.setup() registers PeekViewExtension (which
-      // di.override's PeekViewProvider with our service) only when peekView is
-      // truthy. ViewExtensionManager.get(scope) rebuilds on each call, so this
-      // one-time configure is picked up by all subsequent editor mounts — both
-      // the main surface and the PeekViewModal.
       this.viewManager.configure(FoundationViewExtension, {
         peekView: covePeekViewService,
       });
     }
     return this.viewManager;
+  }
+
+  getViewSpecs(scope: "page" | "edgeless"): ExtensionType[] {
+    if (scope === "page" && this.cachedPageSpecs) return this.cachedPageSpecs;
+    if (scope === "edgeless" && this.cachedEdgelessSpecs) return this.cachedEdgelessSpecs;
+    const specs = this.getViewManager().get(scope);
+    if (scope === "page") this.cachedPageSpecs = specs;
+    else this.cachedEdgelessSpecs = specs;
+    return specs;
   }
 
   private getWorkspace(): TestWorkspace {
@@ -136,6 +144,57 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     return doc;
   }
 
+  /**
+   * Export an open note doc as Markdown / HTML / PDF. The transformer triggers
+   * a browser download as a side effect. Dynamically imported so the (heavy)
+   * transformer code stays out of the main bundle.
+   */
+  async exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<void> {
+    const ws = this.getWorkspace();
+    const doc = ws.getDoc(noteId);
+    if (!doc) throw new Error("Note doc is not open; cannot export.");
+    const store = doc.getStore();
+    const { MarkdownTransformer, HtmlTransformer, PdfTransformer } = await import(
+      "@blocksuite/affine/widgets/linked-doc"
+    );
+    if (format === "markdown") await MarkdownTransformer.exportDoc(store);
+    else if (format === "html") await HtmlTransformer.exportDoc(store);
+    else {
+      // The PdfAdapter hard-codes remote font URLs (cdn.affine.pro) which are
+      // CORS-blocked off affine.pro. pdfMake is a singleton: re-point its font
+      // table at the locally-served Inter TTF BEFORE exporting. The adapter's
+      // default body font is "SarasaGothicCL" (CJK) and code font "Inter"; map
+      // both to Inter so pdfmake resolves them (Latin-only — CJK falls back).
+      const pdfMake = (await import("pdfmake/build/pdfmake")).default;
+      const inter = "/fonts/Inter.ttf";
+      const slots = { normal: inter, bold: inter, italics: inter, bolditalics: inter };
+      pdfMake.fonts = { Inter: { ...slots }, SarasaGothicCL: { ...slots } };
+      await PdfTransformer.exportDoc(store);
+    }
+  }
+
+  /**
+   * Import a Markdown file as a new note doc. Returns the new doc id; the doc
+   * is created inside the workspace so the docMetaAdded subscriber syncs it to
+   * Cove's DB automatically.
+   */
+  async importMarkdownFile(file: File): Promise<string | undefined> {
+    const ws = this.getWorkspace();
+    const markdown = await file.text();
+    const { MarkdownTransformer } = await import("@blocksuite/affine/widgets/linked-doc");
+    const extensions = this.getViewManager().get("page");
+    // The schema is workspace-wide; derive it from any already-open doc.
+    const sampleDoc = ws.docs.values().next().value;
+    if (!sampleDoc) throw new Error("Open a note before importing.");
+    return MarkdownTransformer.importMarkdownToDoc({
+      collection: ws,
+      schema: sampleDoc.getStore().schema,
+      markdown,
+      fileName: file.name.replace(/\.md$/i, ""),
+      extensions,
+    });
+  }
+
   getDocStoreForPeek(docId: string): BlockSuiteStore | null {
     const ws = this.getWorkspace();
     const doc = ws.getDoc(docId);
@@ -183,6 +242,8 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     this.workspace?.forceStop();
     this.workspace?.dispose();
     this.workspace = null;
+    this.cachedPageSpecs = null;
+    this.cachedEdgelessSpecs = null;
     this.initializedDocs.clear();
     this.coveOwnedDocIds.clear();
   }

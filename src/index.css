@@ -130,6 +130,16 @@ doc-title {
   transition: background 0.4s ease;
 }
 
+/* FramePanel frame cards have a fixed ~280px width + 8px side margins that
+   overflow a narrow sidebar. Drop the margins and clip any residual overflow
+   so the cards fit Cove's right bar. */
+.cove-frame-host .frame-list-container {
+  margin: 0 !important;
+}
+.cove-frame-host {
+  overflow-x: hidden;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

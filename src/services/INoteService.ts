@@ -6,6 +6,8 @@ export type NoteMeta = Pick<Note, "id" | "workspaceId" | "title" | "icon">;
 export interface INoteService {
   /** Notes that link TO this note (metadata only). */
   backlinksOf(id: string): Promise<NoteMeta[]>;
+  /** Notes that this note links TO (outgoing references, metadata only). */
+  outgoingLinksOf(id: string): Promise<NoteMeta[]>;
   /** Metadata for specific ids across workspaces — for link chips. */
   getLinkTargets(ids: string[]): Promise<NoteMeta[]>;
   listMetadataByWorkspace(workspaceId: string): Promise<Note[]>;

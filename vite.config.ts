@@ -92,6 +92,15 @@ export default defineConfig({
         find: /^@preact\/signals-core(?=\/|$)/,
         replacement: resolve(rootDir, "node_modules/@preact/signals-core"),
       },
+      // pdfmake is a transitive dep of @blocksuite/affine-shared (the PDF
+      // adapter). It lives in AFFiNE/node_modules; alias it there so Cove can
+      // reach the SAME singleton instance the adapter uses — letting us
+      // re-point pdfMake.fonts at local fonts before PDF export (the adapter
+      // otherwise hard-codes CORS-blocked cdn.affine.pro font URLs).
+      {
+        find: /^pdfmake(?=\/|$)/,
+        replacement: resolve(rootDir, "AFFiNE/node_modules/pdfmake"),
+      },
     ],
     dedupe: [
       "@blocksuite/global",

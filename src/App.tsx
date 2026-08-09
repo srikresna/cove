@@ -6,6 +6,7 @@ import { PeekViewModal } from "./components/editor/blocksuite/peek/PeekViewModal
 import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
+import { BlockSuiteDialogs } from "./components/editor/BlockSuiteDialogs";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { TrashDialog } from "./components/modals/TrashDialog";
 import { Sidebar } from "./components/sidebar/Sidebar";
@@ -146,6 +147,7 @@ export const AppContent: React.FC = () => {
       <TrashDialog />
       <ToastContainer />
       <PeekViewModal />
+      <BlockSuiteDialogs />
     </div>
   );
 };

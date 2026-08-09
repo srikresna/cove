@@ -83,3 +83,7 @@ export const blockSuiteEditorService: IBlockSuiteEditorService = new BlockSuiteE
   blobSource,
 });
 vaultService.onLock(() => blockSuiteEditorService.reset());
+// Scrub the decrypted blob cache on lock so no plaintext images survive a
+// lockdown. BlockSuite's edgeless renderer re-fetches blobs on every render,
+// so the cache is essential for performance — but it must be cleared on lock.
+vaultService.onLock(() => blobSource.clearCache());

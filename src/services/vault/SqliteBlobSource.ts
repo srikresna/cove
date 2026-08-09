@@ -29,25 +29,62 @@ function splitBlobContainer(bytes: Bytes): { mime: string; bytes: Uint8Array } {
 /**
  * A persistent, vault-encrypted BlobSource for BlockSuite. Stores image /
  * attachment bytes encrypted with the session DEK in the `note_blobs` table.
- * Holds no plaintext cache, so a vault lock leaves nothing to scrub — blobs are
- * re-decrypted from the (encrypted) DB on the next open.
+ *
+ * BlockSuite's edgeless renderer re-fetches the same blobs on every frame
+ * render/animation (hundreds of redundant queries per second during
+ * presentation — confirmed via query diagnostic), exhausting the
+ * tauri-plugin-sql pool and causing slow-acquire warnings. An in-memory cache
+ * deduplicates these fetches. The cache is cleared on vault lock so no
+ * plaintext survives a lockdown.
  */
 export class SqliteBlobSource implements BlobSource {
   readonly name = "cove-sqlite";
   readonly readonly = false;
+
+  // LRU-bounded cache: key → decrypted Blob (or null = known-missing). Cleared
+  // on vault lock. Capped at MAX_CACHE entries to bound memory; oldest evicted.
+  private static readonly MAX_CACHE = 200;
+  private readonly cache = new Map<string, Blob | null>();
 
   constructor(
     private readonly blobs: IBlobRepository,
     private readonly crypto: IEncryptionService,
   ) {}
 
+  /** Clear the plaintext cache — called on vault lock. */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  /** Evict the oldest entry if the cache is at capacity (LRU). */
+  private evictIfNeeded(): void {
+    if (this.cache.size >= SqliteBlobSource.MAX_CACHE) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest !== undefined) this.cache.delete(oldest);
+    }
+  }
+
   async get(key: string): Promise<Blob | null> {
+    if (this.cache.has(key)) {
+      const cached = this.cache.get(key);
+      // LRU: re-insert to move to end (most-recently-used).
+      this.cache.delete(key);
+      this.cache.set(key, cached ?? null);
+      return cached ? cached.slice(0, cached.size, cached.type) : null;
+    }
     const rec = await this.blobs.get(key);
-    if (!rec) return null;
+    if (!rec) {
+      this.evictIfNeeded();
+      this.cache.set(key, null);
+      return null;
+    }
     const { mime, bytes } = splitBlobContainer(
       await this.crypto.decryptBlob(rec.payload, blobAad(key)),
     );
-    return new Blob([bytes.slice()], { type: mime });
+    const blob = new Blob([bytes.slice()], { type: mime });
+    this.evictIfNeeded();
+    this.cache.set(key, blob);
+    return blob.slice(0, blob.size, blob.type);
   }
 
   async set(key: string, value: Blob): Promise<string> {
@@ -57,11 +94,13 @@ export class SqliteBlobSource implements BlobSource {
       blobAad(key),
     );
     await this.blobs.upsert({ id: key, payload, kmsVersion: KMS_VERSION_DEK });
+    this.cache.set(key, value.slice(0, value.size, value.type));
     return key;
   }
 
   async delete(key: string): Promise<void> {
     await this.blobs.delete(key);
+    this.cache.delete(key);
   }
 
   async list(): Promise<string[]> {
