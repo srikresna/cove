@@ -19,14 +19,14 @@ import { NoteService } from "../services/NoteService";
 import { PropertyService } from "../services/PropertyService";
 import { TagService } from "../services/TagService";
 import { type KdfDerive, VaultService } from "../services/VaultService";
-import { WorkspaceService } from "../services/WorkspaceService";
+import { TauriBackupService } from "../services/vault/backup";
 import { CryptoVault } from "../services/vault/CryptoVault";
 import { DeviceBind } from "../services/vault/DeviceBind";
 import type { IBackupService } from "../services/vault/IBackupService";
 import { KeyringKeychainStore } from "../services/vault/KeyringKeychainStore";
 import { LocalStorageLegacyKeyStore } from "../services/vault/LocalStorageLegacyKeyStore";
 import { SqliteBlobSource } from "../services/vault/SqliteBlobSource";
-import { TauriBackupService } from "../services/vault/backup";
+import { WorkspaceService } from "../services/WorkspaceService";
 
 const kmsRepository = new SQLiteKmsRepository();
 const migrationRepository = new SQLiteMigrationRepository();

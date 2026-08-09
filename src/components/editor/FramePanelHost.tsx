@@ -30,14 +30,13 @@ export const FramePanelHost: React.FC<{
     void mode;
     let gfx: unknown;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       gfx = editor?.std?.get?.(GfxControllerIdentifier);
     } catch {
       gfx = undefined;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: BlockSuite internal type
     setHasRenderer(Boolean((gfx as any)?.surfaceComponent));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: BlockSuite internal type
     setIsEdgeless(Boolean((gfx as any)?.tool));
   }, [editor, mode]);
 
@@ -70,10 +69,10 @@ export const FramePanelHost: React.FC<{
       e.preventDefault();
       onStartPresentation();
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: BlockSuite internal type
     let button: any = null;
     const tryAttach = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: BlockSuite internal type
       const header = container.querySelector("affine-frame-panel-header") as any;
       const found = header?.shadowRoot?.querySelector(".presentation-button") ?? null;
       if (found && found !== button) {
@@ -89,7 +88,7 @@ export const FramePanelHost: React.FC<{
       observer.disconnect();
       button?.removeEventListener("click", onClick, true);
     };
-  }, [isEdgeless, hasRenderer, editor, onStartPresentation]);
+  }, [isEdgeless, onStartPresentation]);
 
   if (!hasRenderer) {
     return (

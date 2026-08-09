@@ -8,8 +8,19 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../ui/dia
  * (BlockSuite confirm/prompt calls). Mounted once at the app root.
  */
 export const BlockSuiteDialogs = () => {
-  const { open, kind, title, message, confirmText, cancelText, placeholder, input, setInput, ok, cancel } =
-    useBlockSuiteDialogStore();
+  const {
+    open,
+    kind,
+    title,
+    message,
+    confirmText,
+    cancelText,
+    placeholder,
+    input,
+    setInput,
+    ok,
+    cancel,
+  } = useBlockSuiteDialogStore();
 
   // Enter = confirm, Escape = cancel (Dialog handles Escape → onOpenChange).
   useEffect(() => {
@@ -33,7 +44,9 @@ export const BlockSuiteDialogs = () => {
     >
       <DialogContent className="max-w-sm">
         <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
-        {message ? <DialogDescription className="text-sm text-muted-foreground">{message}</DialogDescription> : null}
+        {message ? (
+          <DialogDescription className="text-sm text-muted-foreground">{message}</DialogDescription>
+        ) : null}
         {kind === "prompt" && (
           <input
             autoFocus

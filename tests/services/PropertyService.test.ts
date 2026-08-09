@@ -1,7 +1,7 @@
+import { describe, expect, it } from "vitest";
 import { NotFoundError } from "@/domain/errors";
 import { ValidationError } from "@/errors/AppError";
 import { PropertyService } from "@/services/PropertyService";
-import { describe, expect, it } from "vitest";
 import { InMemoryPropertyRepository } from "../fakes/InMemoryPropertyRepository";
 
 describe("PropertyService", () => {

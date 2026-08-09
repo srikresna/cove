@@ -67,7 +67,6 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
         <ContextMenuTrigger asChild>
           <motion.div
             layout
-            // biome-ignore lint/a11y/useSemanticElements: the row hosts a nested menu button — button-in-button is invalid HTML
             role="button"
             tabIndex={0}
             aria-label={`Note: ${note.title || MESSAGES.UNTITLED_NOTE}`}

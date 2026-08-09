@@ -3,17 +3,17 @@ import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store"
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
 import { FoundationViewExtension } from "@blocksuite/affine/foundation/view";
 import { FeatureFlagService } from "@blocksuite/affine/shared/services";
-import { TestWorkspace } from "@blocksuite/affine/store/test";
-import type { BlobSource } from "@blocksuite/sync";
-import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
 import type { ExtensionType } from "@blocksuite/affine/store";
-import { unpackBlockSuiteContent } from "../editor/contentFormat";
+import { TestWorkspace } from "@blocksuite/affine/store/test";
+import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
+import type { BlobSource } from "@blocksuite/sync";
 import {
   type BlockSuiteDoc,
   type BlockSuiteStore,
   normalizeBlockTree,
   seedDefaultBlocks,
 } from "../editor/BlockTreeNormalizer";
+import { unpackBlockSuiteContent } from "../editor/contentFormat";
 import { applySnapshot } from "../editor/yjsCodec";
 import {
   type CanvasPrefs,
@@ -52,7 +52,8 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private readonly registeredMetaIds = new Set<string>();
 
   private canvasPrefsProvider: () => CanvasPrefs = () => DEFAULT_CANVAS_PREFS;
-  private docCreatedHandler: (docId: string, title?: string) => Promise<void> = async () => undefined;
+  private docCreatedHandler: (docId: string, title?: string) => Promise<void> = async () =>
+    undefined;
 
   constructor(private readonly deps: BlockSuiteEditorServiceDeps) {
     // Register the affine-editor-container web component once (NOT a
@@ -82,7 +83,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private getWorkspace(): TestWorkspace {
     if (!this.workspace) {
       const storeManager = new StoreExtensionManager(getInternalStoreExtensions());
-      const workspace = new TestWorkspace({ id: "cove", blobSources: { main: this.deps.blobSource } });
+      const workspace = new TestWorkspace({
+        id: "cove",
+        blobSources: { main: this.deps.blobSource },
+      });
       workspace.storeExtensions = storeManager.get("store");
       workspace.meta.initialize();
       workspace.start();

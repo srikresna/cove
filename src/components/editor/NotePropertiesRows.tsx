@@ -25,7 +25,7 @@ import type {
   PropertyType,
   PropertyValue,
 } from "../../domain/property/Property";
-import { PROPERTY_TYPES, hasOptions } from "../../domain/property/Property";
+import { hasOptions, PROPERTY_TYPES } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";

@@ -3,8 +3,8 @@ import type { Note } from "../domain/note/Note";
 import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
 import {
   DEFAULT_NOTE_TITLE,
-  EMPTY_NOTE_CONTENT,
   duplicateNoteProps,
+  EMPTY_NOTE_CONTENT,
   makeNoteId,
   trashPurgeCutoff,
 } from "../domain/note/notePolicy";
@@ -14,8 +14,8 @@ import type { INoteRepository, NoteRecord } from "../repositories/INoteRepositor
 import { extractNoteLinkIds } from "../utils/noteLinks";
 import { buildSnippet, extractPlainText } from "../utils/plainText";
 import type { INoteService, NoteMeta } from "./INoteService";
-import type { IEncryptionService } from "./vault/IEncryptionService";
 import { coverAad, titleAad } from "./vault/aad";
+import type { IEncryptionService } from "./vault/IEncryptionService";
 
 export class NoteService implements INoteService {
   constructor(

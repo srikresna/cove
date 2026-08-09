@@ -1,9 +1,9 @@
+import { describe, expect, it } from "vitest";
 import {
   isBlockSuiteContent,
   packBlockSuiteContent,
   unpackBlockSuiteContent,
 } from "@/services/editor/contentFormat";
-import { describe, expect, it } from "vitest";
 
 describe("contentFormat", () => {
   it("round-trips a BlockSuite update through the envelope", () => {

@@ -1,10 +1,10 @@
-import { NoteService } from "@/services/NoteService";
-import { packBlockSuiteContent } from "@/services/editor/contentFormat";
-import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
-import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
-import { extractNoteLinkIds } from "@/utils/noteLinks";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
+import { packBlockSuiteContent } from "@/services/editor/contentFormat";
+import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
+import { NoteService } from "@/services/NoteService";
+import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
+import { extractNoteLinkIds } from "@/utils/noteLinks";
 import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
 import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
 

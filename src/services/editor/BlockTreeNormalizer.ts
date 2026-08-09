@@ -25,7 +25,9 @@ export function seedDefaultBlocks(store: BlockSuiteStore): void {
 function cloneYValue(value: unknown): unknown {
   if (value instanceof Y.Map) {
     const clone = new Y.Map();
-    value.forEach((v, k) => clone.set(k, cloneYValue(v)));
+    value.forEach((v, k) => {
+      clone.set(k, cloneYValue(v));
+    });
     return clone;
   }
   if (value instanceof Y.Array) {

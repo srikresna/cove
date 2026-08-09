@@ -1,15 +1,15 @@
 import { Plus } from "lucide-react";
 import type React from "react";
-import { Suspense, lazy, useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { BlockSuiteDialogs } from "./components/editor/BlockSuiteDialogs";
 import { PeekViewModal } from "./components/editor/blocksuite/peek/PeekViewModal";
-import { ToastContainer } from "./components/ToastContainer";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
-import { BlockSuiteDialogs } from "./components/editor/BlockSuiteDialogs";
 import { SettingsModal } from "./components/modals/SettingsModal";
 import { TrashDialog } from "./components/modals/TrashDialog";
 import { Sidebar } from "./components/sidebar/Sidebar";
+import { ToastContainer } from "./components/ToastContainer";
 import { Button } from "./components/ui/button";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";

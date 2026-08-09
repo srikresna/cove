@@ -1,7 +1,7 @@
 import {
+  isPropertyType,
   type PropertyDefinition,
   type PropertyOption,
-  isPropertyType,
 } from "../domain/property/Property";
 import { toPersistenceError } from "../errors/errorMappers";
 import type { IPropertyRepository, NotePropertyRecord } from "./IPropertyRepository";

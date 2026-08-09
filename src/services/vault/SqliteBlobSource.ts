@@ -1,8 +1,8 @@
 import type { BlobSource } from "@blocksuite/sync";
 import type { IBlobRepository } from "../../repositories/IBlobRepository";
-import type { IEncryptionService } from "./IEncryptionService";
 import { blobAad } from "./aad";
 import type { Bytes } from "./crypto";
+import type { IEncryptionService } from "./IEncryptionService";
 
 const KMS_VERSION_DEK = 1;
 

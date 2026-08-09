@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { IDeviceBind } from "./IDeviceBind";
 import type { Bytes } from "./crypto";
+import type { IDeviceBind } from "./IDeviceBind";
 
 export class DeviceBind implements IDeviceBind {
   async wrap(plaintext: Bytes): Promise<Bytes> {

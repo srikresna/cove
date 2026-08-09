@@ -1,4 +1,4 @@
-import { type Tag, makeTagId } from "@/domain/tag/Tag";
+import { makeTagId, type Tag } from "@/domain/tag/Tag";
 import type { ITagRepository } from "@/repositories/ITagRepository";
 
 export class InMemoryTagRepository implements ITagRepository {

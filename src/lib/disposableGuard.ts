@@ -20,14 +20,14 @@ type DisposableGroupInternals = {
   _disposed: boolean;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: prototype patching
 const proto = DisposableGroup.prototype as any;
 
 proto.dispose = function dispose(this: DisposableGroupInternals) {
   const list = this._disposables ?? [];
   for (const member of list) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: prototype patching
       const m = member as any;
       if (m && typeof m.dispose === "function") {
         m.dispose();

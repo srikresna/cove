@@ -3,15 +3,11 @@ import type { IKmsRepository, KmsRecord } from "../repositories/IKmsRepository";
 import type { IMigrationRepository } from "../repositories/IMigrationRepository";
 import type { IVaultService, VaultStatus } from "./IVaultService";
 import { Logger } from "./Logger";
-import type { IDeviceBind } from "./vault/IDeviceBind";
-import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
-import { type IKeychainStore, KEYRING_USERS } from "./vault/IKeychainStore";
-import type { ILegacyKeyStore } from "./vault/ILegacyKeyStore";
 import { blobAad, coverAad, titleAad } from "./vault/aad";
 import {
-  type Bytes,
   aesGcmDecrypt,
   aesGcmDecryptBytes,
+  type Bytes,
   base64ToBytes,
   bytesToBase64,
   computeIntegrityMac,
@@ -27,6 +23,10 @@ import {
   wrapDek,
   zeroize,
 } from "./vault/crypto";
+import type { IDeviceBind } from "./vault/IDeviceBind";
+import type { EncryptedPayload, IEncryptionService } from "./vault/IEncryptionService";
+import { type IKeychainStore, KEYRING_USERS } from "./vault/IKeychainStore";
+import type { ILegacyKeyStore } from "./vault/ILegacyKeyStore";
 import { validatePassphrase } from "./vault/vaultPolicy";
 
 const ENVELOPE_VERSION = 3;

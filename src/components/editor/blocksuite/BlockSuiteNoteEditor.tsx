@@ -1,6 +1,6 @@
+import type { EditorHost } from "@blocksuite/std";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
-import type { EditorHost } from "@blocksuite/std";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";

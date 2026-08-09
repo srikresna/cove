@@ -1,15 +1,17 @@
 import { Bound } from "@blocksuite/affine/global/gfx";
 import { GfxControllerIdentifier } from "@blocksuite/affine/std/gfx";
 import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-test";
+
 type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
+
 import { Check, Copy, Expand, Loader2, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useNoteStore } from "../../../../store/useNoteStore";
 import { blockSuiteEditorService } from "../../../../di/container";
+import { usePeekViewStore } from "../../../../services/blocksuite/peekViewService";
+import { useNoteStore } from "../../../../store/useNoteStore";
 import { Dialog, DialogContent, DialogTitle } from "../../../ui/dialog";
 import { buildCommonExtensions } from "../BlockSuiteSurface";
-import { usePeekViewStore } from "../../../../services/blocksuite/peekViewService";
 
 /**
  * Globally-mounted modal that renders a frame/mindmap (or any @Peekable
@@ -41,111 +43,111 @@ export const PeekViewModal: React.FC = () => {
     // node is available. Radix mounts DialogContent in a portal asynchronously,
     // so containerRef.current may be null on the first effect run.
     const mountEditor = (container: HTMLDivElement): (() => void) => {
-    const store = blockSuiteEditorService.getDocStoreForPeek(request.docId);
-    if (!store) {
-      const empty = document.createElement("div");
-      empty.style.cssText = "padding:2rem;color:hsl(var(--muted-foreground));font-size:.875rem";
-      empty.textContent = "Referenced note is not loaded in this session.";
-      container.replaceChildren(empty);
-      setLoading(false);
-      return () => undefined;
-    }
+      const store = blockSuiteEditorService.getDocStoreForPeek(request.docId);
+      if (!store) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "padding:2rem;color:hsl(var(--muted-foreground));font-size:.875rem";
+        empty.textContent = "Referenced note is not loaded in this session.";
+        container.replaceChildren(empty);
+        setLoading(false);
+        return () => undefined;
+      }
 
-    let editor: TestAffineEditorContainer | null = null;
-    let raf = 0;
-    let safetyTimer = 0;
-    let tries = 0;
-    let revealed = false;
+      let editor: TestAffineEditorContainer | null = null;
+      let raf = 0;
+      let safetyTimer = 0;
+      let tries = 0;
+      let revealed = false;
 
-    // Wrap the heavy mount in try/catch so a thrown error surfaces instead of
-    // silently aborting (which would leave the spinner forever).
-    try {
-    editor = document.createElement("affine-editor-container") as TestAffineEditorContainer;
-    editor.doc = store;
-    editor.edgelessSpecs = [
-      ...blockSuiteEditorService.getViewSpecs("edgeless"),
-      ...buildCommonExtensions("edgeless"),
-    ];
-    editor.mode = "edgeless";
-    editor.autofocus = false;
-    // Pin the host to the wrapper so the height:100% chain resolves
-    // (modal 85vh → wrapper inset-0 → host inset-0 → viewport 100%).
-    editor.style.position = "absolute";
-    editor.style.inset = "0";
-    editor.style.opacity = "0";
-    container.append(editor);
-
-    const reveal = () => {
-      if (disposed || revealed || !editor) return;
-      revealed = true;
-      editor.style.opacity = "1";
-      setLoading(false);
-    };
-
-    let fitDone = false;
-    const fit = (): boolean => {
-      if (!editor || fitDone) return fitDone;
+      // Wrap the heavy mount in try/catch so a thrown error surfaces instead of
+      // silently aborting (which would leave the spinner forever).
       try {
-        const gfx = editor.std?.get?.(GfxControllerIdentifier);
-        const viewport = gfx?.viewport;
-        if (!viewport) return false;
-        viewport.onResize();
-        if (request.xywh) {
-          viewport.setViewportByBound(Bound.deserialize(request.xywh), [60, 20, 20, 20], false);
-        } else {
-          gfx.fitToScreen({ smooth: false });
-        }
-        fitDone = true;
-        return true;
-      } catch {
-        return false;
-      }
-    };
-    // updateComplete may reject if the Lit render throws; use finally so the
-    // poll starts regardless. Once the viewport is ready, fit it, then poll
-    // until the surface block's renderer has created its <canvas> with
-    // non-zero dimensions (the canvas is created asynchronously by the
-    // SurfaceBlockComponent — revealing before it exists shows a blank modal).
-    // Safety-capped at ~6s.
-    const poll = () => {
-      if (disposed || revealed) return;
-      raf = requestAnimationFrame(waitForCanvas);
-    };
-    const waitForCanvas = () => {
-      if (disposed || revealed) return;
-      if (fit() || ++tries > 600) {
-        raf = requestAnimationFrame(checkCanvas);
-        return;
-      }
-      raf = requestAnimationFrame(waitForCanvas);
-    };
-    const checkCanvas = () => {
-      if (disposed || revealed || !editor) return;
-      const canvas = editor.querySelector("canvas");
-      if (canvas && canvas.width > 0 && canvas.height > 0) {
-        reveal();
-        return;
-      }
-      if (++tries > 600) {
-        reveal(); // safety fallback (~6s)
-        return;
-      }
-      raf = requestAnimationFrame(checkCanvas);
-    };
-    if (editor) void editor.updateComplete.finally(poll);
-    safetyTimer = window.setTimeout(reveal, 6000);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[cove-peek] mount failed", err);
-      setLoading(false);
-    }
+        editor = document.createElement("affine-editor-container") as TestAffineEditorContainer;
+        editor.doc = store;
+        editor.edgelessSpecs = [
+          ...blockSuiteEditorService.getViewSpecs("edgeless"),
+          ...buildCommonExtensions("edgeless"),
+        ];
+        editor.mode = "edgeless";
+        editor.autofocus = false;
+        // Pin the host to the wrapper so the height:100% chain resolves
+        // (modal 85vh → wrapper inset-0 → host inset-0 → viewport 100%).
+        editor.style.position = "absolute";
+        editor.style.inset = "0";
+        editor.style.opacity = "0";
+        container.append(editor);
 
-    return () => {
-      disposed = true;
-      clearTimeout(safetyTimer);
-      cancelAnimationFrame(raf);
-      editor?.remove();
-    };
+        const reveal = () => {
+          if (disposed || revealed || !editor) return;
+          revealed = true;
+          editor.style.opacity = "1";
+          setLoading(false);
+        };
+
+        let fitDone = false;
+        const fitViewport = (): boolean => {
+          if (!editor || fitDone) return fitDone;
+          try {
+            const gfx = editor.std?.get?.(GfxControllerIdentifier);
+            const viewport = gfx?.viewport;
+            if (!viewport) return false;
+            viewport.onResize();
+            if (request.xywh) {
+              viewport.setViewportByBound(Bound.deserialize(request.xywh), [60, 20, 20, 20], false);
+            } else {
+              gfx.fitToScreen({ smooth: false });
+            }
+            fitDone = true;
+            return true;
+          } catch {
+            return false;
+          }
+        };
+        // updateComplete may reject if the Lit render throws; use finally so the
+        // poll starts regardless. Once the viewport is ready, fit it, then poll
+        // until the surface block's renderer has created its <canvas> with
+        // non-zero dimensions (the canvas is created asynchronously by the
+        // SurfaceBlockComponent — revealing before it exists shows a blank modal).
+        // Safety-capped at ~6s.
+        const poll = () => {
+          if (disposed || revealed) return;
+          raf = requestAnimationFrame(waitForCanvas);
+        };
+        const waitForCanvas = () => {
+          if (disposed || revealed) return;
+          if (fitViewport() || ++tries > 600) {
+            raf = requestAnimationFrame(checkCanvas);
+            return;
+          }
+          raf = requestAnimationFrame(waitForCanvas);
+        };
+        const checkCanvas = () => {
+          if (disposed || revealed || !editor) return;
+          const canvas = editor.querySelector("canvas");
+          if (canvas && canvas.width > 0 && canvas.height > 0) {
+            reveal();
+            return;
+          }
+          if (++tries > 600) {
+            reveal(); // safety fallback (~6s)
+            return;
+          }
+          raf = requestAnimationFrame(checkCanvas);
+        };
+        if (editor) void editor.updateComplete.finally(poll);
+        safetyTimer = window.setTimeout(reveal, 6000);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[cove-peek] mount failed", err);
+        setLoading(false);
+      }
+
+      return () => {
+        disposed = true;
+        clearTimeout(safetyTimer);
+        cancelAnimationFrame(raf);
+        editor?.remove();
+      };
     }; // end mountEditor
 
     // Wait for the container DOM node (Radix portal may not have mounted it on

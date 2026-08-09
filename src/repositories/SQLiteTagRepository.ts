@@ -1,4 +1,4 @@
-import { type Tag, makeTagId } from "../domain/tag/Tag";
+import { makeTagId, type Tag } from "../domain/tag/Tag";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
 import type { ITagRepository } from "./ITagRepository";

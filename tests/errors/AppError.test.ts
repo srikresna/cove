@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import {
   BusinessRuleError,
   EncryptionError,
@@ -6,7 +7,6 @@ import {
   ValidationError,
 } from "@/errors/AppError";
 import { toAppError, toPersistenceError } from "@/errors/errorMappers";
-import { describe, expect, it } from "vitest";
 
 describe("AppError hierarchy", () => {
   it("preserves categories and stack trace", () => {

@@ -1,7 +1,7 @@
-import { applySnapshot, docFromSnapshot, encodeDocSnapshot } from "@/services/editor/yjsCodec";
-import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
+import { applySnapshot, docFromSnapshot, encodeDocSnapshot } from "@/services/editor/yjsCodec";
+import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
 
 const envelopeCrypto: IEncryptionService = {
   isUnlocked: () => true,

@@ -1,7 +1,7 @@
+import { describe, expect, it } from "vitest";
 import { TAG_COLORS } from "@/domain/tag/Tag";
 import { ValidationError } from "@/errors/AppError";
 import { TagService } from "@/services/TagService";
-import { describe, expect, it } from "vitest";
 import { InMemoryTagRepository } from "../fakes/InMemoryTagRepository";
 
 describe("TagService", () => {

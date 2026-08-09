@@ -14,7 +14,9 @@ type Format = "markdown" | "plaintext";
 // the heavy Store type).
 interface AdapterStore {
   getTransformer(middlewares: unknown[]): unknown;
-  get(id: unknown): { get(job: unknown): { fromDoc(store: unknown): Promise<{ file?: string } | null> } };
+  get(id: unknown): {
+    get(job: unknown): { fromDoc(store: unknown): Promise<{ file?: string } | null> };
+  };
 }
 
 const TABS: ReadonlyArray<{ value: Format; label: string }> = [
@@ -35,16 +37,18 @@ export const LivePreview: React.FC<{ noteId: string }> = ({ noteId }) => {
 
   useEffect(() => {
     let cancelled = false;
-    const store = blockSuiteEditorService.getDocStoreForPeek(noteId) as unknown as
-      | AdapterStore
-      | null;
+    const store = blockSuiteEditorService.getDocStoreForPeek(
+      noteId,
+    ) as unknown as AdapterStore | null;
     if (!store) return;
     setLoading(true);
     void (async () => {
       try {
         const job = store.getTransformer([embedSyncedDocMiddleware("content")]);
         const factoryId =
-          format === "markdown" ? MarkdownAdapterFactoryIdentifier : PlainTextAdapterFactoryIdentifier;
+          format === "markdown"
+            ? MarkdownAdapterFactoryIdentifier
+            : PlainTextAdapterFactoryIdentifier;
         const adapter = store.get(factoryId).get(job);
         const result = await adapter.fromDoc(store);
         if (!cancelled) setContent(result?.file ?? "");

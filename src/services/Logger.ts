@@ -44,8 +44,10 @@ function emit(entry: LogEntry): void {
       : entry.level === "warn"
         ? console.warn
         : entry.level === "info"
-          ? console.info
-          : console.debug;
+          ? // biome-ignore lint/suspicious/noConsole: Logger is a console wrapper
+            console.info
+          : // biome-ignore lint/suspicious/noConsole: Logger is a console wrapper
+            console.debug;
 
   sink(jsonStr);
 }

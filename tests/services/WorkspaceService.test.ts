@@ -1,6 +1,6 @@
+import { describe, expect, it } from "vitest";
 import { BusinessRuleError, NotFoundError } from "@/domain/errors";
 import { WorkspaceService } from "@/services/WorkspaceService";
-import { describe, expect, it } from "vitest";
 import { InMemoryWorkspaceRepository } from "../fakes/InMemoryWorkspaceRepository";
 
 describe("WorkspaceService", () => {

@@ -56,10 +56,10 @@ function resolvePeekTarget(args: {
   // page note). Double-click / shift-click calls peek({ target }). The block's
   // `referenceModel` points at the edgeless element it mirrors.
   if (target && "model" in target) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: BlockSuite duck-typing
     const model = (target as any).model;
     if (model?.flavour === "affine:surface-ref") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: BlockSuite duck-typing
       const ref = (target as any).referenceModel;
       const refDocId = ref && "store" in ref ? ref.store.id : ref?.surface?.store?.id;
       if (refDocId && ref?.xywh) {

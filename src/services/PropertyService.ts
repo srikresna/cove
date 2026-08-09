@@ -1,14 +1,14 @@
 import { NotFoundError } from "../domain/errors";
 import {
   DEFAULT_STATUS_OPTIONS,
-  type PropertyDefinition,
-  type PropertyOption,
-  type PropertyType,
-  type PropertyValue,
   deserializePropertyValue,
   hasOptions,
   makePropertyId,
   nextOptionColor,
+  type PropertyDefinition,
+  type PropertyOption,
+  type PropertyType,
+  type PropertyValue,
   serializePropertyValue,
 } from "../domain/property/Property";
 import { normalizeTagName } from "../domain/tag/Tag";

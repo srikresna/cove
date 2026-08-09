@@ -13,24 +13,29 @@ import {
 import { GfxControllerIdentifier } from "@blocksuite/affine/std/gfx";
 import type { ExtensionType } from "@blocksuite/affine/store";
 import type { DeepPartial } from "@blocksuite/global/utils";
-import type { EditorHost } from "@blocksuite/std";
 import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-test";
+import type { EditorHost } from "@blocksuite/std";
+
 // The vendored dist .d.ts for TestAffineEditorContainer doesn't fully resolve
 // the LitElement→HTMLElement inheritance chain; intersect with HTMLElement so
 // .style, .querySelector, .append etc. are available to tsc.
 type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
+
 import { effect, signal } from "@preact/signals-core";
 import type React from "react";
 import { useEffect, useRef } from "react";
+import { blockSuiteEditorService } from "../../../di/container";
 import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
+import {
+  coveNotificationExtension,
+  coveQuickSearchExtension,
+} from "../../../services/blocksuite/coveBlockSuiteProviders";
+import { registerEdgelessTemplates } from "../../../services/blocksuite/edgelessTemplates";
+import { consumePresentation } from "../../../services/blocksuite/presentationIntent";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
-import { blockSuiteEditorService } from "../../../di/container";
-import { coveNotificationExtension, coveQuickSearchExtension } from "../../../services/blocksuite/coveBlockSuiteProviders";
-import { registerEdgelessTemplates } from "../../../services/blocksuite/edgelessTemplates";
-import { consumePresentation } from "../../../services/blocksuite/presentationIntent";
 import type { Note } from "../../../types";
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -103,7 +108,11 @@ export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
   ];
 }
 
-export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode, onEditorReady }) => {
+export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
+  note,
+  mode,
+  onEditorReady,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const noteId = note.id;
   const initialContent = useRef(note.content);
@@ -121,8 +130,18 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
 
     const editor = document.createElement("affine-editor-container") as TestAffineEditorContainer;
     editor.doc = doc.getStore();
-    editor.pageSpecs = [...pageSpecs, ...common, coveNotificationExtension, coveQuickSearchExtension];
-    editor.edgelessSpecs = [...edgelessSpecs, ...common, coveNotificationExtension, coveQuickSearchExtension];
+    editor.pageSpecs = [
+      ...pageSpecs,
+      ...common,
+      coveNotificationExtension,
+      coveQuickSearchExtension,
+    ];
+    editor.edgelessSpecs = [
+      ...edgelessSpecs,
+      ...common,
+      coveNotificationExtension,
+      coveQuickSearchExtension,
+    ];
     editor.mode = mode;
     editor.autofocus = true;
     // Tool handlers assume both the surface model and renderer component exist.
@@ -156,8 +175,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
         // built. Edgeless readiness needs the tool controller (gfx.tool), which
         // FramePanel's presentation depends on — wait for it so onEditorReady
         // surfaces a fully-initialized edgeless host.
-        const ready =
-          mode === "edgeless" ? Boolean(gfx?.tool) : Boolean(editor.host?.std);
+        const ready = mode === "edgeless" ? Boolean(gfx?.tool) : Boolean(editor.host?.std);
         if (ready) {
           disableBrokenAutoComplete();
           editor.style.pointerEvents = "";
@@ -262,7 +280,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({ note, mode
       editor.remove();
       onEditorReady?.(null);
     };
-  }, [noteId, mode]);
+  }, [noteId, mode, onEditorReady]);
 
   return <div ref={containerRef} className="h-full min-h-full flex-1" />;
 };

@@ -21,8 +21,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@preact/signals-core": ["node_modules/@preact/signals-core"],
-      "yjs": ["AFFiNE/node_modules/yjs"]
+      "@preact/signals-core": ["node_modules/@preact/signals-core"]
     }
   },
   "include": ["src"]

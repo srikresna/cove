@@ -1,11 +1,10 @@
+import { describe, expect, it } from "vitest";
 import { EncryptionError, ValidationError } from "@/errors/AppError";
 import { type KdfDerive, VaultService } from "@/services/VaultService";
 import { CryptoVault } from "@/services/vault/CryptoVault";
-import type { IDeviceBind } from "@/services/vault/IDeviceBind";
-import { KEYRING_USERS } from "@/services/vault/IKeychainStore";
 import {
-  type Bytes,
   aesGcmEncrypt,
+  type Bytes,
   bytesToBase64,
   counterToIv,
   derivePrk,
@@ -13,7 +12,8 @@ import {
   generateDek,
   importAesGcmKey,
 } from "@/services/vault/crypto";
-import { describe, expect, it } from "vitest";
+import type { IDeviceBind } from "@/services/vault/IDeviceBind";
+import { KEYRING_USERS } from "@/services/vault/IKeychainStore";
 import { IdentityDeviceBind } from "../fakes/IdentityDeviceBind";
 import { InMemoryKeychainStore } from "../fakes/InMemoryKeychainStore";
 import { InMemoryKmsRepository } from "../fakes/InMemoryKmsRepository";

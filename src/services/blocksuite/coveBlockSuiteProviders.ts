@@ -1,12 +1,12 @@
 import {
   NotificationExtension,
-  QuickSearchExtension,
   type NotificationService,
+  QuickSearchExtension,
   type QuickSearchService,
 } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
-import { useNotificationStore } from "../../store/useNotificationStore";
 import { useBlockSuiteDialogStore } from "../../store/useBlockSuiteDialogStore";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { useUIStore } from "../../store/useUIStore";
 
 const asText = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -40,7 +40,14 @@ export const coveNotificationService: NotificationService = {
     }),
   notify: (options) => {
     useNotificationStore.getState().pushToast({
-      kind: options.accent === "error" ? "error" : options.accent === "warning" ? "warning" : options.accent === "success" ? "success" : "info",
+      kind:
+        options.accent === "error"
+          ? "error"
+          : options.accent === "warning"
+            ? "warning"
+            : options.accent === "success"
+              ? "success"
+              : "info",
       title: asText(options.title),
       description: options.message ? asText(options.message) : undefined,
     });
@@ -50,9 +57,8 @@ export const coveNotificationService: NotificationService = {
 };
 
 /** ExtensionType that registers the notification service in every editor. */
-export const coveNotificationExtension: ExtensionType = NotificationExtension(
-  coveNotificationService,
-);
+export const coveNotificationExtension: ExtensionType =
+  NotificationExtension(coveNotificationService);
 
 /**
  * Maps BlockSuite's QuickSearchService contract onto Cove's QuickSearchModal,
@@ -67,6 +73,4 @@ export const coveQuickSearchService: QuickSearchService = {
 };
 
 /** ExtensionType that registers the quick-search service in every editor. */
-export const coveQuickSearchExtension: ExtensionType = QuickSearchExtension(
-  coveQuickSearchService,
-);
+export const coveQuickSearchExtension: ExtensionType = QuickSearchExtension(coveQuickSearchService);
