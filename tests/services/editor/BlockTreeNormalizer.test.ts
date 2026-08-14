@@ -18,7 +18,6 @@ type SurfaceLike = {
 
 let counter = 0;
 
-/** Create a fresh BlockSuite TestWorkspace + doc with store extensions wired. */
 function createDoc(): BlockSuiteDoc {
   const ws = new TestWorkspace({ id: `ws-${counter++}` });
   const storeExt = new StoreExtensionManager(getInternalStoreExtensions());
@@ -30,21 +29,18 @@ function createDoc(): BlockSuiteDoc {
   return doc;
 }
 
-/** Access a surface model's element Y.Map (the canvas elements store). */
 function surfaceElements(model: BlockModel): Y.Map<Y.Map<unknown>> {
   const els = (model as unknown as SurfaceLike).elements?.getValue();
   if (!els) throw new Error("surface model has no elements map");
   return els;
 }
 
-/** Get a block model by id, throwing if missing (avoids non-null assertions). */
 function getModel(store: BlockSuiteStore, id: string): BlockModel {
   const model = store.getModelById(id);
   if (!model) throw new Error(`block ${id} not found`);
   return model;
 }
 
-/** Insert a minimal canvas element into a surface's element map. */
 function addElement(els: Y.Map<Y.Map<unknown>>, id: string, type: string, xywh: string): void {
   const el = new Y.Map();
   el.set("type", type);
@@ -52,7 +48,6 @@ function addElement(els: Y.Map<Y.Map<unknown>>, id: string, type: string, xywh: 
   els.set(id, el);
 }
 
-/** Build a page → surface → note → paragraph structure, returning block ids. */
 function buildStandardDoc(doc: BlockSuiteDoc) {
   const store = doc.getStore();
   const rootId = store.addBlock("affine:page", { title: new Text() });
@@ -62,7 +57,6 @@ function buildStandardDoc(doc: BlockSuiteDoc) {
   return { store, rootId, surfaceId, noteId };
 }
 
-/** Get the first block model of a flavour (throws if none). Avoids [0] null. */
 function firstBlockModel(store: BlockSuiteStore, flavour: string): BlockModel {
   const block = store.getBlocksByFlavour(flavour)[0];
   if (!block) throw new Error(`no ${flavour} block found`);
@@ -153,8 +147,7 @@ describe("BlockTreeNormalizer", () => {
       const rootId = store.addBlock("affine:page", { title: new Text() });
       const s1 = store.addBlock("affine:surface", {}, rootId);
       const s2 = store.addBlock("affine:surface", {}, rootId);
-      // Both surfaces hold the "same" element (corruption copy) with the same
-      // type + xywh but different ids.
+
       addElement(surfaceElements(getModel(store, s1)), "el-a", "shape", "[0,0,100,100]");
       addElement(surfaceElements(getModel(store, s2)), "el-b", "shape", "[0,0,100,100]");
 
@@ -168,7 +161,7 @@ describe("BlockTreeNormalizer", () => {
       const { store, surfaceId } = buildStandardDoc(doc);
       const els = surfaceElements(getModel(store, surfaceId));
       addElement(els, "a", "shape", "[0,0,100,100]");
-      addElement(els, "b", "shape", "[0,0,100,100]"); // deliberate in-place dup
+      addElement(els, "b", "shape", "[0,0,100,100]");
 
       normalizeBlockTree(doc);
 

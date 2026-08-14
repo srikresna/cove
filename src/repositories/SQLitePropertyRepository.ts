@@ -69,8 +69,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
   async appendOption(id: string, optionJson: string): Promise<void> {
     try {
       const db = await this.getDb();
-      // Atomic JSON array append (JSON1) instead of read-modify-write: two
-      // concurrent addOption calls can no longer overwrite each other's option.
+
       await db.execute(
         "UPDATE property_defs SET optionsJson = json_insert(optionsJson, '$[#]', json(?)) WHERE id = ?",
         [optionJson, id],

@@ -33,7 +33,6 @@ function makeText(blocks: Y.Map<unknown>, id: string, text: string, linkId?: str
   }
 }
 
-/** Build a BlockSuite envelope whose body references `targetId`. */
 function blockSuiteWithLink(targetId: string): string {
   const doc = new Y.Doc();
   const blocks = doc.getMap("blocks");

@@ -12,13 +12,6 @@ pub struct SqlStatement {
 
 type BoundQuery<'q> = sqlx::query::Query<'q, sqlx::Sqlite, SqliteArguments<'q>>;
 
-/// Runs a sequence of statements as ONE atomic transaction on a dedicated sqlx
-/// connection. The plugin-sql pool may route each `execute` to a different
-/// connection, so multi-statement writes (cascade deletes, link replacement,
-/// schema recreate) cannot be made atomic with BEGIN/COMMIT through the pool.
-/// This command owns a single connection + transaction, so all-or-nothing
-/// semantics hold and any failure rolls every statement back. `foreign_keys` is
-/// on, so `ON DELETE CASCADE` constraints fire within the transaction.
 #[tauri::command]
 pub async fn run_sql_transaction(
     app: tauri::AppHandle,

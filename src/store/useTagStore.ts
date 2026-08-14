@@ -6,11 +6,11 @@ import { notifyError } from "./notify";
 interface TagState {
   tags: Tag[];
   activeTagId: string | null;
-  /** Note ids carrying the active tag; null when no filter is active. */
+
   taggedNoteIds: Set<string> | null;
   fetchTags: () => Promise<void>;
   setTagFilter: (tagId: string | null) => Promise<void>;
-  /** Re-sync tag list and the active filter after note-tag mutations. */
+
   refresh: () => Promise<void>;
 }
 

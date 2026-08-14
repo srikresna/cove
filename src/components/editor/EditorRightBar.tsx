@@ -35,9 +35,9 @@ interface EditorRightBarProps {
   note: Note;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
-  /** Live editor host from the page-mode surface; powers the native OutlinePanel. */
+
   editorHost?: EditorHost | null;
-  /** Whether the bar is expanded (animated via width transition). */
+
   open?: boolean;
 }
 
@@ -142,7 +142,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
           </Button>
         </div>
 
-        {/* Preview / frames fill the whole panel; the other tabs scroll. */}
+        {}
         {(tab === "preview" || tab === "frames") && (
           <div className="min-h-0 flex-1 overflow-hidden p-2 pt-1">
             {tab === "preview" && <LivePreview noteId={note.id} />}

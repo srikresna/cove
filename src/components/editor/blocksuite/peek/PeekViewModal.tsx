@@ -13,15 +13,6 @@ import { useNoteStore } from "../../../../store/useNoteStore";
 import { Dialog, DialogContent, DialogTitle } from "../../../ui/dialog";
 import { buildCommonExtensions } from "../BlockSuiteSurface";
 
-/**
- * Globally-mounted modal that renders a frame/mindmap (or any @Peekable
- * surface-ref) in an edgeless editor — the Cove equivalent of AFFiNE's
- * doc-peek-view. Mirrors AFFiNE's pattern: reuse the already-loaded doc store,
- * defer the heavy editor mount until after the open animation, then fit the
- * viewport to the referenced frame. A generic loading skeleton (spinner +
- * "Loading" + description) is shown until the canvas paints — matching
- * AFFiNE's PageDetailLoading rather than a blank-white modal.
- */
 export const PeekViewModal: React.FC = () => {
   const request = usePeekViewStore((s) => s.request);
   const close = usePeekViewStore((s) => s.close);
@@ -41,9 +32,6 @@ export const PeekViewModal: React.FC = () => {
     let waitRaf = 0;
     let waitTries = 0;
 
-    // The editor mount, extracted so it can run as soon as the container DOM
-    // node is available. Radix mounts DialogContent in a portal asynchronously,
-    // so containerRef.current may be null on the first effect run.
     const mountEditor = (container: HTMLDivElement): (() => void) => {
       const store = blockSuiteEditorService.getDocStoreForPeek(request.docId);
       if (!store) {
@@ -61,8 +49,6 @@ export const PeekViewModal: React.FC = () => {
       let tries = 0;
       let revealed = false;
 
-      // Wrap the heavy mount in try/catch so a thrown error surfaces instead of
-      // silently aborting (which would leave the spinner forever).
       try {
         editor = document.createElement("affine-editor-container") as TestAffineEditorContainer;
         editor.doc = store;
@@ -72,8 +58,7 @@ export const PeekViewModal: React.FC = () => {
         ];
         editor.mode = "edgeless";
         editor.autofocus = false;
-        // Pin the host to the wrapper so the height:100% chain resolves
-        // (modal 85vh → wrapper inset-0 → host inset-0 → viewport 100%).
+
         editor.style.position = "absolute";
         editor.style.inset = "0";
         editor.style.opacity = "0";
@@ -105,12 +90,7 @@ export const PeekViewModal: React.FC = () => {
             return false;
           }
         };
-        // updateComplete may reject if the Lit render throws; use finally so the
-        // poll starts regardless. Once the viewport is ready, fit it, then poll
-        // until the surface block's renderer has created its <canvas> with
-        // non-zero dimensions (the canvas is created asynchronously by the
-        // SurfaceBlockComponent — revealing before it exists shows a blank modal).
-        // Safety-capped at ~6s.
+
         const poll = () => {
           if (disposed || revealed) return;
           raf = requestAnimationFrame(waitForCanvas);
@@ -131,7 +111,7 @@ export const PeekViewModal: React.FC = () => {
             return;
           }
           if (++tries > 600) {
-            reveal(); // safety fallback (~6s)
+            reveal();
             return;
           }
           raf = requestAnimationFrame(checkCanvas);
@@ -150,10 +130,8 @@ export const PeekViewModal: React.FC = () => {
         cancelAnimationFrame(raf);
         editor?.remove();
       };
-    }; // end mountEditor
+    };
 
-    // Wait for the container DOM node (Radix portal may not have mounted it on
-    // the first effect run), then mount. Caps at ~2s before giving up.
     const waitForContainer = () => {
       if (disposed) return;
       const container = containerRef.current;
@@ -178,10 +156,7 @@ export const PeekViewModal: React.FC = () => {
 
   const handleOpenInFull = () => {
     if (!request) return;
-    // Switch the main editor to this note in edgeless mode, then close the
-    // peek — mirroring AFFiNE's "open doc" peek control. Without
-    // setActiveNoteId the mode change applies to a background note the user
-    // never sees.
+
     const ns = useNoteStore.getState();
     ns.setActiveNoteId(request.docId);
     void ns.updateNote(request.docId, { docMode: "edgeless" });
@@ -194,9 +169,7 @@ export const PeekViewModal: React.FC = () => {
       await navigator.clipboard.writeText(request.docId);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard may be unavailable; ignore silently.
-    }
+    } catch {}
   };
 
   return (
@@ -211,12 +184,7 @@ export const PeekViewModal: React.FC = () => {
         hideClose
       >
         <DialogTitle className="sr-only">Peek view</DialogTitle>
-        {/*
-          absolute inset-0 (not h-full) gives the editor a definite height.
-          DialogContent's base class is display:grid, under which an h-full
-          child resolves to 0 height. The dialog's fixed positioning establishes
-          the containing block for this absolute child.
-        */}
+        {}
         <div ref={containerRef} className="absolute inset-0" />
         {error && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-card p-8 text-center">
@@ -243,10 +211,7 @@ export const PeekViewModal: React.FC = () => {
             <div className="text-xs text-muted-foreground/70">Preparing peek view…</div>
           </div>
         )}
-        {/* Peek controls — vertical cluster top-right, mirroring AFFiNE's
-            DocPeekViewControls (close / open / copy-link). Positioned INSIDE
-            the modal box (DialogContent is overflow-hidden, so an outside
-            -right offset would be clipped and invisible). */}
+        {}
         <div className="absolute right-3 top-3 z-30 flex flex-col gap-1.5">
           <ControlButton label="Close peek view" onClick={close}>
             <X className="h-4 w-4" aria-hidden="true" />

@@ -9,7 +9,6 @@ import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEnc
 import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
 import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
 
-/** Build a BlockSuite envelope with a single paragraph of body text. */
 function blockSuiteWithText(text: string): string {
   const doc = new Y.Doc();
   const blocks = doc.getMap("blocks");

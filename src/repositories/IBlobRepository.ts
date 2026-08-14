@@ -12,7 +12,7 @@ export interface IBlobRepository {
   upsert(rec: Omit<IBlobRecord, "updatedAt">): Promise<void>;
   delete(id: string): Promise<void>;
   listIds(): Promise<string[]>;
-  /** All blobs, cursor-paginated by id (for DEK rotation). */
+
   findAllBatch(afterId: string | null, limit: number): Promise<IBlobRecord[]>;
   markMigrated(id: string, payload: EncryptedPayload): Promise<void>;
 }

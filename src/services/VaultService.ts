@@ -50,23 +50,17 @@ function hexToBytes(hex: string): Bytes {
   return out;
 }
 
-// Fails loud on malformed params: a silent default could diverge from the
-// params the KDF actually ran with (the Rust side rejects them the same way).
 function parseIterations(kdfParamsJson: string): number {
   try {
     const parsed = JSON.parse(kdfParamsJson) as { iterations?: unknown };
     if (typeof parsed.iterations === "number") return parsed.iterations;
-  } catch {
-    /* fall through */
-  }
+  } catch {}
   throw new EncryptionError(
     "malformed_payload",
     "KDF parameters are malformed (missing iteration count).",
   );
 }
 
-// Locked vault / broken persistence dooms a whole migration run — abort and
-// retry later instead of mislabeling every remaining row as corrupt.
 function isSystemicMigrationError(err: unknown): boolean {
   return (
     err instanceof PersistenceError ||
@@ -86,8 +80,6 @@ interface Envelope {
 }
 
 export class VaultService implements IVaultService {
-  // Raw copy of the session DEK, kept so keychain escrow can device-wrap it on
-  // demand (the CryptoKey in the encryption service is non-extractable).
   private rawDek: Bytes | null = null;
   private unlockInFlight: Promise<unknown> | null = null;
   private lockListeners: Array<() => void> = [];
@@ -144,8 +136,6 @@ export class VaultService implements IVaultService {
   ): Promise<string> {
     const fields = [saltB64, String(iterations), String(kdfVersion), kdfAlg, wrappedDekB64];
     if (kdfVersion >= ENVELOPE_VERSION) {
-      // v3+: length-prefixed fields and kdfParamsJson bound in, so stored KDF
-      // costs are tamper-evident. v1/v2 keep the historical concat format.
       return bytesToBase64(
         await computeIntegrityMacDelimited(macKey, [...fields, kdfParamsJson].map(encodeUtf8)),
       );
@@ -166,16 +156,9 @@ export class VaultService implements IVaultService {
     await this.enforceIvHighWaterMark();
   }
 
-  // Defense against at-rest tamper/rollback of the deterministic IV counter: the
-  // device-bound keychain holds a high-water-mark of the largest counter this DEK
-  // has emitted. If the persisted counter is below it, the DB was rewound (e.g. a
-  // snapshot rollback), which would risk AES-GCM nonce reuse under a stable DEK —
-  // refuse to encrypt rather than reuse IVs. A MAC over the *current* counter only
-  // proves self-consistency; it cannot detect a rollback to a prior valid pair, so
-  // the monotonic witness must live outside the attacker-controlled DB file.
   private async enforceIvHighWaterMark(): Promise<void> {
     const hwmStr = await this.readIvHighWaterMark();
-    if (hwmStr == null) return; // fresh device — trust the persisted value
+    if (hwmStr == null) return;
     const hwm = Number.parseInt(hwmStr, 10);
     if (!Number.isFinite(hwm)) return;
     const current = this.crypto.getIvCounter();
@@ -185,8 +168,7 @@ export class VaultService implements IVaultService {
         "IV counter rewind detected (database may have been rolled back); refusing AES-GCM nonce reuse.",
       );
     }
-    // Advance the mark so the session's starting counter is recorded even before a
-    // lock, narrowing the window for an undetected mid-session rewind.
+
     if (current > hwm) {
       await this.writeIvHighWaterMark(current).catch(() => {});
     }
@@ -205,8 +187,6 @@ export class VaultService implements IVaultService {
     await this.keychain.set(KEYRING_USERS.ivHighWaterMark, String(counter));
   }
 
-  // A freshly minted DEK resets the IV space on purpose, so the mark from any
-  // prior DEK must not gate the new counter sequence.
   private async resetIvHighWaterMark(): Promise<void> {
     try {
       await this.keychain.delete(KEYRING_USERS.ivHighWaterMark);
@@ -241,7 +221,6 @@ export class VaultService implements IVaultService {
     const check = validatePassphrase(passphrase);
     if (!check.ok) throw new ValidationError(check.error ?? "Invalid passphrase");
     if (await this.kms.get()) {
-      // Re-running setup would mint a fresh DEK and orphan every existing note.
       throw new ValidationError("Vault is already initialized.");
     }
 
@@ -269,9 +248,7 @@ export class VaultService implements IVaultService {
     if (legacyHex) {
       try {
         await this.keychain.set(KEYRING_USERS.legacyBridge, legacyHex);
-      } catch {
-        /* best-effort */
-      }
+      } catch {}
       await this.kms.update({ migrationState: "in_progress" });
       const legacyRaw = hexToBytes(legacyHex);
       let failed: number;
@@ -287,8 +264,6 @@ export class VaultService implements IVaultService {
     }
   }
 
-  // Key material is purged ONLY after a zero-failure run — a transient failure
-  // must never destroy the last key able to decrypt the affected rows.
   private async finishLegacyRun(failed: number): Promise<void> {
     if (failed === 0) {
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
@@ -298,8 +273,6 @@ export class VaultService implements IVaultService {
     }
   }
 
-  // Bridge-key encoding is state-dependent: legacy migration stores hex,
-  // DEK rotation stores base64.
   private async completePendingMigration(): Promise<void> {
     const rec = await this.kms.get();
     if (!rec || rec.migrationState === "complete") return;
@@ -358,9 +331,7 @@ export class VaultService implements IVaultService {
     this.legacyKeys.remove();
     try {
       await this.keychain.delete(KEYRING_USERS.legacyBridge);
-    } catch {
-      /* best-effort */
-    }
+    } catch {}
   }
 
   private async migrateLegacy(legacyRawKey: Bytes): Promise<number> {
@@ -391,8 +362,6 @@ export class VaultService implements IVaultService {
     return failed;
   }
 
-  // Concurrent unlocks queue and then run their own attempt — nobody gets
-  // success semantics for an attempt that never verified their passphrase.
   async unlock(passphrase: string): Promise<void> {
     while (this.unlockInFlight) {
       await this.unlockInFlight.then(
@@ -409,8 +378,6 @@ export class VaultService implements IVaultService {
     }
   }
 
-  // The single passphrase oracle: unlock AND changePassphrase both go through
-  // it, so neither can skip verification via session state.
   private async verifyPassphraseAndUnwrap(passphrase: string, rec: KmsRecord): Promise<Bytes> {
     const { wrapKey, macKey } = await this.deriveKeys(
       passphrase,
@@ -449,8 +416,6 @@ export class VaultService implements IVaultService {
     }
   }
 
-  // Never touches the escrow entry: a broken keychain cannot block a correct
-  // passphrase, and entries are only written behind the Trust-device setting.
   private async doUnlock(passphrase: string): Promise<void> {
     const rec = await this.kms.get();
     if (!rec) throw new ValidationError("Vault is not initialized yet.");
@@ -472,9 +437,6 @@ export class VaultService implements IVaultService {
     }
   }
 
-  // H6: encrypt plaintext note titles (titleKmsVersion 0 -> 1) under the session
-  // DEK. Runs on every unlock until done; resumable via the per-row flag so an
-  // interrupt still leaves plaintext titles readable (decryptTitle falls back).
   private async migrateTitles(): Promise<number> {
     let cursor: string | null = null;
     let failed = 0;
@@ -500,9 +462,6 @@ export class VaultService implements IVaultService {
     return failed;
   }
 
-  // DEK rotation must reencrypt every title under the new key: titles already
-  // encrypted (v1) decrypt under oldKey then reencrypt; plaintext titles (v0)
-  // encrypt directly. Mirrors reencryptAllNotes / reencryptAllCovers.
   private async reencryptAllTitles(oldKey: CryptoKey): Promise<number> {
     let cursor: string | null = null;
     let failed = 0;
@@ -517,7 +476,6 @@ export class VaultService implements IVaultService {
             try {
               plain = await aesGcmDecrypt(oldKey, row.title, encodeUtf8(titleAad(row.id)));
             } catch {
-              // Pre-AAD ciphertexts (encrypted before title AAD binding).
               plain = await aesGcmDecrypt(oldKey, row.title);
             }
           } else {
@@ -538,8 +496,6 @@ export class VaultService implements IVaultService {
     return failed;
   }
 
-  // Serialized behind in-flight unlocks: zeroizing this.rawDek mid-attempt
-  // would hand zeroed key bytes to an operation still using the buffer.
   async lock(): Promise<void> {
     while (this.unlockInFlight) {
       await this.unlockInFlight.then(
@@ -547,7 +503,7 @@ export class VaultService implements IVaultService {
         () => {},
       );
     }
-    // Record the highest counter emitted so a future at-rest rollback is detectable.
+
     if (this.crypto.isUnlocked()) {
       await this.writeIvHighWaterMark(this.crypto.getIvCounter()).catch((err) =>
         Logger.warn("vault: iv high-water-mark persist on lock failed", err),
@@ -581,8 +537,6 @@ export class VaultService implements IVaultService {
     const backup = await this.keychain.get(KEYRING_USERS.dekBackup);
     if (!backup) return false;
     try {
-      // No raw-blob fallback: a backup that fails device unwrap is treated as
-      // tampered/foreign, never silently accepted as a plaintext DEK.
       const rawDek = await this.deviceBind.unwrap(base64ToBytes(backup));
       await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
       await this.resumeMigrationBestEffort();
@@ -592,8 +546,6 @@ export class VaultService implements IVaultService {
     }
   }
 
-  // Wraps a private COPY: a concurrent lock() zeroizing the shared session
-  // buffer must never turn the escrow entry into an all-zero DEK.
   private async writeEscrow(rawDek: Bytes): Promise<void> {
     const copy = new Uint8Array(rawDek);
     try {
@@ -635,7 +587,7 @@ export class VaultService implements IVaultService {
       updatedAt: Date.now(),
     };
     await this.kms.save(updated);
-    // The DEK is unchanged, so an existing escrow entry remains valid as-is.
+
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
   }
 
@@ -650,8 +602,6 @@ export class VaultService implements IVaultService {
     const recoveredDek = await this.deviceBind.unwrap(base64ToBytes(backupB64));
     const existing = await this.kms.get();
     if (existing) {
-      // Same DEK under a new passphrase envelope; ivCounter is preserved so
-      // the IV sequence keeps advancing.
       const env = await this.buildArgon2Envelope(newPassphrase, recoveredDek);
       await this.kms.save({
         ...existing,
@@ -675,12 +625,6 @@ export class VaultService implements IVaultService {
     await this.recoverWithDekRotation(newPassphrase, recoveredDek);
   }
 
-  // kms row missing but a keychain backup exists: the old DEK's IV counter is
-  // unknown, so it must never encrypt again — mint a fresh DEK and re-encrypt
-  // every note. Ordering is load-bearing: bridge the old DEK and replace the
-  // keychain backup with the NEW DEK before any state persists, so no crash
-  // can auto-unlock the old DEK against the reset IV space (AES-GCM nonce
-  // reuse). 'rotation_in_progress' makes an interrupted sweep resumable.
   private async recoverWithDekRotation(newPassphrase: string, oldRawDek: Bytes): Promise<void> {
     await this.keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldRawDek));
     const oldKey = await importAesGcmKey(oldRawDek);
@@ -731,7 +675,6 @@ export class VaultService implements IVaultService {
           try {
             plain = await aesGcmDecrypt(oldKey, row.content, encodeUtf8(row.id));
           } catch {
-            // Pre-AAD ciphertexts were encrypted without additionalData.
             plain = await aesGcmDecrypt(oldKey, row.content);
           }
           const reencrypted = await this.crypto.encryptPayload(plain, row.id);
@@ -739,7 +682,6 @@ export class VaultService implements IVaultService {
         } catch (err) {
           if (isSystemicMigrationError(err)) throw err;
           try {
-            // Decrypts under the session DEK => already rotated; skip.
             await this.crypto.decryptPayload(row.content, row.id);
             continue;
           } catch (err2) {
@@ -757,9 +699,6 @@ export class VaultService implements IVaultService {
     return failed;
   }
 
-  // Covers always postdate AAD-era ciphertexts, so no pre-AAD fallback. The
-  // pass is cursor-free: a resumed sweep rescans covers cheaply, and rows that
-  // already decrypt under the session DEK are skipped, keeping it idempotent.
   private async reencryptAllCovers(oldKey: CryptoKey): Promise<number> {
     let cursor: string | null = null;
     let failed = 0;
@@ -793,9 +732,6 @@ export class VaultService implements IVaultService {
     return failed;
   }
 
-  // DEK rotation must reencrypt every stored blob under the new key. Blobs are
-  // binary (random-IV ciphertext), so this uses the byte crypto path. Idempotent
-  // skip if a blob already decrypts under the new (session) DEK.
   private async reencryptAllBlobs(oldKey: CryptoKey): Promise<number> {
     let cursor: string | null = null;
     let failed = 0;

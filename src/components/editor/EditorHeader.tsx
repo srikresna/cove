@@ -79,9 +79,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
     }, 300);
   };
 
-  // Flush a pending debounced title save (clears the timer and persists the last
-  // keystroke). Held in a ref so both onBlur and the unmount cleanup share one
-  // always-fresh implementation without re-subscribing effects.
   commitTitleRef.current = () => {
     if (titleTimer.current) {
       clearTimeout(titleTimer.current);
@@ -94,8 +91,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
     }
   };
 
-  // Switching notes re-keys the editor subtree and unmounts this header; flush
-  // the pending title so the final keystroke is never silently dropped.
   useEffect(() => {
     return () => {
       commitTitleRef.current?.();

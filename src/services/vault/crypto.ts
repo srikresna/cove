@@ -6,11 +6,8 @@ const GCM_IV_BYTES = 12;
 const GCM_TAG_BYTES = 16;
 export const SALT_BYTES = 16;
 
-// OWASP 2026 floor for PBKDF2-HMAC-SHA256 (legacy vaults only; new vaults use Argon2id).
 export const PBKDF2_ITERATIONS = 600_000;
 
-// Per-DEK AES-GCM encryption ceiling, well below the 2^32 NIST SP 800-38D
-// birthday bound; hitting it fails loud so the key rotates before IV-reuse risk.
 export const IV_EXHAUSTION_LIMIT = 2 ** 28;
 
 export type Bytes = Uint8Array<ArrayBuffer>;
@@ -19,7 +16,6 @@ export function randomBytes(n: number): Bytes {
   return crypto.getRandomValues(new Uint8Array(n));
 }
 
-// Best-effort scrubbing: GC may already have copied the bytes — defense-in-depth only.
 export function zeroize(bytes: Bytes): void {
   bytes.fill(0);
 }
@@ -67,7 +63,6 @@ export async function derivePrk(
   return new Uint8Array(bits);
 }
 
-// Empty HKDF salt: the PRK is already salted by the passphrase KDF.
 export async function deriveSubkey(
   prk: Bytes,
   info: string,
@@ -121,8 +116,6 @@ export async function unwrapDek(wrapKey: CryptoKey, wrapped: Bytes): Promise<Byt
   return pt;
 }
 
-// Legacy envelope v1/v2 verification only: plain concatenation leaves field
-// boundaries ambiguous — new envelopes use computeIntegrityMacDelimited.
 export async function computeIntegrityMac(macKey: CryptoKey, fields: Bytes[]): Promise<Bytes> {
   const total = fields.reduce((n, f) => n + f.byteLength, 0);
   const buf = new Uint8Array(total);
@@ -135,7 +128,6 @@ export async function computeIntegrityMac(macKey: CryptoKey, fields: Bytes[]): P
   return new Uint8Array(sig);
 }
 
-// 4-byte big-endian length prefix per field: ["ab","c"] can never collide with ["a","bc"].
 export async function computeIntegrityMacDelimited(
   macKey: CryptoKey,
   fields: Bytes[],
@@ -162,8 +154,6 @@ export function constantTimeEqual(a: Bytes, b: Bytes): boolean {
   return diff === 0;
 }
 
-// Deterministic counter IV (NIST SP 800-38D §8.2.1). Uniqueness is enforced by
-// CryptoVault's synchronous increment, persisted via kms.setIvCounter BEFORE use.
 export function counterToIv(counter: number): Bytes {
   const iv = new Uint8Array(GCM_IV_BYTES);
   const view = new DataView(iv.buffer);
@@ -210,10 +200,6 @@ export async function aesGcmDecrypt(
   return new TextDecoder().decode(pt);
 }
 
-// Byte-oriented AES-GCM for binary blobs (images/attachments). Uses a RANDOM IV
-// per call (not the deterministic counter): blobs are write-once (sourceId is
-// the sha of the bytes), so a fresh random 96-bit IV is safe (NIST SP 800-38D
-// §8.2.2) and does not consume the counter budget shared by content/title/cover.
 export async function aesGcmEncryptBytes(
   key: CryptoKey,
   plaintext: Bytes,

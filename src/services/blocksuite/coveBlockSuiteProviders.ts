@@ -11,12 +11,6 @@ import { useUIStore } from "../../store/useUIStore";
 
 const asText = (v: unknown): string => (typeof v === "string" ? v : "");
 
-/**
- * Maps BlockSuite's NotificationService contract onto Cove's toast + modal
- * layers. confirm/prompt use a real modal (BlockSuiteDialogs), not native
- * alerts. Blocks call this via `std.get(NotificationProvider)` — e.g. the
- * "create linked doc" title prompt and undo toasts.
- */
 export const coveNotificationService: NotificationService = {
   toast: (message, options) => {
     void options;
@@ -52,19 +46,13 @@ export const coveNotificationService: NotificationService = {
       description: options.message ? asText(options.message) : undefined,
     });
   },
-  // Undo-action wiring is deferred; surface the notification for now.
+
   notifyWithUndoAction: (options) => coveNotificationService.notify(options),
 };
 
-/** ExtensionType that registers the notification service in every editor. */
 export const coveNotificationExtension: ExtensionType =
   NotificationExtension(coveNotificationService);
 
-/**
- * Maps BlockSuite's QuickSearchService contract onto Cove's QuickSearchModal,
- * run in picker mode so a chosen doc id is returned (used by the @-popover
- * "link to doc" and bookmark quick-search flows).
- */
 export const coveQuickSearchService: QuickSearchService = {
   openQuickSearch: async () => {
     const docId = await useUIStore.getState().pickNote();
@@ -72,5 +60,4 @@ export const coveQuickSearchService: QuickSearchService = {
   },
 };
 
-/** ExtensionType that registers the quick-search service in every editor. */
 export const coveQuickSearchExtension: ExtensionType = QuickSearchExtension(coveQuickSearchService);

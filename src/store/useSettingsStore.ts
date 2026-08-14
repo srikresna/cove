@@ -24,8 +24,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "cove-settings",
-      // Merge persisted canvasPrefs over defaults so newly-added keys keep
-      // their default even if an older persisted state is present.
+
       merge: (persisted, current) => {
         const base = current as SettingsState;
         const p = (persisted ?? {}) as Partial<SettingsState>;
@@ -39,6 +38,4 @@ export const useSettingsStore = create<SettingsState>()(
   ),
 );
 
-// Inject the live canvas-feature-flag provider into the editor service. The
-// service reads it lazily when opening a doc, so registration order is safe.
 blockSuiteEditorService.provideCanvasPrefs(() => useSettingsStore.getState().canvasPrefs);

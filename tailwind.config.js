@@ -45,9 +45,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Helvetica"],
-        display: ["Helvetica"],
-        mono: ["Helvetica"],
+        sans: ["Liberation Sans"],
+        display: ["Liberation Sans"],
+        mono: ["Liberation Sans"],
       },
       borderRadius: {
         lg: "var(--radius)",

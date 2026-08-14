@@ -59,8 +59,6 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex h-full w-full">
-        {/* Left column: topbar + editor. The right bar sits beside the topbar
-            (full height), matching AFFiNE's sidebar layout — not below it. */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <EditorTopbar
             note={note}
@@ -84,12 +82,15 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
                 <BlockSuiteSurface note={note} mode="edgeless" onEditorReady={setEditorHost} />
               </EditorErrorBoundary>
             ) : (
-              <div ref={scrollRef} className="h-full w-full overflow-y-auto">
+              <div
+                ref={scrollRef}
+                className="cove-doc-scroll flex h-full w-full flex-col overflow-y-auto"
+              >
                 <EditorHeader note={note} isFullWidth={isFullWidth} />
 
                 <div
                   className={cn(
-                    "flex min-h-[500px] w-full flex-col pb-24",
+                    "flex min-h-0 w-full flex-1 flex-col",
                     !isFullWidth && "mx-auto max-w-3xl",
                   )}
                 >

@@ -3,13 +3,8 @@ use sqlx::ConnectOptions;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
 
-/// `VACUUM INTO` instead of a file copy: the DB runs in WAL mode, so committed
-/// rows can live exclusively in cove.db-wal — a copy of cove.db alone silently
-/// misses them. Content in the snapshot is ciphertext; titles/metadata are not.
 #[tauri::command]
 pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Result<(), String> {
-    // app_config_dir, NOT app_local_data_dir: tauri-plugin-sql resolves
-    // "sqlite:cove.db" there (Roaming vs Local on Windows).
     let data_dir = app
         .path()
         .app_config_dir()
@@ -21,8 +16,6 @@ pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Resu
 
     let target = validate_target(&target_path, &data_dir)?;
     if target.exists() {
-        // The save dialog already confirmed overwriting; VACUUM INTO refuses
-        // to write over an existing file.
         std::fs::remove_file(&target).map_err(|e| format!("Cannot replace backup file: {e}"))?;
     }
     run_vacuum_into(&db_path, &target).await
@@ -48,9 +41,6 @@ async fn run_vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// The renderer supplies the path, so it is untrusted: absolute, .db, and
-/// outside the live DB directory (guards cove.db and its -wal/-shm sidecars).
-/// A non-canonicalizable data dir is a hard error, never a skipped guard.
 fn validate_target(raw: &str, data_dir: &Path) -> Result<PathBuf, String> {
     let target = PathBuf::from(raw);
     if !target.is_absolute() {
@@ -138,7 +128,6 @@ mod tests {
             .execute(&mut writer)
             .await
             .unwrap();
-        // Writer stays open so the committed row lives only in cove.db-wal.
         assert!(dir.join("cove.db-wal").exists(), "test setup: WAL sidecar expected");
 
         run_vacuum_into(&db, &target).await.unwrap();

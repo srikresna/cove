@@ -10,8 +10,6 @@ import { cn } from "../../lib/utils";
 
 type Format = "markdown" | "plaintext";
 
-// Minimal shape of the doc store's adapter surface (kept loose to avoid pulling
-// the heavy Store type).
 interface AdapterStore {
   getTransformer(middlewares: unknown[]): unknown;
   get(id: unknown): {
@@ -24,12 +22,6 @@ const TABS: ReadonlyArray<{ value: Format; label: string }> = [
   { value: "plaintext", label: "Plain Text" },
 ];
 
-/**
- * Live Markdown / Plain-Text preview of the note doc, using BlockSuite's
- * adapters directly (no HTML/Snapshot — those are intentionally omitted). The
- * AdapterPanel fragment renders all four adapters with no filter prop, so we
- * re-implement the two we want here.
- */
 export const LivePreview: React.FC<{ noteId: string }> = ({ noteId }) => {
   const [format, setFormat] = useState<Format>("markdown");
   const [content, setContent] = useState("");

@@ -16,9 +16,6 @@ import type { DeepPartial } from "@blocksuite/global/utils";
 import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-test";
 import type { EditorHost } from "@blocksuite/std";
 
-// The vendored dist .d.ts for TestAffineEditorContainer doesn't fully resolve
-// the LitElement→HTMLElement inheritance chain; intersect with HTMLElement so
-// .style, .querySelector, .append etc. are available to tsc.
 type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
 
 import { effect, signal } from "@preact/signals-core";
@@ -43,19 +40,10 @@ const SAVE_DEBOUNCE_MS = 800;
 interface BlockSuiteSurfaceProps {
   note: Note;
   mode: CoveDocMode;
-  /** Fired with the editor host once the surface is ready, and null on unmount.
-   *  Lets the parent mount host-dependent panels (e.g. the native OutlinePanel). */
+
   onEditorReady?: (host: EditorHost | null) => void;
 }
 
-/**
- * Default editor settings — mirrors the playground's mockEditorSetting: parse
- * each GeneralSettingSchema field with undefined so zod applies its .default().
- * Required because the drag-handle PreviewHelper (std.get(EditorSettingProvider))
- * and edgeless rendering read this provider; without it the drag preview throws
- * ServiceNotFoundError mid-drag (blocks never land) and the peek edgeless canvas
- * renders blank.
- */
 const defaultEditorSetting = Object.fromEntries(
   Object.entries(GeneralSettingSchema.shape).map(([key, schema]) => [
     key,
@@ -63,15 +51,6 @@ const defaultEditorSetting = Object.fromEntries(
   ]),
 ) as DeepPartial<EditorSetting>;
 
-/**
- * Shared extensions mounted on every editor (the main surface and the peek-view
- * modal). DocModeProvider is the critical one for edgeless: getEditorMode() MUST
- * reflect the real mode — the edgeless selection toolbar bails when it returns
- * 'page' (toolbar.ts:516), and dozens of edgeless paths key off
- * getEditorMode() === 'edgeless'. Hardcoding 'page' corrupts all of edgeless.
- * EditorSettingExtension supplies the provider the drag-preview PreviewHelper and
- * edgeless rendering depend on. Exported so PeekViewModal reuses the same wiring.
- */
 export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
   let editorMode = mode;
   let primaryMode = mode;
@@ -85,8 +64,7 @@ export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
       primaryMode = primaryMode === "page" ? "edgeless" : "page";
       return primaryMode;
     },
-    // Cove remounts the editor when its React mode changes. BlockSuite still
-    // needs the current imperative value for all edgeless tool guards.
+
     getEditorMode: () => editorMode,
     setEditorMode: (m: DocMode) => {
       editorMode = m;
@@ -98,10 +76,7 @@ export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
 
   return [
     DocModeExtension(docModeService),
-    // Cast through unknown: Cove and AFFiNE each ship @preact/signals-core, so
-    // tsc sees two branded (BRAND_SYMBOL) Signal types that don't overlap. At
-    // runtime signals are duck-compatible — DocModeProvider above already relies
-    // on Cove's signal() and works. `unknown` bridges the type-level divergence.
+
     EditorSettingExtension({
       setting$: signal(defaultEditorSetting) as unknown as EditorSettingService["setting$"],
     }),
@@ -144,9 +119,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     ];
     editor.mode = mode;
     editor.autofocus = true;
-    // Tool handlers assume both the surface model and renderer component exist.
-    // Keep pointer input disabled during the short Lit mount window so a fast
-    // click cannot create root-level frames/media before those dependencies exist.
+
     editor.style.pointerEvents = "none";
     container.append(editor);
 
@@ -171,19 +144,13 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
       if (disposed) return;
       try {
         const gfx = editor.std?.get?.(GfxControllerIdentifier);
-        // Page root has no GfxController — page is ready once the host/std are
-        // built. Edgeless readiness needs the tool controller (gfx.tool), which
-        // FramePanel's presentation depends on — wait for it so onEditorReady
-        // surfaces a fully-initialized edgeless host.
+
         const ready = mode === "edgeless" ? Boolean(gfx?.tool) : Boolean(editor.host?.std);
         if (ready) {
           disableBrokenAutoComplete();
           editor.style.pointerEvents = "";
           onEditorReady?.(editor.host ?? null);
-          // CSS presentation "fullscreen": the browser fullscreen API is
-          // gesture-blocked in Tauri and window setFullscreen is a visual
-          // no-op on Windows, so instead float the editor over Cove's chrome
-          // whenever the frameNavigator (presentation) tool is active.
+
           if (gfx?.tool && !stopPresentationWatch) {
             const gfxTool = gfx.tool;
             stopPresentationWatch = effect(() => {
@@ -193,37 +160,28 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
               editor.style.zIndex = presenting ? "99999" : "";
               editor.style.background = presenting ? "#000" : "";
             });
-            // Honor a presentation request initiated from page mode: flip to
-            // edgeless was done by the caller; here we activate PresentTool now
-            // that the tool controller is ready.
+
             if (consumePresentation(noteId)) {
               void import("@blocksuite/affine/blocks/frame").then(({ PresentTool }) => {
                 try {
                   gfxTool.setTool(PresentTool, { mode: "fit" });
-                } catch {
-                  // tool/controller disposed between ready and activation
-                }
+                } catch {}
               });
             }
           }
           return;
         }
-      } catch {
-        // Lit has not created the std/host yet.
-      }
+      } catch {}
       if (++readyTries < 200) readyFrame = requestAnimationFrame(enableWhenReady);
     };
     void editor.updateComplete.then(enableWhenReady);
 
-    // Navigate to a linked note when the user clicks a @-mention reference.
-    // BlockSuite fires docLinkClicked via RefNodeSlotsProvider.
     const refSlots = editor.std?.get?.(RefNodeSlotsProvider);
     const navSub = refSlots?.docLinkClicked?.subscribe?.(
       ({ pageId: targetId }: { pageId: string }) => {
-        // Find which workspace the target note belongs to and navigate there.
         const noteStore = useNoteStore.getState();
         const wsStore = useWorkspaceStore.getState();
-        // Check if the note is in the current note list; if not, find its workspace.
+
         const allNotes = noteStore.notes;
         const targetNote = allNotes.find((n) => n.id === targetId);
         if (targetNote && targetNote.workspaceId !== wsStore.activeWorkspaceId) {
@@ -233,26 +191,15 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
       },
     );
 
-    // Debounced save on doc update. The encoding (encodeDocSnapshot →
-    // Y.encodeStateAsUpdate) traverses the CRDT state synchronously — for large
-    // edgeless docs this can freeze the main thread for 50–100ms. Deferring it
-    // to an idle callback keeps animation frames (presentation, canvas drag)
-    // smooth. A snapshot is only written when it actually changed since the
-    // last save — many Yjs transactions fire `update` without altering the
-    // serialized doc.
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;
     let lastSavedSnapshot: string | null = null;
-    /** Encode the current doc state synchronously and trigger the DB write.
-     *  Used by the lock/close flush (must not be idle-deferred — the workspace
-     *  is about to be torn down). */
+
     const encodeAndSave = () => {
       if (!blockSuiteEditorService.isWorkspaceAlive()) return;
       const snapshot = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
       if (snapshot === lastSavedSnapshot) return;
-      // Advance lastSavedSnapshot ONLY on successful persist — otherwise a
-      // failed save (DB error) would make the next flush skip (snapshot
-      // compares equal) and the edit stays unsaved until the next change.
+
       void useNoteStore
         .getState()
         .updateNote(noteId, { content: snapshot })
@@ -260,9 +207,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
           () => {
             lastSavedSnapshot = snapshot;
           },
-          () => {
-            // persist failed — lastSavedSnapshot unchanged so the next flush retries
-          },
+          () => {},
         );
     };
     const flush = () => {
@@ -270,9 +215,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
         pending = false;
         encodeAndSave();
       };
-      // Defer the expensive encoding to an idle period (fallback: setTimeout
-      // 0). pending stays true until encoding completes, so rapid edits during
-      // the defer coalesce into one encode.
+
       if (typeof requestIdleCallback === "function") {
         requestIdleCallback(doEncode, { timeout: 3000 });
       } else {
@@ -286,9 +229,6 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     };
     doc.spaceDoc.on("update", onUpdate);
 
-    // Register a synchronous flush so vault lock / beforeunload captures edits
-    // still inside the debounce window. reset() calls these BEFORE disposing
-    // the workspace, so isWorkspaceAlive() is still true and the encode runs.
     const unregisterFlusher = blockSuiteEditorService.registerPendingFlusher(() => {
       if (timer) {
         clearTimeout(timer);
@@ -315,7 +255,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     };
   }, [noteId, mode, onEditorReady]);
 
-  return <div ref={containerRef} className="h-full min-h-full flex-1" />;
+  return <div ref={containerRef} className="h-full min-h-0 flex-1" />;
 };
 
 export default BlockSuiteSurface;

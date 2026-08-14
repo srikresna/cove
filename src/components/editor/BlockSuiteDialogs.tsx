@@ -3,10 +3,6 @@ import { useBlockSuiteDialogStore } from "../../store/useBlockSuiteDialogStore";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 
-/**
- * Renders the modal confirm/prompt that backs Cove's NotificationProvider
- * (BlockSuite confirm/prompt calls). Mounted once at the app root.
- */
 export const BlockSuiteDialogs = () => {
   const {
     open,
@@ -22,7 +18,6 @@ export const BlockSuiteDialogs = () => {
     cancel,
   } = useBlockSuiteDialogStore();
 
-  // Enter = confirm, Escape = cancel (Dialog handles Escape → onOpenChange).
   useEffect(() => {
     if (!open || kind !== "prompt") return;
     const onKey = (e: KeyboardEvent) => {

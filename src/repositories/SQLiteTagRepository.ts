@@ -46,9 +46,7 @@ export class SQLiteTagRepository implements ITagRepository {
   async findOrCreateByName(name: string, color: string): Promise<Tag> {
     try {
       const db = await this.getDb();
-      // Atomic find-or-create: INSERT OR IGNORE on UNIQUE(name), then read the
-      // canonical row. Closes the find-then-create race that surfaced UNIQUE
-      // violations as generic PersistenceErrors when two callers raced on a name.
+
       await db.execute(
         "INSERT OR IGNORE INTO tags (id, name, color, createdAt) VALUES (?, ?, ?, ?)",
         [makeTagId(), name, color, Date.now()],

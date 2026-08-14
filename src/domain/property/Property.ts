@@ -30,7 +30,6 @@ export interface PropertyDefinition {
   readonly createdAt: number;
 }
 
-/** Typed value per property type; persisted as JSON. */
 export type PropertyValue =
   | { type: "text"; text: string }
   | { type: "number"; number: number }

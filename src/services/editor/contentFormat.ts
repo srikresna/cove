@@ -1,7 +1,5 @@
 export const BLOCKSUITE_CONTENT_FORMAT = "blocksuite-yjs-v1";
 
-// Envelope key order is fixed by packBlockSuiteContent, so the prefix test is
-// a cheap discriminator that avoids JSON.parse on large BlockSuite documents.
 const ENVELOPE_PREFIX = `{"format":"${BLOCKSUITE_CONTENT_FORMAT}"`;
 
 export function packBlockSuiteContent(updateB64: string): string {

@@ -1,8 +1,3 @@
-/**
- * Ambient declaration for pdfmake's singleton entry. Cove declares pdfmake as a
- * direct dependency and re-points pdfMake.fonts at local fonts before export.
- * Only the shape Cove touches is declared here.
- */
 declare module "pdfmake/build/pdfmake" {
   interface PdfFontSlots {
     normal: string;

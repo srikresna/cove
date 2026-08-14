@@ -76,9 +76,6 @@ export const useVaultStore = create<VaultState>((set) => ({
   },
 }));
 
-// Mirror the service's lock into store status no matter who triggered the lock
-// (the store action refreshes status, but a service-level/idle lock would not),
-// so the lock screen always appears. Defensive, matching useNoteStore/useTagStore.
 vaultService.onLock(() => {
   useVaultStore.setState({ status: "locked" });
 });

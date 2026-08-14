@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { covePeekViewService, usePeekViewStore } from "@/services/blocksuite/peekViewService";
 
 function makeSurfaceRefTarget(docId: string, xywh: string): HTMLElement {
-  // Mimic a BlockSuite surface-ref block component: has .model.flavour and
-  // .referenceModel pointing at the mirrored edgeless element.
   const el = document.createElement("div");
   Object.defineProperty(el, "model", {
     value: { flavour: "affine:surface-ref" },
@@ -69,7 +67,7 @@ describe("peekViewService", () => {
     });
 
     it("resolves immediately (no-op) for an unrecognized target", async () => {
-      const el = document.createElement("div"); // no model, no docId
+      const el = document.createElement("div");
       await expect(covePeekViewService.peek({ target: el })).resolves.toBeUndefined();
       expect(usePeekViewStore.getState().request).toBeNull();
     });

@@ -87,8 +87,6 @@ export class PropertyService implements IPropertyService {
       if (value) {
         values.set(record.propertyId, value);
       } else {
-        // Surface silent data drift (corrupt/truncated JSON or schema mismatch)
-        // instead of dropping the value with no trace.
         Logger.warn("property: dropped undecodable value", {
           noteId,
           propertyId: record.propertyId,

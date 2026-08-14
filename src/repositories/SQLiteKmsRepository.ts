@@ -104,10 +104,7 @@ export class SQLiteKmsRepository implements IKmsRepository {
   async setIvCounter(n: number): Promise<void> {
     try {
       const db = await this.getDb();
-      // Monotonic guard: the counter must strictly advance, never regress. A write
-      // that does not move it forward means the persisted value was rolled back or
-      // replayed, which would risk AES-GCM nonce reuse under a stable DEK. Fail
-      // loud instead of persisting a non-increasing value.
+
       const res = await db.execute("UPDATE kms SET ivCounter = ? WHERE id = 1 AND ivCounter < ?", [
         n,
         n,

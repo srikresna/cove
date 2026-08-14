@@ -1,9 +1,7 @@
 import type { Note } from "./Note";
 
 export const DEFAULT_NOTE_TITLE = "Untitled Note";
-// A non-empty placeholder so a brand-new note mounts (App gates on content !== "").
-// It is NOT a BlockSuite envelope, so engine.openNoteDoc seeds a fresh empty
-// BlockSuite doc from it on first open; the first real save persists the envelope.
+
 export const DEFAULT_NOTE_CONTENT = '[{"type":"paragraph","content":[]}]';
 export { DEFAULT_NOTE_CONTENT as EMPTY_NOTE_CONTENT };
 

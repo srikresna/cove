@@ -43,7 +43,6 @@ describe("PropertyService", () => {
     expect(values.get(checkbox.id)).toEqual({ type: "checkbox", checked: true });
     expect(values.get(relation.id)).toEqual({ type: "relation", noteIds: ["n2", "n3"] });
 
-    // A stored value whose type no longer matches its definition is ignored.
     await repo.setValue("n1", checkbox.id, JSON.stringify({ type: "text", text: "stale" }));
     expect((await service.valuesForNote("n1")).has(checkbox.id)).toBe(false);
 

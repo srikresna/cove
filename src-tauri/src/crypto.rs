@@ -1,12 +1,9 @@
 use serde_json::Value;
 
-/// The params originate from the kms row (attacker-writable under DB theft),
-/// and Argon2 allocates m_cost KiB up front — unbounded values are an
-/// unlock-time DoS. Malformed/out-of-range params fail loud, never default.
 const PBKDF2_MIN_ITERATIONS: u64 = 100_000;
 const PBKDF2_MAX_ITERATIONS: u64 = 10_000_000;
-const ARGON2_MIN_M_COST_KIB: u64 = 8 * 1024; // 8 MiB
-const ARGON2_MAX_M_COST_KIB: u64 = 1024 * 1024; // 1 GiB
+const ARGON2_MIN_M_COST_KIB: u64 = 8 * 1024;
+const ARGON2_MAX_M_COST_KIB: u64 = 1024 * 1024;
 const ARGON2_MIN_T_COST: u64 = 1;
 const ARGON2_MAX_T_COST: u64 = 10;
 const ARGON2_MIN_P_COST: u64 = 1;
@@ -25,8 +22,6 @@ fn required_param(params: &Value, key: &str, min: u64, max: u64) -> Result<u32, 
     Ok(v as u32)
 }
 
-/// Runs in Rust rather than the webview so the memory-hard Argon2id is
-/// GPU/ASIC-resistant at full strength.
 #[tauri::command]
 pub fn derive_key_kdf(
     passphrase: String,
@@ -122,7 +117,6 @@ mod tests {
             derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), "{}".into())
                 .is_err()
         );
-        // ~4 TiB m_cost
         let huge = r#"{"m_cost": 4294967295, "t_cost": 3, "p_cost": 4}"#;
         assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), huge.into()).is_err());
         let tiny = r#"{"iterations": 1}"#;

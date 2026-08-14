@@ -14,7 +14,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Validates, downscales, and re-encodes an uploaded file into a cover data URL. */
 export async function processCoverImage(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
     throw new ValidationError(MESSAGES.COVER_INVALID_IMAGE);

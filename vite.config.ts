@@ -4,16 +4,11 @@ import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import react from "@vitejs/plugin-react";
 import { transform } from "esbuild";
 import { visualizer } from "rollup-plugin-visualizer";
-import { type Plugin, defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import wasm from "vite-plugin-wasm";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
-/**
- * BlockSuite source uses the `accessor` keyword (TC39 stage 3 class fields).
- * Rollup's parser cannot handle it; esbuild downgrades it with target < es2022.
- * This only runs on .ts files that contain `accessor` — minimal overhead.
- */
 function accessorTransformPlugin(): Plugin {
   return {
     name: "cove:accessor-transform",
@@ -51,12 +46,6 @@ export default defineConfig({
   ],
   clearScreen: false,
   resolve: {
-    // ── Single-copy resolution for BlockSuite's core libraries ────────────
-    // With vendored BlockSuite packages in ./vendor/ (junctions in
-    // node_modules/@blocksuite/), all transitive deps (yjs, rxjs, pdfmake, …)
-    // resolve from Cove's own node_modules — no more AFFiNE/ directory needed.
-    // Only @preact/signals-core is pinned to Cove's copy for signal-propagation
-    // compatibility with BlockSuite 0.27.
     alias: [
       {
         find: /^@preact\/signals-core(?=\/|$)/,
@@ -80,9 +69,6 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     fs: {
-      // Cove is fully self-contained: BlockSuite + templates are vendored in
-      // ./vendor/ (junctions in node_modules/), and yjs/signals resolve from
-      // Cove's own node_modules. No external AFFiNE/ sibling needed.
       allow: [rootDir],
     },
   },

@@ -3,12 +3,6 @@ import type { EditorHost } from "@blocksuite/std";
 import type React from "react";
 import { useEffect, useRef } from "react";
 
-/**
- * Mounts BlockSuite's native {@link OutlineViewer} — the thin scroll-position
- * indicator pinned at the right edge of the editor that expands into a hover
- * "Table of Contents" popover. Auto-hides in edgeless mode or when there are no
- * headings. Re-mounts when the editor host changes.
- */
 export const OutlineViewerHost: React.FC<{ editor: EditorHost | null }> = ({ editor }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 

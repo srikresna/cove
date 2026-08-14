@@ -1,6 +1,5 @@
 import { extractBlockSuiteParagraphs } from "../services/editor/blockSuiteContent";
 
-/** One string per non-empty block, in document order. */
 export function extractParagraphs(content: string): string[] {
   if (!content) return [];
   return extractBlockSuiteParagraphs(content) ?? [];

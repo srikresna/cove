@@ -41,7 +41,7 @@ export class CryptoVault implements IEncryptionService {
     if (!this.dek) {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot encrypt.");
     }
-    // Synchronous increment => unique per call (single-threaded JS, no interleave).
+
     this.ivCounter += 1;
     const counter = this.ivCounter;
     if (counter >= IV_EXHAUSTION_LIMIT) {
@@ -50,9 +50,7 @@ export class CryptoVault implements IEncryptionService {
         "IV counter exhausted; DEK rotation required before more encryptions.",
       );
     }
-    // Persisted BEFORE use (single autocommit UPDATE — tauri-plugin-sql's pool
-    // breaks multi-statement transactions), so a crash can never lower the
-    // counter below an IV already emitted.
+
     await this.kms.setIvCounter(counter);
     const payload = await aesGcmEncrypt(this.dek, plaintext, counterToIv(counter), encodeUtf8(aad));
     return payload as EncryptedPayload;
@@ -66,7 +64,6 @@ export class CryptoVault implements IEncryptionService {
     try {
       return await aesGcmDecrypt(this.dek, payloadB64, encodeUtf8(aad));
     } catch {
-      // Pre-AAD ciphertexts (migrated before AAD binding) carry no additionalData.
       try {
         return await aesGcmDecrypt(this.dek, payloadB64);
       } catch (cause) {
@@ -83,7 +80,7 @@ export class CryptoVault implements IEncryptionService {
     if (!this.dek) {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot encrypt.");
     }
-    // Random IV per blob (not the deterministic counter) — see crypto.aesGcmEncryptBytes.
+
     return (await aesGcmEncryptBytes(this.dek, plaintext, encodeUtf8(aad))) as EncryptedPayload;
   }
 

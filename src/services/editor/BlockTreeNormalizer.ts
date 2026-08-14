@@ -2,14 +2,9 @@ import { type BlockModel, Text } from "@blocksuite/affine/store";
 import type { TestWorkspace } from "@blocksuite/affine/store/test";
 import * as Y from "yjs";
 
-/**
- * The BlockSuite doc shape Cove operates on. Type-only alias over the
- * TestWorkspace doc so this module stays accurate without a runtime coupling.
- */
 export type BlockSuiteDoc = NonNullable<ReturnType<TestWorkspace["getDoc"]>>;
 export type BlockSuiteStore = ReturnType<BlockSuiteDoc["getStore"]>;
 
-/** Seeds a minimal valid block tree for an empty note. */
 export function seedDefaultBlocks(store: BlockSuiteStore): void {
   const rootId = store.addBlock("affine:page", { title: new Text() });
   store.addBlock("affine:surface", {}, rootId);
@@ -17,11 +12,6 @@ export function seedDefaultBlocks(store: BlockSuiteStore): void {
   store.addBlock("affine:paragraph", {}, noteBlockId);
 }
 
-/**
- * Deep-clone a Yjs shared value (Y.Map/Y.Array/Y.Text) so it can be inserted
- * into a different parent without the "already integrated" error. Plain values
- * pass through unchanged.
- */
 function cloneYValue(value: unknown): unknown {
   if (value instanceof Y.Map) {
     const clone = new Y.Map();
@@ -47,19 +37,6 @@ type SurfaceLike = {
   elements: { getValue(): Y.Map<Y.Map<unknown>> | undefined };
 };
 
-/**
- * Repairs snapshots that accumulated multiple surface blocks. BlockSuite tracks
- * a single surface via gfx.surface, but corrupted snapshots ended up with one
- * surface per element (six+ stacked canvases). Each surface renders its own
- * canvas, so the topmost stale canvas covered live changes until a selection
- * event forced a full re-render — the cause of delayed color/type changes and
- * "ghost" old positions during drag.
- *
- * This merges every surface's canvas elements into one primary surface, then
- * removes the rest so only a single canvas remains. It also deduplicates
- * surface elements that the multi-surface corruption may have copied across
- * surfaces (same type + identical bound).
- */
 export function normalizeBlockTree(doc: BlockSuiteDoc): void {
   const store = doc.getStore();
   const pageBlocks = store.getBlocksByFlavour("affine:page");
@@ -71,7 +48,6 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
   const surfaceBlocks = store.getBlocksByFlavour("affine:surface");
   const getElements = (model: BlockModel) => (model as unknown as SurfaceLike).elements?.getValue();
 
-  // Pick the surface holding the most elements as the primary — the real one.
   let primary: BlockModel | undefined;
   if (surfaceBlocks.length > 0) {
     primary = surfaceBlocks.reduce((best, current) =>
@@ -81,11 +57,6 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
     ).model;
   }
 
-  // Merge all non-primary surfaces' elements into the primary. Element yMaps
-  // are cloned because a Yjs shared type cannot live under two parents.
-  // `mergeCompleted` gates the later surface deletion: if the primary's
-  // elements map couldn't be read, we must NOT delete the others or their
-  // elements are lost (better to leave a multi-surface doc and retry next open).
   let mergeCompleted = false;
   if (primary && surfaceBlocks.length > 1) {
     const primarySurface = primary;
@@ -104,13 +75,6 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
     }
   }
 
-  // Deduplicate surface elements the multi-surface corruption may have copied
-  // across surfaces. Only runs when corruption was actually present
-  // (mergeCompleted) — a clean single-surface doc never had elements copied
-  // across surfaces, so deduping there risks deleting legitimate in-place
-  // duplicates (two shapes the user deliberately stacked). The signature is
-  // type + bound; two elements sharing both are almost certainly the same
-  // element copied to a duplicate surface.
   if (mergeCompleted && primary) {
     const elements = getElements(primary);
     if (elements && elements.size > 0) {
@@ -150,7 +114,6 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
 
   if (primary) append(primary);
 
-  // Preserve every non-surface root child before collapsing duplicate pages.
   for (const page of pageBlocks) {
     for (const child of page.model.children) {
       if (child.flavour !== "affine:surface") append(child);
@@ -173,9 +136,6 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
 
   store.updateBlock(root, { children });
 
-  // Remove duplicate page roots and every non-primary surface now that its
-  // elements have been merged into the primary. Surface removal is gated on
-  // mergeCompleted so an unreadable primary never triggers data loss.
   store.transact(() => {
     for (const page of pageBlocks) {
       if (page.id !== root.id) doc.yBlocks.delete(page.id);

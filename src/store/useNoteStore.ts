@@ -80,8 +80,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
     fetchNotes: async (workspaceId) => {
       try {
         const notes = await noteService.listMetadataByWorkspace(workspaceId);
-        // Register all notes in the BlockSuite workspace so @-mention search
-        // can find them (not just notes that have been opened in the editor).
+
         blockSuiteEditorService.registerExistingNotes(
           notes.map((n) => ({ id: n.id, title: n.title })),
         );
@@ -106,7 +105,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
           noteService.getNote(id),
           noteService.getCoverImage(id),
         ]);
-        // The user may have switched notes while this load was in flight.
+
         if (get().activeNoteId !== id) return;
         set((state) => ({
           notes: note ? state.notes.map((n) => (n.id === id ? note : n)) : state.notes,
@@ -121,7 +120,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       useSaveStatusStore.getState().setSaving();
       try {
         const created = await noteService.createNote(workspaceId, title, content, icon);
-        // Register the new note in BlockSuite workspace so @-mention can find it.
+
         blockSuiteEditorService.registerExistingNotes([{ id: created.id, title: created.title }]);
         set((state) => ({
           notes: [created, ...state.notes],
@@ -145,9 +144,6 @@ export const useNoteStore = create<NoteState>((set, get) => {
       useSaveStatusStore.getState().setSaving();
 
       try {
-        // Persist content AND metadata together — the optimistic patch above
-        // already applied every field locally, so dropping any non-content field
-        // here would silently lose it on reload.
         const { content, ...metadata } = updates;
         if (content !== undefined) {
           await noteService.updateContent(id, content);
@@ -196,8 +192,6 @@ export const useNoteStore = create<NoteState>((set, get) => {
     moveNoteToWorkspace: async (id, workspaceId) => {
       useSaveStatusStore.getState().setSaving();
       try {
-        // No optimistic patch: mutating workspaceId in place would unmatch the
-        // active note and flash the editor before the workspace switches.
         await noteService.updateMetadata(id, { workspaceId });
         useWorkspaceStore.getState().setActiveWorkspace(workspaceId);
         await get().fetchNotes(workspaceId);
@@ -295,14 +289,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
   };
 });
 
-// Registered against the service so the plaintext purge fires on EVERY lock,
-// no matter who initiated it — the invariant cannot be bypassed via the store.
 vaultService.onLock(() => {
   useNoteStore.setState({ notes: [], activeNoteId: null, activeCoverImage: null });
 });
 
-// Sync BlockSuite-initiated doc creation (@-popover / slash menu "create doc")
-// into Cove's DB. The service calls this for docs it did NOT open itself.
 blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
   if (!activeWs) return;

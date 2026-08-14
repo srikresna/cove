@@ -69,8 +69,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   onToggleFullscreen,
   onToggleRightBar,
 }) => {
-  // Stable action references: selecting them individually avoids re-rendering the
-  // toolbar on every notes-array mutation (e.g. each debounced save while typing).
   const trashNote = useNoteStore((s) => s.trashNote);
   const duplicateNote = useNoteStore((s) => s.duplicateNote);
   const togglePinNote = useNoteStore((s) => s.togglePinNote);

@@ -15,8 +15,6 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       aria-checked={checked}
       ref={ref}
       onClick={(e) => {
-        // Compose so a consumer-supplied onClick (e.g. telemetry) can't replace
-        // the internal toggle handler — last-prop-wins would silently break it.
         onClick?.(e);
         onCheckedChange(!checked);
       }}

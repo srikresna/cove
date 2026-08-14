@@ -67,10 +67,7 @@ export const SettingsModal: React.FC = () => {
     setRestoring(true);
     try {
       await backupService.restoreFromFile(pendingRestorePath);
-      // The DB file was swapped, so every in-memory store is now stale and the
-      // connection pool was just suspended. A full reload is the only correct
-      // recovery — it reopens the pool against the restored file and rebuilds
-      // state from scratch.
+
       setPendingRestorePath(null);
       window.location.reload();
     } catch (err) {
@@ -115,7 +112,7 @@ export const SettingsModal: React.FC = () => {
           />
         </div>
 
-        {/* ── Canvas preferences (BlockSuite feature flags) ── */}
+        {}
         <p className="pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Canvas
         </p>

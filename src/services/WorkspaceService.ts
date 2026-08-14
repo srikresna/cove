@@ -35,8 +35,6 @@ export class WorkspaceService implements IWorkspaceService {
   }
 
   async deleteWorkspace(id: string): Promise<void> {
-    // Enforce the business rule from the authoritative source (the repository),
-    // never a caller-supplied count that may be stale.
     const all = await this.workspaces.getAllWorkspaces();
     if (!canDeleteLastWorkspace(all.length)) {
       throw new BusinessRuleError("Cannot delete the only remaining workspace.");
@@ -45,8 +43,6 @@ export class WorkspaceService implements IWorkspaceService {
     const ws = await this.workspaces.getWorkspaceById(id);
     if (!ws) throw new NotFoundError("Workspace", id);
 
-    // Deleting the workspace cascades to its notes and their children atomically
-    // (ON DELETE CASCADE on a foreign_keys=ON transaction connection).
     await this.workspaces.deleteWorkspace(id);
   }
 }

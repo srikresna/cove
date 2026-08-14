@@ -4,7 +4,6 @@ import type { EncryptedPayload } from "../services/vault/IEncryptionService";
 import type { INoteRepository, NoteRecord } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
-// 1 = encrypted under the session DEK; 0 = pre-vault legacy row awaiting migration.
 const KMS_VERSION_DEK = 1;
 
 export class SQLiteNoteRepository implements INoteRepository {
@@ -177,8 +176,6 @@ export class SQLiteNoteRepository implements INoteRepository {
     return existing;
   }
 
-  // Single statement on a foreign_keys=ON transaction connection: the schema's
-  // ON DELETE CASCADE removes note_links/tags/covers/properties atomically.
   async deleteNote(id: string): Promise<void> {
     try {
       await SQLiteDatabase.runTransaction([

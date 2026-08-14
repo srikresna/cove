@@ -1,10 +1,7 @@
 use keyring::Entry;
 
-/// Hard-coded service + allowlisted entry names: the renderer can only ever
-/// touch cove's own OS credentials, never other applications'.
 const SERVICE: &str = "com.cove.notes";
 
-/// Must match KEYRING_USERS on the TS side (src/services/vault/IKeychainStore.ts).
 const ALLOWED_USERS: [&str; 3] = ["dek-backup", "legacy-dek-bridge", "iv-highwatermark"];
 
 fn entry_for(user: &str) -> Result<Entry, String> {

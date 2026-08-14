@@ -31,8 +31,6 @@ export class NoteService implements INoteService {
   }
 
   private async decryptTitle(rec: NoteRecord): Promise<string> {
-    // titleKmsVersion 0 = pre-H6 plaintext (not yet migrated); >=1 = encrypted
-    // under the session DEK with the title AAD.
     if (rec.titleKmsVersion < 1) return String(rec.title);
     return this.crypto.decryptPayload(rec.title, titleAad(rec.id));
   }
@@ -70,8 +68,7 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    // Titles are encrypted at rest, so there is no full-text index: decrypt title
-    // and body for each recent note and match either (decrypt-on-search).
+
     const candidates = await this.notes.findRecentForSearch(100);
     const hits: NoteSearchHit[] = [];
     for (const rec of candidates) {
@@ -88,9 +85,7 @@ export class NoteService implements INoteService {
             snippet: matchesBody ? buildSnippet(plain, q) : "",
           });
         }
-      } catch {
-        // A single corrupt/undecodable note must not abort the whole search.
-      }
+      } catch {}
     }
     return hits;
   }
@@ -118,7 +113,6 @@ export class NoteService implements INoteService {
     return { ...rec, content, title };
   }
 
-  /** Create a note with a caller-supplied ID (for BlockSuite "new doc" sync). */
   async createNoteWithId(
     workspaceId: string,
     id: string,

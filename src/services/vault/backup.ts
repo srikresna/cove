@@ -24,14 +24,10 @@ export class TauriBackupService implements IBackupService {
   }
 
   async restoreFromFile(path: string): Promise<void> {
-    // The pool must release cove.db (and stay closed) while the file is swapped.
     await this.db.suspend();
     try {
       await invoke("restore_database", { sourcePath: path });
     } finally {
-      // Always release the suspend so the pool can reopen — on success against
-      // the swapped file, on error against the original. (The caller still reloads
-      // on success because every in-memory store is now stale.)
       this.db.resume();
     }
   }

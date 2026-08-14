@@ -23,31 +23,20 @@ import {
 import { covePeekViewService } from "./peekViewService";
 
 interface BlockSuiteEditorServiceDeps {
-  /** Persistent BlobSource backing BlockSuite blob storage. */
   blobSource: BlobSource;
 }
 
-/**
- * Manages the single BlockSuite workspace that backs every Cove note editor.
- *
- * Owns workspace/view-manager lifecycle and the Cove-note ↔ BlockSuite-doc mapping,
- * and is intentionally free of zustand imports: the two pieces of UI state it
- * needs (canvas feature flags and new-doc DB sync) are injected by the store
- * layer via {@link provideCanvasPrefs} / {@link provideDocCreatedHandler}.
- */
 export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private workspace: TestWorkspace | null = null;
   private viewManager: ViewExtensionManager | null = null;
-  // Cached view extension specs — ExtensionManager.get(scope) rebuilds on every
-  // call; caching avoids that cost across editor mounts (main surface + peek).
+
   private cachedPageSpecs: ExtensionType[] | null = null;
   private cachedEdgelessSpecs: ExtensionType[] | null = null;
-  // Doc ids that have been fully loaded (snapshot applied + normalized).
+
   private readonly initializedDocs = new Set<string>();
-  // Doc ids Cove opened itself (vs BlockSuite-initiated "new doc" creates).
+
   private readonly coveOwnedDocIds = new Set<string>();
-  // Doc ids registered as lightweight metadata (for @-mention search), tracked
-  // so they can be pruned on workspace switch.
+
   private readonly registeredMetaIds = new Set<string>();
 
   private canvasPrefsProvider: () => CanvasPrefs = () => DEFAULT_CANVAS_PREFS;
@@ -55,8 +44,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     undefined;
 
   constructor(private readonly deps: BlockSuiteEditorServiceDeps) {
-    // Register the affine-editor-container web component once (NOT a
-    // block/widget extension — it's the editor container itself).
     registerEditorContainer();
   }
 
@@ -89,19 +76,15 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       workspace.storeExtensions = storeManager.get("store");
       workspace.meta.initialize();
       workspace.start();
-      // Intercept BlockSuite's "new doc" creation (@-popover / slash menu) and
-      // sync it to Cove's DB via the injected handler (provided by the note
-      // store, which owns noteService + fetchNotes + the active workspace).
+
       workspace.meta.docMetaAdded.subscribe(async (docId: string) => {
-        if (this.coveOwnedDocIds.has(docId)) return; // Cove opened this doc itself
+        if (this.coveOwnedDocIds.has(docId)) return;
         this.coveOwnedDocIds.add(docId);
         const meta = workspace.meta.getDocMeta(docId);
         const title = meta?.title ?? undefined;
         try {
           await this.docCreatedHandler(docId, title);
-        } catch {
-          // Best-effort: if DB sync fails, the doc still exists in-memory.
-        }
+        } catch {}
       });
       this.workspace = workspace;
     }
@@ -117,20 +100,15 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       const store = doc.getStore();
       try {
         const flags = store.get(FeatureFlagService);
-        // Canvas feature flags are user-configurable in Settings; read the live
-        // preferences (injected provider) and apply them per-doc.
+
         const prefs = this.canvasPrefsProvider();
         flags.setFlag("enable_turbo_renderer", prefs.turboRenderer);
         flags.setFlag("enable_edgeless_scribbled_style", prefs.scribbledStyle);
         flags.setFlag("enable_shape_shadow_blur", prefs.shapeShadowBlur);
         flags.setFlag("enable_dom_renderer", prefs.domRenderer);
         flags.setFlag("enable_advanced_block_visibility", true);
-      } catch {
-        // FeatureFlagService is registered by store extensions; guard anyway.
-      }
+      } catch {}
       if (snapshotB64) {
-        // Yjs updates merge; they do not overwrite. Clear metadata placeholders
-        // before applying the persisted state or the document gets two roots.
         doc.load();
         doc.clear();
         applySnapshot(doc.spaceDoc, snapshotB64);
@@ -147,11 +125,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     return doc;
   }
 
-  /**
-   * Export an open note doc as Markdown / HTML / PDF. The transformer triggers
-   * a browser download as a side effect. Dynamically imported so the (heavy)
-   * transformer code stays out of the main bundle.
-   */
   async exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<void> {
     const ws = this.getWorkspace();
     const doc = ws.getDoc(noteId);
@@ -163,11 +136,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     if (format === "markdown") await MarkdownTransformer.exportDoc(store);
     else if (format === "html") await HtmlTransformer.exportDoc(store);
     else {
-      // The PdfAdapter hard-codes remote font URLs (cdn.affine.pro) which are
-      // CORS-blocked off affine.pro. pdfMake is a singleton: re-point its font
-      // table at the locally-served Inter TTF BEFORE exporting. The adapter's
-      // default body font is "SarasaGothicCL" (CJK) and code font "Inter"; map
-      // both to Inter so pdfmake resolves them (Latin-only — CJK falls back).
       const pdfMake = (await import("pdfmake/build/pdfmake")).default;
       const inter = "/fonts/Inter.ttf";
       const slots = { normal: inter, bold: inter, italics: inter, bolditalics: inter };
@@ -176,17 +144,12 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     }
   }
 
-  /**
-   * Import a Markdown file as a new note doc. Returns the new doc id; the doc
-   * is created inside the workspace so the docMetaAdded subscriber syncs it to
-   * Cove's DB automatically.
-   */
   async importMarkdownFile(file: File): Promise<string | undefined> {
     const ws = this.getWorkspace();
     const markdown = await file.text();
     const { MarkdownTransformer } = await import("@blocksuite/affine/widgets/linked-doc");
     const extensions = this.getViewManager().get("page");
-    // The schema is workspace-wide; derive it from any already-open doc.
+
     const sampleDoc = ws.docs.values().next().value;
     if (!sampleDoc) throw new Error("Open a note before importing.");
     return MarkdownTransformer.importMarkdownToDoc({
@@ -206,19 +169,14 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   }
 
   registerExistingNotes(notes: Array<{ id: string; title: string }>): void {
-    // Ensure workspace exists (fetchNotes may run before the editor mounts).
     const ws = this.getWorkspace();
     const newIds = new Set(notes.map((n) => n.id));
 
-    // Remove previously registered notes that are NOT in the new set and NOT
-    // currently open in the editor — keeps @-mention scoped to current workspace.
     for (const oldId of this.registeredMetaIds) {
       if (!newIds.has(oldId) && !this.initializedDocs.has(oldId)) {
         try {
           ws.removeDoc(oldId);
-        } catch {
-          // Doc might be in use — skip.
-        }
+        } catch {}
         this.coveOwnedDocIds.delete(oldId);
       }
     }
@@ -229,9 +187,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       if (this.coveOwnedDocIds.has(id)) continue;
       if (ws.getDoc(id)) continue;
       this.coveOwnedDocIds.add(id);
-      // Metadata is sufficient for linked-doc search. Do not seed block content
-      // here: applying a persisted Yjs update onto those placeholder blocks merges
-      // both trees and creates multiple roots.
+
       ws.createDoc(id);
       ws.meta.setDocMeta(id, { title });
     }
@@ -251,18 +207,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   }
 
   reset(): void {
-    // Flush every open editor's pending edits BEFORE disposing the workspace.
-    // Each flusher encodes the Yjs snapshot synchronously (capturing the live
-    // doc state) and fires the async DB write — the encoded string is
-    // independent of the workspace, so the write completes on the Rust side
-    // even though the JS promise may be abandoned on beforeunload. Without
-    // this, debounced edits within the 800ms window are silently lost.
     for (const fn of [...this.pendingFlushers]) {
       try {
         fn();
-      } catch {
-        // best-effort — a failing flush must not block the lock/teardown
-      }
+      } catch {}
     }
     this.pendingFlushers.clear();
 

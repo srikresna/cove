@@ -39,7 +39,6 @@ const noteLinkRepository = new SQLiteNoteLinkRepository();
 const tagRepository = new SQLiteTagRepository();
 const blobRepository = new SQLiteBlobRepository();
 
-// Persistent, vault-encrypted BlobSource for BlockSuite images/attachments.
 export const blobSource = new SqliteBlobSource(blobRepository, cryptoVault);
 
 export const noteService: INoteService = new NoteService(
@@ -77,13 +76,9 @@ export const backupService: IBackupService = new TauriBackupService({
   resume: () => SQLiteDatabase.resume(),
 });
 
-// BlockSuite workspace/view-manager lifecycle. Decrypted note content lives in
-// these Y docs, so they must die with the session key — wire reset() on lock.
 export const blockSuiteEditorService: IBlockSuiteEditorService = new BlockSuiteEditorService({
   blobSource,
 });
 vaultService.onLock(() => blockSuiteEditorService.reset());
-// Scrub the decrypted blob cache on lock so no plaintext images survive a
-// lockdown. BlockSuite's edgeless renderer re-fetches blobs on every render,
-// so the cache is essential for performance — but it must be cleared on lock.
+
 vaultService.onLock(() => blobSource.clearCache());

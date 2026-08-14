@@ -42,7 +42,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         workspaces: [...state.workspaces, created],
         activeWorkspaceId: created.id,
       }));
-      // Close the create-workspace modal once creation succeeds.
+
       useUIStore.getState().setCreateModalOpen(false);
       return created;
     } catch (err) {

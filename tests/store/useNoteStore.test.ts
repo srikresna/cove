@@ -1,16 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// vi.hoisted ensures the mock fns exist when vi.mock's factory runs (vi.mock
-// is hoisted above top-level const declarations, which would otherwise be
-// "accessed before initialization").
 const { togglePin, toggleFavorite, updateNote } = vi.hoisted(() => ({
   togglePin: vi.fn<(id: string) => Promise<void>>(),
   toggleFavorite: vi.fn<(id: string) => Promise<void>>(),
   updateNote: vi.fn<(id: string, updates: Record<string, unknown>) => Promise<void>>(),
 }));
 
-// Mock the DI container services so the store can be exercised in jsdom
-// without Tauri/SQLite.
 vi.mock("@/di/container", () => ({
   noteService: { togglePin, toggleFavorite, updateNote },
   vaultService: { isUnlocked: () => true, onLock: () => {} },
@@ -65,7 +60,7 @@ describe("useNoteStore — optimistic update & rollback", () => {
     );
 
     const flip = useNoteStore.getState().togglePinNote("n1");
-    // Immediately reflected (optimistic)
+
     expect(useNoteStore.getState().notes[0]?.isPinned).toBe(true);
 
     resolvePin();

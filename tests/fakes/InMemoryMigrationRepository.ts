@@ -70,7 +70,6 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
     this.titleRows.set(id, { title: encryptedTitle, titleKmsVersion: 1 });
   }
 
-  // Blobs are not exercised by the in-memory migration fake.
   async findAllBlobBatch(): Promise<LegacyRow[]> {
     return [];
   }

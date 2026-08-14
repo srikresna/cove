@@ -4,7 +4,7 @@ import type { Note } from "../domain/note/Note";
 export interface NoteRecord extends Omit<Note, "content" | "title"> {
   content: EncryptedPayload;
   title: EncryptedPayload;
-  /** 0 = plaintext (pre-H6), 1 = encrypted under the session DEK. */
+
   titleKmsVersion: number;
 }
 

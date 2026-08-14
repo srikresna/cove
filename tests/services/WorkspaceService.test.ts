@@ -41,8 +41,6 @@ describe("WorkspaceService", () => {
     await expect(service.deleteWorkspace("ws-1")).rejects.toThrow(BusinessRuleError);
   });
 
-  // Note cascade is enforced at the DB layer (ON DELETE CASCADE on a
-  // foreign_keys=ON transaction connection), so it is not asserted here.
   it("deleteWorkspace removes the workspace when more than one exists", async () => {
     const wsRepo = new InMemoryWorkspaceRepository();
     const service = new WorkspaceService(wsRepo);

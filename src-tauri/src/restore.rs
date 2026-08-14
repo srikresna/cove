@@ -3,9 +3,6 @@ use sqlx::{ConnectOptions, Connection};
 use std::path::Path;
 use tauri::Manager;
 
-/// Replaces the live database with a backup and restarts the app. The JS side
-/// must close its connection pool first, or the file swap fails on Windows.
-/// The previous database survives as cove.db.pre-restore.
 #[tauri::command]
 pub async fn restore_database(app: tauri::AppHandle, source_path: String) -> Result<(), String> {
     let data_dir = app
@@ -28,9 +25,6 @@ pub async fn restore_database(app: tauri::AppHandle, source_path: String) -> Res
     }
     validate_backup(&source).await?;
 
-    // Stage into a temp file, then swap with an atomic same-volume rename —
-    // a failure at any step leaves the live cove.db untouched (fs::copy onto
-    // it directly would truncate in place and corrupt it on a partial write).
     let staged = data_dir.join("cove.db.restore-tmp");
     let _ = std::fs::remove_file(&staged);
     std::fs::copy(&source, &staged).map_err(|e| format!("Cannot stage backup: {e}"))?;
@@ -44,7 +38,6 @@ pub async fn restore_database(app: tauri::AppHandle, source_path: String) -> Res
         let _ = std::fs::remove_file(&staged);
         return Err(format!("Restore failed: {e}"));
     }
-    // Stale sidecars of the replaced database would corrupt the restored one.
     let _ = std::fs::remove_file(data_dir.join("cove.db-wal"));
     let _ = std::fs::remove_file(data_dir.join("cove.db-shm"));
 

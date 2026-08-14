@@ -61,7 +61,7 @@ export const AppContent: React.FC = () => {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
-    // BlockSuite's ThemeObserver watches the data-theme attribute.
+
     document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
   }, [isDarkMode]);
 
@@ -72,10 +72,6 @@ export const AppContent: React.FC = () => {
       <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
         {activeNote ? (
           activeNote.content === "" ? (
-            // Content arrives async (metadata list returns content=""); never mount
-            // the editor against an empty doc — it would seed blank and, once
-            // initializedDocs locks it in, the real snapshot could be lost on the
-            // first debounced save.
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
               Loading editor…
             </div>

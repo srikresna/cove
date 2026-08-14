@@ -24,17 +24,12 @@ interface BlockSuiteDialogState {
   confirm: (opts: ConfirmOptions) => Promise<boolean>;
   prompt: (opts: PromptOptions) => Promise<string | null>;
   setInput: (value: string) => void;
-  /** Resolve the current dialog (ok). */
+
   ok: () => void;
-  /** Resolve the current dialog (cancel). */
+
   cancel: () => void;
 }
 
-/**
- * Backs the modal confirm/prompt rendered by {@link BlockSuiteDialogs} and used
- * by Cove's NotificationProvider so BlockSuite-originated confirm/prompt calls
- * (e.g. "create linked doc" title prompt) use a real modal, not native alerts.
- */
 export const useBlockSuiteDialogStore = create<BlockSuiteDialogState>((set, get) => ({
   open: false,
   kind: null,

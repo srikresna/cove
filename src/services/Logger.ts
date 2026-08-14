@@ -26,8 +26,6 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 40,
 };
 
-// Gate noisy debug logs (which can leak internal ids) below info, and route each
-// level to its matching console sink so severity is preserved for tooling.
 const MIN_LEVEL: LogLevel = "info";
 
 function emit(entry: LogEntry): void {

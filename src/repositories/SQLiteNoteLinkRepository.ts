@@ -10,12 +10,10 @@ export class SQLiteNoteLinkRepository implements INoteLinkRepository {
 
   async replaceForSource(sourceId: string, targetIds: string[]): Promise<void> {
     const targets = [...new Set(targetIds)].filter((id) => id && id !== sourceId);
-    // DELETE + all INSERTs run as one transaction so a failure can never leave the
-    // note with zero or partial links.
+
     const statements: SqlStatement[] = [
       { sql: "DELETE FROM note_links WHERE sourceId = ?", params: [sourceId] },
       ...targets.map((targetId) => ({
-        // OR IGNORE: the target may have been deleted since the link was typed.
         sql: "INSERT OR IGNORE INTO note_links (sourceId, targetId) SELECT ?, id FROM notes WHERE id = ?",
         params: [sourceId, targetId],
       })),

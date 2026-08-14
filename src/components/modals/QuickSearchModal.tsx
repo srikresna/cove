@@ -157,8 +157,6 @@ export const QuickSearchModal: React.FC = () => {
   }, [highlightedId]);
 
   const openHit = (hit: NoteSearchHit) => {
-    // Picker mode (invoked by BlockSuite's QuickSearchProvider): resolve with
-    // the doc id instead of navigating to it.
     if (pickerResolve) {
       resolvePicker(hit.id);
       return;
@@ -170,8 +168,6 @@ export const QuickSearchModal: React.FC = () => {
   };
 
   const onOpenChange = (open: boolean) => {
-    // If a picker is pending and the user cancels, resolve with null so the
-    // awaiting promise never hangs.
     if (!open && pickerResolve) resolvePicker(null);
     else setQuickSearchOpen(open);
   };

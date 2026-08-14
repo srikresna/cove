@@ -46,7 +46,6 @@ function blocksInTreeOrder(blocks: Y.Map<unknown>): YBlock[] {
   return ordered;
 }
 
-/** One string per non-empty block, in document order; null if not an envelope. */
 export function extractBlockSuiteParagraphs(content: string): string[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;
@@ -62,7 +61,6 @@ export function extractBlockSuiteParagraphs(content: string): string[] | null {
   return parts;
 }
 
-/** Plaintext of a BlockSuite envelope in document order, or null if not one. */
 export function extractBlockSuitePlainText(content: string): string | null {
   const paragraphs = extractBlockSuiteParagraphs(content);
   if (paragraphs === null) return null;
@@ -77,7 +75,6 @@ export interface BlockSuiteHeading {
 
 const HEADING_LEVELS: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4, h5: 5, h6: 6 };
 
-/** Headings of a BlockSuite envelope in document order, or null if not one. */
 export function extractBlockSuiteHeadings(content: string): BlockSuiteHeading[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;
@@ -100,7 +97,6 @@ interface ReferenceDelta {
   attributes?: { reference?: { pageId?: unknown } };
 }
 
-/** Linked doc ids referenced by a BlockSuite envelope, or null if not one. */
 export function extractBlockSuiteLinkIds(content: string): string[] | null {
   const update = unpackBlockSuiteContent(content);
   if (update === null) return null;

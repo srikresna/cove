@@ -1,10 +1,41 @@
+@font-face {
+  font-family: "Liberation Sans";
+  src: url("./assets/fonts/LiberationSans-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Liberation Sans";
+  src: url("./assets/fonts/LiberationSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Liberation Sans";
+  src: url("./assets/fonts/LiberationSans-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Liberation Sans";
+  src: url("./assets/fonts/LiberationSans-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Cove — seaglass mist */
     --background: 150 7% 97%;
     --foreground: 201 29% 15%;
     --card: 0 0% 100%;
@@ -30,7 +61,6 @@
   }
 
   .dark {
-    /* Neutral dark; teal stays only as the action color */
     --background: 240 5% 7%;
     --foreground: 0 0% 93%;
     --card: 240 4% 10%;
@@ -66,7 +96,6 @@
   }
 }
 
-/* Signature: waterline — a faint wave under the note title that ripples while saving. */
 .waterline {
   height: 6px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='6' viewBox='0 0 28 6'%3E%3Cpath d='M0 3 Q 7 0, 14 3 T 28 3' fill='none' stroke='%230e7c66' stroke-opacity='0.45' stroke-width='1.2'/%3E%3C/svg%3E");
@@ -84,18 +113,24 @@
   }
 }
 
-/* ── BlockSuite surface: match TestAffineEditorContainer CSS exactly ── */
-
-/* The affine-editor-container custom element defaults to display:inline (HTML
-   spec for unknown elements) which gives it 0 height — the drag handle, edgeless
-   viewport, and all position-aware widgets break. Force block + full height. */
 affine-editor-container {
   display: block;
   height: 100%;
 }
 
-/* Hide the container's built-in doc-title — Cove renders its own title via
-   EditorHeader (with icon picker, cover image, etc.). */
+affine-editor-container .affine-page-viewport {
+  height: 100%;
+  overflow: visible;
+}
+
+affine-editor-container .playground-page-editor-container {
+  padding-bottom: 96px;
+}
+
+.cove-doc-scroll {
+  scroll-padding-bottom: 96px;
+}
+
 doc-title {
   display: none;
 }
@@ -103,8 +138,8 @@ doc-title {
 .affine-page-viewport,
 .affine-edgeless-viewport {
   --affine-editor-side-padding: 48px;
-  --affine-font-family: Helvetica;
-  --affine-font-code-family: Helvetica;
+  --affine-font-family: "Liberation Sans";
+  --affine-font-code-family: "Liberation Sans";
   --affine-text-primary-color: hsl(var(--foreground));
   --affine-text-secondary-color: hsl(var(--muted-foreground));
   --affine-icon-color: hsl(var(--muted-foreground));
@@ -118,21 +153,12 @@ doc-title {
   color: var(--affine-text-primary-color);
 }
 
-/* Page viewport: let TestAffineEditorContainer's built-in Lit CSS handle
-   layout (overflow, flex, padding, container-type, side-padding). Cove ONLY
-   overrides theme variables above. Overriding layout here breaks the drag
-   handle + add button positioning. */
-
-/* TOC click flash on the target block */
 .cove-block-flash {
   background: hsl(var(--accent));
   border-radius: 6px;
   transition: background 0.4s ease;
 }
 
-/* FramePanel frame cards have a fixed ~280px width + 8px side margins that
-   overflow a narrow sidebar. Drop the margins and clip any residual overflow
-   so the cards fit Cove's right bar. */
 .cove-frame-host .frame-list-container {
   margin: 0 !important;
 }

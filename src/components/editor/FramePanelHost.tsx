@@ -5,18 +5,6 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 
-/**
- * Mounts BlockSuite's native {@link FramePanel} (frame thumbnails + reorder).
- *
- * FramePanel's body/preview render thumbnails via the surface renderer
- * (`gfx.surfaceComponent.renderer`), which exists in BOTH page and edgeless
- * modes — so thumbnails show in page mode too. Its native presentation button
- * works in edgeless (gfx.tool is available). In page mode that button would
- * crash (`gfx.tool` is undefined), so we intercept its click at the capture
- * phase and route it through Cove's own page-mode presentation flow instead
- * (switch to edgeless + present via intent) — no Cove button, the native one is
- * the single trigger.
- */
 export const FramePanelHost: React.FC<{
   editor: EditorHost | null;
   mode?: string;
@@ -52,14 +40,6 @@ export const FramePanelHost: React.FC<{
     };
   }, [editor, hasRenderer]);
 
-  // The native presentation button lives inside <affine-frame-panel-header>'s
-  // SHADOW root, so an external capture listener can't reach it (clicks are
-  // retargeted to the header host). In any mode where gfx.tool is NOT yet
-  // available (page mode, or the edgeless transition window where the renderer
-  // is mounted but the tool controller isn't), that button would crash
-  // (`_gfx.tool.setTool`). Reach into the shadow root and intercept the click
-  // there — a MutationObserver catches the button the instant it appears,
-  // regardless of how slowly the header renders.
   useEffect(() => {
     const container = containerRef.current;
     if (!container || isEdgeless || !onStartPresentation) return;

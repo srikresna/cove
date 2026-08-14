@@ -3,7 +3,6 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Logger } from "../../../services/Logger";
 
 interface Props {
-  /** Bumped to reset the boundary (e.g. on note or mode switch). */
   resetKey: string;
   children: ReactNode;
 }
@@ -13,15 +12,6 @@ interface State {
   message: string | null;
 }
 
-/**
- * Catches errors thrown by the BlockSuite editor (Lit web-component mount,
- * lifecycle, or a BlockSuite-internal throw) so a single editor crash shows a
- * localized fallback instead of taking down the whole app. The sidebar,
- * topbar, and note list remain interactive.
- *
- * `resetKey` lets a parent remount a recovered editor: changing it forces this
- * class back to the clean state via `componentDidUpdate`.
- */
 export class EditorErrorBoundary extends Component<Props, State> {
   public state: State = { hasError: false, message: null };
 
@@ -36,8 +26,6 @@ export class EditorErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidUpdate(prevProps: Props): void {
-    // A note/mode switch means the failing editor is gone; clear the error so
-    // the new one can mount cleanly.
     if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
       this.setState({ hasError: false, message: null });
     }

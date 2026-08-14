@@ -11,12 +11,8 @@ export class SQLiteDatabase {
   private static instance: Promise<Database> | null = null;
   private static suspended = false;
 
-  // Connection + PRAGMAs + schema migration resolve inside one promise, so no
-  // caller can race ahead of CREATE TABLE.
   static getInstance(): Promise<Database> {
     if (SQLiteDatabase.suspended) {
-      // The lazy singleton must not reopen cove.db while a restore is
-      // swapping the file — a fresh pool would re-lock it mid-swap.
       return Promise.reject(
         new PersistenceError("db.open", "Database is suspended while a backup is being restored."),
       );
@@ -50,11 +46,6 @@ export class SQLiteDatabase {
     SQLiteDatabase.suspended = false;
   }
 
-  // Runs statements as ONE atomic transaction on a dedicated single connection
-  // with foreign_keys ON. The plugin-sql pool may route each `execute` to a
-  // different connection, so multi-statement writes cannot rely on BEGIN/COMMIT
-  // through the pool — this guarantees all-or-nothing semantics (rollback on any
-  // failure) and lets ON DELETE CASCADE fire within the unit of work.
   static async runTransaction(statements: SqlStatement[]): Promise<void> {
     if (SQLiteDatabase.suspended) {
       throw new PersistenceError(
@@ -65,9 +56,6 @@ export class SQLiteDatabase {
     await invoke("run_sql_transaction", { statements });
   }
 
-  // tauri-plugin-sql's pool may route each execute to a different connection,
-  // so multi-statement transactions are unsafe except the inline BEGIN/COMMIT
-  // in the v2 block (accepted risk: recreate-table must be atomic).
   private static async migrate(db: Database): Promise<void> {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS workspaces (
@@ -104,10 +92,6 @@ export class SQLiteDatabase {
     if (version < 2) {
       const cols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
       if (cols.some((c) => c.name === "folderId")) {
-        // Recreate-table must be atomic: interrupted between DROP and RENAME the
-        // notes table is gone with no rollback. Run it as a single real
-        // transaction on a dedicated connection — the pool's BEGIN/COMMIT is not
-        // reliable across pooled connections.
         await SQLiteDatabase.runTransaction([
           {
             sql: "CREATE TABLE notes_new (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, icon TEXT, coverColor TEXT, isPinned INTEGER NOT NULL DEFAULT 0, isFavorite INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
@@ -159,7 +143,6 @@ export class SQLiteDatabase {
     }
 
     if (version < 4) {
-      // If FTS5 is missing from the bundled SQLite, search falls back to decrypt-on-search.
       try {
         await db.execute(
           "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(note_id UNINDEXED, title, tokenize='unicode61 remove_diacritics 2')",
@@ -176,16 +159,11 @@ export class SQLiteDatabase {
         await db.execute(
           "INSERT INTO notes_fts(note_id, title) SELECT id, title FROM notes WHERE id NOT IN (SELECT note_id FROM notes_fts)",
         );
-      } catch {
-        /* FTS5 unavailable */
-      }
+      } catch {}
       await db.execute("PRAGMA user_version = 4");
     }
 
     if (version < 5) {
-      // Pre-v5 INSERTs omitted kmsVersion, leaving DEK-encrypted rows at the
-      // legacy default 0. Backfill is safe only once migration completed:
-      // legacy rows cannot exist after that, except those in migration_failures.
       const kmsRows = await db.select<Array<{ migrationState: string }>>(
         "SELECT migrationState FROM kms WHERE id = 1",
       );
@@ -246,11 +224,6 @@ export class SQLiteDatabase {
     }
 
     if (version < 11) {
-      // H6: encrypt note titles at rest. titleKmsVersion flags per-row state
-      // (0 = plaintext legacy, 1 = encrypted) so the read path decrypts gracefully
-      // and a batched migration can resume after an interrupt. Encrypted titles
-      // cannot be FTS-indexed, so the title full-text index is dropped and search
-      // falls back to decrypt-on-search.
       const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
       if (!noteCols.some((c) => c.name === "titleKmsVersion")) {
         await db.execute("ALTER TABLE notes ADD COLUMN titleKmsVersion INTEGER NOT NULL DEFAULT 0");
@@ -263,7 +236,6 @@ export class SQLiteDatabase {
     }
 
     if (version < 12) {
-      // BlockSuite-native: persistent, vault-encrypted image/attachment blobs.
       await db.execute(`
         CREATE TABLE IF NOT EXISTS note_blobs (
           id TEXT PRIMARY KEY,

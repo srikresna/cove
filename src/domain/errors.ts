@@ -1,9 +1,3 @@
-/**
- * Domain error hierarchy — the canonical source of truth for the app's typed
- * errors. The infrastructure layer (src/errors) re-exports these and adds
- * presentation mapping (errorMappers), so the domain never depends outward.
- */
-
 export type ErrorCategory =
   | "not_found"
   | "validation"
