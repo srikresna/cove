@@ -243,14 +243,32 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending = false;
     let lastSavedSnapshot: string | null = null;
+    /** Encode the current doc state synchronously and trigger the DB write.
+     *  Used by the lock/close flush (must not be idle-deferred — the workspace
+     *  is about to be torn down). */
+    const encodeAndSave = () => {
+      if (!blockSuiteEditorService.isWorkspaceAlive()) return;
+      const snapshot = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
+      if (snapshot === lastSavedSnapshot) return;
+      // Advance lastSavedSnapshot ONLY on successful persist — otherwise a
+      // failed save (DB error) would make the next flush skip (snapshot
+      // compares equal) and the edit stays unsaved until the next change.
+      void useNoteStore
+        .getState()
+        .updateNote(noteId, { content: snapshot })
+        .then(
+          () => {
+            lastSavedSnapshot = snapshot;
+          },
+          () => {
+            // persist failed — lastSavedSnapshot unchanged so the next flush retries
+          },
+        );
+    };
     const flush = () => {
       const doEncode = () => {
         pending = false;
-        if (!blockSuiteEditorService.isWorkspaceAlive()) return;
-        const snapshot = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
-        if (snapshot === lastSavedSnapshot) return;
-        lastSavedSnapshot = snapshot;
-        void useNoteStore.getState().updateNote(noteId, { content: snapshot });
+        encodeAndSave();
       };
       // Defer the expensive encoding to an idle period (fallback: setTimeout
       // 0). pending stays true until encoding completes, so rapid edits during
@@ -268,6 +286,20 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     };
     doc.spaceDoc.on("update", onUpdate);
 
+    // Register a synchronous flush so vault lock / beforeunload captures edits
+    // still inside the debounce window. reset() calls these BEFORE disposing
+    // the workspace, so isWorkspaceAlive() is still true and the encode runs.
+    const unregisterFlusher = blockSuiteEditorService.registerPendingFlusher(() => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (pending) {
+        pending = false;
+        encodeAndSave();
+      }
+    });
+
     return () => {
       disposed = true;
       cancelAnimationFrame(readyFrame);
@@ -275,6 +307,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
       stopPresentationWatch?.();
       doc.spaceDoc.off("update", onUpdate);
       navSub?.unsubscribe?.();
+      unregisterFlusher();
       if (timer) clearTimeout(timer);
       if (pending) flush();
       editor.remove();

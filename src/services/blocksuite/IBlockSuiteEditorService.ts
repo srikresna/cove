@@ -50,6 +50,10 @@ export interface IBlockSuiteEditorService {
   registerExistingNotes(notes: Array<{ id: string; title: string }>): void;
   /** Whether the workspace is still mounted (false after a vault lock). */
   isWorkspaceAlive(): boolean;
+  /** Register a synchronous flush callback (encode + trigger DB write) for an
+   *  open editor. Called by {@link reset} before tearing down the workspace so
+   *  debounced edits are not lost on lock / window close. Returns an unregister. */
+  registerPendingFlusher(fn: () => void): () => void;
   /** Disposes the workspace + every doc. Called on vault lock. */
   reset(): void;
 

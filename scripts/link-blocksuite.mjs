@@ -1,6 +1,9 @@
 /**
  * Links vendored @blocksuite/* + @affine/templates packages from ./vendor/ into
- * node_modules/ via Windows junctions. Run automatically via `postinstall`.
+ * node_modules/ via symlinks. Run automatically via `postinstall`.
+ *
+ * On Windows uses "junction" (no admin privileges required); on POSIX uses
+ * "dir" (regular directory symlink). Cross-platform safe.
  *
  * The vendor/ directory contains pre-built BlockSuite 0.27.0 dist packages
  * (committed to the repo). This script makes them resolvable by Vite/tsc by
@@ -10,8 +13,8 @@
  *
  * Usage: node scripts/link-blocksuite.mjs
  */
-import { readdirSync, existsSync, rmSync, mkdirSync, symlinkSync } from "node:fs";
-import { dirname, resolve, join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +40,11 @@ function linkScope(scope) {
     // packages in the same scope, e.g. @blocksuite/icons from npm).
     if (existsSync(linkPath)) rmSync(linkPath, { recursive: true, force: true });
     try {
-      symlinkSync(source, linkPath, "junction");
+      // Windows: "junction" doesn't require admin privileges. POSIX: "dir" is
+      // a regular directory symlink (type is largely ignored on POSIX, but
+      // being explicit avoids edge cases).
+      const linkType = process.platform === "win32" ? "junction" : "dir";
+      symlinkSync(source, linkPath, linkType);
       linked++;
     } catch (err) {
       console.error(`  FAIL: ${scope}/${entry.name}: ${err.message}`);

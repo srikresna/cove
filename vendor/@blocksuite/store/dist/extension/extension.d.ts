@@ -1,4 +1,4 @@
-import type { Container } from '@blocksuite/global/di';
+import type { Container } from "@blocksuite/global/di";
 /**
  * # Understanding Extensions
  *
@@ -123,9 +123,9 @@ import type { Container } from '@blocksuite/global/di';
  * @category Extension
  */
 export declare abstract class Extension {
-    static setup(_di: Container): void;
+  static setup(_di: Container): void;
 }
 export interface ExtensionType {
-    setup(di: Container): void;
+  setup(di: Container): void;
 }
 //# sourceMappingURL=extension.d.ts.map

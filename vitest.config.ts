@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [react()],
+  // biome-ignore lint/suspicious/noExplicitAny: vitest bundles its own vite copy, causing a dual-PluginOption type mismatch that is runtime-irrelevant
+  plugins: [react()] as any,
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),

@@ -4,7 +4,7 @@ import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-
 
 type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
 
-import { Check, Copy, Expand, Loader2, X } from "lucide-react";
+import { AlertTriangle, Check, Copy, Expand, Loader2, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { blockSuiteEditorService } from "../../../../di/container";
@@ -28,11 +28,13 @@ export const PeekViewModal: React.FC = () => {
   const open = request !== null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!request) return;
     setLoading(true);
+    setError(false);
 
     let disposed = false;
     let cleanup: (() => void) | null = null;
@@ -137,8 +139,8 @@ export const PeekViewModal: React.FC = () => {
         if (editor) void editor.updateComplete.finally(poll);
         safetyTimer = window.setTimeout(reveal, 6000);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error("[cove-peek] mount failed", err);
+        setError(true);
         setLoading(false);
       }
 
@@ -176,9 +178,13 @@ export const PeekViewModal: React.FC = () => {
 
   const handleOpenInFull = () => {
     if (!request) return;
-    // Switch the main editor for this note to edgeless mode, then close the
-    // peek — mirroring AFFiNE's "open doc" peek control.
-    void useNoteStore.getState().updateNote(request.docId, { docMode: "edgeless" });
+    // Switch the main editor to this note in edgeless mode, then close the
+    // peek — mirroring AFFiNE's "open doc" peek control. Without
+    // setActiveNoteId the mode change applies to a background note the user
+    // never sees.
+    const ns = useNoteStore.getState();
+    ns.setActiveNoteId(request.docId);
+    void ns.updateNote(request.docId, { docMode: "edgeless" });
     close();
   };
 
@@ -212,7 +218,25 @@ export const PeekViewModal: React.FC = () => {
           the containing block for this absolute child.
         */}
         <div ref={containerRef} className="absolute inset-0" />
-        {loading && (
+        {error && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-card p-8 text-center">
+            <AlertTriangle className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+            <div className="text-sm font-medium text-muted-foreground">
+              Could not open this frame
+            </div>
+            <div className="text-xs text-muted-foreground/70">
+              The editor hit an unexpected error. Try reopening the note.
+            </div>
+            <button
+              type="button"
+              onClick={close}
+              className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Close
+            </button>
+          </div>
+        )}
+        {loading && !error && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-card">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
             <div className="text-sm font-medium text-muted-foreground">Loading</div>

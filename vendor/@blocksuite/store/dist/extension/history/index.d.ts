@@ -1,2 +1,2 @@
-export * from './history-extension';
+export * from "./history-extension";
 //# sourceMappingURL=index.d.ts.map

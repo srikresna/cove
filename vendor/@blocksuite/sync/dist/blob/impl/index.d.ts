@@ -1,3 +1,3 @@
-export * from './indexeddb.js';
-export * from './memory.js';
+export * from "./indexeddb.js";
+export * from "./memory.js";
 //# sourceMappingURL=index.d.ts.map

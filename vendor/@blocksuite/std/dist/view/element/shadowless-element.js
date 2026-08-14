@@ -1,75 +1,79 @@
-import { CSSResult, LitElement } from 'lit';
+import { CSSResult, LitElement } from "lit";
 export class ShadowlessElement extends LitElement {
-    // Map of the number of styles injected into a node
-    // A reference count of the number of ShadowlessElements that are still connected
-    static { this.connectedCount = new WeakMap(); }
-    static { this.onDisconnectedMap = new WeakMap(); }
-    // styles registered in ShadowlessElement will be available globally
-    // even if the element is not being rendered
-    static finalizeStyles(styles) {
-        const elementStyles = super.finalizeStyles(styles);
-        // XXX: This breaks component encapsulation and applies styles to the document.
-        // These styles should be manually scoped.
-        elementStyles.forEach((s) => {
-            if (s instanceof CSSResult && typeof document !== 'undefined') {
-                const styleRoot = document.head;
-                const style = document.createElement('style');
-                style.textContent = s.cssText;
-                styleRoot.append(style);
-            }
-        });
-        return elementStyles;
+  // Map of the number of styles injected into a node
+  // A reference count of the number of ShadowlessElements that are still connected
+  static {
+    this.connectedCount = new WeakMap();
+  }
+  static {
+    this.onDisconnectedMap = new WeakMap();
+  }
+  // styles registered in ShadowlessElement will be available globally
+  // even if the element is not being rendered
+  static finalizeStyles(styles) {
+    const elementStyles = super.finalizeStyles(styles);
+    // XXX: This breaks component encapsulation and applies styles to the document.
+    // These styles should be manually scoped.
+    elementStyles.forEach((s) => {
+      if (s instanceof CSSResult && typeof document !== "undefined") {
+        const styleRoot = document.head;
+        const style = document.createElement("style");
+        style.textContent = s.cssText;
+        styleRoot.append(style);
+      }
+    });
+    return elementStyles;
+  }
+  getConnectedCount() {
+    const SE = this.constructor;
+    return SE.connectedCount.get(SE)?.get(this.getRootNode()) ?? 0;
+  }
+  setConnectedCount(count) {
+    const SE = this.constructor;
+    if (!SE.connectedCount.has(SE)) {
+      SE.connectedCount.set(SE, new WeakMap());
     }
-    getConnectedCount() {
-        const SE = this.constructor;
-        return SE.connectedCount.get(SE)?.get(this.getRootNode()) ?? 0;
-    }
-    setConnectedCount(count) {
-        const SE = this.constructor;
-        if (!SE.connectedCount.has(SE)) {
-            SE.connectedCount.set(SE, new WeakMap());
+    SE.connectedCount.get(SE)?.set(this.getRootNode(), count);
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    const parentRoot = this.getRootNode();
+    const SE = this.constructor;
+    const insideShadowRoot = parentRoot instanceof ShadowRoot;
+    const styleInjectedCount = this.getConnectedCount();
+    if (styleInjectedCount === 0 && insideShadowRoot) {
+      const elementStyles = SE.elementStyles;
+      const injectedStyles = [];
+      elementStyles.forEach((s) => {
+        if (s instanceof CSSResult && typeof document !== "undefined") {
+          const style = document.createElement("style");
+          style.textContent = s.cssText;
+          parentRoot.prepend(style);
+          injectedStyles.push(style);
         }
-        SE.connectedCount.get(SE)?.set(this.getRootNode(), count);
+      });
+      if (!SE.onDisconnectedMap.has(SE)) {
+        SE.onDisconnectedMap.set(SE, new WeakMap());
+      }
+      SE.onDisconnectedMap.get(SE)?.set(parentRoot, () => {
+        injectedStyles.forEach((style) => style.remove());
+      });
     }
-    connectedCallback() {
-        super.connectedCallback();
-        const parentRoot = this.getRootNode();
-        const SE = this.constructor;
-        const insideShadowRoot = parentRoot instanceof ShadowRoot;
-        const styleInjectedCount = this.getConnectedCount();
-        if (styleInjectedCount === 0 && insideShadowRoot) {
-            const elementStyles = SE.elementStyles;
-            const injectedStyles = [];
-            elementStyles.forEach((s) => {
-                if (s instanceof CSSResult && typeof document !== 'undefined') {
-                    const style = document.createElement('style');
-                    style.textContent = s.cssText;
-                    parentRoot.prepend(style);
-                    injectedStyles.push(style);
-                }
-            });
-            if (!SE.onDisconnectedMap.has(SE)) {
-                SE.onDisconnectedMap.set(SE, new WeakMap());
-            }
-            SE.onDisconnectedMap.get(SE)?.set(parentRoot, () => {
-                injectedStyles.forEach(style => style.remove());
-            });
-        }
-        this.setConnectedCount(styleInjectedCount + 1);
+    this.setConnectedCount(styleInjectedCount + 1);
+  }
+  createRenderRoot() {
+    return this;
+  }
+  disconnectedCallback() {
+    const parentRoot = this.getRootNode();
+    super.disconnectedCallback();
+    const SE = this.constructor;
+    let styleInjectedCount = this.getConnectedCount();
+    styleInjectedCount--;
+    this.setConnectedCount(styleInjectedCount);
+    if (styleInjectedCount === 0) {
+      // remove the style element when the last shadowless element is disconnected in the parent root
+      SE.onDisconnectedMap.get(SE)?.get(parentRoot)?.();
     }
-    createRenderRoot() {
-        return this;
-    }
-    disconnectedCallback() {
-        const parentRoot = this.getRootNode();
-        super.disconnectedCallback();
-        const SE = this.constructor;
-        let styleInjectedCount = this.getConnectedCount();
-        styleInjectedCount--;
-        this.setConnectedCount(styleInjectedCount);
-        if (styleInjectedCount === 0) {
-            // remove the style element when the last shadowless element is disconnected in the parent root
-            SE.onDisconnectedMap.get(SE)?.get(parentRoot)?.();
-        }
-    }
+  }
 }

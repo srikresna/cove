@@ -1,1 +1,1 @@
-export * from './std-scope.js';
+export * from "./std-scope.js";

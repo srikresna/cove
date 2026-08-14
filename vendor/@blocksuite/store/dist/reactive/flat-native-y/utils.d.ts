@@ -1,4 +1,4 @@
-import type { UnRecord } from '../types';
+import type { UnRecord } from "../types";
 export declare const keyWithoutPrefix: (key: string) => string;
 export declare const keyWithPrefix: (key: string) => string;
 export declare function isProxy(value: unknown): boolean;

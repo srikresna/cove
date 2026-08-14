@@ -78,13 +78,23 @@ export class SqliteBlobSource implements BlobSource {
       this.cache.set(key, null);
       return null;
     }
-    const { mime, bytes } = splitBlobContainer(
-      await this.crypto.decryptBlob(rec.payload, blobAad(key)),
-    );
-    const blob = new Blob([bytes.slice()], { type: mime });
-    this.evictIfNeeded();
-    this.cache.set(key, blob);
-    return blob.slice(0, blob.size, blob.type);
+    try {
+      const { mime, bytes } = splitBlobContainer(
+        await this.crypto.decryptBlob(rec.payload, blobAad(key)),
+      );
+      const blob = new Blob([bytes.slice()], { type: mime });
+      this.evictIfNeeded();
+      this.cache.set(key, blob);
+      return blob.slice(0, blob.size, blob.type);
+    } catch {
+      // Undecryptable blob (corrupt payload, or encrypted under a pre-rotation
+      // DEK) — cache null so BlockSuite's per-frame re-fetch loop doesn't
+      // hammer the DB + crypto hundreds of times per second. The cache already
+      // supports null (known-missing), so this short-circuits at line 68 next time.
+      this.evictIfNeeded();
+      this.cache.set(key, null);
+      return null;
+    }
   }
 
   async set(key: string, value: Blob): Promise<string> {

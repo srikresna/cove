@@ -8,7 +8,13 @@
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,
+    "allowJs": true,
     "types": ["node"]
   },
-  "include": ["vite/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "tailwind.config.js",
+    "postcss.config.js"
+  ]
 }

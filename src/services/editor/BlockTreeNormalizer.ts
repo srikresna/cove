@@ -105,9 +105,13 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
   }
 
   // Deduplicate surface elements the multi-surface corruption may have copied
-  // across surfaces. Two elements with the same type AND identical bound are
-  // almost certainly corruption artifacts (real edits have unique IDs/positions).
-  if (primary) {
+  // across surfaces. Only runs when corruption was actually present
+  // (mergeCompleted) — a clean single-surface doc never had elements copied
+  // across surfaces, so deduping there risks deleting legitimate in-place
+  // duplicates (two shapes the user deliberately stacked). The signature is
+  // type + bound; two elements sharing both are almost certainly the same
+  // element copied to a duplicate surface.
+  if (mergeCompleted && primary) {
     const elements = getElements(primary);
     if (elements && elements.size > 0) {
       const seen = new Set<string>();

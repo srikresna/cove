@@ -30,8 +30,7 @@ interface BlockSuiteEditorServiceDeps {
 /**
  * Manages the single BlockSuite workspace that backs every Cove note editor.
  *
- * This is the service extracted from the old `engine.ts` god-module. It owns
- * workspace/view-manager lifecycle and the Cove-note ↔ BlockSuite-doc mapping,
+ * Owns workspace/view-manager lifecycle and the Cove-note ↔ BlockSuite-doc mapping,
  * and is intentionally free of zustand imports: the two pieces of UI state it
  * needs (canvas feature flags and new-doc DB sync) are injected by the store
  * layer via {@link provideCanvasPrefs} / {@link provideDocCreatedHandler}.
@@ -242,7 +241,31 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     return this.workspace !== null;
   }
 
+  private readonly pendingFlushers = new Set<() => void>();
+
+  registerPendingFlusher(fn: () => void): () => void {
+    this.pendingFlushers.add(fn);
+    return () => {
+      this.pendingFlushers.delete(fn);
+    };
+  }
+
   reset(): void {
+    // Flush every open editor's pending edits BEFORE disposing the workspace.
+    // Each flusher encodes the Yjs snapshot synchronously (capturing the live
+    // doc state) and fires the async DB write — the encoded string is
+    // independent of the workspace, so the write completes on the Rust side
+    // even though the JS promise may be abandoned on beforeunload. Without
+    // this, debounced edits within the 800ms window are silently lost.
+    for (const fn of [...this.pendingFlushers]) {
+      try {
+        fn();
+      } catch {
+        // best-effort — a failing flush must not block the lock/teardown
+      }
+    }
+    this.pendingFlushers.clear();
+
     this.workspace?.forceStop();
     this.workspace?.dispose();
     this.workspace = null;

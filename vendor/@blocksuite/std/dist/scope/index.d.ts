@@ -1,2 +1,2 @@
-export * from './std-scope.js';
+export * from "./std-scope.js";
 //# sourceMappingURL=index.d.ts.map

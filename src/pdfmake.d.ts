@@ -1,7 +1,6 @@
 /**
- * Ambient declaration for pdfmake's singleton entry. Cove aliases the `pdfmake`
- * specifier to AFFiNE/node_modules/pdfmake (same instance the BlockSuite PDF
- * adapter uses) so it can re-point pdfMake.fonts at local fonts before export.
+ * Ambient declaration for pdfmake's singleton entry. Cove declares pdfmake as a
+ * direct dependency and re-points pdfMake.fonts at local fonts before export.
  * Only the shape Cove touches is declared here.
  */
 declare module "pdfmake/build/pdfmake" {

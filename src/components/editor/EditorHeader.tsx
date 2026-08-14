@@ -54,7 +54,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
   const saveStatus = useSaveStatusStore((s) => s.status);
 
   const [title, setTitle] = useState(note.title);
-  const titleTimer = useRef<NodeJS.Timeout | null>(null);
+  const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTitleRef = useRef<string | null>(null);
   const commitTitleRef = useRef<() => void>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);

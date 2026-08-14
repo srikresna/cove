@@ -56,12 +56,13 @@ mod platform {
     }
 
     pub fn unprotect(ciphertext: &[u8]) -> Result<Vec<u8>, String> {
-        // Prefer the app-bound entropy; fall back to no-entropy so blobs minted by
-        // older builds (before entropy was added) still unwrap for a smooth upgrade.
-        match unprotect_with(ciphertext, true) {
-            Ok(pt) => Ok(pt),
-            Err(_) => unprotect_with(ciphertext, false),
-        }
+        // Always require app-bound entropy. A previous build fell back to
+        // no-entropy for legacy blobs, but that weakened the binding to
+        // per-user-SID (any same-user process could unwrap). Cove is
+        // pre-release with no shipped legacy blobs, so the fallback is removed
+        // entirely. If an old dev blob fails to unwrap, the user simply
+        // re-enables "Trust this device" (which wraps WITH entropy).
+        unprotect_with(ciphertext, true)
     }
 
     fn unprotect_with(ciphertext: &[u8], with_entropy: bool) -> Result<Vec<u8>, String> {

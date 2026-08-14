@@ -1,6 +1,9 @@
-import type { Store } from '@blocksuite/store';
-import { type GfxCompatibleInterface, type GfxGroupCompatibleInterface } from '../gfx/model/base.js';
-import type { GfxGroupModel, GfxModel } from '../gfx/model/model.js';
+import type { Store } from "@blocksuite/store";
+import {
+  type GfxCompatibleInterface,
+  type GfxGroupCompatibleInterface,
+} from "../gfx/model/base.js";
+import type { GfxGroupModel, GfxModel } from "../gfx/model/model.js";
 /**
  * Get the top elements from the list of elements, which are in some tree structures.
  *
@@ -20,14 +23,26 @@ import type { GfxGroupModel, GfxModel } from '../gfx/model/model.js';
  * The result should be `[G1, G4, E6]`
  */
 export declare function getTopElements(elements: GfxModel[]): GfxModel[];
-export declare function batchAddChildren(container: GfxGroupCompatibleInterface, elements: GfxModel[]): void;
-export declare function batchRemoveChildren(container: GfxGroupCompatibleInterface, elements: GfxModel[]): void;
+export declare function batchAddChildren(
+  container: GfxGroupCompatibleInterface,
+  elements: GfxModel[],
+): void;
+export declare function batchRemoveChildren(
+  container: GfxGroupCompatibleInterface,
+  elements: GfxModel[],
+): void;
 export declare function descendantElementsImpl(container: GfxGroupCompatibleInterface): GfxModel[];
-export declare function hasDescendantElementImpl(container: GfxGroupCompatibleInterface, element: GfxCompatibleInterface): boolean;
+export declare function hasDescendantElementImpl(
+  container: GfxGroupCompatibleInterface,
+  element: GfxCompatibleInterface,
+): boolean;
 /**
  * This checker is used to prevent circular reference, when adding a child element to a container.
  */
-export declare function canSafeAddToContainer(container: GfxGroupModel, element: GfxCompatibleInterface): boolean;
+export declare function canSafeAddToContainer(
+  container: GfxGroupModel,
+  element: GfxCompatibleInterface,
+): boolean;
 export declare function isLockedByAncestorImpl(element: GfxCompatibleInterface): boolean;
 export declare function isLockedBySelfImpl(element: GfxCompatibleInterface): boolean;
 export declare function isLockedImpl(element: GfxCompatibleInterface): boolean;

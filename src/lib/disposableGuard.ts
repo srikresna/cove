@@ -40,7 +40,6 @@ proto.dispose = function dispose(this: DisposableGroupInternals) {
       // else: a plain object with no dispose/unsubscribe — skip silently
       // (this is the case that previously threw).
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error(e);
     }
   }

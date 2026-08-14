@@ -80,8 +80,10 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     fs: {
-      // Allow Vite to serve BlockSuite source from the sibling AFFiNE repo.
-      allow: [rootDir, resolve(rootDir, "AFFiNE")],
+      // Cove is fully self-contained: BlockSuite + templates are vendored in
+      // ./vendor/ (junctions in node_modules/), and yjs/signals resolve from
+      // Cove's own node_modules. No external AFFiNE/ sibling needed.
+      allow: [rootDir],
     },
   },
   build: {
@@ -89,13 +91,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules") || id.includes("Affine")) {
-            if (
-              id.includes("@blocksuite") ||
-              id.includes("Affine\\blocksuite") ||
-              id.includes("Affine/blocksuite")
-            )
-              return "vendor-blocksuite";
+          if (id.includes("node_modules")) {
+            if (id.includes("@blocksuite")) return "vendor-blocksuite";
             if (id.includes("yjs")) return "vendor-yjs";
             if (id.includes("@radix-ui") || id.includes("cmdk")) return "vendor-ui-primitives";
             if (id.includes("lucide-react") || id.includes("framer-motion"))

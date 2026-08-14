@@ -13,8 +13,8 @@
  * Carries the main synchronization logic.
  *
  */
-export * from './consts.js';
-export * from './engine.js';
-export * from './impl/index.js';
-export * from './peer.js';
-export * from './source.js';
+export * from "./consts.js";
+export * from "./engine.js";
+export * from "./impl/index.js";
+export * from "./peer.js";
+export * from "./source.js";

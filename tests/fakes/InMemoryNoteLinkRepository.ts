@@ -14,4 +14,8 @@ export class InMemoryNoteLinkRepository implements INoteLinkRepository {
     }
     return sources.sort();
   }
+
+  async outgoingLinksOf(sourceId: string): Promise<string[]> {
+    return [...(this.links.get(sourceId) ?? [])].sort();
+  }
 }

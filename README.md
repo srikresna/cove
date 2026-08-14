@@ -39,7 +39,7 @@ A joyful, privacy-first desktop note-taking app with block-based editing, multi-
 
 ```bash
 # Clone
-git clone https://github.com/<your-org>/cove-notes.git
+git clone https://github.com/cove-notes/cove-notes.git
 cd cove-notes
 
 # Install dependencies (runs postinstall script that symlinks BlockSuite)
@@ -111,7 +111,7 @@ BlockSuite integration is isolated in `services/blocksuite/` — the editor serv
 
 ## License
 
-[MIT](LICENSE) (or your chosen license)
+[MIT](LICENSE)
 
 ## Acknowledgements
 

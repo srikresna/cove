@@ -1,2 +1,2 @@
-export { PropTypes, requiredProperties } from './required.js';
+export { PropTypes, requiredProperties } from "./required.js";
 //# sourceMappingURL=index.d.ts.map

@@ -122,7 +122,7 @@
  * @category Extension
  */
 export class Extension {
-    static setup(_di) {
-        // do nothing
-    }
+  static setup(_di) {
+    // do nothing
+  }
 }
