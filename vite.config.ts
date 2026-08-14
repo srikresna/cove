@@ -77,18 +77,22 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("@blocksuite")) return "vendor-blocksuite";
-            if (id.includes("yjs")) return "vendor-yjs";
-            if (id.includes("@radix-ui") || id.includes("cmdk")) return "vendor-ui-primitives";
-            if (id.includes("lucide-react") || id.includes("framer-motion"))
+          const p = id.replace(/\\/g, "/");
+          if (p.includes("vendor/@blocksuite") || p.includes("node_modules/@blocksuite")) {
+            return "vendor-blocksuite";
+          }
+          if (p.includes("vendor/@affine") || p.includes("@affine/templates")) {
+            return "vendor-templates";
+          }
+          if (p.includes("node_modules")) {
+            if (p.includes("yjs")) return "vendor-yjs";
+            if (p.includes("@radix-ui") || p.includes("cmdk")) return "vendor-ui-primitives";
+            if (p.includes("lucide-react") || p.includes("framer-motion"))
               return "vendor-icons-animation";
-            if (
-              id.includes("node_modules/react/") ||
-              id.includes("node_modules/react-dom/") ||
-              id.includes("node_modules/scheduler/")
-            )
+            if (p.includes("/react/") || p.includes("/react-dom/") || p.includes("/scheduler/"))
               return "vendor-react";
+            if (p.includes("pdfmake") || p.includes("html2canvas") || p.includes("jspdf"))
+              return "vendor-export";
           }
         },
       },
