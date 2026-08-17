@@ -12,8 +12,11 @@ AFFiNE/
 docs/
 .remember
 .kilo
-.claude
 .serena
+
+# .claude: ignore local state, but track vendored plugins in .claude/skills/
+.claude/*
+!.claude/skills/
 
 # secrets / env
 .env

@@ -57,6 +57,12 @@ The app opens at `http://localhost:1420` inside a Tauri desktop window.
 
 Cove ships BlockSuite 0.27.0 as **pre-built vendored packages** in `vendor/@blocksuite/` (committed to the repo, ~43MB). The `postinstall` script (`scripts/link-blocksuite.mjs`) creates Windows junctions from `node_modules/@blocksuite/` → `vendor/@blocksuite/` so Vite/tsc resolve them naturally. No external BlockSuite source or AFFiNE checkout is needed.
 
+### Bundled Claude Code Plugins
+
+This repo bundles 15 [Claude Code](https://code.claude.com/docs) plugins in `.claude/skills/` (skills-directory plugins, ~2MB). Open Claude Code at the repo root and accept the workspace trust dialog — they load automatically: **no `/plugin install`, no network, no marketplace account**. Bundled: superpowers, remember, serena, code-review, code-simplifier, feature-dev, frontend-design, security-guidance, skill-creator, claude-code-setup, claude-md-management, ralph-loop, context7, typescript-lsp, rust-analyzer-lsp.
+
+Runtime dependencies for the tool-based plugins (optional, fetched only when used): `uvx` for serena, `typescript-language-server` / `rust-analyzer` binaries on PATH for the LSP plugins. Each plugin directory retains its upstream `LICENSE` (Anthropic, Oraios, and other upstream authors); the copies are pinned — re-vendor to pick up upstream updates.
+
 ## Scripts
 
 | Command | Description |
