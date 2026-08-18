@@ -11,12 +11,27 @@ interface SaveStatusState {
   setError: (msg: string) => void;
 }
 
+let inFlightSaves = 0;
+
 export const useSaveStatusStore = create<SaveStatusState>((set) => ({
   status: "idle",
   lastSavedAt: null,
   errorMessage: null,
 
-  setSaving: () => set({ status: "saving", errorMessage: null }),
-  setSaved: () => set({ status: "saved", lastSavedAt: Date.now(), errorMessage: null }),
-  setError: (msg) => set({ status: "error", errorMessage: msg }),
+  setSaving: () => {
+    inFlightSaves += 1;
+    set({ status: "saving", errorMessage: null });
+  },
+  setSaved: () => {
+    inFlightSaves = Math.max(0, inFlightSaves - 1);
+    if (inFlightSaves === 0) {
+      set({ status: "saved", lastSavedAt: Date.now(), errorMessage: null });
+    }
+  },
+  setError: (msg) => {
+    inFlightSaves = Math.max(0, inFlightSaves - 1);
+    if (inFlightSaves === 0) {
+      set({ status: "error", errorMessage: msg });
+    }
+  },
 }));

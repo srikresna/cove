@@ -1,3 +1,5 @@
+import { vaultService } from "../../di/container";
+
 let pendingNoteId: string | null = null;
 
 export function requestPresentation(noteId: string): void {
@@ -11,3 +13,9 @@ export function consumePresentation(noteId: string): boolean {
   }
   return false;
 }
+
+export function clearPresentationIntent(): void {
+  pendingNoteId = null;
+}
+
+vaultService.onLock(clearPresentationIntent);

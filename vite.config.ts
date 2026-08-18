@@ -1,37 +1,17 @@
-import tailwindcss from "@tailwindcss/vite";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import react from "@vitejs/plugin-react";
-import { transform } from "esbuild";
 import { visualizer } from "rollup-plugin-visualizer";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 import wasm from "vite-plugin-wasm";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
-function accessorTransformPlugin(): Plugin {
-  return {
-    name: "cove:accessor-transform",
-    enforce: "pre",
-    async transform(code, id) {
-      if (!id.includes("blocksuite") && !id.includes("Affine")) return;
-      if (!id.endsWith(".ts")) return;
-      if (!code.includes("accessor ")) return;
-      try {
-        const result = await transform(code, { loader: "ts", target: "es2021" });
-        return { code: result.code };
-      } catch {
-        return null;
-      }
-    },
-  };
-}
-
 export default defineConfig({
   plugins: [
     tailwindcss(),
-    accessorTransformPlugin(),
     vanillaExtractPlugin(),
     wasm(),
     react(),

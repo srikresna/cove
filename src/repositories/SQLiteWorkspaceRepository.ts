@@ -92,7 +92,11 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
       throw toPersistenceError("updateWorkspace", err);
     }
 
-    return updated;
+    const persisted = await this.getWorkspaceById(id);
+    if (!persisted) {
+      throw new PersistenceError("updateWorkspace", `Workspace not found after update: ${id}`);
+    }
+    return persisted;
   }
 
   async deleteWorkspace(id: string): Promise<void> {

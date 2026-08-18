@@ -4,6 +4,7 @@ import { blockSuiteEditorService, noteService } from "../../../../di/container";
 import type { DocPeekRequest } from "../../../../services/blocksuite/peekViewService";
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
+import { Logger } from "../../../../services/Logger";
 import { useNoteStore } from "../../../../store/useNoteStore";
 import type { Note } from "../../../../types";
 import { TooltipProvider } from "../../../ui/tooltip";
@@ -28,7 +29,6 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
   onReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<TestAffineEditorContainer | null>(null);
   const uploadCoverImage = useNoteStore((s) => s.uploadCoverImage);
   const removeCoverImage = useNoteStore((s) => s.removeCoverImage);
   const [coverImage, setCoverImage] = useState<string | null>(null);
@@ -75,7 +75,6 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
         editor.mode = "page";
 
         editor.autofocus = true;
-        editorRef.current = editor;
 
         const encodeAndSave = () => {
           if (!blockSuiteEditorService.isWorkspaceAlive()) return;
@@ -153,7 +152,7 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
           });
         });
       } catch (err) {
-        console.error("[cove-peek] doc view mount failed", err);
+        Logger.error("[cove-peek] doc view mount failed", err);
         handleUnavailable();
       }
     };
@@ -188,7 +187,6 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
       finalFlush?.();
       detachSaveListener?.();
       unregisterFlusher?.();
-      editorRef.current = null;
       editor?.remove();
     };
   }, [request.docId, handleUnavailable, handleReady]);

@@ -8,6 +8,7 @@ import type { DocPeekRequest } from "../../../../services/blocksuite/peekViewSer
 import { usePeekViewStore } from "../../../../services/blocksuite/peekViewService";
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
+import { Logger } from "../../../../services/Logger";
 import { useNoteStore } from "../../../../store/useNoteStore";
 import { useNotificationStore } from "../../../../store/useNotificationStore";
 import { useWorkspaceStore } from "../../../../store/useWorkspaceStore";
@@ -43,6 +44,8 @@ export const PeekViewModal: React.FC = () => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        const peekContent = document.querySelector(".peek-modal-content");
+        if (peekContent?.querySelector('[data-state="open"]')) return;
         e.stopPropagation();
         close();
       }
@@ -207,10 +210,12 @@ export const PeekViewModal: React.FC = () => {
           }
           raf = requestAnimationFrame(checkCanvas);
         };
-        void editor.updateComplete.finally(poll);
+        void editor.updateComplete.finally(poll).catch(() => {
+          if (!disposed && !revealed) reveal();
+        });
         safetyTimer = window.setTimeout(reveal, PEEK_REVEAL_TIMEOUT_MS);
       } catch (err) {
-        console.error("[cove-peek] mount failed", err);
+        Logger.error("[cove-peek] mount failed", err);
         setError(true);
         setLoading(false);
       }
@@ -235,6 +240,7 @@ export const PeekViewModal: React.FC = () => {
         return;
       }
       if (++waitTries > PEEK_CONTAINER_MAX_TRIES) {
+        setError(true);
         setLoading(false);
         return;
       }

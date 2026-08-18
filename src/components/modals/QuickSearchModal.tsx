@@ -74,12 +74,13 @@ const PreviewPane: React.FC<{ preview: PreviewData | null; hasHits: boolean }> =
 };
 
 export const QuickSearchModal: React.FC = () => {
-  const { workspaces, setActiveWorkspace } = useWorkspaceStore();
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const isQuickSearchOpen = useUIStore((s) => s.isQuickSearchOpen);
   const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
   const pickerResolve = useUIStore((s) => s.pickerResolve);
   const resolvePicker = useUIStore((s) => s.resolvePicker);
-  const { setActiveNoteId } = useNoteStore();
+  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<NoteSearchHit[]>([]);
   const [loading, setLoading] = useState(false);

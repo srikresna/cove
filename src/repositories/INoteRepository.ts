@@ -16,7 +16,6 @@ export interface INoteRepository {
   createNote(note: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord>;
   updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord>;
   deleteNote(id: string): Promise<void>;
-  deleteNotesByWorkspace(workspaceId: string): Promise<void>;
   getCover(noteId: string): Promise<EncryptedPayload | null>;
   upsertCover(noteId: string, payload: EncryptedPayload): Promise<void>;
   deleteCover(noteId: string): Promise<void>;

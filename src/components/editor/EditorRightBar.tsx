@@ -33,7 +33,7 @@ const isRightBarTab = (value: string | null): value is RightBarTab =>
 
 interface EditorRightBarProps {
   note: Note;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
 
   editorHost?: EditorHost | null;
@@ -49,7 +49,6 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 export const EditorRightBar: React.FC<EditorRightBarProps> = ({
   note,
-  scrollRef: _scrollRef,
   onClose,
   editorHost,
   open = true,
@@ -157,7 +156,6 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
           </Button>
         </div>
 
-        {}
         {(tab === "preview" || tab === "frames") && (
           <div className="min-h-0 flex-1 overflow-hidden p-2 pt-1">
             {tab === "preview" && <LivePreview noteId={note.id} />}

@@ -29,6 +29,11 @@ interface NoteItemProps {
   onDelete: (id: string) => void;
 }
 
+const updatedTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 const MenuEntries: React.FC<{
   note: Note;
   onTogglePin: (id: string) => void;
@@ -96,12 +101,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                   {note.title || MESSAGES.UNTITLED_NOTE}
                 </div>
                 <div className="truncate font-mono text-[10px] text-muted-foreground">
-                  {note.updatedAt
-                    ? new Intl.DateTimeFormat("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }).format(note.updatedAt)
-                    : "Just now"}
+                  {note.updatedAt ? updatedTimeFormatter.format(note.updatedAt) : "Just now"}
                 </div>
               </div>
             </div>

@@ -18,7 +18,6 @@ import { applySnapshot, encodeDocSnapshot } from "../editor/yjsCodec";
 import { Logger } from "../Logger";
 import {
   type CanvasPrefs,
-  type DatabaseBacklinkRef,
   DEFAULT_CANVAS_PREFS,
   type IBlockSuiteEditorService,
 } from "./IBlockSuiteEditorService";
@@ -229,51 +228,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     return this.initializedDocs.has(docId);
   }
 
-  findDatabaseBacklinks(docId: string): DatabaseBacklinkRef[] {
-    const ws = this.workspace;
-    if (!ws) return [];
-    const results: DatabaseBacklinkRef[] = [];
-    for (const doc of ws.docs.values()) {
-      let store: BlockSuiteStore;
-      try {
-        store = doc.getStore();
-      } catch {
-        continue;
-      }
-      if (!store.root) continue;
-      let databases: ReturnType<BlockSuiteStore["getBlocksByFlavour"]>;
-      try {
-        databases = store.getBlocksByFlavour("affine:database");
-      } catch {
-        continue;
-      }
-      for (const db of databases) {
-        const model = store.getBlock(db.id)?.model;
-        if (!model) continue;
-        for (const child of model.children) {
-          const text = (child as { text?: { deltas$: { value: Array<Record<string, unknown>> } } })
-            .text;
-          const deltas = text?.deltas$?.value;
-          if (!deltas) continue;
-          for (const delta of deltas) {
-            const attrs = (
-              delta as { attributes?: { reference?: { type?: string; pageId?: string } } }
-            ).attributes;
-            if (attrs?.reference?.type === "LinkedPage" && attrs.reference.pageId === docId) {
-              results.push({
-                databaseDocId: store.id,
-                databaseId: db.id,
-                databaseRowId: child.id,
-              });
-              break;
-            }
-          }
-        }
-      }
-    }
-    return results;
-  }
-
   registerExistingNotes(notes: Array<{ id: string; title: string }>): void {
     const ws = this.getWorkspace();
     const newIds = new Set(notes.map((n) => n.id));
@@ -337,6 +291,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     this.cachedEdgelessSpecs = null;
     this.initializedDocs.clear();
     this.coveOwnedDocIds.clear();
+    this.registeredMetaIds.clear();
     this.knownTitles.clear();
     this.docCreatedPromises.clear();
   }

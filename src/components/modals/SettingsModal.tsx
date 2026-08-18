@@ -112,7 +112,6 @@ export const SettingsModal: React.FC = () => {
           />
         </div>
 
-        {}
         <p className="pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Canvas
         </p>
@@ -179,8 +178,12 @@ export const SettingsModal: React.FC = () => {
             variant="outline"
             className="w-full justify-start"
             onClick={async () => {
-              await lock();
-              setSettingsOpen(false);
+              try {
+                await lock();
+                setSettingsOpen(false);
+              } catch (err) {
+                notifyError(err);
+              }
             }}
           >
             <Lock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

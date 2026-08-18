@@ -47,6 +47,7 @@ export const BlockSuiteDialogs = () => {
             autoFocus
             value={input}
             placeholder={placeholder}
+            aria-label={placeholder || title}
             onChange={(e) => setInput(e.target.value)}
             className="mt-2 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none ring-ring focus-visible:ring-2"
           />

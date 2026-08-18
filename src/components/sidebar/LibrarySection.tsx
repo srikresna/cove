@@ -74,10 +74,9 @@ export const LibrarySection: React.FC = () => {
   if (pinned.length === 0 && favorites.length === 0) return null;
 
   const toggleOpen = () => {
-    setIsOpen((open) => {
-      localStorage.setItem(OPEN_KEY, String(!open));
-      return !open;
-    });
+    const next = !isOpen;
+    setIsOpen(next);
+    localStorage.setItem(OPEN_KEY, String(next));
   };
 
   return (

@@ -186,16 +186,6 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
-  async deleteNotesByWorkspace(workspaceId: string): Promise<void> {
-    try {
-      await SQLiteDatabase.runTransaction([
-        { sql: "DELETE FROM notes WHERE workspaceId = ?", params: [workspaceId] },
-      ]);
-    } catch (err) {
-      throw toPersistenceError("deleteNotesByWorkspace", err);
-    }
-  }
-
   async getCover(noteId: string): Promise<EncryptedPayload | null> {
     try {
       const db = await this.getDb();

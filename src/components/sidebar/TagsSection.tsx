@@ -21,10 +21,9 @@ export const TagsSection: React.FC = () => {
   if (tags.length === 0) return null;
 
   const toggleOpen = () => {
-    setIsOpen((open) => {
-      localStorage.setItem(OPEN_KEY, String(!open));
-      return !open;
-    });
+    const next = !isOpen;
+    localStorage.setItem(OPEN_KEY, String(next));
+    setIsOpen(next);
   };
 
   return (

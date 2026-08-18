@@ -32,7 +32,11 @@ export const LivePreview: React.FC<{ noteId: string }> = ({ noteId }) => {
     const store = blockSuiteEditorService.getDocStoreForPeek(
       noteId,
     ) as unknown as AdapterStore | null;
-    if (!store) return;
+    if (!store) {
+      setContent("");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     void (async () => {
       try {

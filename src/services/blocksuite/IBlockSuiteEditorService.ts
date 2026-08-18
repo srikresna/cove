@@ -36,8 +36,6 @@ export interface IBlockSuiteEditorService {
 
   isNoteDocLoaded(docId: string): boolean;
 
-  findDatabaseBacklinks(docId: string): DatabaseBacklinkRef[];
-
   registerExistingNotes(notes: Array<{ id: string; title: string }>): void;
 
   isWorkspaceAlive(): boolean;

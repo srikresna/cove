@@ -1,5 +1,5 @@
 import { BusinessRuleError, NotFoundError } from "../domain/errors";
-import { canDeleteLastWorkspace } from "../domain/note/notePolicy";
+import { canDeleteWorkspace } from "../domain/note/notePolicy";
 import type { Workspace } from "../domain/workspace/Workspace";
 import type { IWorkspaceRepository } from "../repositories/IWorkspaceRepository";
 import type { IWorkspaceService } from "./IWorkspaceService";
@@ -36,7 +36,7 @@ export class WorkspaceService implements IWorkspaceService {
 
   async deleteWorkspace(id: string): Promise<void> {
     const all = await this.workspaces.getAllWorkspaces();
-    if (!canDeleteLastWorkspace(all.length)) {
+    if (!canDeleteWorkspace(all.length)) {
       throw new BusinessRuleError("Cannot delete the only remaining workspace.");
     }
 

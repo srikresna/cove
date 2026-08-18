@@ -144,7 +144,11 @@ export const CreateWorkspaceModal: React.FC = () => {
                 {MESSAGES.CANCEL}
               </Button>
             </DialogClose>
-            <Button type="submit" aria-label={MESSAGES.CREATE_WORKSPACE_BUTTON}>
+            <Button
+              type="submit"
+              disabled={!name.trim()}
+              aria-label={MESSAGES.CREATE_WORKSPACE_BUTTON}
+            >
               <Plus className="h-4 w-4" aria-hidden="true" />
               <span>{MESSAGES.CREATE_WORKSPACE_BUTTON}</span>
             </Button>

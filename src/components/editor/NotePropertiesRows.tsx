@@ -221,7 +221,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
 
   const save = (propertyId: string, value: PropertyValue) => {
     setValues((prev) => new Map(prev).set(propertyId, value));
-    propertyService.setValue(note.id, propertyId, value).catch((err) => {
+    return propertyService.setValue(note.id, propertyId, value).catch((err) => {
       notifyError(err);
       reload();
     });
@@ -251,14 +251,14 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   const createOption = (def: PropertyDefinition, name: string, thenPick: boolean) => {
     propertyService
       .addOption(def.id, name)
-      .then((option) => {
+      .then(async (option) => {
         if (!thenPick) return reload();
         const current = values.get(def.id);
         if (def.type === "multiSelect") {
           const ids = current?.type === "multiSelect" ? current.optionIds : [];
-          save(def.id, { type: "multiSelect", optionIds: [...ids, option.id] });
+          await save(def.id, { type: "multiSelect", optionIds: [...ids, option.id] });
         } else {
-          save(def.id, { type: def.type as "select" | "status", optionId: option.id });
+          await save(def.id, { type: def.type as "select" | "status", optionId: option.id });
         }
         reload();
       })

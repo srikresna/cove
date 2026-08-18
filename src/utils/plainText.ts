@@ -1,8 +1,20 @@
 import { extractBlockSuiteParagraphs } from "../services/editor/blockSuiteContent";
 
+const PARAGRAPH_CACHE_CAPACITY = 50;
+
+const paragraphCache = new Map<string, string[]>();
+
 export function extractParagraphs(content: string): string[] {
   if (!content) return [];
-  return extractBlockSuiteParagraphs(content) ?? [];
+  const cached = paragraphCache.get(content);
+  if (cached) return cached;
+  const paragraphs = extractBlockSuiteParagraphs(content) ?? [];
+  if (paragraphCache.size >= PARAGRAPH_CACHE_CAPACITY) {
+    const oldest = paragraphCache.keys().next().value;
+    if (oldest !== undefined) paragraphCache.delete(oldest);
+  }
+  paragraphCache.set(content, paragraphs);
+  return paragraphs;
 }
 
 export function extractPlainText(content: string): string {

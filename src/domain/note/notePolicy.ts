@@ -13,7 +13,7 @@ export const duplicateNoteProps = (note: Pick<Note, "title" | "content" | "icon"
   icon: note.icon,
 });
 
-export const canDeleteLastWorkspace = (count: number): boolean => count > 1;
+export const canDeleteWorkspace = (count: number): boolean => count > 1;
 
 export const TRASH_RETENTION_DAYS = 30;
 

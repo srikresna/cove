@@ -30,19 +30,6 @@ export class SQLiteTagRepository implements ITagRepository {
     }
   }
 
-  async findByName(name: string): Promise<Tag | null> {
-    try {
-      const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, name, color, createdAt FROM tags WHERE name = ? COLLATE NOCASE",
-        [name],
-      );
-      return rows[0] ? rowToTag(rows[0]) : null;
-    } catch (err) {
-      throw toPersistenceError("tags.findByName", err);
-    }
-  }
-
   async findOrCreateByName(name: string, color: string): Promise<Tag> {
     try {
       const db = await this.getDb();

@@ -172,6 +172,7 @@ export class VaultService implements IVaultService {
     if (current < hwm) {
       Logger.warn(
         "vault: iv counter behind keychain high-water mark; fast-forwarding to avoid nonce reuse",
+        undefined,
         { current, hwm },
       );
       await this.crypto.advanceCounterTo(hwm);
@@ -278,15 +279,21 @@ export class VaultService implements IVaultService {
     if (failed === 0) {
       const remaining = await this.migrationRepo.countLegacy();
       if (remaining > 0) {
-        Logger.warn("vault: migration sweep finished but legacy rows remain; key retained", {
-          remaining,
-        });
+        Logger.warn(
+          "vault: migration sweep finished but legacy rows remain; key retained",
+          undefined,
+          {
+            remaining,
+          },
+        );
         return;
       }
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
       await this.purgeLegacyKeyMaterial();
     } else {
-      Logger.warn("vault: migration recorded failures; legacy key retained for retry", { failed });
+      Logger.warn("vault: migration recorded failures; legacy key retained for retry", undefined, {
+        failed,
+      });
     }
   }
 
@@ -317,7 +324,9 @@ export class VaultService implements IVaultService {
         await this.kms.update({ migrationState: "complete", migrationCursor: null });
         await this.purgeLegacyKeyMaterial();
       } else {
-        Logger.warn("vault: rotation sweep recorded failures; bridge key retained", { failed });
+        Logger.warn("vault: rotation sweep recorded failures; bridge key retained", undefined, {
+          failed,
+        });
       }
       return;
     }
@@ -327,9 +336,13 @@ export class VaultService implements IVaultService {
       if ((await this.migrationRepo.countLegacy()) === 0) {
         await this.kms.update({ migrationState: "complete", migrationCursor: null });
       } else {
-        Logger.warn("vault: interrupted migration but no bridge key; legacy rows left as-is", {
-          migrationState: rec.migrationState,
-        });
+        Logger.warn(
+          "vault: interrupted migration but no bridge key; legacy rows left as-is",
+          undefined,
+          {
+            migrationState: rec.migrationState,
+          },
+        );
       }
       return;
     }
@@ -477,7 +490,8 @@ export class VaultService implements IVaultService {
         }
       }
     }
-    if (failed > 0) Logger.warn("vault: title encryption migration recorded failures", { failed });
+    if (failed > 0)
+      Logger.warn("vault: title encryption migration recorded failures", undefined, { failed });
     return failed;
   }
 
@@ -690,7 +704,9 @@ export class VaultService implements IVaultService {
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
       await this.purgeLegacyKeyMaterial();
     } else {
-      Logger.warn("vault: rotation sweep recorded failures; bridge key retained", { failed });
+      Logger.warn("vault: rotation sweep recorded failures; bridge key retained", undefined, {
+        failed,
+      });
     }
   }
 

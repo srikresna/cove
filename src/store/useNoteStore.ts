@@ -3,8 +3,8 @@ import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
 import { clearBacklinkScans, invalidateNoteBacklinkScan } from "../services/editor/backlinkScan";
-import { presentError } from "../services/errorPresenter";
 import { processCoverImage } from "../utils/coverImage";
+import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 import { useNotificationStore } from "./useNotificationStore";
 import { useSaveStatusStore } from "./useSaveStatusStore";
 import { useWorkspaceStore } from "./useWorkspaceStore";
@@ -39,23 +39,15 @@ interface NoteState {
   toggleFavoriteNote: (id: string) => Promise<void>;
 }
 
-function notifyError(err: unknown, opts: { saveStatus: boolean } = { saveStatus: true }): void {
-  const p = presentError(err);
-  if (opts.saveStatus) {
-    useSaveStatusStore.getState().setError(p.userMessage);
-  }
-  useNotificationStore.getState().pushToast({
-    kind: p.kind,
-    title: p.toastTitle,
-    description: p.toastDescription,
-  });
-}
-
 export const useNoteStore = create<NoteState>((set, get) => {
   const toggleFlag = async (id: string, key: "isPinned" | "isFavorite"): Promise<void> => {
     const previousNotes = get().notes;
+    const previousNote = previousNotes.find((n) => n.id === id);
+    const optimisticNote: Note | null = previousNote
+      ? { ...previousNote, [key]: !previousNote[key] }
+      : null;
     set((state) => ({
-      notes: state.notes.map((n) => (n.id === id ? { ...n, [key]: !n[key] } : n)),
+      notes: state.notes.map((n) => (n.id === id && optimisticNote ? optimisticNote : n)),
     }));
     useSaveStatusStore.getState().setSaving();
 
@@ -67,7 +59,11 @@ export const useNoteStore = create<NoteState>((set, get) => {
       }
       useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      if (vaultService.isUnlocked()) set({ notes: previousNotes });
+      if (previousNote && optimisticNote && vaultService.isUnlocked()) {
+        set((state) => ({
+          notes: state.notes.map((n) => (n === optimisticNote ? previousNote : n)),
+        }));
+      }
       notifyError(err);
     }
   };
@@ -156,9 +152,13 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
     updateNote: async (id, updates) => {
       const previousNotes = get().notes;
+      const previousNote = previousNotes.find((n) => n.id === id);
       const now = Date.now();
+      const optimisticNote: Note | undefined = previousNote
+        ? { ...previousNote, ...updates, updatedAt: now }
+        : undefined;
       const optimisticNotes = previousNotes.map((n) =>
-        n.id === id ? { ...n, ...updates, updatedAt: now } : n,
+        n.id === id && optimisticNote ? optimisticNote : n,
       );
       set({ notes: optimisticNotes });
       useSaveStatusStore.getState().setSaving();
@@ -178,8 +178,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
         }
         useSaveStatusStore.getState().setSaved();
       } catch (err) {
-        if (vaultService.isUnlocked() && useNoteStore.getState().notes === optimisticNotes) {
-          set({ notes: previousNotes });
+        if (previousNote && optimisticNote && vaultService.isUnlocked()) {
+          set((state) => ({
+            notes: state.notes.map((n) => (n === optimisticNote ? previousNote : n)),
+          }));
         }
         notifyError(err);
       }
@@ -269,6 +271,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
         const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
         if (trashed && trashed.workspaceId === activeWorkspaceId) {
           const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
+          blockSuiteEditorService.registerExistingNotes(
+            notes.map((n) => ({ id: n.id, title: n.title })),
+          );
           set({ notes });
         }
       } catch (err) {
@@ -304,6 +309,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
       useSaveStatusStore.getState().setSaving();
       try {
         const duplicated = await noteService.duplicateNote(id);
+        blockSuiteEditorService.registerExistingNotes([
+          { id: duplicated.id, title: duplicated.title },
+        ]);
         set((state) => ({
           notes: [duplicated, ...state.notes],
           activeNoteId: duplicated.id,

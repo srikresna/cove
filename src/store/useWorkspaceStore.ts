@@ -28,8 +28,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   fetchWorkspaces: async () => {
     try {
       const workspaces = await workspaceService.getAllWorkspaces();
-      const first = workspaces[0];
-      set({ workspaces, activeWorkspaceId: first ? first.id : null });
+      set((state) => ({
+        workspaces,
+        activeWorkspaceId:
+          state.activeWorkspaceId && workspaces.some((w) => w.id === state.activeWorkspaceId)
+            ? state.activeWorkspaceId
+            : (workspaces[0]?.id ?? null),
+      }));
     } catch (err) {
       notifyError(err);
     }

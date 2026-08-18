@@ -91,6 +91,7 @@ export class SqliteBlobSource implements BlobSource {
       blobAad(key),
     );
     await this.blobs.upsert({ id: key, payload, kmsVersion: KMS_VERSION_DEK });
+    this.evictIfNeeded();
     this.cache.set(key, value.slice(0, value.size, value.type));
     return key;
   }

@@ -18,6 +18,7 @@ import { cn } from "../../../../lib/utils";
 import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlockSuiteEditorService";
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
+import { Logger } from "../../../../services/Logger";
 import { useNoteStore } from "../../../../store/useNoteStore";
 import { Button } from "../../../ui/button";
 import { InfoRow } from "../../NoteInfoPanel";
@@ -134,7 +135,11 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
         });
       }
 
-      cells.sort((a, b) => (a.type === "date" ? -1 : b.type === "date" ? 1 : 0));
+      cells.sort((a, b) => {
+        if (a.type === "date" && b.type !== "date") return -1;
+        if (b.type === "date" && a.type !== "date") return 1;
+        return 0;
+      });
       return { cells, ds };
     } catch {
       return null;
@@ -182,7 +187,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
         setRev((r) => r + 1);
         scheduleSave();
       } catch (err) {
-        console.error("[cove-backlink] date write failed", err);
+        Logger.error("[cove-backlink] date write failed", err);
       }
     },
     [data, databaseRowId, scheduleSave],

@@ -11,11 +11,14 @@ import {
   type PropertyValue,
   serializePropertyValue,
 } from "../domain/property/Property";
-import { normalizeTagName } from "../domain/tag/Tag";
 import { ValidationError } from "../errors/AppError";
 import type { IPropertyRepository } from "../repositories/IPropertyRepository";
 import type { IPropertyService } from "./IPropertyService";
 import { Logger } from "./Logger";
+
+function normalizePropertyName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
 
 export class PropertyService implements IPropertyService {
   constructor(private readonly properties: IPropertyRepository) {}
@@ -25,8 +28,13 @@ export class PropertyService implements IPropertyService {
   }
 
   async createDefinition(name: string, type: PropertyType): Promise<PropertyDefinition> {
-    const normalized = normalizeTagName(name);
+    const normalized = normalizePropertyName(name);
     if (!normalized) throw new ValidationError("Property name cannot be empty.");
+
+    const duplicate = (await this.properties.listDefinitions()).find(
+      (d) => d.name.toLowerCase() === normalized.toLowerCase(),
+    );
+    if (duplicate) throw new ValidationError("A property with this name already exists.");
 
     const options: PropertyOption[] =
       type === "status"
@@ -52,7 +60,7 @@ export class PropertyService implements IPropertyService {
   }
 
   async addOption(definitionId: string, name: string): Promise<PropertyOption> {
-    const normalized = normalizeTagName(name);
+    const normalized = normalizePropertyName(name);
     if (!normalized) throw new ValidationError("Option name cannot be empty.");
 
     const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
@@ -87,7 +95,7 @@ export class PropertyService implements IPropertyService {
       if (value) {
         values.set(record.propertyId, value);
       } else {
-        Logger.warn("property: dropped undecodable value", {
+        Logger.warn("property: dropped undecodable value", undefined, {
           noteId,
           propertyId: record.propertyId,
         });
