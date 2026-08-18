@@ -28,12 +28,14 @@ import { registerEdgelessTemplates } from "../../../services/blocksuite/edgeless
 import { consumePresentation } from "../../../services/blocksuite/presentationIntent";
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
+import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import type { Note } from "../../../types";
 import type { TestAffineEditorContainer } from "./editorContainer";
 
 const SAVE_DEBOUNCE_MS = 800;
+const EDITOR_READY_MAX_TRIES = 200;
 
 interface BlockSuiteSurfaceProps {
   note: Note;
@@ -49,10 +51,7 @@ const defaultEditorSetting = Object.fromEntries(
   ]),
 ) as DeepPartial<EditorSetting>;
 
-export function buildCommonExtensions(
-  mode: DocMode,
-  modeRef?: { current: DocMode },
-): ExtensionType[] {
+export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
   let editorMode = mode;
   let primaryMode = mode;
 
@@ -66,10 +65,9 @@ export function buildCommonExtensions(
       return primaryMode;
     },
 
-    getEditorMode: () => (modeRef ? modeRef.current : editorMode),
+    getEditorMode: () => editorMode,
     setEditorMode: (m: DocMode) => {
       editorMode = m;
-      if (modeRef) modeRef.current = m;
     },
     onPrimaryModeChange: (() => ({
       unsubscribe: () => undefined,
@@ -174,7 +172,16 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
           return;
         }
       } catch {}
-      if (++readyTries < 200) readyFrame = requestAnimationFrame(enableWhenReady);
+      if (++readyTries < EDITOR_READY_MAX_TRIES) {
+        readyFrame = requestAnimationFrame(enableWhenReady);
+        return;
+      }
+      disableBrokenAutoComplete();
+      editor.style.pointerEvents = "";
+      onEditorReady?.(editor.host ?? null);
+      Logger.warn(
+        `BlockSuiteSurface: editor not ready after ${EDITOR_READY_MAX_TRIES} frames; enabling anyway`,
+      );
     };
     void editor.updateComplete.then(enableWhenReady);
 

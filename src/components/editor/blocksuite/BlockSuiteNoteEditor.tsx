@@ -1,6 +1,6 @@
 import type { EditorHost } from "@blocksuite/std";
 import type React from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
@@ -23,7 +23,7 @@ interface BlockSuiteNoteEditorProps {
 export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note }) => {
   const updateNote = useNoteStore((s) => s.updateNote);
   const [isFullWidth, setIsFullWidth] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
   const [isRightBarOpen, setRightBarOpen] = useState(
     () => localStorage.getItem(RIGHTBAR_KEY) === "true",
   );
@@ -35,17 +35,21 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     [note.content],
   );
 
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
         Logger.error("requestFullscreen error", err);
       });
-      setIsFullscreen(true);
     } else {
       document.exitFullscreen().catch((err) => {
         Logger.error("exitFullscreen error", err);
       });
-      setIsFullscreen(false);
     }
   };
 

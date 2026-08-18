@@ -109,10 +109,9 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
     };
   }, [databaseDocId]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rev intentionally retriggers after in-place cell edits
   const data = useMemo(() => {
     try {
-      const _writeGeneration = rev;
-      void _writeGeneration;
       const store = blockSuiteEditorService.getDocStoreForPeek(databaseDocId);
       if (!store) return null;
       const block = store.getBlock(databaseId);
@@ -232,7 +231,9 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
               size="sm"
               className="h-7 gap-1.5 px-2 text-muted-foreground"
               onClick={() => {
-                useNoteStore.getState().setActiveNoteId(databaseDocId);
+                if (useNoteStore.getState().notes.some((n) => n.id === databaseDocId)) {
+                  useNoteStore.getState().setActiveNoteId(databaseDocId);
+                }
               }}
             >
               <ListTodo className="h-3.5 w-3.5" aria-hidden="true" />

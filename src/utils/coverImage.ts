@@ -3,6 +3,7 @@ import { ValidationError } from "../errors/AppError";
 
 const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 const MAX_COVER_WIDTH = 2400;
+const MAX_COVER_PIXELS = 30_000_000;
 const COVER_QUALITY = 0.85;
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -30,7 +31,11 @@ export async function processCoverImage(file: File): Promise<string> {
     if (!width || !height) {
       throw new ValidationError(MESSAGES.COVER_INVALID_IMAGE);
     }
-    const scale = Math.min(1, MAX_COVER_WIDTH / width);
+    const scale = Math.min(
+      1,
+      MAX_COVER_WIDTH / width,
+      Math.sqrt(MAX_COVER_PIXELS / (width * height)),
+    );
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(width * scale);
     canvas.height = Math.round(height * scale);

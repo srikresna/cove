@@ -32,7 +32,13 @@ export const useUIStore = create<UIState>((set, get) => ({
   pickerResolve: null,
 
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
-  setQuickSearchOpen: (open) => set({ isQuickSearchOpen: open }),
+  setQuickSearchOpen: (open) => {
+    if (!open && get().pickerResolve) {
+      get().resolvePicker(null);
+      return;
+    }
+    set({ isQuickSearchOpen: open });
+  },
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
   setTrashOpen: (open) => set({ isTrashOpen: open }),
   toggleDarkMode: () =>

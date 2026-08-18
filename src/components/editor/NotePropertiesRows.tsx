@@ -73,7 +73,7 @@ const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = 
         type="button"
         aria-label={`Remove ${option.name}`}
         onClick={onRemove}
-        className="hidden shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground group-hover/opt:block"
+        className="shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/opt:opacity-100"
       >
         <X className="h-2.5 w-2.5" aria-hidden="true" />
       </button>

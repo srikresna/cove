@@ -20,6 +20,10 @@ export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
   }, [init]);
 
   useEffect(() => {
+    if (status !== "locked") setView("main");
+  }, [status]);
+
+  useEffect(() => {
     const lock = () => {
       void useVaultStore.getState().lock();
     };

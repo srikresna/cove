@@ -54,5 +54,7 @@ export interface IBlockSuiteEditorService {
 
   provideDocCreatedHandler(handler: (docId: string, title?: string) => Promise<void>): void;
 
+  provideNoteSavedHandler(handler: (docId: string, content: string) => Promise<void>): void;
+
   setDocTitle(docId: string, title: string): void;
 }

@@ -49,23 +49,14 @@ mod platform {
     }
 
     pub fn unprotect(ciphertext: &[u8]) -> Result<Vec<u8>, String> {
-        unprotect_with(ciphertext, true)
-    }
-
-    fn unprotect_with(ciphertext: &[u8], with_entropy: bool) -> Result<Vec<u8>, String> {
         unsafe {
             let input = wrap_blob(ciphertext);
             let entropy = wrap_blob(APP_ENTROPY);
-            let entropy_arg: *const Blob = if with_entropy {
-                &entropy
-            } else {
-                std::ptr::null()
-            };
             let mut output = Blob { cbData: 0, pbData: std::ptr::null_mut() };
             let ok = CryptUnprotectData(
                 &input,
                 std::ptr::null_mut(),
-                entropy_arg,
+                &entropy,
                 std::ptr::null(),
                 std::ptr::null(),
                 CRYPTPROTECT_UI_FORBIDDEN,

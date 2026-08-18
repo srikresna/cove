@@ -41,9 +41,12 @@ export class SQLiteDatabase {
   static async suspend(): Promise<void> {
     SQLiteDatabase.suspended = true;
     if (!SQLiteDatabase.instance) return;
-    const db = await SQLiteDatabase.instance;
-    await db.close();
-    SQLiteDatabase.instance = null;
+    try {
+      const db = await SQLiteDatabase.instance;
+      await db.close();
+    } finally {
+      SQLiteDatabase.instance = null;
+    }
   }
 
   static resume(): void {

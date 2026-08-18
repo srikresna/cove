@@ -37,11 +37,30 @@ type SurfaceLike = {
   elements: { getValue(): Y.Map<Y.Map<unknown>> | undefined };
 };
 
+function canonicalBounds(raw: unknown): string {
+  if (typeof raw !== "string") return String(raw ?? "");
+  const numbers = raw.match(/-?\d+(?:\.\d+)?/g);
+  return numbers ? numbers.join(",") : raw;
+}
+
+function elementSignature(element: Y.Map<unknown>): string {
+  return `${element.get("type") ?? ""}:${canonicalBounds(element.get("xywh"))}`;
+}
+
 export function normalizeBlockTree(doc: BlockSuiteDoc): void {
   const store = doc.getStore();
   const pageBlocks = store.getBlocksByFlavour("affine:page");
   if (pageBlocks.length === 0) {
+    const strayIds = [
+      ...store.getBlocksByFlavour("affine:surface"),
+      ...store.getBlocksByFlavour("affine:note"),
+    ].map(({ id }) => id);
     seedDefaultBlocks(store);
+    if (strayIds.length > 0) {
+      store.transact(() => {
+        for (const id of strayIds) doc.yBlocks.delete(id);
+      });
+    }
     return;
   }
 
@@ -57,34 +76,40 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
     ).model;
   }
 
-  let mergeCompleted = false;
+  const mergedIds: string[] = [];
   if (primary && surfaceBlocks.length > 1) {
     const primarySurface = primary;
     const primaryElements = getElements(primarySurface);
     if (primaryElements) {
-      mergeCompleted = true;
       store.transact(() => {
         for (const surface of surfaceBlocks) {
           if (surface.id === primarySurface.id) continue;
           getElements(surface.model)?.forEach((elementYMap, id) => {
             if (primaryElements.has(id)) return;
             primaryElements.set(id, cloneYValue(elementYMap) as Y.Map<unknown>);
+            mergedIds.push(id);
           });
         }
       });
     }
   }
 
-  if (mergeCompleted && primary) {
+  if (primary && mergedIds.length > 0) {
     const elements = getElements(primary);
     if (elements && elements.size > 0) {
+      const mergedIdSet = new Set(mergedIds);
       const seen = new Set<string>();
       const dupes: string[] = [];
       elements.forEach((elYMap: Y.Map<unknown>, id: string) => {
-        const sig = `${elYMap.get("type") ?? ""}:${elYMap.get("xywh") ?? ""}`;
+        if (!mergedIdSet.has(id)) seen.add(elementSignature(elYMap));
+      });
+      for (const id of mergedIds) {
+        const elYMap = elements.get(id);
+        if (!elYMap) continue;
+        const sig = elementSignature(elYMap);
         if (seen.has(sig)) dupes.push(id);
         else seen.add(sig);
-      });
+      }
       if (dupes.length > 0) {
         store.transact(() => {
           for (const id of dupes) elements.delete(id);
@@ -140,9 +165,9 @@ export function normalizeBlockTree(doc: BlockSuiteDoc): void {
     for (const page of pageBlocks) {
       if (page.id !== root.id) doc.yBlocks.delete(page.id);
     }
-    if (mergeCompleted) {
+    if (primary && surfaceBlocks.length > 1) {
       for (const surface of surfaceBlocks) {
-        if (primary && surface.id !== primary.id) doc.yBlocks.delete(surface.id);
+        if (surface.id !== primary.id) doc.yBlocks.delete(surface.id);
       }
     }
   });

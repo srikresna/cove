@@ -7,9 +7,7 @@
     "core:default",
     "core:window:allow-set-fullscreen",
     "sql:default",
-    "sql:allow-load",
     "sql:allow-execute",
-    "sql:allow-select",
     "dialog:default"
   ]
 }

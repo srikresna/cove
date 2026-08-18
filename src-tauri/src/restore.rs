@@ -26,20 +26,48 @@ pub async fn restore_database(app: tauri::AppHandle, source_path: String) -> Res
     validate_backup(&source).await?;
 
     let staged = data_dir.join("cove.db.restore-tmp");
-    let _ = std::fs::remove_file(&staged);
-    std::fs::copy(&source, &staged).map_err(|e| format!("Cannot stage backup: {e}"))?;
+    let stage_src = source.clone();
+    let stage_dst = staged.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let _ = std::fs::remove_file(&stage_dst);
+        std::fs::copy(&stage_src, &stage_dst).map_err(|e| format!("Cannot stage backup: {e}"))?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Stage task failed: {e}"))??;
+
     if db_path.exists() {
-        if let Err(e) = std::fs::copy(&db_path, data_dir.join("cove.db.pre-restore")) {
-            let _ = std::fs::remove_file(&staged);
-            return Err(format!("Cannot create safety copy: {e}"));
+        let pre = data_dir.join("cove.db.pre-restore");
+        let _ = std::fs::remove_file(&pre);
+        let copied = crate::backup::vacuum_into(&db_path, &pre).await;
+        if copied.is_err() {
+            tracing::warn!(target: "cove::restore", "VACUUM INTO safety copy failed; falling back to file copy");
+            if let Err(e) = std::fs::copy(&db_path, &pre) {
+                let _ = std::fs::remove_file(&staged);
+                return Err(format!("Cannot create safety copy: {e}"));
+            }
         }
     }
-    if let Err(e) = std::fs::rename(&staged, &db_path) {
-        let _ = std::fs::remove_file(&staged);
-        return Err(format!("Restore failed: {e}"));
-    }
-    let _ = std::fs::remove_file(data_dir.join("cove.db-wal"));
-    let _ = std::fs::remove_file(data_dir.join("cove.db-shm"));
+
+    let swap_staged = staged.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        for sidecar in ["cove.db-wal", "cove.db-shm"] {
+            let sidecar_path = data_dir.join(sidecar);
+            if sidecar_path.exists() {
+                if let Err(e) = std::fs::remove_file(&sidecar_path) {
+                    let _ = std::fs::remove_file(&swap_staged);
+                    return Err(format!("Cannot remove stale {sidecar}: {e}"));
+                }
+            }
+        }
+        if let Err(e) = std::fs::rename(&swap_staged, &db_path) {
+            let _ = std::fs::remove_file(&swap_staged);
+            return Err(format!("Restore failed: {e}"));
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Swap task failed: {e}"))??;
 
     app.restart();
 }
@@ -88,6 +116,51 @@ mod tests {
                 .unwrap();
         }
         conn.close().await.ok();
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn safety_copy_via_vacuum_captures_wal_resident_rows() {
+        let dir = std::env::temp_dir().join(format!("cove-restore-wal-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("cove.db");
+        let copy = dir.join("cove.db.pre-restore");
+        let _ = std::fs::remove_file(&db);
+        let _ = std::fs::remove_file(&copy);
+
+        let mut writer = SqliteConnectOptions::new()
+            .filename(&db)
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal)
+            .connect()
+            .await
+            .unwrap();
+        sqlx::query("CREATE TABLE notes(id TEXT PRIMARY KEY, content TEXT)")
+            .execute(&mut writer)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO notes VALUES ('n1', 'wal-resident')")
+            .execute(&mut writer)
+            .await
+            .unwrap();
+
+        crate::backup::vacuum_into(&db, &copy).await.unwrap();
+
+        let mut check = SqliteConnectOptions::new()
+            .filename(&copy)
+            .read_only(true)
+            .connect()
+            .await
+            .unwrap();
+        let row: (String,) = sqlx::query_as("SELECT content FROM notes WHERE id = 'n1'")
+            .fetch_one(&mut check)
+            .await
+            .unwrap();
+        assert_eq!(row.0, "wal-resident");
+
+        use sqlx::Connection;
+        check.close().await.ok();
+        writer.close().await.ok();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test(flavor = "current_thread")]

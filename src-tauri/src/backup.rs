@@ -15,13 +15,29 @@ pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Resu
     }
 
     let target = validate_target(&target_path, &data_dir)?;
-    if target.exists() {
-        std::fs::remove_file(&target).map_err(|e| format!("Cannot replace backup file: {e}"))?;
-    }
-    run_vacuum_into(&db_path, &target).await
+    backup_to(&db_path, &target).await
 }
 
-async fn run_vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
+async fn backup_to(db_path: &Path, target: &Path) -> Result<(), String> {
+    let file_name = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("Backup path is not valid UTF-8.")?
+        .to_owned();
+    let staged = target.with_file_name(format!("{file_name}.tmp"));
+    let _ = std::fs::remove_file(&staged);
+    if let Err(e) = vacuum_into(&db_path, &staged).await {
+        let _ = std::fs::remove_file(&staged);
+        return Err(e);
+    }
+    if let Err(e) = std::fs::rename(&staged, &target) {
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!("Cannot finalize backup: {e}"));
+    }
+    Ok(())
+}
+
+pub(crate) async fn vacuum_into(db_path: &Path, target: &Path) -> Result<(), String> {
     let mut conn = SqliteConnectOptions::new()
         .filename(db_path)
         .read_only(true)
@@ -130,7 +146,7 @@ mod tests {
             .unwrap();
         assert!(dir.join("cove.db-wal").exists(), "test setup: WAL sidecar expected");
 
-        run_vacuum_into(&db, &target).await.unwrap();
+        vacuum_into(&db, &target).await.unwrap();
 
         let mut check = SqliteConnectOptions::new()
             .filename(&target)
@@ -147,6 +163,26 @@ mod tests {
         use sqlx::Connection;
         check.close().await.ok();
         writer.close().await.ok();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn failed_vacuum_preserves_existing_backup_and_cleans_tmp() {
+        let dir = std::env::temp_dir().join(format!("cove-backup-keep-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("cove.db");
+        let target = dir.join("backup.db");
+        std::fs::write(&db, b"definitely not sqlite").unwrap();
+        std::fs::write(&target, b"previous-backup-bytes").unwrap();
+
+        assert!(backup_to(&db, &target).await.is_err());
+
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"previous-backup-bytes",
+            "old backup must survive a failed vacuum"
+        );
+        assert!(!dir.join("backup.db.tmp").exists(), "staged tmp must be cleaned");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

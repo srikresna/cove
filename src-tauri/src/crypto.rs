@@ -1,4 +1,4 @@
-use serde_json::Value;
+﻿use serde_json::Value;
 
 const PBKDF2_MIN_ITERATIONS: u64 = 100_000;
 const PBKDF2_MAX_ITERATIONS: u64 = 10_000_000;
@@ -23,12 +23,28 @@ fn required_param(params: &Value, key: &str, min: u64, max: u64) -> Result<u32, 
 }
 
 #[tauri::command]
-pub fn derive_key_kdf(
+pub async fn derive_key_kdf(
     passphrase: String,
     salt: Vec<u8>,
     kdf_alg: String,
     params: String,
 ) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        derive_key_kdf_blocking(passphrase, salt, kdf_alg, params)
+    })
+    .await
+    .map_err(|e| format!("KDF task failed: {e}"))?
+}
+
+fn derive_key_kdf_blocking(
+    passphrase: String,
+    salt: Vec<u8>,
+    kdf_alg: String,
+    params: String,
+) -> Result<Vec<u8>, String> {
+    if salt.len() < 8 {
+        return Err("KDF salt must be at least 8 bytes.".into());
+    }
     let p: Value =
         serde_json::from_str(&params).map_err(|e| format!("Malformed KDF params JSON: {e}"))?;
     match kdf_alg.as_str() {
@@ -74,9 +90,9 @@ mod tests {
     #[test]
     fn pbkdf2_is_deterministic_and_32_bytes() {
         let params = r#"{"iterations": 100000}"#;
-        let a = derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
+        let a = derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
             .unwrap();
-        let b = derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
+        let b = derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
             .unwrap();
         assert_eq!(a.len(), 32);
         assert_eq!(a, b);
@@ -86,12 +102,12 @@ mod tests {
     fn argon2id_is_deterministic_and_differs_from_pbkdf2() {
         let params = r#"{"m_cost": 8192, "t_cost": 1, "p_cost": 1}"#;
         let a =
-            derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
+            derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
         let b =
-            derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
+            derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "ARGON2ID".into(), params.into()).unwrap();
         assert_eq!(a.len(), 32);
         assert_eq!(a, b);
-        let pb = derive_key_kdf(
+        let pb = derive_key_kdf_blocking(
             "pw".into(),
             SALT.to_vec(),
             "PBKDF2-SHA256".into(),
@@ -101,27 +117,44 @@ mod tests {
         assert_ne!(a, pb);
     }
 
+    #[tokio::test(flavor = "current_thread")]
+    async fn async_command_wrapper_matches_blocking_impl() {
+        let params = r#"{"iterations": 100000}"#;
+        let via_command = derive_key_kdf(
+            "pw".into(),
+            SALT.to_vec(),
+            "PBKDF2-SHA256".into(),
+            params.into(),
+        )
+        .await
+        .unwrap();
+        let direct =
+            derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), params.into())
+                .unwrap();
+        assert_eq!(via_command, direct);
+    }
+
     #[test]
     fn rejects_unknown_algorithm_and_malformed_json() {
-        assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "MD5".into(), "{}".into()).is_err());
+        assert!(derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "MD5".into(), "{}".into()).is_err());
         assert!(
-            derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "not json".into())
+            derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "not json".into())
                 .is_err()
         );
     }
 
     #[test]
     fn rejects_missing_and_out_of_range_params() {
-        assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "{}".into()).is_err());
+        assert!(derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "ARGON2ID".into(), "{}".into()).is_err());
         assert!(
-            derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), "{}".into())
+            derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), "{}".into())
                 .is_err()
         );
         let huge = r#"{"m_cost": 4294967295, "t_cost": 3, "p_cost": 4}"#;
-        assert!(derive_key_kdf("pw".into(), SALT.to_vec(), "ARGON2ID".into(), huge.into()).is_err());
+        assert!(derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "ARGON2ID".into(), huge.into()).is_err());
         let tiny = r#"{"iterations": 1}"#;
         assert!(
-            derive_key_kdf("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), tiny.into())
+            derive_key_kdf_blocking("pw".into(), SALT.to_vec(), "PBKDF2-SHA256".into(), tiny.into())
                 .is_err()
         );
     }

@@ -18,6 +18,11 @@ import { PeekDocView } from "./PeekDocView";
 import { PeekModalFrame } from "./PeekModalFrame";
 
 const SAVE_DEBOUNCE_MS = 800;
+const PEEK_CANVAS_MAX_TRIES = 600;
+const PEEK_REVEAL_TIMEOUT_MS = 6000;
+const PEEK_CONTAINER_MAX_TRIES = 120;
+const COPIED_RESET_MS = 1500;
+const PEEK_VIEWPORT_PADDING: [number, number, number, number] = [60, 20, 20, 20];
 
 export const PeekViewModal: React.FC = () => {
   const request = usePeekViewStore((s) => s.request);
@@ -74,7 +79,8 @@ export const PeekViewModal: React.FC = () => {
       let editor: TestAffineEditorContainer | null = null;
       let raf = 0;
       let safetyTimer = 0;
-      let tries = 0;
+      let fitTries = 0;
+      let canvasTries = 0;
       let revealed = false;
       let saveTimer: ReturnType<typeof setTimeout> | null = null;
       let savePending = false;
@@ -163,7 +169,7 @@ export const PeekViewModal: React.FC = () => {
             if (docRequest.xywh) {
               viewport.setViewportByBound(
                 Bound.deserialize(docRequest.xywh),
-                [60, 20, 20, 20],
+                PEEK_VIEWPORT_PADDING,
                 false,
               );
             } else {
@@ -182,7 +188,7 @@ export const PeekViewModal: React.FC = () => {
         };
         const waitForCanvas = () => {
           if (disposed || revealed) return;
-          if (fitViewport() || ++tries > 600) {
+          if (fitViewport() || ++fitTries > PEEK_CANVAS_MAX_TRIES) {
             raf = requestAnimationFrame(checkCanvas);
             return;
           }
@@ -195,14 +201,14 @@ export const PeekViewModal: React.FC = () => {
             reveal();
             return;
           }
-          if (++tries > 600) {
+          if (++canvasTries > PEEK_CANVAS_MAX_TRIES) {
             reveal();
             return;
           }
           raf = requestAnimationFrame(checkCanvas);
         };
         void editor.updateComplete.finally(poll);
-        safetyTimer = window.setTimeout(reveal, 6000);
+        safetyTimer = window.setTimeout(reveal, PEEK_REVEAL_TIMEOUT_MS);
       } catch (err) {
         console.error("[cove-peek] mount failed", err);
         setError(true);
@@ -228,7 +234,7 @@ export const PeekViewModal: React.FC = () => {
         cleanup = mountEditor(container, current);
         return;
       }
-      if (++waitTries > 120) {
+      if (++waitTries > PEEK_CONTAINER_MAX_TRIES) {
         setLoading(false);
         return;
       }
@@ -300,7 +306,7 @@ export const PeekViewModal: React.FC = () => {
     try {
       await navigator.clipboard.writeText(request.docId);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {}
   };
 
@@ -336,9 +342,7 @@ export const PeekViewModal: React.FC = () => {
       }
     >
       {request?.type === "template" ? (
-        <div className="relative h-full w-full" data-peek-content>
-          {toReactNode(request.template)}
-        </div>
+        <div className="relative h-full w-full">{toReactNode(request.template)}</div>
       ) : peekMode === "page" && request?.type === "doc" ? (
         <PeekDocView
           key={request.docId}
@@ -348,7 +352,7 @@ export const PeekViewModal: React.FC = () => {
           onReady={handleDocReady}
         />
       ) : (
-        <div className="relative h-full w-full" ref={containerRef} data-peek-content />
+        <div className="relative h-full w-full" ref={containerRef} />
       )}
     </PeekModalFrame>
   );

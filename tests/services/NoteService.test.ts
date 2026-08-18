@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { NotFoundError } from "@/domain/errors";
+import { EMPTY_NOTE_CONTENT } from "@/domain/note/notePolicy";
 import { VaultLockedError } from "@/errors/AppError";
 import { packBlockSuiteContent } from "@/services/editor/contentFormat";
 import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
 import { NoteService } from "@/services/NoteService";
+import { titleAad } from "@/services/vault/aad";
 import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
 import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
 import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
@@ -135,6 +137,43 @@ describe("NoteService", () => {
     const copy = await service.duplicateNote(created.id);
     expect(copy.content).toBe("new body");
     expect(fakeRepo.notes[0]?.content).toBe(`enc[${copy.id}]:new body`);
+  });
+
+  it("encrypts titles under the title AAD with titleKmsVersion 1 at rest", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "Title", "body");
+    expect(fakeRepo.notes[0]?.title).toBe(`enc[${titleAad(created.id)}]:Title`);
+    expect(fakeRepo.notes[0]?.titleKmsVersion).toBe(1);
+
+    const updated = await service.updateMetadata(created.id, { title: "T" });
+    expect(updated.title).toBe("T");
+    expect(fakeRepo.notes[0]?.title).toBe(`enc[${titleAad(created.id)}]:T`);
+    expect(fakeRepo.notes[0]?.titleKmsVersion).toBe(1);
+
+    const fetched = await service.getNote(created.id);
+    expect(fetched?.title).toBe("T");
+  });
+
+  it("createNoteWithId stores encrypted title/content at rest but returns plaintext", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const note = await service.createNoteWithId("ws-1", "fixed-id-7", "My Fixed Title");
+    expect(note.id).toBe("fixed-id-7");
+    expect(note.title).toBe("My Fixed Title");
+    expect(note.content).toBe(EMPTY_NOTE_CONTENT);
+
+    const row = fakeRepo.notes[0];
+    if (!row) throw new Error("note row missing");
+    expect(row.title).toBe(`enc[${titleAad("fixed-id-7")}]:My Fixed Title`);
+    expect(row.titleKmsVersion).toBe(1);
+    expect(row.content).toBe(`enc[fixed-id-7]:${EMPTY_NOTE_CONTENT}`);
+
+    const fetched = await service.getNote("fixed-id-7");
+    expect(fetched?.title).toBe("My Fixed Title");
+    expect(fetched?.content).toBe(EMPTY_NOTE_CONTENT);
   });
 
   it("creates notes without a default icon or cover", async () => {

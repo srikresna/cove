@@ -116,17 +116,24 @@ export const QuickSearchModal: React.FC = () => {
       return;
     }
     setLoading(true);
+    let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        setHits(await noteService.searchAcrossWorkspaces(q));
+        const results = await noteService.searchAcrossWorkspaces(q);
+        if (!cancelled) setHits(results);
       } catch (err) {
-        setHits([]);
-        notifyError(err);
+        if (!cancelled) {
+          setHits([]);
+          notifyError(err);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [query]);
 
   useEffect(() => {
@@ -168,8 +175,7 @@ export const QuickSearchModal: React.FC = () => {
   };
 
   const onOpenChange = (open: boolean) => {
-    if (!open && pickerResolve) resolvePicker(null);
-    else setQuickSearchOpen(open);
+    setQuickSearchOpen(open);
   };
 
   const trimmed = query.trim();
@@ -212,39 +218,42 @@ export const QuickSearchModal: React.FC = () => {
                   {MESSAGES.QUICK_SEARCH_EMPTY}
                 </div>
               )}
-              {hits.map((hit) => {
-                const ws = workspaces.find((w) => w.id === hit.workspaceId);
-                return (
-                  <Command.Item
-                    key={hit.id}
-                    value={hit.id}
-                    onSelect={() => openHit(hit)}
-                    className="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 text-left outline-none transition-colors aria-selected:bg-accent"
-                  >
-                    <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-base"
-                      aria-hidden="true"
+              {trimmed &&
+                hits.map((hit) => {
+                  const ws = workspaces.find((w) => w.id === hit.workspaceId);
+                  return (
+                    <Command.Item
+                      key={hit.id}
+                      value={hit.id}
+                      onSelect={() => openHit(hit)}
+                      className="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 text-left outline-none transition-colors aria-selected:bg-accent"
                     >
-                      {hit.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-foreground">
-                        {hit.title || MESSAGES.UNTITLED_NOTE}
-                      </div>
-                      {hit.snippet && (
-                        <div className="truncate text-xs text-muted-foreground">{hit.snippet}</div>
-                      )}
-                      <span className="mt-1 inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                        {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-base"
+                        aria-hidden="true"
+                      >
+                        {hit.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
                       </span>
-                    </div>
-                    <ArrowRight
-                      className="h-4 w-4 shrink-0 text-muted-foreground/50"
-                      aria-hidden="true"
-                    />
-                  </Command.Item>
-                );
-              })}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {hit.title || MESSAGES.UNTITLED_NOTE}
+                        </div>
+                        {hit.snippet && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {hit.snippet}
+                          </div>
+                        )}
+                        <span className="mt-1 inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          {ws?.emoji || "🚀"} {ws?.name || "Workspace"}
+                        </span>
+                      </div>
+                      <ArrowRight
+                        className="h-4 w-4 shrink-0 text-muted-foreground/50"
+                        aria-hidden="true"
+                      />
+                    </Command.Item>
+                  );
+                })}
             </Command.List>
 
             <PreviewPane preview={preview} hasHits={hits.length > 0} />

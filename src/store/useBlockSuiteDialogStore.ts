@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { vaultService } from "../di/container";
 
 export interface ConfirmOptions {
   title: string;
@@ -42,6 +43,7 @@ export const useBlockSuiteDialogStore = create<BlockSuiteDialogState>((set, get)
   resolve: null,
   confirm: (opts) =>
     new Promise<boolean>((resolve) => {
+      get().resolve?.(false);
       set({
         open: true,
         kind: "confirm",
@@ -55,6 +57,7 @@ export const useBlockSuiteDialogStore = create<BlockSuiteDialogState>((set, get)
     }),
   prompt: (opts) =>
     new Promise<string | null>((resolve) => {
+      get().resolve?.(null);
       set({
         open: true,
         kind: "prompt",
@@ -79,3 +82,9 @@ export const useBlockSuiteDialogStore = create<BlockSuiteDialogState>((set, get)
     set({ open: false, kind: null, resolve: null });
   },
 }));
+
+vaultService.onLock(() => {
+  const { resolve } = useBlockSuiteDialogStore.getState();
+  resolve?.(null);
+  useBlockSuiteDialogStore.setState({ open: false, kind: null, resolve: null });
+});

@@ -8,6 +8,7 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
   private rows = new Map<string, { content: string; migrated: boolean }>();
   private coverRows = new Map<string, string>();
   private titleRows = new Map<string, { title: string; titleKmsVersion: number }>();
+  private blobRows = new Map<string, string>();
   private failures = new Map<string, string>();
 
   seedTitle(id: string, title: string, titleKmsVersion = 0): void {
@@ -20,6 +21,10 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
 
   seedCover(noteId: string, payload: string): void {
     this.coverRows.set(noteId, payload);
+  }
+
+  seedBlob(id: string, encryptedPayload: string): void {
+    this.blobRows.set(id, encryptedPayload);
   }
 
   async findLegacyBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
@@ -70,11 +75,19 @@ export class InMemoryMigrationRepository implements IMigrationRepository {
     this.titleRows.set(id, { title: encryptedTitle, titleKmsVersion: 1 });
   }
 
-  async findAllBlobBatch(): Promise<LegacyRow[]> {
-    return [];
+  async findAllBlobBatch(afterId: string | null, limit: number): Promise<LegacyRow[]> {
+    const ids = [...this.blobRows.keys()].sort();
+    const filtered = afterId ? ids.filter((id) => id > afterId) : ids;
+    return filtered.slice(0, limit).map((id) => ({ id, content: this.blobRows.get(id) ?? "" }));
   }
 
-  async markBlobMigrated(): Promise<void> {}
+  async markBlobMigrated(id: string, encryptedPayload: string): Promise<void> {
+    this.blobRows.set(id, encryptedPayload);
+  }
+
+  blobContentOf(id: string): string | undefined {
+    return this.blobRows.get(id);
+  }
 
   async findAllTitlesBatch(afterId: string | null, limit: number): Promise<TitleRow[]> {
     const ids = [...this.titleRows.keys()].sort();

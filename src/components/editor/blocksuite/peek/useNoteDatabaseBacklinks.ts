@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { noteService } from "../../../../di/container";
 import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlockSuiteEditorService";
 import {
+  hasBacklinkScan,
   scanNoteForDatabaseRows,
   scannedBacklinksOf,
 } from "../../../../services/editor/backlinkScan";
@@ -22,6 +23,7 @@ export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklin
       const ids = noteIds ? noteIds.split(",") : [];
       for (const id of ids) {
         if (cancelled) return;
+        if (hasBacklinkScan(id)) continue;
         await scanNoteForDatabaseRows(
           (nid) => noteService.getNote(nid).then((n) => n?.content),
           id,

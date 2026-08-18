@@ -45,6 +45,7 @@ export class CryptoVault implements IEncryptionService {
     if (!this.dek) {
       throw new EncryptionError("key_unavailable", "Vault is locked; cannot encrypt.");
     }
+    const dek = this.dek;
 
     this.ivCounter += 1;
     const counter = this.ivCounter;
@@ -56,7 +57,7 @@ export class CryptoVault implements IEncryptionService {
     }
 
     await this.kms.setIvCounter(counter);
-    const payload = await aesGcmEncrypt(this.dek, plaintext, counterToIv(counter), encodeUtf8(aad));
+    const payload = await aesGcmEncrypt(dek, plaintext, counterToIv(counter), encodeUtf8(aad));
     return payload as EncryptedPayload;
   }
 

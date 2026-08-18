@@ -119,6 +119,53 @@ describe("peekViewService", () => {
       await Promise.all([p1, p2]);
     });
 
+    it("does not dedupe doc peeks whose blockIds differ", async () => {
+      const p1 = covePeekViewService.peek({ docId: "d", blockIds: ["b1"] });
+      const p2 = covePeekViewService.peek({ docId: "d", blockIds: ["b2"] });
+      expect(p2).not.toBe(p1);
+
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type === "doc" && request.blockIds).toEqual(["b2"]);
+
+      usePeekViewStore.getState().close();
+      await Promise.all([p1, p2]);
+    });
+
+    it("does not dedupe a doc peek when blockIds are omitted vs present", async () => {
+      const p1 = covePeekViewService.peek({ docId: "d" });
+      const p2 = covePeekViewService.peek({ docId: "d", blockIds: ["b1"] });
+      expect(p2).not.toBe(p1);
+
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type === "doc" && request.blockIds).toEqual(["b1"]);
+
+      usePeekViewStore.getState().close();
+      await Promise.all([p1, p2]);
+    });
+
+    it("does not dedupe distinct (or identical) template peeks; second resolves the first", async () => {
+      const host = document.createElement("div");
+      const t1 = html`<affine-data-view-record-detail id="one"></affine-data-view-record-detail>`;
+      const t2 = html`<affine-data-view-record-detail id="two"></affine-data-view-record-detail>`;
+      const p1 = covePeekViewService.peek({ target: host, template: t1 });
+      const p2 = covePeekViewService.peek({ target: host, template: t2 });
+      expect(p2).not.toBe(p1);
+
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type).toBe("template");
+      expect(request?.type === "template" && request.template).toBe(t2);
+
+      await p1;
+      usePeekViewStore.getState().close();
+      await p2;
+
+      const p3 = covePeekViewService.peek({ target: host, template: t1 });
+      const p4 = covePeekViewService.peek({ target: host, template: t1 });
+      expect(p4).not.toBe(p3);
+      usePeekViewStore.getState().close();
+      await Promise.all([p3, p4]);
+    });
+
     it("opens a template peek from { target, template } args (data-view row detail)", async () => {
       const target = document.createElement("div");
       const template = html`<affine-data-view-record-detail></affine-data-view-record-detail>`;

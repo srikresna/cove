@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { EncryptionError, ValidationError } from "@/errors/AppError";
 import { type KdfDerive, VaultService } from "@/services/VaultService";
+import { blobAad, titleAad } from "@/services/vault/aad";
 import { CryptoVault } from "@/services/vault/CryptoVault";
 import {
   aesGcmEncrypt,
+  aesGcmEncryptBytes,
   type Bytes,
   bytesToBase64,
   counterToIv,
@@ -13,6 +15,7 @@ import {
   importAesGcmKey,
 } from "@/services/vault/crypto";
 import type { IDeviceBind } from "@/services/vault/IDeviceBind";
+import type { EncryptedPayload } from "@/services/vault/IEncryptionService";
 import { KEYRING_USERS } from "@/services/vault/IKeychainStore";
 import { IdentityDeviceBind } from "../fakes/IdentityDeviceBind";
 import { InMemoryKeychainStore } from "../fakes/InMemoryKeychainStore";
@@ -109,6 +112,33 @@ describe("VaultService setup / unlock / lock", () => {
     await service.unlock(PW);
     await service.lock();
     expect(fired).toBe(2);
+  });
+
+  it("runs lock listeners before the session keys are zeroized (flush window)", async () => {
+    const { service } = makeVault();
+    await service.setupPassphrase(PW);
+    const unlockedDuringListener: boolean[] = [];
+    service.onLock(() => {
+      unlockedDuringListener.push(service.isUnlocked());
+    });
+    await service.lock();
+    expect(unlockedDuringListener).toEqual([true]);
+    expect(service.isUnlocked()).toBe(false);
+  });
+
+  it("a lock listener can still encrypt via the crypto service during lock()", async () => {
+    const { service, crypto } = makeVault();
+    await service.setupPassphrase(PW);
+    const flushed: { payload?: Promise<EncryptedPayload> } = {};
+    service.onLock(() => {
+      flushed.payload = crypto.encryptPayload("flush on lock", "n-flush");
+    });
+    await service.lock();
+    if (!flushed.payload) throw new Error("lock listener did not run");
+    const payload = await flushed.payload;
+    expect(payload).not.toBe("");
+    await service.unlock(PW);
+    expect(await crypto.decryptPayload(payload, "n-flush")).toBe("flush on lock");
   });
 
   it("rejects a weak passphrase at setup", async () => {
@@ -232,6 +262,56 @@ describe("VaultService legacy migration", () => {
     expect(migration.isMigrated("n-corrupt")).toBe(false);
     expect((await kms.get())?.migrationState).toBe("in_progress");
     expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBe(toHex(legacyRaw));
+  });
+});
+
+describe("VaultService title encryption migration", () => {
+  it("encrypts plaintext legacy titles under the DEK at unlock", async () => {
+    const { service, migration, crypto } = makeVault();
+    migration.seedTitle("n1", "plain title");
+    await service.setupPassphrase(PW);
+    await service.lock();
+
+    await service.unlock(PW);
+
+    const rows = await migration.findAllTitlesBatch(null, 50);
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    if (!row) throw new Error("title row missing");
+    expect(row.id).toBe("n1");
+    expect(row.titleKmsVersion).toBe(1);
+    expect(row.title).not.toBe("plain title");
+    expect(await crypto.decryptPayload(row.title, titleAad("n1"))).toBe("plain title");
+    await expect(crypto.decryptPayload(row.title, titleAad("n-other"))).rejects.toThrow(
+      EncryptionError,
+    );
+  });
+
+  it("re-encrypts old-DEK titles when an interrupted rotation resumes at unlock", async () => {
+    const { service, kms, keychain, migration, crypto } = makeVault();
+    await service.setupPassphrase(PW);
+    await service.setKeychainEscrow(true);
+
+    const oldDek = await generateDek();
+    const oldTitleCipher = await aesGcmEncrypt(
+      oldDek.cryptoKey,
+      "legacy row title",
+      counterToIv(11),
+    );
+    migration.seedTitle("n-old", oldTitleCipher, 1);
+    await keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldDek.rawKey));
+    await kms.update({ migrationState: "rotation_in_progress" });
+    await service.lock();
+
+    await service.unlock(PW);
+
+    const rows = await migration.findAllTitlesBatch(null, 50);
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    if (!row) throw new Error("title row missing");
+    expect(row.title).not.toBe(oldTitleCipher);
+    expect(row.titleKmsVersion).toBe(1);
+    expect(await crypto.decryptPayload(row.title, titleAad("n-old"))).toBe("legacy row title");
   });
 });
 
@@ -383,6 +463,12 @@ describe("VaultService changePassphrase + recovery", () => {
       encodeUtf8("cover:n-old"),
     );
     migration.seedCover("n-old", oldCoverCipher);
+    const oldBlobCipher = await aesGcmEncryptBytes(
+      oldDek.cryptoKey,
+      encodeUtf8("unswept blob"),
+      encodeUtf8(blobAad("n-old")),
+    );
+    migration.seedBlob("n-old", oldBlobCipher);
     await keychain.set(KEYRING_USERS.legacyBridge, bytesToBase64(oldDek.rawKey));
     await kms.update({ migrationState: "rotation_in_progress" });
     await service.lock();
@@ -395,6 +481,13 @@ describe("VaultService changePassphrase + recovery", () => {
     expect(
       await crypto.decryptPayload(migration.coverContentOf("n-old") ?? "", "cover:n-old"),
     ).toBe("unswept cover");
+    const rotatedBlob = migration.blobContentOf("n-old");
+    expect(rotatedBlob).toBeDefined();
+    expect(rotatedBlob).not.toBe(oldBlobCipher);
+    if (!rotatedBlob) throw new Error("blob row missing");
+    expect(
+      bytesToBase64(await crypto.decryptBlob(rotatedBlob as EncryptedPayload, blobAad("n-old"))),
+    ).toBe(bytesToBase64(encodeUtf8("unswept blob")));
     expect(migration.contentOf("n-done")).toBe(alreadyRotated);
     expect((await kms.get())?.migrationState).toBe("complete");
     expect(await keychain.get(KEYRING_USERS.legacyBridge)).toBeNull();

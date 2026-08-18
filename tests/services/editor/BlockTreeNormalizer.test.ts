@@ -3,7 +3,7 @@ import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store"
 import type { BlockModel } from "@blocksuite/affine/store";
 import { Text } from "@blocksuite/affine/store";
 import { TestWorkspace } from "@blocksuite/affine/store/test";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import {
   type BlockSuiteDoc,
@@ -17,9 +17,11 @@ type SurfaceLike = {
 };
 
 let counter = 0;
+const workspaces: TestWorkspace[] = [];
 
 function createDoc(): BlockSuiteDoc {
   const ws = new TestWorkspace({ id: `ws-${counter++}` });
+  workspaces.push(ws);
   const storeExt = new StoreExtensionManager(getInternalStoreExtensions());
   ws.storeExtensions = storeExt.get("store");
   ws.meta.initialize();
@@ -28,6 +30,14 @@ function createDoc(): BlockSuiteDoc {
   doc.load();
   return doc;
 }
+
+afterEach(() => {
+  for (const ws of workspaces) {
+    ws.forceStop();
+    ws.dispose();
+  }
+  workspaces.length = 0;
+});
 
 function surfaceElements(model: BlockModel): Y.Map<Y.Map<unknown>> {
   const els = (model as unknown as SurfaceLike).elements?.getValue();

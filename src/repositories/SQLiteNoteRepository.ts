@@ -243,6 +243,18 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
+  async getAllContents(): Promise<Array<{ id: string; content: EncryptedPayload }>> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ id: string; content: EncryptedPayload }>>(
+        "SELECT id, content FROM notes",
+      );
+      return rows ?? [];
+    } catch (err) {
+      throw toPersistenceError("getAllContents", err);
+    }
+  }
+
   async setDeleted(id: string, deletedAt: number | null): Promise<void> {
     try {
       const db = await this.getDb();

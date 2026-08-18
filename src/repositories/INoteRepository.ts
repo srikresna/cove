@@ -23,4 +23,5 @@ export interface INoteRepository {
   listTrashed(): Promise<NoteRecord[]>;
   setDeleted(id: string, deletedAt: number | null): Promise<void>;
   findExpiredTrash(cutoff: number): Promise<string[]>;
+  getAllContents?(): Promise<Array<{ id: string; content: EncryptedPayload }>>;
 }

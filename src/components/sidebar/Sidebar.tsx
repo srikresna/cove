@@ -51,7 +51,11 @@ export const Sidebar: React.FC = () => {
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="h-full overflow-hidden"
         >
-          <div className="flex h-full w-[224px] flex-col">
+          <div
+            aria-hidden={isCollapsed}
+            className="flex h-full w-[224px] flex-col"
+            {...(isCollapsed ? ({ inert: true } as Record<string, boolean>) : {})}
+          >
             <div className="px-4 pb-1 pt-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

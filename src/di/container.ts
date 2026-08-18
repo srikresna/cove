@@ -45,6 +45,7 @@ export const noteService: INoteService = new NoteService(
   noteRepository,
   cryptoVault,
   noteLinkRepository,
+  blobSource,
 );
 export const tagService: ITagService = new TagService(tagRepository);
 export const propertyService: IPropertyService = new PropertyService(

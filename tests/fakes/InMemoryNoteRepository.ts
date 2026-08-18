@@ -1,3 +1,4 @@
+import { PersistenceError } from "@/errors/AppError";
 import type { INoteRepository, NoteRecord } from "@/repositories/INoteRepository";
 import type { EncryptedPayload } from "@/services/vault/IEncryptionService";
 
@@ -12,6 +13,7 @@ export class InMemoryNoteRepository implements INoteRepository {
     if (this.shouldFail) throw new Error("Fake repo error: getNotesMetadataByWorkspace");
     return this.notes
       .filter((n) => n.workspaceId === workspaceId && n.deletedAt == null)
+      .sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
       .map((n) => ({ ...n, content: "" as EncryptedPayload }));
   }
 
@@ -55,7 +57,9 @@ export class InMemoryNoteRepository implements INoteRepository {
     if (this.shouldFail) throw new Error("Fake repo error: updateNote");
     const index = this.notes.findIndex((n) => n.id === id);
     const existing = this.notes[index];
-    if (index === -1 || !existing) throw new Error(`Note not found: ${id}`);
+    if (index === -1 || !existing) {
+      throw new PersistenceError("updateNote", `Note not found after update: ${id}`);
+    }
     const updated: NoteRecord = { ...existing, ...updates, updatedAt: Date.now() };
     this.notes[index] = updated;
     return updated;

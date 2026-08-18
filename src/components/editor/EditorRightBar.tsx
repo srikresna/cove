@@ -65,22 +65,37 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: note.updatedAt intentionally retriggers the fetch after content saves
   useEffect(() => {
+    setBacklinks([]);
+    setOutgoing([]);
+    let cancelled = false;
     noteService
       .backlinksOf(note.id)
-      .then(setBacklinks)
+      .then((metas) => {
+        if (!cancelled) setBacklinks(metas);
+      })
       .catch((err) => {
-        setBacklinks([]);
-        notifyError(err);
+        if (!cancelled) {
+          setBacklinks([]);
+          notifyError(err);
+        }
       });
     noteService
       .outgoingLinksOf(note.id)
-      .then(setOutgoing)
+      .then((metas) => {
+        if (!cancelled) setOutgoing(metas);
+      })
       .catch((err) => {
-        setOutgoing([]);
-        notifyError(err);
+        if (!cancelled) {
+          setOutgoing([]);
+          notifyError(err);
+        }
       });
-  }, [note.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [note.id, note.updatedAt]);
 
   const openNote = (meta: NoteMeta) => {
     if (meta.workspaceId !== activeWorkspaceId) setActiveWorkspace(meta.workspaceId);
@@ -96,7 +111,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
     <aside
       className={cn(
         "flex h-full flex-shrink-0 flex-col overflow-hidden border-l bg-background transition-[width,opacity] duration-200 ease-out",
-        open ? "w-[340px] opacity-100" : "w-0 border-l-0 opacity-0",
+        open ? "w-[340px] opacity-100" : "w-0 border-l-0 opacity-0 invisible",
       )}
     >
       <div className="flex w-[340px] flex-shrink-0 flex-col h-full">

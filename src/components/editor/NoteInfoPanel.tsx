@@ -36,7 +36,7 @@ const TagChip: React.FC<{ tag: Tag; onRemove?: () => void }> = ({ tag, onRemove 
         type="button"
         aria-label={`Remove tag ${tag.name}`}
         onClick={onRemove}
-        className="hidden shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground group-hover/tag:block"
+        className="shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/tag:opacity-100"
       >
         <X className="h-2.5 w-2.5" aria-hidden="true" />
       </button>
@@ -76,18 +76,27 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [query, setQuery] = useState("");
+  const tagVersion = useTagStore((s) => s.version);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const moveNoteToWorkspace = useNoteStore((s) => s.moveNoteToWorkspace);
 
   const workspace = workspaces.find((w) => w.id === note.workspaceId);
 
-  const refreshTags = useCallback(() => {
-    tagService.tagsForNote(note.id).then(setTags).catch(notifyError);
-  }, [note.id]);
+  const refreshTags = useCallback(
+    (version: number) => {
+      tagService
+        .tagsForNote(note.id)
+        .then((next) => {
+          if (useTagStore.getState().version === version) setTags(next);
+        })
+        .catch(notifyError);
+    },
+    [note.id],
+  );
 
   useEffect(() => {
-    refreshTags();
-  }, [refreshTags]);
+    refreshTags(tagVersion);
+  }, [refreshTags, tagVersion]);
 
   const toggleOpen = () => {
     const next = !isOpen;
@@ -103,7 +112,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
     try {
       await tagService.addTag(note.id, name);
       setQuery("");
-      refreshTags();
+      refreshTags(tagVersion);
       loadAllTags();
       void useTagStore.getState().refresh();
     } catch (err) {
@@ -114,7 +123,7 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
   const removeTag = async (tagId: string) => {
     try {
       await tagService.removeTag(note.id, tagId);
-      refreshTags();
+      refreshTags(tagVersion);
       void useTagStore.getState().refresh();
     } catch (err) {
       notifyError(err);

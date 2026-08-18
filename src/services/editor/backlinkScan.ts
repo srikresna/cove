@@ -19,6 +19,14 @@ export function invalidateNoteBacklinkScan(noteId: string): void {
   rowsBySourceNoteId.delete(noteId);
 }
 
+export function clearBacklinkScans(): void {
+  rowsBySourceNoteId.clear();
+}
+
+export function hasBacklinkScan(noteId: string): boolean {
+  return rowsBySourceNoteId.has(noteId);
+}
+
 export function scannedBacklinksOf(targetDocId: string): DatabaseBacklinkRef[] {
   const refs: DatabaseBacklinkRef[] = [];
   for (const [sourceNoteId, rows] of rowsBySourceNoteId) {

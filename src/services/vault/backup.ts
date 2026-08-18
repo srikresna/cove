@@ -24,8 +24,8 @@ export class TauriBackupService implements IBackupService {
   }
 
   async restoreFromFile(path: string): Promise<void> {
-    await this.db.suspend();
     try {
+      await this.db.suspend();
       await invoke("restore_database", { sourcePath: path });
     } finally {
       this.db.resume();

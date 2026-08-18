@@ -85,12 +85,19 @@ type PeekArg = {
   databaseRowId?: string;
 };
 
+let templateSeq = 0;
+
 function peekKey(req: PeekRequest): string {
-  if (req.type === "template") return `template:${req.template}`;
-  return `doc:${req.docId}:${req.mode ?? ""}:${req.xywh ?? ""}:${(req.elementIds ?? []).join(",")}:${req.databaseRowId ?? ""}`;
+  if (req.type === "template") return `template:${++templateSeq}`;
+  return `doc:${req.docId}:${req.mode ?? ""}:${req.xywh ?? ""}:${(req.blockIds ?? []).join(",")}:${(req.elementIds ?? []).join(",")}:${req.databaseId ?? ""}:${req.databaseDocId ?? ""}:${req.databaseRowId ?? ""}`;
 }
 
 let inflight: { key: string; promise: Promise<void> } | null = null;
+
+export function dismissAllPeeks(): void {
+  inflight = null;
+  usePeekViewStore.getState().close();
+}
 
 export const covePeekViewService: PeekViewService = {
   peek: ((arg: PeekArg, _options?: PeekOptions): Promise<void> => {

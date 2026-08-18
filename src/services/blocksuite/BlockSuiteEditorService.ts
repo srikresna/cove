@@ -13,15 +13,16 @@ import {
   normalizeBlockTree,
   seedDefaultBlocks,
 } from "../editor/BlockTreeNormalizer";
-import { unpackBlockSuiteContent } from "../editor/contentFormat";
-import { applySnapshot } from "../editor/yjsCodec";
+import { packBlockSuiteContent, unpackBlockSuiteContent } from "../editor/contentFormat";
+import { applySnapshot, encodeDocSnapshot } from "../editor/yjsCodec";
+import { Logger } from "../Logger";
 import {
   type CanvasPrefs,
   type DatabaseBacklinkRef,
   DEFAULT_CANVAS_PREFS,
   type IBlockSuiteEditorService,
 } from "./IBlockSuiteEditorService";
-import { covePeekViewService } from "./peekViewService";
+import { covePeekViewService, dismissAllPeeks } from "./peekViewService";
 
 interface BlockSuiteEditorServiceDeps {
   blobSource: BlobSource;
@@ -43,6 +44,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private canvasPrefsProvider: () => CanvasPrefs = () => DEFAULT_CANVAS_PREFS;
   private docCreatedHandler: (docId: string, title?: string) => Promise<void> = async () =>
     undefined;
+  private noteSavedHandler: (docId: string, content: string) => Promise<void> = async () =>
+    undefined;
+
+  private readonly docCreatedPromises = new Map<string, Promise<void>>();
 
   private readonly knownTitles = new Map<string, string>();
 
@@ -85,9 +90,13 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
         this.coveOwnedDocIds.add(docId);
         const meta = workspace.meta.getDocMeta(docId);
         const title = meta?.title ?? undefined;
-        try {
-          await this.docCreatedHandler(docId, title);
-        } catch {}
+        const created = (async () => {
+          try {
+            await this.docCreatedHandler(docId, title);
+          } catch {}
+        })();
+        this.docCreatedPromises.set(docId, created);
+        void created.finally(() => this.docCreatedPromises.delete(docId));
       });
 
       this.workspace = workspace;
@@ -125,17 +134,29 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
         flags.setFlag("enable_dom_renderer", prefs.domRenderer);
         flags.setFlag("enable_advanced_block_visibility", true);
       } catch {}
-      if (snapshotB64) {
-        doc.load();
-        doc.clear();
-        applySnapshot(doc.spaceDoc, snapshotB64);
-      } else if (store.getAllModels().length === 0) {
-        doc.load(() => seedDefaultBlocks(store));
-      } else if (!doc.ready) {
-        doc.load();
-      }
+      try {
+        if (snapshotB64) {
+          doc.load();
+          doc.clear();
+          applySnapshot(doc.spaceDoc, snapshotB64);
+        } else if (store.getAllModels().length === 0) {
+          doc.load(() => seedDefaultBlocks(store));
+        } else if (!doc.ready) {
+          doc.load();
+        }
 
-      normalizeBlockTree(doc);
+        normalizeBlockTree(doc);
+      } catch (err) {
+        Logger.error("blocksuite: openNoteDoc restore failed; reseeding note", undefined, {
+          noteId,
+          name: err instanceof Error ? err.name : typeof err,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        try {
+          doc.clear();
+          seedDefaultBlocks(store);
+        } catch {}
+      }
       doc.getStore().resetHistory();
       this.initializedDocs.add(noteId);
 
@@ -171,13 +192,23 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
 
     const sampleDoc = ws.docs.values().next().value;
     if (!sampleDoc) throw new Error("Open a note before importing.");
-    return MarkdownTransformer.importMarkdownToDoc({
+    const docId = await MarkdownTransformer.importMarkdownToDoc({
       collection: ws,
       schema: sampleDoc.getStore().schema,
       markdown,
       fileName: file.name.replace(/\.md$/i, ""),
       extensions,
     });
+    if (!docId) return docId;
+    const created = this.docCreatedPromises.get(docId);
+    if (created) await created;
+    const doc = ws.getDoc(docId);
+    if (doc) {
+      if (!doc.ready) doc.load();
+      const content = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
+      await this.noteSavedHandler(docId, content);
+    }
+    return docId;
   }
 
   getDocStoreForPeek(docId: string): BlockSuiteStore | null {
@@ -291,6 +322,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   }
 
   reset(): void {
+    dismissAllPeeks();
     for (const fn of [...this.pendingFlushers]) {
       try {
         fn();
@@ -306,6 +338,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     this.initializedDocs.clear();
     this.coveOwnedDocIds.clear();
     this.knownTitles.clear();
+    this.docCreatedPromises.clear();
   }
 
   provideCanvasPrefs(provider: () => CanvasPrefs): void {
@@ -314,6 +347,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
 
   provideDocCreatedHandler(handler: (docId: string, title?: string) => Promise<void>): void {
     this.docCreatedHandler = handler;
+  }
+
+  provideNoteSavedHandler(handler: (docId: string, content: string) => Promise<void>): void {
+    this.noteSavedHandler = handler;
   }
 
   setDocTitle(docId: string, title: string): void {

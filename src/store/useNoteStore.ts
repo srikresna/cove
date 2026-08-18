@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
-import { invalidateNoteBacklinkScan } from "../services/editor/backlinkScan";
+import { clearBacklinkScans, invalidateNoteBacklinkScan } from "../services/editor/backlinkScan";
 import { presentError } from "../services/errorPresenter";
 import { processCoverImage } from "../utils/coverImage";
 import { useNotificationStore } from "./useNotificationStore";
@@ -67,7 +67,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       }
       useSaveStatusStore.getState().setSaved();
     } catch (err) {
-      set({ notes: previousNotes });
+      if (vaultService.isUnlocked()) set({ notes: previousNotes });
       notifyError(err);
     }
   };
@@ -157,9 +157,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
     updateNote: async (id, updates) => {
       const previousNotes = get().notes;
       const now = Date.now();
-      set((state) => ({
-        notes: state.notes.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: now } : n)),
-      }));
+      const optimisticNotes = previousNotes.map((n) =>
+        n.id === id ? { ...n, ...updates, updatedAt: now } : n,
+      );
+      set({ notes: optimisticNotes });
       useSaveStatusStore.getState().setSaving();
 
       try {
@@ -177,7 +178,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
         }
         useSaveStatusStore.getState().setSaved();
       } catch (err) {
-        if (useNoteStore.getState().notes === get().notes) {
+        if (vaultService.isUnlocked() && useNoteStore.getState().notes === optimisticNotes) {
           set({ notes: previousNotes });
         }
         notifyError(err);
@@ -244,6 +245,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
       try {
         await noteService.trashNote(id);
+        invalidateNoteBacklinkScan(id);
         useSaveStatusStore.getState().setSaved();
         useNotificationStore.getState().pushToast({
           kind: "info",
@@ -251,7 +253,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
           description: MESSAGES.TRASH_MOVED_DESC,
         });
       } catch (err) {
-        set({ notes: previousNotes, activeNoteId: previousActive });
+        if (vaultService.isUnlocked()) {
+          set({ notes: previousNotes, activeNoteId: previousActive });
+        }
         notifyError(err);
       }
     },
@@ -281,6 +285,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
       try {
         await noteService.deleteNote(id);
+        invalidateNoteBacklinkScan(id);
       } catch (err) {
         set({ trashedNotes: previousTrash });
         notifyError(err, { saveStatus: false });
@@ -316,6 +321,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
 });
 
 vaultService.onLock(() => {
+  clearBacklinkScans();
   useNoteStore.setState({
     notes: [],
     trashedNotes: [],
@@ -330,4 +336,8 @@ blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   await noteService.createNoteWithId(activeWs, docId, title);
 
   await useNoteStore.getState().refreshNotesInPlace(activeWs);
+});
+
+blockSuiteEditorService.provideNoteSavedHandler(async (docId, content) => {
+  await useNoteStore.getState().updateNote(docId, { content });
 });

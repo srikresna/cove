@@ -1,3 +1,4 @@
+import * as Y from "yjs";
 import { NotFoundError } from "../domain/errors";
 import type { Note } from "../domain/note/Note";
 import type { NoteSearchHit } from "../domain/note/NoteSearchHit";
@@ -13,6 +14,8 @@ import type { INoteLinkRepository } from "../repositories/INoteLinkRepository";
 import type { INoteRepository, NoteRecord } from "../repositories/INoteRepository";
 import { extractNoteLinkIds } from "../utils/noteLinks";
 import { buildSnippet, extractPlainText } from "../utils/plainText";
+import { unpackBlockSuiteContent } from "./editor/contentFormat";
+import { tryDocFromSnapshot } from "./editor/yjsCodec";
 import type { INoteService, NoteMeta } from "./INoteService";
 import { coverAad, titleAad } from "./vault/aad";
 import type { IEncryptionService } from "./vault/IEncryptionService";
@@ -22,6 +25,10 @@ export class NoteService implements INoteService {
     private readonly notes: INoteRepository,
     private readonly crypto: IEncryptionService,
     private readonly links: INoteLinkRepository,
+    private readonly blobSource?: {
+      list(): Promise<string[]>;
+      delete(key: string): Promise<void>;
+    },
   ) {}
 
   private assertUnlocked(): void {
@@ -74,15 +81,24 @@ export class NoteService implements INoteService {
     for (const rec of candidates) {
       try {
         const title = await this.decryptTitle(rec);
-        const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
-        const matchesBody = plain.toLowerCase().includes(q);
-        if (title.toLowerCase().includes(q) || matchesBody) {
+        if (title.toLowerCase().includes(q)) {
           hits.push({
             id: rec.id,
             workspaceId: rec.workspaceId,
             title,
             icon: rec.icon,
-            snippet: matchesBody ? buildSnippet(plain, q) : "",
+            snippet: "",
+          });
+          continue;
+        }
+        const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
+        if (plain.toLowerCase().includes(q)) {
+          hits.push({
+            id: rec.id,
+            workspaceId: rec.workspaceId,
+            title,
+            icon: rec.icon,
+            snippet: buildSnippet(plain, q),
           });
         }
       } catch {}
@@ -185,7 +201,11 @@ export class NoteService implements INoteService {
 
   async deleteNote(id: string): Promise<void> {
     this.assertUnlocked();
-    return this.notes.deleteNote(id);
+    const blobCandidates = await this.collectNoteBlobCandidates(id);
+    await this.notes.deleteNote(id);
+    if (blobCandidates.length > 0) {
+      void this.deleteBlobsNoLongerReferenced(blobCandidates).catch(() => {});
+    }
   }
 
   async trashNote(id: string): Promise<void> {
@@ -213,10 +233,74 @@ export class NoteService implements INoteService {
   async purgeExpiredTrash(now = Date.now()): Promise<number> {
     this.assertUnlocked();
     const expired = await this.notes.findExpiredTrash(trashPurgeCutoff(now));
+    const blobCandidates: string[] = [];
     for (const id of expired) {
+      blobCandidates.push(...(await this.collectNoteBlobCandidates(id)));
       await this.notes.deleteNote(id);
     }
+    if (blobCandidates.length > 0) {
+      void this.deleteBlobsNoLongerReferenced(blobCandidates).catch(() => {});
+    }
     return expired.length;
+  }
+
+  private async collectNoteBlobCandidates(id: string): Promise<string[]> {
+    try {
+      const rec = await this.notes.getNoteById(id);
+      if (!rec) return [];
+      const content = await this.crypto.decryptPayload(rec.content, id);
+      return this.candidateBlobIdsIn(content);
+    } catch {
+      return [];
+    }
+  }
+
+  private candidateBlobIdsIn(content: string): string[] {
+    try {
+      const snapshot = unpackBlockSuiteContent(content);
+      if (!snapshot) return [];
+      const doc = tryDocFromSnapshot(snapshot);
+      if (!doc) return [];
+      const ids: string[] = [];
+      const visit = (node: unknown): void => {
+        if (typeof node === "string") {
+          ids.push(node);
+        } else if (node instanceof Y.Map) {
+          for (const value of node.values()) visit(value);
+        } else if (node instanceof Y.Array) {
+          for (const value of node.toArray()) visit(value);
+        }
+      };
+      visit(doc.getMap("blocks"));
+      return ids;
+    } catch {
+      return [];
+    }
+  }
+
+  private async deleteBlobsNoLongerReferenced(candidates: string[]): Promise<void> {
+    if (!this.blobSource || !this.notes.getAllContents || candidates.length === 0) return;
+    const existing = new Set(await this.blobSource.list());
+    const orphans = new Set(candidates.filter((id) => existing.has(id)));
+    if (orphans.size === 0) return;
+    const rows = await this.notes.getAllContents();
+    for (const row of rows) {
+      if (orphans.size === 0) break;
+      let content: string;
+      try {
+        content = await this.crypto.decryptPayload(row.content, row.id);
+      } catch {
+        continue;
+      }
+      for (const id of this.candidateBlobIdsIn(content)) {
+        orphans.delete(id);
+      }
+    }
+    for (const id of orphans) {
+      try {
+        await this.blobSource.delete(id);
+      } catch {}
+    }
   }
 
   async duplicateNote(id: string): Promise<Note> {
