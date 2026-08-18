@@ -8,6 +8,7 @@ const envelopeCrypto: IEncryptionService = {
   setSessionKeys: async () => {},
   clearSessionKeys: () => {},
   getIvCounter: () => 0,
+  advanceCounterTo: () => {},
   encryptBlob: async () => "" as EncryptedPayload,
   decryptBlob: async () => new Uint8Array(0),
   encryptPayload: async (p: string, aad: string) => `enc[${aad}]:${p}` as EncryptedPayload,

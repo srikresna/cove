@@ -51,6 +51,12 @@ const TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> 
 const inputClass =
   "h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring";
 
+function toLocalDateString(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = ({
   option,
   onRemove,
@@ -330,8 +336,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         );
       }
       case "date": {
-        const current =
-          value?.type === "date" ? new Date(value.timestamp).toISOString().slice(0, 10) : "";
+        const current = value?.type === "date" ? toLocalDateString(value.timestamp) : "";
         return (
           <input
             key={`${note.id}-${def.id}-${current}`}

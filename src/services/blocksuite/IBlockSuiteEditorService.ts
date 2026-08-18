@@ -19,6 +19,12 @@ export const DEFAULT_CANVAS_PREFS: CanvasPrefs = {
   domRenderer: false,
 };
 
+export interface DatabaseBacklinkRef {
+  databaseDocId: string;
+  databaseId: string;
+  databaseRowId: string;
+}
+
 export interface IBlockSuiteEditorService {
   getViewManager(): ViewExtensionManager;
 
@@ -27,6 +33,10 @@ export interface IBlockSuiteEditorService {
   openNoteDoc(noteId: string, content: string): BlockSuiteDoc;
 
   getDocStoreForPeek(docId: string): BlockSuiteStore | null;
+
+  isNoteDocLoaded(docId: string): boolean;
+
+  findDatabaseBacklinks(docId: string): DatabaseBacklinkRef[];
 
   registerExistingNotes(notes: Array<{ id: string; title: string }>): void;
 
@@ -43,4 +53,6 @@ export interface IBlockSuiteEditorService {
   provideCanvasPrefs(provider: () => CanvasPrefs): void;
 
   provideDocCreatedHandler(handler: (docId: string, title?: string) => Promise<void>): void;
+
+  setDocTitle(docId: string, title: string): void;
 }

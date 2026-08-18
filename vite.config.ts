@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
@@ -29,6 +30,7 @@ function accessorTransformPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     accessorTransformPlugin(),
     vanillaExtractPlugin(),
     wasm(),
@@ -58,6 +60,10 @@ export default defineConfig({
       "@blocksuite/store",
       "@blocksuite/sync",
       "@preact/signals-core",
+      "@radix-ui/react-dismissable-layer",
+      "@radix-ui/react-focus-scope",
+      "@radix-ui/react-portal",
+      "lit",
       "yjs",
     ],
   },

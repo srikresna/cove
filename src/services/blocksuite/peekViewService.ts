@@ -1,14 +1,28 @@
 import type { PeekOptions, PeekViewService } from "@blocksuite/affine/components/peek";
+import type { TemplateResult } from "lit";
 import { create } from "zustand";
 
-export interface PeekRequest {
+export interface DocPeekRequest {
+  type: "doc";
   docId: string;
-  mode: "edgeless" | "page";
+
+  mode?: "edgeless" | "page";
 
   xywh?: string;
   blockIds?: string[];
   elementIds?: string[];
+
+  databaseId?: string;
+  databaseDocId?: string;
+  databaseRowId?: string;
 }
+
+export interface TemplatePeekRequest {
+  type: "template";
+  template: TemplateResult;
+}
+
+export type PeekRequest = DocPeekRequest | TemplatePeekRequest;
 
 interface PeekViewState {
   request: PeekRequest | null;
@@ -20,7 +34,10 @@ interface PeekViewState {
 export const usePeekViewStore = create<PeekViewState>((set, get) => ({
   request: null,
   resolve: null,
-  open: (request, resolve) => set({ request, resolve }),
+  open: (request, resolve) => {
+    get().resolve?.();
+    set({ request, resolve });
+  },
   close: () => {
     get().resolve?.();
     set({ request: null, resolve: null });
@@ -32,8 +49,11 @@ function resolvePeekTarget(args: {
   docId?: string;
   blockIds?: string[];
   elementIds?: string[];
-}): PeekRequest | null {
-  const { target, docId, blockIds, elementIds } = args;
+  databaseId?: string;
+  databaseDocId?: string;
+  databaseRowId?: string;
+}): DocPeekRequest | null {
+  const { target, docId, blockIds, elementIds, databaseId, databaseDocId, databaseRowId } = args;
 
   if (target && "model" in target) {
     // biome-ignore lint/suspicious/noExplicitAny: BlockSuite duck-typing
@@ -43,20 +63,20 @@ function resolvePeekTarget(args: {
       const ref = (target as any).referenceModel;
       const refDocId = ref && "store" in ref ? ref.store.id : ref?.surface?.store?.id;
       if (refDocId && ref?.xywh) {
-        return { docId: refDocId, mode: "edgeless", xywh: ref.xywh };
+        return { type: "doc", docId: refDocId, mode: "edgeless", xywh: ref.xywh };
       }
     }
   }
 
   if (docId) {
-    return { docId, mode: "edgeless", blockIds, elementIds };
+    return { type: "doc", docId, blockIds, elementIds, databaseId, databaseDocId, databaseRowId };
   }
   return null;
 }
 
 type PeekArg = {
   target?: HTMLElement;
-  template?: unknown;
+  template?: TemplateResult;
   docId?: string;
   blockIds?: string[];
   elementIds?: string[];
@@ -66,7 +86,8 @@ type PeekArg = {
 };
 
 function peekKey(req: PeekRequest): string {
-  return `${req.docId}:${req.mode}:${req.xywh ?? ""}:${(req.elementIds ?? []).join(",")}`;
+  if (req.type === "template") return `template:${req.template}`;
+  return `doc:${req.docId}:${req.mode ?? ""}:${req.xywh ?? ""}:${(req.elementIds ?? []).join(",")}:${req.databaseRowId ?? ""}`;
 }
 
 let inflight: { key: string; promise: Promise<void> } | null = null;
@@ -74,12 +95,21 @@ let inflight: { key: string; promise: Promise<void> } | null = null;
 export const covePeekViewService: PeekViewService = {
   peek: ((arg: PeekArg, _options?: PeekOptions): Promise<void> => {
     void _options;
-    const request = resolvePeekTarget({
-      target: arg.target,
-      docId: arg.docId,
-      blockIds: arg.blockIds,
-      elementIds: arg.elementIds,
-    });
+    let request: PeekRequest | null = null;
+
+    if (arg.template) {
+      request = { type: "template", template: arg.template };
+    } else {
+      request = resolvePeekTarget({
+        target: arg.target,
+        docId: arg.docId,
+        blockIds: arg.blockIds,
+        elementIds: arg.elementIds,
+        databaseId: arg.databaseId,
+        databaseDocId: arg.databaseDocId,
+        databaseRowId: arg.databaseRowId,
+      });
+    }
     if (!request) return Promise.resolve();
     const key = peekKey(request);
 
@@ -87,7 +117,7 @@ export const covePeekViewService: PeekViewService = {
       return inflight.promise;
     }
     const promise = new Promise<void>((resolve) => {
-      usePeekViewStore.getState().open(request, resolve);
+      usePeekViewStore.getState().open(request as PeekRequest, resolve);
     });
     inflight = { key, promise };
     promise.finally(() => {

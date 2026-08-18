@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
+import { invalidateNoteBacklinkScan } from "../services/editor/backlinkScan";
 import { presentError } from "../services/errorPresenter";
 import { processCoverImage } from "../utils/coverImage";
 import { useNotificationStore } from "./useNotificationStore";
@@ -15,6 +16,8 @@ interface NoteState {
   activeCoverImage: string | null;
   setActiveNoteId: (id: string | null) => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
+
+  refreshNotesInPlace: (workspaceId: string) => Promise<void>;
   fetchTrash: () => Promise<void>;
   loadActiveNoteContent: (id: string) => Promise<void>;
   createNote: (
@@ -69,6 +72,19 @@ export const useNoteStore = create<NoteState>((set, get) => {
     }
   };
 
+  const listAndRegister = async (workspaceId: string): Promise<Note[] | null> => {
+    try {
+      const notes = await noteService.listMetadataByWorkspace(workspaceId);
+      blockSuiteEditorService.registerExistingNotes(
+        notes.map((n) => ({ id: n.id, title: n.title })),
+      );
+      return notes;
+    } catch (err) {
+      notifyError(err, { saveStatus: false });
+      return null;
+    }
+  };
+
   return {
     notes: [],
     trashedNotes: [],
@@ -78,17 +94,20 @@ export const useNoteStore = create<NoteState>((set, get) => {
     setActiveNoteId: (id) => set({ activeNoteId: id, activeCoverImage: null }),
 
     fetchNotes: async (workspaceId) => {
-      try {
-        const notes = await noteService.listMetadataByWorkspace(workspaceId);
+      const notes = await listAndRegister(workspaceId);
+      if (!notes) return;
+      set((state) => ({
+        notes,
+        activeNoteId:
+          state.activeNoteId && notes.some((n) => n.id === state.activeNoteId)
+            ? state.activeNoteId
+            : (notes[0]?.id ?? null),
+        activeCoverImage: state.activeCoverImage,
+      }));
+    },
 
-        blockSuiteEditorService.registerExistingNotes(
-          notes.map((n) => ({ id: n.id, title: n.title })),
-        );
-        const first = notes[0];
-        set({ notes, activeNoteId: first ? first.id : null, activeCoverImage: null });
-      } catch (err) {
-        notifyError(err, { saveStatus: false });
-      }
+    refreshNotesInPlace: async (workspaceId) => {
+      await get().fetchNotes(workspaceId);
     },
 
     fetchTrash: async () => {
@@ -147,13 +166,20 @@ export const useNoteStore = create<NoteState>((set, get) => {
         const { content, ...metadata } = updates;
         if (content !== undefined) {
           await noteService.updateContent(id, content);
+          invalidateNoteBacklinkScan(id);
         }
         if (Object.keys(metadata).length > 0) {
           await noteService.updateMetadata(id, metadata);
         }
+
+        if (updates.title !== undefined) {
+          blockSuiteEditorService.setDocTitle(id, updates.title);
+        }
         useSaveStatusStore.getState().setSaved();
       } catch (err) {
-        set({ notes: previousNotes });
+        if (useNoteStore.getState().notes === get().notes) {
+          set({ notes: previousNotes });
+        }
         notifyError(err);
       }
     },
@@ -290,12 +316,18 @@ export const useNoteStore = create<NoteState>((set, get) => {
 });
 
 vaultService.onLock(() => {
-  useNoteStore.setState({ notes: [], activeNoteId: null, activeCoverImage: null });
+  useNoteStore.setState({
+    notes: [],
+    trashedNotes: [],
+    activeNoteId: null,
+    activeCoverImage: null,
+  });
 });
 
 blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
   if (!activeWs) return;
   await noteService.createNoteWithId(activeWs, docId, title);
-  await useNoteStore.getState().fetchNotes(activeWs);
+
+  await useNoteStore.getState().refreshNotesInPlace(activeWs);
 });

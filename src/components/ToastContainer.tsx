@@ -10,7 +10,7 @@ export const ToastContainer: React.FC = () => {
   return (
     <output
       aria-live="polite"
-      className="pointer-events-none fixed bottom-5 right-5 z-50 flex w-full max-w-sm flex-col gap-2"
+      className="pointer-events-none fixed bottom-5 right-5 z-[1200] flex w-full max-w-sm flex-col gap-2"
     >
       <AnimatePresence>
         {toasts.map((toast) => {

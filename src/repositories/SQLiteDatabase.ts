@@ -18,7 +18,7 @@ export class SQLiteDatabase {
       );
     }
     if (!SQLiteDatabase.instance) {
-      SQLiteDatabase.instance = (async () => {
+      const init = (async () => {
         const db = await Database.load("sqlite:cove.db");
         await db.execute("PRAGMA journal_mode = WAL");
         await db.execute("PRAGMA synchronous = NORMAL");
@@ -30,6 +30,10 @@ export class SQLiteDatabase {
         await SQLiteDatabase.migrate(db);
         return db;
       })();
+      SQLiteDatabase.instance = init;
+      init.catch(() => {
+        if (SQLiteDatabase.instance === init) SQLiteDatabase.instance = null;
+      });
     }
     return SQLiteDatabase.instance;
   }
@@ -245,6 +249,38 @@ export class SQLiteDatabase {
         )
       `);
       await db.execute("PRAGMA user_version = 12");
+    }
+
+    if (version < 13) {
+      const tagCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(tags)");
+      if (tagCols.length > 0) {
+        await db.execute(
+          `UPDATE note_tags SET tagId = COALESCE(
+            (
+              SELECT k.id FROM tags k
+              WHERE LOWER(k.name) = (
+                SELECT LOWER(d.name) FROM tags d WHERE d.id = note_tags.tagId
+              )
+              ORDER BY k.createdAt, k.id LIMIT 1
+            ),
+            note_tags.tagId
+          )`,
+        );
+        await db.execute(
+          `DELETE FROM tags WHERE id NOT IN (
+            SELECT t.id FROM tags t
+            WHERE t.id = (
+              SELECT t2.id FROM tags t2
+              WHERE LOWER(t2.name) = LOWER(t.name)
+              ORDER BY t2.createdAt, t2.id LIMIT 1
+            )
+          )`,
+        );
+        await db.execute(
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_name_nocase ON tags(name COLLATE NOCASE)",
+        );
+      }
+      await db.execute("PRAGMA user_version = 13");
     }
   }
 }

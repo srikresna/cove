@@ -11,6 +11,7 @@ export interface IEncryptionService {
   decryptPayload(payloadB64: string, aad: string): Promise<string>;
 
   getIvCounter(): number;
+  advanceCounterTo(n: number): void;
 
   encryptBlob(plaintext: Bytes, aad: string): Promise<EncryptedPayload>;
   decryptBlob(payload: EncryptedPayload, aad: string): Promise<Bytes>;

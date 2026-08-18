@@ -20,6 +20,10 @@ export interface KmsRecord {
 
 export interface KmsPatch {
   ivCounter?: number;
+  kdfVersion?: number;
+  kdfAlg?: string;
+  kdfParamsJson?: string;
+  saltB64?: string;
   wrappedDekLocalB64?: string | null;
   integrityMacB64?: string;
   migrationState?: MigrationState;

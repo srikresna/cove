@@ -153,7 +153,14 @@ export class VaultService implements IVaultService {
     if (this.rawDek && this.rawDek !== rawDek) zeroize(this.rawDek);
     this.rawDek = rawDek;
     await this.crypto.setSessionKeys({ dek: cryptoKey });
-    await this.enforceIvHighWaterMark();
+    try {
+      await this.enforceIvHighWaterMark();
+    } catch (err) {
+      if (this.rawDek) zeroize(this.rawDek);
+      this.rawDek = null;
+      this.crypto.clearSessionKeys();
+      throw err;
+    }
   }
 
   private async enforceIvHighWaterMark(): Promise<void> {
@@ -163,10 +170,13 @@ export class VaultService implements IVaultService {
     if (!Number.isFinite(hwm)) return;
     const current = this.crypto.getIvCounter();
     if (current < hwm) {
-      throw new EncryptionError(
-        "iv_rewind",
-        "IV counter rewind detected (database may have been rolled back); refusing AES-GCM nonce reuse.",
+      Logger.warn(
+        "vault: iv counter behind keychain high-water mark; fast-forwarding to avoid nonce reuse",
+        { current, hwm },
       );
+      await this.crypto.advanceCounterTo(hwm);
+      await this.kms.setIvCounter(hwm).catch(() => {});
+      return;
     }
 
     if (current > hwm) {
@@ -266,6 +276,13 @@ export class VaultService implements IVaultService {
 
   private async finishLegacyRun(failed: number): Promise<void> {
     if (failed === 0) {
+      const remaining = await this.migrationRepo.countLegacy();
+      if (remaining > 0) {
+        Logger.warn("vault: migration sweep finished but legacy rows remain; key retained", {
+          remaining,
+        });
+        return;
+      }
       await this.kms.update({ migrationState: "complete", migrationCursor: null });
       await this.purgeLegacyKeyMaterial();
     } else {
@@ -337,16 +354,19 @@ export class VaultService implements IVaultService {
   private async migrateLegacy(legacyRawKey: Bytes): Promise<number> {
     const legacyKey = await importAesGcmKey(legacyRawKey);
     const rec = await this.kms.get();
-    let cursor: string | null = rec?.migrationCursor ?? null;
+    let durable: string | null = rec?.migrationCursor ?? null;
+    let sweep: string | null = durable;
     let failed = 0;
     for (;;) {
-      const batch = await this.migrationRepo.findLegacyBatch(cursor, MIGRATION_BATCH);
+      const batch = await this.migrationRepo.findLegacyBatch(sweep, MIGRATION_BATCH);
       if (batch.length === 0) break;
       for (const row of batch) {
+        sweep = row.id;
         try {
           const plain = await aesGcmDecrypt(legacyKey, row.content);
           const reencrypted = await this.crypto.encryptPayload(plain, row.id);
           await this.migrationRepo.markMigrated(row.id, reencrypted);
+          if (failed === 0) durable = row.id;
         } catch (err) {
           if (isSystemicMigrationError(err)) throw err;
           failed += 1;
@@ -355,9 +375,8 @@ export class VaultService implements IVaultService {
             err instanceof Error ? err.message : String(err),
           );
         }
-        cursor = row.id;
       }
-      await this.kms.update({ migrationCursor: cursor });
+      await this.kms.update({ migrationCursor: durable });
     }
     return failed;
   }
@@ -398,7 +417,7 @@ export class VaultService implements IVaultService {
     if (!constantTimeEqual(base64ToBytes(rec.integrityMacB64), base64ToBytes(expectedMac))) {
       throw new EncryptionError(
         "decrypt_failed",
-        "Vault integrity check failed (possibly tampered).",
+        "Wrong passphrase, or vault integrity check failed (possibly tampered).",
       );
     }
 
@@ -485,6 +504,12 @@ export class VaultService implements IVaultService {
           await this.migrationRepo.markTitleMigrated(row.id, reencrypted);
         } catch (err) {
           if (isSystemicMigrationError(err)) throw err;
+          try {
+            await this.crypto.decryptPayload(row.title, titleAad(row.id));
+            continue;
+          } catch (err2) {
+            if (isSystemicMigrationError(err2)) throw err2;
+          }
           failed += 1;
           await this.migrationRepo.recordFailure(
             row.id,
@@ -503,16 +528,29 @@ export class VaultService implements IVaultService {
         () => {},
       );
     }
-
-    if (this.crypto.isUnlocked()) {
-      await this.writeIvHighWaterMark(this.crypto.getIvCounter()).catch((err) =>
-        Logger.warn("vault: iv high-water-mark persist on lock failed", err),
-      );
+    const attempt = (async () => {
+      for (const listener of this.lockListeners) {
+        try {
+          listener();
+        } catch (err) {
+          Logger.warn("vault: lock listener failed", err);
+        }
+      }
+      if (this.crypto.isUnlocked()) {
+        await this.writeIvHighWaterMark(this.crypto.getIvCounter()).catch((err) =>
+          Logger.warn("vault: iv high-water-mark persist on lock failed", err),
+        );
+      }
+      if (this.rawDek) zeroize(this.rawDek);
+      this.rawDek = null;
+      this.crypto.clearSessionKeys();
+    })();
+    this.unlockInFlight = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (this.unlockInFlight === attempt) this.unlockInFlight = null;
     }
-    if (this.rawDek) zeroize(this.rawDek);
-    this.rawDek = null;
-    this.crypto.clearSessionKeys();
-    for (const listener of this.lockListeners) listener();
   }
 
   async tryAutoUnlock(): Promise<boolean> {
@@ -576,17 +614,14 @@ export class VaultService implements IVaultService {
     const rawDek = await this.verifyPassphraseAndUnwrap(oldPassphrase, rec);
 
     const env = await this.buildArgon2Envelope(newPassphrase, rawDek);
-    const updated: KmsRecord = {
-      ...rec,
+    await this.kms.update({
       kdfVersion: ENVELOPE_VERSION,
       kdfAlg: ARGON2ID_ALG,
       kdfParamsJson: ARGON2ID_PARAMS,
       saltB64: env.saltB64,
       wrappedDekLocalB64: env.wrappedB64,
       integrityMacB64: env.integrityMacB64,
-      updatedAt: Date.now(),
-    };
-    await this.kms.save(updated);
+    });
 
     await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
   }
@@ -603,15 +638,13 @@ export class VaultService implements IVaultService {
     const existing = await this.kms.get();
     if (existing) {
       const env = await this.buildArgon2Envelope(newPassphrase, recoveredDek);
-      await this.kms.save({
-        ...existing,
+      await this.kms.update({
         kdfVersion: ENVELOPE_VERSION,
         kdfAlg: ARGON2ID_ALG,
         kdfParamsJson: ARGON2ID_PARAMS,
         saltB64: env.saltB64,
         wrappedDekLocalB64: env.wrappedB64,
         integrityMacB64: env.integrityMacB64,
-        updatedAt: Date.now(),
       });
       await this.setSessionDek(recoveredDek, await importAesGcmKey(recoveredDek));
       try {

@@ -235,7 +235,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt, deletedAt FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
+        "SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt, deletedAt, titleKmsVersion FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
       );
       return rows.map((row) => this.mapRowToRecord(row));
     } catch (err) {

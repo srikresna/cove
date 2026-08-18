@@ -69,7 +69,7 @@ export class NoteService implements INoteService {
     const q = query.trim().toLowerCase();
     if (!q) return [];
 
-    const candidates = await this.notes.findRecentForSearch(100);
+    const candidates = await this.notes.findRecentForSearch(1000);
     const hits: NoteSearchHit[] = [];
     for (const rec of candidates) {
       try {

@@ -1,20 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { togglePin, toggleFavorite, updateNote } = vi.hoisted(() => ({
+const { togglePin, toggleFavorite, updateNote, listMetadataByWorkspace } = vi.hoisted(() => ({
   togglePin: vi.fn<(id: string) => Promise<void>>(),
   toggleFavorite: vi.fn<(id: string) => Promise<void>>(),
   updateNote: vi.fn<(id: string, updates: Record<string, unknown>) => Promise<void>>(),
+  listMetadataByWorkspace: vi.fn<(wsId: string) => Promise<Note[]>>(),
 }));
 
 vi.mock("@/di/container", () => ({
-  noteService: { togglePin, toggleFavorite, updateNote },
+  noteService: { togglePin, toggleFavorite, updateNote, listMetadataByWorkspace },
   vaultService: { isUnlocked: () => true, onLock: () => {} },
   blockSuiteEditorService: {
     isWorkspaceAlive: () => true,
     registerPendingFlusher: () => () => {},
     provideDocCreatedHandler: () => {},
+    setDocTitle: () => {},
     provideCanvasPrefs: () => {},
     getViewSpecs: () => [],
+    registerExistingNotes: () => {},
   },
 }));
 
@@ -93,5 +96,39 @@ describe("useNoteStore — optimistic update & rollback", () => {
     const notes = useNoteStore.getState().notes;
     expect(notes[0]?.isPinned).toBe(false);
     expect(notes[1]?.isPinned).toBe(true);
+  });
+});
+
+describe("useNoteStore — refreshNotesInPlace (peek-created docs)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useNoteStore.setState({
+      notes: [makeNote({ id: "cal-note", title: "Calendar" })],
+      trashedNotes: [],
+      activeNoteId: "cal-note",
+      activeCoverImage: "cover-data",
+    });
+  });
+
+  it("keeps activeNoteId and activeCoverImage when a new note appears (stay in calendar)", async () => {
+    listMetadataByWorkspace.mockResolvedValue([
+      makeNote({ id: "new-doc", title: "Linked doc" }),
+      makeNote({ id: "cal-note", title: "Calendar" }),
+    ]);
+
+    await useNoteStore.getState().refreshNotesInPlace("ws1");
+
+    const state = useNoteStore.getState();
+    expect(state.notes.map((n) => n.id)).toContain("new-doc");
+    expect(state.activeNoteId).toBe("cal-note");
+    expect(state.activeCoverImage).toBe("cover-data");
+  });
+
+  it("falls back to the first note only when the active note disappeared", async () => {
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "other", title: "Other" })]);
+
+    await useNoteStore.getState().refreshNotesInPlace("ws1");
+
+    expect(useNoteStore.getState().activeNoteId).toBe("other");
   });
 });

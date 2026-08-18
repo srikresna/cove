@@ -13,10 +13,7 @@ import {
 import { GfxControllerIdentifier } from "@blocksuite/affine/std/gfx";
 import type { ExtensionType } from "@blocksuite/affine/store";
 import type { DeepPartial } from "@blocksuite/global/utils";
-import type { TestAffineEditorContainer as _TEC } from "@blocksuite/integration-test";
 import type { EditorHost } from "@blocksuite/std";
-
-type TestAffineEditorContainer = _TEC & HTMLElement & { updateComplete: Promise<boolean> };
 
 import { effect, signal } from "@preact/signals-core";
 import type React from "react";
@@ -34,6 +31,7 @@ import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import type { Note } from "../../../types";
+import type { TestAffineEditorContainer } from "./editorContainer";
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -51,7 +49,10 @@ const defaultEditorSetting = Object.fromEntries(
   ]),
 ) as DeepPartial<EditorSetting>;
 
-export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
+export function buildCommonExtensions(
+  mode: DocMode,
+  modeRef?: { current: DocMode },
+): ExtensionType[] {
   let editorMode = mode;
   let primaryMode = mode;
 
@@ -65,9 +66,10 @@ export function buildCommonExtensions(mode: DocMode): ExtensionType[] {
       return primaryMode;
     },
 
-    getEditorMode: () => editorMode,
+    getEditorMode: () => (modeRef ? modeRef.current : editorMode),
     setEditorMode: (m: DocMode) => {
       editorMode = m;
+      if (modeRef) modeRef.current = m;
     },
     onPrimaryModeChange: (() => ({
       unsubscribe: () => undefined,

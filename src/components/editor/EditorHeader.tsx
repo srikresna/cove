@@ -10,6 +10,8 @@ import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import type { Note } from "../../types";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { DatabaseBacklinkSection } from "./blocksuite/peek/PeekDatabaseBacklink";
+import { useNoteDatabaseBacklinks } from "./blocksuite/peek/useNoteDatabaseBacklinks";
 import { NoteInfoPanel } from "./NoteInfoPanel";
 
 interface EditorHeaderProps {
@@ -22,7 +24,7 @@ interface IconPickerContentProps {
   onRemove?: () => void;
 }
 
-const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove }) => (
+export const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove }) => (
   <PopoverContent align="start" className="w-auto overflow-hidden p-0">
     <EmojiPicker
       emojiStyle={EmojiStyle.NATIVE}
@@ -47,11 +49,49 @@ const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove 
 );
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
   const uploadCoverImage = useNoteStore((s) => s.uploadCoverImage);
   const removeCoverImage = useNoteStore((s) => s.removeCoverImage);
   const coverImage = useNoteStore((s) => s.activeCoverImage);
   const saveStatus = useSaveStatusStore((s) => s.status);
+  const backlinks = useNoteDatabaseBacklinks(note.id);
+
+  return (
+    <NoteHeaderBody
+      note={note}
+      coverImage={coverImage}
+      isFullWidth={isFullWidth}
+      saveStatus={saveStatus}
+      uploadCoverImage={uploadCoverImage}
+      removeCoverImage={removeCoverImage}
+      extraInfo={
+        backlinks.length > 0
+          ? backlinks.map((ref) => (
+              <DatabaseBacklinkSection key={`${ref.databaseId}:${ref.databaseRowId}`} {...ref} />
+            ))
+          : null
+      }
+    />
+  );
+};
+
+export const NoteHeaderBody: React.FC<{
+  note: Note;
+  coverImage: string | null;
+  isFullWidth: boolean;
+  saveStatus?: string;
+  uploadCoverImage: (id: string, file: File) => Promise<void>;
+  removeCoverImage: (id: string) => Promise<void>;
+  extraInfo?: React.ReactNode;
+}> = ({
+  note,
+  coverImage,
+  isFullWidth,
+  saveStatus,
+  uploadCoverImage,
+  removeCoverImage,
+  extraInfo,
+}) => {
+  const updateNote = useNoteStore((s) => s.updateNote);
 
   const [title, setTitle] = useState(note.title);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -223,40 +263,41 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
           </Popover>
         )}
 
-        {(!hasIcon || !hasCover) && (
-          <div
-            className={cn(
-              "flex items-center gap-1 pt-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover/header:opacity-100",
-            )}
-          >
-            {!hasIcon && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1.5 px-2 text-muted-foreground"
-                  >
-                    <Smile className="h-3.5 w-3.5" aria-hidden="true" />
-                    {MESSAGES.ICON_ADD}
-                  </Button>
-                </PopoverTrigger>
-                <IconPickerContent onPick={(emoji) => updateNote(note.id, { icon: emoji })} />
-              </Popover>
-            )}
-            {!hasCover && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 px-2 text-muted-foreground"
-                onClick={() => updateNote(note.id, { coverColor: DEFAULT_COVER_COLOR })}
-              >
-                <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {MESSAGES.COVER_ADD}
-              </Button>
-            )}
-          </div>
-        )}
+        <div
+          className={cn(
+            "flex items-center gap-1 pt-2",
+            !hasIcon && !hasCover
+              ? "opacity-0 transition-opacity focus-within:opacity-100 group-hover/header:opacity-100"
+              : "",
+          )}
+        >
+          {!hasIcon && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-muted-foreground"
+                >
+                  <Smile className="h-3.5 w-3.5" aria-hidden="true" />
+                  {MESSAGES.ICON_ADD}
+                </Button>
+              </PopoverTrigger>
+              <IconPickerContent onPick={(emoji) => updateNote(note.id, { icon: emoji })} />
+            </Popover>
+          )}
+          {!hasCover && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-muted-foreground"
+              onClick={() => updateNote(note.id, { coverColor: DEFAULT_COVER_COLOR })}
+            >
+              <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.COVER_ADD}
+            </Button>
+          )}
+        </div>
 
         <label htmlFor="note-title-input" className="sr-only">
           Note Title
@@ -280,6 +321,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
         />
 
         <NoteInfoPanel note={note} />
+        {extraInfo}
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ export class SqliteBlobSource implements BlobSource {
 
   private static readonly MAX_CACHE = 200;
   private readonly cache = new Map<string, Blob | null>();
+  private lockEpoch = 0;
 
   constructor(
     private readonly blobs: IBlobRepository,
@@ -37,6 +38,7 @@ export class SqliteBlobSource implements BlobSource {
 
   clearCache(): void {
     this.cache.clear();
+    this.lockEpoch += 1;
   }
 
   private evictIfNeeded(): void {
@@ -54,10 +56,13 @@ export class SqliteBlobSource implements BlobSource {
       this.cache.set(key, cached ?? null);
       return cached ? cached.slice(0, cached.size, cached.type) : null;
     }
+    const epoch = this.lockEpoch;
     const rec = await this.blobs.get(key);
     if (!rec) {
-      this.evictIfNeeded();
-      this.cache.set(key, null);
+      if (epoch === this.lockEpoch) {
+        this.evictIfNeeded();
+        this.cache.set(key, null);
+      }
       return null;
     }
     try {
@@ -65,12 +70,16 @@ export class SqliteBlobSource implements BlobSource {
         await this.crypto.decryptBlob(rec.payload, blobAad(key)),
       );
       const blob = new Blob([bytes.slice()], { type: mime });
-      this.evictIfNeeded();
-      this.cache.set(key, blob);
+      if (epoch === this.lockEpoch) {
+        this.evictIfNeeded();
+        this.cache.set(key, blob);
+      }
       return blob.slice(0, blob.size, blob.type);
     } catch {
-      this.evictIfNeeded();
-      this.cache.set(key, null);
+      if (epoch === this.lockEpoch) {
+        this.evictIfNeeded();
+        this.cache.set(key, null);
+      }
       return null;
     }
   }

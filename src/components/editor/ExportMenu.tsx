@@ -52,6 +52,8 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ noteId }) => {
         type="file"
         accept=".md,.markdown,text/markdown"
         className="hidden"
+        hidden
+        style={{ display: "none" }}
         onChange={onPickFile}
       />
       <DropdownMenu>

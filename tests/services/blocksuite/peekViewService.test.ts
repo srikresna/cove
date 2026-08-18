@@ -1,3 +1,4 @@
+import { html } from "lit";
 import { beforeEach, describe, expect, it } from "vitest";
 import { covePeekViewService, usePeekViewStore } from "@/services/blocksuite/peekViewService";
 
@@ -24,18 +25,18 @@ describe("peekViewService", () => {
       let resolved = false;
       usePeekViewStore
         .getState()
-        .open({ docId: "n1", mode: "edgeless", xywh: "[0,0,100,100]" }, () => {
+        .open({ type: "doc", docId: "n1", mode: "edgeless", xywh: "[0,0,100,100]" }, () => {
           resolved = true;
         });
       const { request } = usePeekViewStore.getState();
       expect(request).not.toBeNull();
-      expect(request?.docId).toBe("n1");
+      expect(request?.type === "doc" && request.docId).toBe("n1");
       expect(resolved).toBe(false);
     });
 
     it("close invokes the resolve callback and clears the request", () => {
       let resolved = false;
-      usePeekViewStore.getState().open({ docId: "n2", mode: "edgeless" }, () => {
+      usePeekViewStore.getState().open({ type: "doc", docId: "n2", mode: "edgeless" }, () => {
         resolved = true;
       });
       usePeekViewStore.getState().close();
@@ -51,9 +52,10 @@ describe("peekViewService", () => {
 
       const { request } = usePeekViewStore.getState();
       expect(request).not.toBeNull();
-      expect(request?.docId).toBe("doc-1");
-      expect(request?.mode).toBe("edgeless");
-      expect(request?.xywh).toBe("[10,20,300,200]");
+      expect(request?.type).toBe("doc");
+      expect(request?.type === "doc" && request.docId).toBe("doc-1");
+      expect(request?.type === "doc" && request.mode).toBe("edgeless");
+      expect(request?.type === "doc" && request.xywh).toBe("[10,20,300,200]");
 
       usePeekViewStore.getState().close();
       await expect(promise).resolves.toBeUndefined();
@@ -75,10 +77,85 @@ describe("peekViewService", () => {
     it("opens a page-ref peek from { docId } args", async () => {
       const promise = covePeekViewService.peek({ docId: "ref-doc", blockIds: ["b1"] });
       const { request } = usePeekViewStore.getState();
-      expect(request?.docId).toBe("ref-doc");
-      expect(request?.blockIds).toEqual(["b1"]);
+      expect(request?.type).toBe("doc");
+      expect(request?.type === "doc" && request.docId).toBe("ref-doc");
+      expect(request?.type === "doc" && request.blockIds).toEqual(["b1"]);
       usePeekViewStore.getState().close();
       await promise;
+    });
+
+    it("carries database context (backlink) from the vendored openDoc args", async () => {
+      const promise = covePeekViewService.peek({
+        docId: "linked-doc",
+        databaseId: "db-block-1",
+        databaseDocId: "cal-note",
+        databaseRowId: "row-9",
+      });
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type).toBe("doc");
+      if (request?.type !== "doc") return;
+      expect(request.databaseId).toBe("db-block-1");
+      expect(request.databaseDocId).toBe("cal-note");
+      expect(request.databaseRowId).toBe("row-9");
+      usePeekViewStore.getState().close();
+      await promise;
+    });
+
+    it("does not dedupe peeks of the same doc from different rows", async () => {
+      const p1 = covePeekViewService.peek({
+        docId: "d",
+        databaseId: "db",
+        databaseDocId: "cal",
+        databaseRowId: "row-1",
+      });
+      const p2 = covePeekViewService.peek({
+        docId: "d",
+        databaseId: "db",
+        databaseDocId: "cal",
+        databaseRowId: "row-2",
+      });
+      expect(p2).not.toBe(p1);
+      usePeekViewStore.getState().close();
+      await Promise.all([p1, p2]);
+    });
+
+    it("opens a template peek from { target, template } args (data-view row detail)", async () => {
+      const target = document.createElement("div");
+      const template = html`<affine-data-view-record-detail></affine-data-view-record-detail>`;
+      const promise = covePeekViewService.peek({ target, template });
+
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type).toBe("template");
+      expect(request?.type === "template" && request.template).toBe(template);
+
+      usePeekViewStore.getState().close();
+      await expect(promise).resolves.toBeUndefined();
+    });
+
+    it("prioritizes template over target/docId resolution", async () => {
+      const target = makeSurfaceRefTarget("doc-3", "[0,0,10,10]");
+      const template = html`<div>detail</div>`;
+      const promise = covePeekViewService.peek({ target, template });
+
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type).toBe("template");
+
+      usePeekViewStore.getState().close();
+      await promise;
+    });
+
+    it("opening a new peek resolves the previous request (single modal)", async () => {
+      let firstResolved = false;
+      usePeekViewStore.getState().open({ type: "doc", docId: "a", mode: "edgeless" }, () => {
+        firstResolved = true;
+      });
+      usePeekViewStore.getState().open({ type: "doc", docId: "b", mode: "edgeless" }, () => {});
+
+      expect(firstResolved).toBe(true);
+      const { request } = usePeekViewStore.getState();
+      expect(request?.type === "doc" && request.docId).toBe("b");
+
+      usePeekViewStore.getState().close();
     });
   });
 });

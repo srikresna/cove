@@ -73,6 +73,22 @@ export class SQLiteKmsRepository implements IKmsRepository {
         sets.push("ivCounter = ?");
         params.push(patch.ivCounter);
       }
+      if (patch.kdfVersion !== undefined) {
+        sets.push("kdfVersion = ?");
+        params.push(patch.kdfVersion);
+      }
+      if (patch.kdfAlg !== undefined) {
+        sets.push("kdfAlg = ?");
+        params.push(patch.kdfAlg);
+      }
+      if (patch.kdfParamsJson !== undefined) {
+        sets.push("kdfParamsJson = ?");
+        params.push(patch.kdfParamsJson);
+      }
+      if (patch.saltB64 !== undefined) {
+        sets.push("saltB64 = ?");
+        params.push(patch.saltB64);
+      }
       if (patch.wrappedDekLocalB64 !== undefined) {
         sets.push("wrappedDekLocalB64 = ?");
         params.push(patch.wrappedDekLocalB64);
@@ -104,17 +120,7 @@ export class SQLiteKmsRepository implements IKmsRepository {
   async setIvCounter(n: number): Promise<void> {
     try {
       const db = await this.getDb();
-
-      const res = await db.execute("UPDATE kms SET ivCounter = ? WHERE id = 1 AND ivCounter < ?", [
-        n,
-        n,
-      ]);
-      if (res.rowsAffected === 0) {
-        throw new PersistenceError(
-          "kms.setIvCounter",
-          "IV counter did not advance (persisted value >= new value); refusing AES-GCM nonce-reuse risk.",
-        );
-      }
+      await db.execute("UPDATE kms SET ivCounter = ? WHERE id = 1 AND ivCounter < ?", [n, n]);
     } catch (err) {
       throw toPersistenceError("kms.setIvCounter", err);
     }

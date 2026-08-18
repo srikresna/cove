@@ -17,6 +17,7 @@ import { unpackBlockSuiteContent } from "../editor/contentFormat";
 import { applySnapshot } from "../editor/yjsCodec";
 import {
   type CanvasPrefs,
+  type DatabaseBacklinkRef,
   DEFAULT_CANVAS_PREFS,
   type IBlockSuiteEditorService,
 } from "./IBlockSuiteEditorService";
@@ -42,6 +43,8 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private canvasPrefsProvider: () => CanvasPrefs = () => DEFAULT_CANVAS_PREFS;
   private docCreatedHandler: (docId: string, title?: string) => Promise<void> = async () =>
     undefined;
+
+  private readonly knownTitles = new Map<string, string>();
 
   constructor(private readonly deps: BlockSuiteEditorServiceDeps) {
     registerEditorContainer();
@@ -86,9 +89,23 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
           await this.docCreatedHandler(docId, title);
         } catch {}
       });
+
       this.workspace = workspace;
     }
     return this.workspace;
+  }
+
+  private assertMetaTitle(docId: string): void {
+    const ws = this.workspace;
+    if (!ws) return;
+    const title = this.knownTitles.get(docId);
+    if (title === undefined) return;
+    try {
+      const meta = ws.meta.getDocMeta(docId);
+      if (meta && (meta.title ?? "") !== title) {
+        ws.meta.setDocMeta(docId, { title });
+      }
+    } catch {}
   }
 
   openNoteDoc(noteId: string, content: string): BlockSuiteDoc {
@@ -121,6 +138,8 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       normalizeBlockTree(doc);
       doc.getStore().resetHistory();
       this.initializedDocs.add(noteId);
+
+      this.assertMetaTitle(noteId);
     }
     return doc;
   }
@@ -165,7 +184,63 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     const ws = this.getWorkspace();
     const doc = ws.getDoc(docId);
     if (!doc) return null;
+    if (!doc.ready) {
+      try {
+        doc.load();
+      } catch {
+        return null;
+      }
+    }
     return doc.getStore();
+  }
+
+  isNoteDocLoaded(docId: string): boolean {
+    return this.initializedDocs.has(docId);
+  }
+
+  findDatabaseBacklinks(docId: string): DatabaseBacklinkRef[] {
+    const ws = this.workspace;
+    if (!ws) return [];
+    const results: DatabaseBacklinkRef[] = [];
+    for (const doc of ws.docs.values()) {
+      let store: BlockSuiteStore;
+      try {
+        store = doc.getStore();
+      } catch {
+        continue;
+      }
+      if (!store.root) continue;
+      let databases: ReturnType<BlockSuiteStore["getBlocksByFlavour"]>;
+      try {
+        databases = store.getBlocksByFlavour("affine:database");
+      } catch {
+        continue;
+      }
+      for (const db of databases) {
+        const model = store.getBlock(db.id)?.model;
+        if (!model) continue;
+        for (const child of model.children) {
+          const text = (child as { text?: { deltas$: { value: Array<Record<string, unknown>> } } })
+            .text;
+          const deltas = text?.deltas$?.value;
+          if (!deltas) continue;
+          for (const delta of deltas) {
+            const attrs = (
+              delta as { attributes?: { reference?: { type?: string; pageId?: string } } }
+            ).attributes;
+            if (attrs?.reference?.type === "LinkedPage" && attrs.reference.pageId === docId) {
+              results.push({
+                databaseDocId: store.id,
+                databaseId: db.id,
+                databaseRowId: child.id,
+              });
+              break;
+            }
+          }
+        }
+      }
+    }
+    return results;
   }
 
   registerExistingNotes(notes: Array<{ id: string; title: string }>): void {
@@ -178,14 +253,23 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
           ws.removeDoc(oldId);
         } catch {}
         this.coveOwnedDocIds.delete(oldId);
+        this.knownTitles.delete(oldId);
       }
     }
     this.registeredMetaIds.clear();
 
     for (const { id, title } of notes) {
       this.registeredMetaIds.add(id);
-      if (this.coveOwnedDocIds.has(id)) continue;
-      if (ws.getDoc(id)) continue;
+
+      this.knownTitles.set(id, title);
+      if (this.coveOwnedDocIds.has(id)) {
+        this.assertMetaTitle(id);
+        continue;
+      }
+      if (ws.getDoc(id)) {
+        this.assertMetaTitle(id);
+        continue;
+      }
       this.coveOwnedDocIds.add(id);
 
       ws.createDoc(id);
@@ -221,6 +305,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     this.cachedEdgelessSpecs = null;
     this.initializedDocs.clear();
     this.coveOwnedDocIds.clear();
+    this.knownTitles.clear();
   }
 
   provideCanvasPrefs(provider: () => CanvasPrefs): void {
@@ -229,5 +314,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
 
   provideDocCreatedHandler(handler: (docId: string, title?: string) => Promise<void>): void {
     this.docCreatedHandler = handler;
+  }
+
+  setDocTitle(docId: string, title: string): void {
+    this.knownTitles.set(docId, title);
+    this.assertMetaTitle(docId);
   }
 }

@@ -81,9 +81,10 @@ export class SQLitePropertyRepository implements IPropertyRepository {
 
   async deleteDefinition(id: string): Promise<void> {
     try {
-      const db = await this.getDb();
-      await db.execute("DELETE FROM note_properties WHERE propertyId = ?", [id]);
-      await db.execute("DELETE FROM property_defs WHERE id = ?", [id]);
+      await SQLiteDatabase.runTransaction([
+        { sql: "DELETE FROM note_properties WHERE propertyId = ?", params: [id] },
+        { sql: "DELETE FROM property_defs WHERE id = ?", params: [id] },
+      ]);
     } catch (err) {
       throw toPersistenceError("properties.deleteDefinition", err);
     }
