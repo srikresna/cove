@@ -35,6 +35,25 @@ function blockSuiteWithText(text: string): string {
   return packBlockSuiteContent(encodeDocSnapshot(doc));
 }
 
+function blockSuiteWithBlobs(...blobIds: string[]): string {
+  const doc = new Y.Doc();
+  const blocks = doc.getMap("blocks");
+  const page = new Y.Map();
+  blocks.set("page", page);
+  page.set("sys:id", "page");
+  page.set("sys:flavour", "affine:page");
+  page.set("sys:children", Y.Array.from(blobIds.map((_, i) => `img-${i}`)));
+  blobIds.forEach((id, i) => {
+    const img = new Y.Map();
+    blocks.set(`img-${i}`, img);
+    img.set("sys:id", `img-${i}`);
+    img.set("sys:flavour", "affine:image");
+    img.set("sys:children", Y.Array.from([]));
+    img.set("prop:source", id);
+  });
+  return packBlockSuiteContent(encodeDocSnapshot(doc));
+}
+
 const unlockedCrypto: IEncryptionService = {
   isUnlocked: () => true,
   setSessionKeys: async () => {},
@@ -418,5 +437,35 @@ describe("NoteService", () => {
 
     expect(hits).toHaveLength(1);
     expect(hits[0]?.id).toBe("note-deep-target");
+  });
+
+  it("workspace blob GC deletes only blobs no longer referenced by any note", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const deleted: string[] = [];
+    const blobSource = {
+      list: async () => ["blob-shared", "blob-only-ws1"],
+      delete: async (key: string) => {
+        deleted.push(key);
+      },
+    };
+    const service = new NoteService(
+      fakeRepo,
+      unlockedCrypto,
+      new InMemoryNoteLinkRepository(),
+      blobSource,
+    );
+
+    const n1 = await service.createNote("ws-1", "Has images");
+    await service.updateContent(n1.id, blockSuiteWithBlobs("blob-shared", "blob-only-ws1"));
+    const n2 = await service.createNote("ws-2", "Keeps shared");
+    await service.updateContent(n2.id, blockSuiteWithBlobs("blob-shared"));
+
+    const candidates = await service.collectWorkspaceBlobCandidates("ws-1");
+    expect(candidates).toEqual(expect.arrayContaining(["blob-shared", "blob-only-ws1"]));
+
+    await fakeRepo.deleteNotesByWorkspace("ws-1");
+    await service.gcOrphanBlobs(candidates);
+
+    expect(deleted).toEqual(["blob-only-ws1"]);
   });
 });

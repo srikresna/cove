@@ -140,4 +140,10 @@ export class InMemoryNoteRepository implements INoteRepository {
     if (this.shouldFail) throw new Error("Fake repo error: findExpiredTrash");
     return this.notes.filter((n) => n.deletedAt != null && n.deletedAt < cutoff).map((n) => n.id);
   }
+
+  async getAllContents(): Promise<Array<{ id: string; content: EncryptedPayload }>> {
+    this.callLog.push("getAllContents");
+    if (this.shouldFail) throw new Error("Fake repo error: getAllContents");
+    return this.notes.map((n) => ({ id: n.id, content: n.content }));
+  }
 }

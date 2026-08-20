@@ -226,6 +226,20 @@ export class NoteService implements INoteService {
     }
   }
 
+  async collectWorkspaceBlobCandidates(workspaceId: string): Promise<string[]> {
+    this.assertUnlocked();
+    const metas = await this.notes.getNotesMetadataByWorkspace(workspaceId);
+    const candidates: string[] = [];
+    for (const rec of metas) {
+      candidates.push(...(await this.collectNoteBlobCandidates(rec.id)));
+    }
+    return candidates;
+  }
+
+  async gcOrphanBlobs(candidates: string[]): Promise<void> {
+    await this.deleteBlobsNoLongerReferenced(candidates);
+  }
+
   async trashNote(id: string): Promise<void> {
     this.assertUnlocked();
     await this.notes.setDeleted(id, Date.now());

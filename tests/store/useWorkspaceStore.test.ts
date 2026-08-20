@@ -1,20 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Workspace } from "@/domain/workspace/Workspace";
 
-const { getAllWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, notifyError } =
-  vi.hoisted(() => ({
-    getAllWorkspaces: vi.fn<() => Promise<Workspace[]>>(),
-    createWorkspace:
-      vi.fn<
-        (name: string, emoji: string, color: string, description?: string) => Promise<Workspace>
-      >(),
-    updateWorkspace: vi.fn<(id: string, updates: Partial<Workspace>) => Promise<Workspace>>(),
-    deleteWorkspace: vi.fn<(id: string) => Promise<void>>(),
-    notifyError: vi.fn<(err: unknown) => void>(),
-  }));
+const {
+  getAllWorkspaces,
+  createWorkspace,
+  updateWorkspace,
+  deleteWorkspace,
+  collectWorkspaceBlobCandidates,
+  gcOrphanBlobs,
+  notifyError,
+} = vi.hoisted(() => ({
+  getAllWorkspaces: vi.fn<() => Promise<Workspace[]>>(),
+  createWorkspace:
+    vi.fn<
+      (name: string, emoji: string, color: string, description?: string) => Promise<Workspace>
+    >(),
+  updateWorkspace: vi.fn<(id: string, updates: Partial<Workspace>) => Promise<Workspace>>(),
+  deleteWorkspace: vi.fn<(id: string) => Promise<void>>(),
+  collectWorkspaceBlobCandidates: vi.fn<(workspaceId: string) => Promise<string[]>>(),
+  gcOrphanBlobs: vi.fn<(candidates: string[]) => Promise<void>>(),
+  notifyError: vi.fn<(err: unknown) => void>(),
+}));
 
 vi.mock("@/di/container", () => ({
   workspaceService: { getAllWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace },
+  noteService: { collectWorkspaceBlobCandidates, gcOrphanBlobs },
 }));
 
 vi.mock("@/store/notify", () => ({ notifyError }));
@@ -115,10 +125,34 @@ describe("useWorkspaceStore", () => {
       activeWorkspaceId: "w1",
     });
     deleteWorkspace.mockResolvedValue(undefined);
+    collectWorkspaceBlobCandidates.mockResolvedValue([]);
 
     await useWorkspaceStore.getState().deleteWorkspace("w1");
 
     expect(useWorkspaceStore.getState().workspaces.map((w) => w.id)).toEqual(["w2"]);
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("w2");
+  });
+
+  it("deleteWorkspace collects blob candidates first, deletes, then GCs orphans", async () => {
+    useWorkspaceStore.setState({
+      workspaces: [makeWorkspace("w1"), makeWorkspace("w2")],
+      activeWorkspaceId: "w1",
+    });
+    const order: string[] = [];
+    collectWorkspaceBlobCandidates.mockImplementation(async () => {
+      order.push("collect");
+      return ["blob-1"];
+    });
+    deleteWorkspace.mockImplementation(async () => {
+      order.push("delete");
+    });
+    gcOrphanBlobs.mockImplementation(async () => {
+      order.push("gc");
+    });
+
+    await useWorkspaceStore.getState().deleteWorkspace("w1");
+
+    expect(order).toEqual(["collect", "delete", "gc"]);
+    expect(collectWorkspaceBlobCandidates).toHaveBeenCalledWith("w1");
   });
 });

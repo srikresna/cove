@@ -32,6 +32,10 @@ export interface INoteService {
 
   deleteNote(id: string): Promise<void>;
 
+  collectWorkspaceBlobCandidates(workspaceId: string): Promise<string[]>;
+
+  gcOrphanBlobs(candidates: string[]): Promise<void>;
+
   trashNote(id: string): Promise<void>;
   restoreNote(id: string): Promise<void>;
 

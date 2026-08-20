@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { workspaceService } from "../di/container";
+import { noteService, workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
 import { notifyError } from "./notify";
 import { useUIStore } from "./useUIStore";
@@ -75,9 +75,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const filtered = current.filter((w) => w.id !== id);
     const nextActive = filtered[0]?.id ?? null;
 
+    let blobCandidates: string[] = [];
+    try {
+      blobCandidates = await noteService.collectWorkspaceBlobCandidates(id);
+    } catch {}
+
     try {
       await workspaceService.deleteWorkspace(id);
       set({ workspaces: filtered, activeWorkspaceId: nextActive });
+      if (blobCandidates.length > 0) {
+        void noteService.gcOrphanBlobs(blobCandidates).catch(() => {});
+      }
     } catch (err) {
       notifyError(err);
     }
