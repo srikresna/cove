@@ -1,49 +1,73 @@
 import { FileText, RotateCcw, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { useNoteStore } from "../../store/useNoteStore";
-import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { formatRelativeDay } from "../../utils/time";
+import { ConfirmDialog } from "../modals/ConfirmDialog";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Input } from "../ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { ConfirmDialog } from "./ConfirmDialog";
 
-export const TrashDialog: React.FC = () => {
+export const TrashPage: React.FC = () => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const isTrashOpen = useUIStore((s) => s.isTrashOpen);
-  const setTrashOpen = useUIStore((s) => s.setTrashOpen);
   const trashedNotes = useNoteStore((s) => s.trashedNotes);
   const fetchTrash = useNoteStore((s) => s.fetchTrash);
   const restoreNote = useNoteStore((s) => s.restoreNote);
   const deleteNotePermanently = useNoteStore((s) => s.deleteNotePermanently);
 
+  const [query, setQuery] = useState("");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isTrashOpen) {
-      void fetchTrash();
-    }
-  }, [isTrashOpen, fetchTrash]);
+    void fetchTrash();
+  }, [fetchTrash]);
+
+  const trimmed = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      trimmed ? trashedNotes.filter((n) => n.title.toLowerCase().includes(trimmed)) : trashedNotes,
+    [trashedNotes, trimmed],
+  );
 
   const confirming = trashedNotes.find((n) => n.id === confirmingId);
 
   return (
     <>
-      <Dialog open={isTrashOpen} onOpenChange={setTrashOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{MESSAGES.TRASH_TITLE}</DialogTitle>
-            <DialogDescription>{MESSAGES.TRASH_RETENTION_NOTE}</DialogDescription>
-          </DialogHeader>
+      <div className="flex h-full flex-col overflow-y-auto">
+        <div className="mx-auto w-full max-w-2xl px-6 pt-12 pb-16">
+          <h2 className="font-display text-2xl font-medium tracking-tight text-foreground">
+            {MESSAGES.TRASH_TITLE}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">{MESSAGES.TRASH_RETENTION_NOTE}</p>
+
+          <Input
+            className="mt-6 max-w-sm"
+            placeholder={MESSAGES.TRASH_SEARCH_PLACEHOLDER}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+
+          <div aria-hidden="true" className="waterline mt-8 w-full opacity-70" />
 
           {trashedNotes.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">{MESSAGES.TRASH_EMPTY}</p>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div
+                className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
+                aria-hidden="true"
+              >
+                🗑️
+              </div>
+              <p className="max-w-sm text-sm text-muted-foreground">{MESSAGES.TRASH_EMPTY}</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {MESSAGES.TRASH_NO_RESULTS}
+            </p>
           ) : (
-            <div className="-mx-1 max-h-80 space-y-0.5 overflow-y-auto px-1">
-              {trashedNotes.map((note) => {
+            <div className="space-y-0.5">
+              {filtered.map((note) => {
                 const ws = workspaces.find((w) => w.id === note.workspaceId);
                 return (
                   <div
@@ -102,8 +126,8 @@ export const TrashDialog: React.FC = () => {
               })}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
 
       <ConfirmDialog
         open={confirmingId !== null}

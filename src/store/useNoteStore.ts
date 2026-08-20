@@ -7,6 +7,7 @@ import { processCoverImage } from "../utils/coverImage";
 import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 import { useNotificationStore } from "./useNotificationStore";
 import { useSaveStatusStore } from "./useSaveStatusStore";
+import { useUIStore } from "./useUIStore";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 interface NoteState {
@@ -87,7 +88,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
     activeNoteId: null,
     activeCoverImage: null,
 
-    setActiveNoteId: (id) => set({ activeNoteId: id, activeCoverImage: null }),
+    setActiveNoteId: (id) => {
+      useUIStore.getState().setTrashOpen(false);
+      set({ activeNoteId: id, activeCoverImage: null });
+    },
 
     fetchNotes: async (workspaceId) => {
       const notes = await listAndRegister(workspaceId);

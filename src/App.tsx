@@ -6,10 +6,10 @@ import { BlockSuiteDialogs } from "./components/editor/BlockSuiteDialogs";
 import { PeekViewModal } from "./components/editor/blocksuite/peek/PeekViewModal";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
-import { TrashDialog } from "./components/modals/TrashDialog";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { ToastContainer } from "./components/ToastContainer";
+import { TrashPage } from "./components/trash/TrashPage";
 import { Button } from "./components/ui/button";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { VaultGate } from "./components/vault/VaultGate";
@@ -28,6 +28,7 @@ export const AppContent: React.FC = () => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
   const isDarkMode = useUIStore((s) => s.isDarkMode);
+  const isTrashOpen = useUIStore((s) => s.isTrashOpen);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const notes = useNoteStore((s) => s.notes);
   const activeNoteId = useNoteStore((s) => s.activeNoteId);
@@ -72,7 +73,9 @@ export const AppContent: React.FC = () => {
         <Sidebar />
 
         <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
-          {activeNote ? (
+          {isTrashOpen ? (
+            <TrashPage />
+          ) : activeNote ? (
             activeNote.content === "" ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                 Loading editor…
@@ -142,7 +145,6 @@ export const AppContent: React.FC = () => {
         <CreateWorkspaceModal />
         <QuickSearchModal />
         <SettingsModal />
-        <TrashDialog />
         <ToastContainer />
         <PeekViewModal />
         <BlockSuiteDialogs />

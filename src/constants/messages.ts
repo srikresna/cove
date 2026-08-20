@@ -55,6 +55,8 @@ export const MESSAGES = {
   DUPLICATE_NOTE: "Duplicate Note",
   MOVE_TO_TRASH: "Move to Trash",
   TRASH_TITLE: "Trash",
+  TRASH_SEARCH_PLACEHOLDER: "Search deleted notes…",
+  TRASH_NO_RESULTS: "No deleted notes match your search.",
   TRASH_EMPTY: "Trash is empty.",
   TRASH_RESTORE: "Restore",
   TRASH_DELETE_FOREVER: "Delete forever",

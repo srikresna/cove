@@ -18,6 +18,7 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
   const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore();
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const isTrashOpen = useUIStore((s) => s.isTrashOpen);
   const setTrashOpen = useUIStore((s) => s.setTrashOpen);
 
   return (
@@ -93,8 +94,14 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
           <button
             type="button"
             aria-label={MESSAGES.TRASH_TITLE}
-            onClick={() => setTrashOpen(true)}
-            className={cn(tile, "text-muted-foreground hover:bg-accent hover:text-foreground")}
+            aria-pressed={isTrashOpen}
+            onClick={() => setTrashOpen(!isTrashOpen)}
+            className={cn(
+              tile,
+              isTrashOpen
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            )}
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
