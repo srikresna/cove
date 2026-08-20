@@ -27,18 +27,36 @@ const refreshStatus = async (): Promise<VaultStatus> => {
 
 let initInFlight: Promise<void> | null = null;
 
+const AUTO_UNLOCK_RETRY_MS = 400;
+
+async function attemptAutoUnlock(): Promise<boolean> {
+  try {
+    return await vaultService.tryAutoUnlock();
+  } catch (err) {
+    Logger.warn("vault: auto-unlock attempt rejected", err);
+    return false;
+  }
+}
+
 export const useVaultStore = create<VaultState>((set) => ({
   status: "uninitialized",
   init: () => {
     if (initInFlight) return initInFlight;
     const attempt = (async () => {
       const auto = useSettingsStore.getState().autoUnlockOnLaunch;
-      if (auto && (await vaultService.tryAutoUnlock())) {
-        set({ status: "unlocked" });
-      } else {
-        if (auto) Logger.warn("vault: trusted-device auto-unlock unavailable at launch");
-        set({ status: await refreshStatus() });
+      if (auto) {
+        let ok = await attemptAutoUnlock();
+        if (!ok) {
+          await new Promise((r) => setTimeout(r, AUTO_UNLOCK_RETRY_MS));
+          ok = await attemptAutoUnlock();
+        }
+        if (ok) {
+          set({ status: "unlocked" });
+          return;
+        }
+        Logger.warn("vault: trusted-device auto-unlock unavailable at launch");
       }
+      set({ status: await refreshStatus() });
     })();
     initInFlight = attempt;
     void attempt.then(
