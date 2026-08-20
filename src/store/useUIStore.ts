@@ -49,6 +49,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     }),
   pickNote: () =>
     new Promise<string | null>((resolve) => {
+      const prev = get().pickerResolve;
+      if (prev) prev(null);
       set({ pickerResolve: resolve, isQuickSearchOpen: true });
     }),
   resolvePicker: (id) => {
