@@ -43,6 +43,7 @@ export const TrashPage: React.FC = () => {
           <p className="mt-1 text-sm text-muted-foreground">{MESSAGES.TRASH_RETENTION_NOTE}</p>
 
           <Input
+            type="search"
             className="mt-6 max-w-sm"
             placeholder={MESSAGES.TRASH_SEARCH_PLACEHOLDER}
             value={query}
