@@ -8,14 +8,17 @@ import {
   extractClosestEdge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import {
+  Calendar,
   CalendarDays,
   Check,
   CircleDot,
   Eye,
   EyeOff,
   FileText,
+  FolderOpen,
   GripVertical,
   Hash,
+  History,
   Link,
   Link2,
   List,
@@ -24,6 +27,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Tag as TagIcon,
   ToggleLeft,
   Trash2,
   Type,
@@ -33,7 +37,7 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { propertyService } from "../../di/container";
+import { propertyService, tagService } from "../../di/container";
 import type {
   PropertyDefinition,
   PropertyOption,
@@ -41,13 +45,21 @@ import type {
   PropertyValue,
   PropertyVisibility,
 } from "../../domain/property/Property";
-import { hasOptions, PROPERTY_TYPES, PROPERTY_VISIBILITY } from "../../domain/property/Property";
+import {
+  CREATABLE_PROPERTY_TYPES,
+  hasOptions,
+  isSystemPropertyId,
+  PROPERTY_VISIBILITY,
+} from "../../domain/property/Property";
+import type { Tag } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
+import { useTagStore } from "../../store/useTagStore";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
-import { formatRelativeDay } from "../../utils/time";
+import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {
   DropdownMenu,
@@ -58,6 +70,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { InfoRow } from "./NoteInfoPanel";
 
 const TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> = {
@@ -72,6 +85,10 @@ const TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> 
   checkbox: { label: "Checkbox", icon: <ToggleLeft /> },
   url: { label: "URL", icon: <Link /> },
   relation: { label: "Relation", icon: <Link2 /> },
+  tags: { label: "Tags", icon: <TagIcon /> },
+  workspace: { label: "Workspace", icon: <FolderOpen /> },
+  created: { label: "Created", icon: <History /> },
+  updated: { label: "Updated", icon: <Calendar /> },
 };
 
 const inputClass =
@@ -230,6 +247,199 @@ const VISIBILITY_LABEL: Record<PropertyVisibility, string> = {
   "always-hide": MESSAGES.PROP_VIS_ALWAYS_HIDE,
 };
 
+export const TagChip: React.FC<{ tag: Tag; onRemove?: () => void }> = ({ tag, onRemove }) => (
+  <span className="group/tag inline-flex h-[22px] max-w-32 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground">
+    <span
+      aria-hidden="true"
+      className="h-2 w-2 shrink-0 rounded-full"
+      style={{ backgroundColor: tag.color }}
+    />
+    <span className="truncate">{tag.name}</span>
+    {onRemove && (
+      <button
+        type="button"
+        aria-label={`Remove tag ${tag.name}`}
+        onClick={onRemove}
+        className="shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/tag:opacity-100"
+      >
+        <X className="h-2.5 w-2.5" aria-hidden="true" />
+      </button>
+    )}
+  </span>
+);
+
+const DateValue: React.FC<{ timestamp: number }> = ({ timestamp }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="cursor-default">{formatRelativeDay(timestamp)}</span>
+    </TooltipTrigger>
+    <TooltipContent side="top" align="start">
+      {formatFullTimestamp(timestamp)}
+    </TooltipContent>
+  </Tooltip>
+);
+
+/** System row: tags chips + create/pick popover, backed by the tag service. */
+const TagsValue: React.FC<{ noteId: string }> = ({ noteId }) => {
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [query, setQuery] = useState("");
+  const tagVersion = useTagStore((s) => s.version);
+
+  const refreshTags = useCallback(
+    (version: number) => {
+      tagService
+        .tagsForNote(noteId)
+        .then((next) => {
+          if (useTagStore.getState().version === version) setTags(next);
+        })
+        .catch(notifyError);
+    },
+    [noteId],
+  );
+
+  useEffect(() => {
+    refreshTags(tagVersion);
+  }, [refreshTags, tagVersion]);
+
+  const loadAllTags = () => {
+    tagService.listTags().then(setAllTags).catch(notifyError);
+  };
+
+  const addTag = async (name: string) => {
+    try {
+      await tagService.addTag(noteId, name);
+      setQuery("");
+      refreshTags(tagVersion);
+      loadAllTags();
+      void useTagStore.getState().refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const removeTag = async (tagId: string) => {
+    try {
+      await tagService.removeTag(noteId, tagId);
+      refreshTags(tagVersion);
+      void useTagStore.getState().refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const trimmed = query.trim();
+  const attachedIds = new Set(tags.map((t) => t.id));
+  const suggestions = allTags.filter(
+    (t) =>
+      !attachedIds.has(t.id) && (!trimmed || t.name.toLowerCase().includes(trimmed.toLowerCase())),
+  );
+  const exactExists = allTags.some((t) => t.name.toLowerCase() === trimmed.toLowerCase());
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {tags.map((tag) => (
+        <TagChip key={tag.id} tag={tag} onRemove={() => removeTag(tag.id)} />
+      ))}
+      <Popover
+        onOpenChange={(open) => {
+          if (open) loadAllTags();
+          else setQuery("");
+        }}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={MESSAGES.INFO_ADD_TAG_PLACEHOLDER}
+            className={cn(
+              "inline-flex h-[22px] items-center gap-1 rounded-full px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              tags.length === 0 && "px-1",
+            )}
+          >
+            <Plus className="h-3 w-3" aria-hidden="true" />
+            {tags.length === 0 && <span>{MESSAGES.INFO_EMPTY_VALUE}</span>}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-2">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={MESSAGES.INFO_ADD_TAG_PLACEHOLDER}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && trimmed) void addTag(trimmed);
+            }}
+            className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="max-h-48 space-y-0.5 overflow-y-auto">
+            {suggestions.map((tag) => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => void addTag(tag.name)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: tag.color }}
+                />
+                <span className="truncate">{tag.name}</span>
+              </button>
+            ))}
+            {trimmed && !exactExists && (
+              <button
+                type="button"
+                onClick={() => void addTag(trimmed)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">
+                  {MESSAGES.INFO_CREATE_TAG_PREFIX} "{trimmed}"
+                </span>
+              </button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
+
+/** System row: workspace picker, derived from the note's workspaceId. */
+const WorkspaceValue: React.FC<{ note: Note }> = ({ note }) => {
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const moveNoteToWorkspace = useNoteStore((s) => s.moveNoteToWorkspace);
+  const workspace = workspaces.find((w) => w.id === note.workspaceId);
+
+  const moveToWorkspace = (workspaceId: string) => {
+    if (workspaceId === note.workspaceId) return;
+    void moveNoteToWorkspace(note.id, workspaceId);
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span aria-hidden="true">{workspace?.emoji}</span>
+          <span className="truncate">{workspace?.name ?? MESSAGES.INFO_EMPTY_VALUE}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {workspaces.map((ws) => (
+          <DropdownMenuItem key={ws.id} onSelect={() => moveToWorkspace(ws.id)}>
+            <span aria-hidden="true">{ws.emoji}</span>
+            <span className="truncate">{ws.name}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
 /** Compact value rendering used by the collapsed Info summary chips. */
 export const summarizePropertyValue = (
   def: PropertyDefinition,
@@ -357,6 +567,8 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
     });
   }, [def.id, onReorder]);
 
+  const isSystem = isSystemPropertyId(def.id);
+
   const label = renaming ? (
     <input
       ref={renameInputRef}
@@ -438,35 +650,41 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
                 }
               }}
             >
-              <DropdownMenuItem
-                onSelect={() => {
-                  suppressTriggerFocusRef.current = true;
-                  onStartRename(def.id);
-                }}
-              >
-                <Pencil aria-hidden="true" />
-                {MESSAGES.PROP_RENAME}
-              </DropdownMenuItem>
+              {!isSystem && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    suppressTriggerFocusRef.current = true;
+                    onStartRename(def.id);
+                  }}
+                >
+                  <Pencil aria-hidden="true" />
+                  {MESSAGES.PROP_RENAME}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-              {PROPERTY_VISIBILITY.map((visibility) => (
-                <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
-                  <span className="flex h-4 w-4 items-center justify-center">
-                    {def.show === visibility ? (
-                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : null}
-                  </span>
-                  {VISIBILITY_LABEL[visibility]}
-                </DropdownMenuItem>
-              ))}
+              {(isSystem ? (["always-show", "always-hide"] as const) : PROPERTY_VISIBILITY).map(
+                (visibility) => (
+                  <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
+                    <span className="flex h-4 w-4 items-center justify-center">
+                      {def.show === visibility ? (
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      ) : null}
+                    </span>
+                    {VISIBILITY_LABEL[visibility]}
+                  </DropdownMenuItem>
+                ),
+              )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                onSelect={() => onDelete(def)}
-              >
-                <Trash2 aria-hidden="true" />
-                {MESSAGES.PROP_DELETE}
-              </DropdownMenuItem>
+              {!isSystem && (
+                <DropdownMenuItem
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  onSelect={() => onDelete(def)}
+                >
+                  <Trash2 aria-hidden="true" />
+                  {MESSAGES.PROP_DELETE}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -624,6 +842,14 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   const renderValue = (def: PropertyDefinition) => {
     const value = values.get(def.id);
     switch (def.type) {
+      case "tags":
+        return <TagsValue noteId={note.id} />;
+      case "workspace":
+        return <WorkspaceValue note={note} />;
+      case "created":
+        return <DateValue timestamp={note.createdAt} />;
+      case "updated":
+        return <DateValue timestamp={note.updatedAt} />;
       case "text":
       case "person":
       case "url": {
@@ -900,15 +1126,17 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
                   >
                     <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    aria-label={MESSAGES.PROP_DELETE}
-                    title={MESSAGES.PROP_DELETE}
-                    onClick={() => setDeletingDef(def)}
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                  {!isSystemPropertyId(def.id) && (
+                    <button
+                      type="button"
+                      aria-label={MESSAGES.PROP_DELETE}
+                      title={MESSAGES.PROP_DELETE}
+                      onClick={() => setDeletingDef(def)}
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -935,7 +1163,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
             className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
           <div className="grid max-h-56 grid-cols-1 gap-0.5 overflow-y-auto">
-            {PROPERTY_TYPES.map((type) => (
+            {CREATABLE_PROPERTY_TYPES.map((type) => (
               <button
                 key={type}
                 type="button"

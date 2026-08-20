@@ -13,9 +13,39 @@ export const PROPERTY_TYPES = [
   "checkbox",
   "url",
   "relation",
+  "tags",
+  "workspace",
+  "created",
+  "updated",
 ] as const;
 
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
+
+/**
+ * Built-in rows (Tags / Workspace / Created / Updated) are seeded as property
+ * definitions so they take part in ordering and visibility like any other
+ * row, while their values stay derived from their real sources (tag service,
+ * note fields) instead of note_properties.
+ */
+export const SYSTEM_PROPERTY_IDS = [
+  "system:tags",
+  "system:workspace",
+  "system:created",
+  "system:updated",
+] as const;
+
+export type SystemPropertyId = (typeof SYSTEM_PROPERTY_IDS)[number];
+
+export const SYSTEM_PROPERTY_TYPES = ["tags", "workspace", "created", "updated"] as const;
+
+export type SystemPropertyType = (typeof SYSTEM_PROPERTY_TYPES)[number];
+
+export const isSystemPropertyId = (id: string): id is SystemPropertyId =>
+  (SYSTEM_PROPERTY_IDS as readonly string[]).includes(id);
+
+export const CREATABLE_PROPERTY_TYPES = PROPERTY_TYPES.filter(
+  (type) => !(SYSTEM_PROPERTY_TYPES as readonly string[]).includes(type),
+) as Exclude<PropertyType, SystemPropertyType>[];
 
 export const PROPERTY_VISIBILITY = ["always-show", "hide-when-empty", "always-hide"] as const;
 

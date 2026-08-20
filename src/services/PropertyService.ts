@@ -3,6 +3,7 @@ import {
   DEFAULT_STATUS_OPTIONS,
   deserializePropertyValue,
   hasOptions,
+  isSystemPropertyId,
   makePropertyId,
   nextOptionColor,
   orderKeyBetween,
@@ -11,6 +12,7 @@ import {
   type PropertyType,
   type PropertyValue,
   type PropertyVisibility,
+  SYSTEM_PROPERTY_TYPES,
   serializePropertyValue,
 } from "../domain/property/Property";
 import { ValidationError } from "../errors/AppError";
@@ -32,6 +34,9 @@ export class PropertyService implements IPropertyService {
   async createDefinition(name: string, type: PropertyType): Promise<PropertyDefinition> {
     const normalized = normalizePropertyName(name);
     if (!normalized) throw new ValidationError("Property name cannot be empty.");
+    if ((SYSTEM_PROPERTY_TYPES as readonly string[]).includes(type)) {
+      throw new ValidationError("Built-in property types cannot be created.");
+    }
 
     const existing = await this.properties.listDefinitions();
     const duplicate = existing.find((d) => d.name.toLowerCase() === normalized.toLowerCase());
@@ -64,6 +69,9 @@ export class PropertyService implements IPropertyService {
   async renameDefinition(id: string, name: string): Promise<void> {
     const normalized = normalizePropertyName(name);
     if (!normalized) throw new ValidationError("Property name cannot be empty.");
+    if (isSystemPropertyId(id)) {
+      throw new ValidationError("Built-in properties cannot be renamed.");
+    }
 
     const existing = await this.properties.listDefinitions();
     if (!existing.some((d) => d.id === id)) throw new NotFoundError("Property", id);
@@ -76,6 +84,11 @@ export class PropertyService implements IPropertyService {
   }
 
   async setDefinitionVisibility(id: string, show: PropertyVisibility): Promise<void> {
+    if (isSystemPropertyId(id) && show === "hide-when-empty") {
+      // System values live outside note_properties, so "empty" never resolves
+      // and the row could never come back. Only show/hide are meaningful.
+      throw new ValidationError("Built-in properties only support always-show or always-hide.");
+    }
     const existing = await this.properties.listDefinitions();
     if (!existing.some((d) => d.id === id)) throw new NotFoundError("Property", id);
     await this.properties.updateDefinition(id, { show });
@@ -110,6 +123,9 @@ export class PropertyService implements IPropertyService {
   }
 
   deleteDefinition(id: string): Promise<void> {
+    if (isSystemPropertyId(id)) {
+      return Promise.reject(new ValidationError("Built-in properties cannot be deleted."));
+    }
     return this.properties.deleteDefinition(id);
   }
 

@@ -45,7 +45,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, name, type, optionsJson, createdAt, orderIndex, show FROM property_defs ORDER BY orderIndex, createdAt",
+        "SELECT id, name, type, optionsJson, createdAt, orderIndex, show FROM property_defs ORDER BY orderIndex, createdAt, id",
       );
       return rows.map(rowToDefinition).filter((d): d is PropertyDefinition => d !== null);
     } catch (err) {

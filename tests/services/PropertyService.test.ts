@@ -139,4 +139,37 @@ describe("PropertyService", () => {
       NotFoundError,
     );
   });
+
+  it("guards built-in system properties", async () => {
+    const repo = new InMemoryPropertyRepository();
+    repo.definitions.push({
+      id: "system:tags",
+      name: "Tags",
+      type: "tags",
+      options: [],
+      createdAt: 0,
+      order: "a0",
+      show: "always-show",
+    });
+    const service = new PropertyService(repo);
+
+    await expect(service.createDefinition("Fake tags", "tags")).rejects.toThrow(ValidationError);
+    await expect(service.renameDefinition("system:tags", "Renamed")).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(service.deleteDefinition("system:created")).rejects.toThrow(ValidationError);
+    await expect(
+      service.setDefinitionVisibility("system:updated", "hide-when-empty"),
+    ).rejects.toThrow(ValidationError);
+
+    // Reordering and show/hide stay allowed for system rows.
+    const custom = await service.createDefinition("Owner", "text");
+    await expect(
+      service.setDefinitionVisibility("system:tags", "always-hide"),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.reorderDefinition(custom.id, "system:tags", "before"),
+    ).resolves.toBeUndefined();
+    expect((await service.listDefinitions()).map((d) => d.id)).toEqual([custom.id, "system:tags"]);
+  });
 });

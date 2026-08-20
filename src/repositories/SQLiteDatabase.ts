@@ -323,5 +323,52 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 14");
       }
     }
+
+    if (version < 15) {
+      const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
+      if (propCols.length > 0) {
+        // Built-in Info rows become system property definitions: orderable and
+        // hideable like any other row, but rename/delete are guarded in the
+        // service layer and their values stay derived (tags service, note fields).
+        const seed = [
+          ["system:tags", "Tags", "tags"],
+          ["system:workspace", "Workspace", "workspace"],
+          ["system:created", "Created", "created"],
+          ["system:updated", "Updated", "updated"],
+        ] as const;
+        const statements: SqlStatement[] = [
+          // A v14 user could legally have created a custom property named
+          // "Tags" etc.; keep the name-uniqueness invariant intact.
+          {
+            sql: "UPDATE property_defs SET name = name || ' (custom)' WHERE id NOT LIKE 'system:%' AND lower(name) IN ('tags','workspace','created','updated')",
+          },
+          ...seed.map(([id, name, type]) => ({
+            sql: "INSERT OR IGNORE INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES (?, ?, ?, '[]', 0, '', 'always-show')",
+            params: [id, name, type],
+          })),
+        ];
+        // Build the full ordering in code: the seed rows above are only queued
+        // for the transaction, so a SELECT could never see them yet. Custom rows
+        // are ordered by their existing orderIndex to preserve any drag
+        // arrangement made on v14 (createdAt is only a tiebreaker).
+        const customRows = await db.select<Array<{ id: string }>>(
+          "SELECT id FROM property_defs WHERE id NOT LIKE 'system:%' ORDER BY orderIndex, createdAt, id",
+        );
+        const orderedIds = [...seed.map(([id]) => id), ...customRows.map((row) => row.id)];
+        let prev: string | null = null;
+        for (const id of orderedIds) {
+          const key = generateKeyBetween(prev, null);
+          statements.push({
+            sql: "UPDATE property_defs SET orderIndex = ? WHERE id = ?",
+            params: [key, id],
+          });
+          prev = key;
+        }
+        statements.push({ sql: "PRAGMA user_version = 15" });
+        await SQLiteDatabase.runTransaction(statements);
+      } else {
+        await db.execute("PRAGMA user_version = 15");
+      }
+    }
   }
 }
