@@ -11,6 +11,7 @@ import { SettingsModal } from "./components/settings/SettingsModal";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { ToastContainer } from "./components/ToastContainer";
 import { Button } from "./components/ui/button";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import type { Note } from "./domain/note/Note";
@@ -66,85 +67,87 @@ export const AppContent: React.FC = () => {
   }, [isDarkMode]);
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
-      <Sidebar />
+    <TooltipProvider delayDuration={300}>
+      <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
+        <Sidebar />
 
-      <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
-        {activeNote ? (
-          activeNote.content === "" ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              Loading editor…
+        <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
+          {activeNote ? (
+            activeNote.content === "" ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                Loading editor…
+              </div>
+            ) : (
+              <Suspense
+                fallback={
+                  <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                    Loading editor…
+                  </div>
+                }
+              >
+                <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
+              </Suspense>
+            )
+          ) : workspaces.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+              <div
+                className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
+                aria-hidden="true"
+              >
+                🗂️
+              </div>
+              <h2 className="mb-2 font-display text-2xl font-medium tracking-tight text-foreground">
+                {MESSAGES.NO_WORKSPACE_TITLE}
+              </h2>
+              <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+                {MESSAGES.NO_WORKSPACE_DESC}
+              </p>
+              <Button
+                aria-label={MESSAGES.CREATE_WORKSPACE_TITLE}
+                onClick={() => setCreateModalOpen(true)}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                <span>{MESSAGES.CREATE_WORKSPACE_TITLE}</span>
+              </Button>
             </div>
           ) : (
-            <Suspense
-              fallback={
-                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                  Loading editor…
-                </div>
-              }
-            >
-              <BlockSuiteNoteEditor key={activeNote.id} note={activeNote} />
-            </Suspense>
-          )
-        ) : workspaces.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-            <div
-              className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
-              aria-hidden="true"
-            >
-              🗂️
+            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+              <div
+                className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
+                aria-hidden="true"
+              >
+                📝
+              </div>
+              <h2 className="mb-2 font-display text-2xl font-medium tracking-tight text-foreground">
+                {MESSAGES.NO_NOTE_SELECTED_TITLE}
+              </h2>
+              <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+                {MESSAGES.NO_NOTE_SELECTED_DESC}
+              </p>
+              <Button
+                aria-label={MESSAGES.CREATE_NEW_NOTE}
+                onClick={() => {
+                  if (activeWorkspaceId) {
+                    createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE);
+                  }
+                }}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                <span>{MESSAGES.CREATE_NEW_NOTE}</span>
+              </Button>
             </div>
-            <h2 className="mb-2 font-display text-2xl font-medium tracking-tight text-foreground">
-              {MESSAGES.NO_WORKSPACE_TITLE}
-            </h2>
-            <p className="mb-6 max-w-sm text-sm text-muted-foreground">
-              {MESSAGES.NO_WORKSPACE_DESC}
-            </p>
-            <Button
-              aria-label={MESSAGES.CREATE_WORKSPACE_TITLE}
-              onClick={() => setCreateModalOpen(true)}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              <span>{MESSAGES.CREATE_WORKSPACE_TITLE}</span>
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-            <div
-              className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border bg-card text-3xl shadow-sm"
-              aria-hidden="true"
-            >
-              📝
-            </div>
-            <h2 className="mb-2 font-display text-2xl font-medium tracking-tight text-foreground">
-              {MESSAGES.NO_NOTE_SELECTED_TITLE}
-            </h2>
-            <p className="mb-6 max-w-sm text-sm text-muted-foreground">
-              {MESSAGES.NO_NOTE_SELECTED_DESC}
-            </p>
-            <Button
-              aria-label={MESSAGES.CREATE_NEW_NOTE}
-              onClick={() => {
-                if (activeWorkspaceId) {
-                  createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE);
-                }
-              }}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              <span>{MESSAGES.CREATE_NEW_NOTE}</span>
-            </Button>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
 
-      <CreateWorkspaceModal />
-      <QuickSearchModal />
-      <SettingsModal />
-      <TrashDialog />
-      <ToastContainer />
-      <PeekViewModal />
-      <BlockSuiteDialogs />
-    </div>
+        <CreateWorkspaceModal />
+        <QuickSearchModal />
+        <SettingsModal />
+        <TrashDialog />
+        <ToastContainer />
+        <PeekViewModal />
+        <BlockSuiteDialogs />
+      </div>
+    </TooltipProvider>
   );
 };
 
