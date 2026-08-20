@@ -165,6 +165,8 @@ export const NoteHeaderBody: React.FC<{
         type="file"
         accept="image/*"
         className="hidden"
+        hidden
+        style={{ display: "none" }}
         aria-label={MESSAGES.COVER_UPLOAD}
         onChange={handleCoverFile}
       />

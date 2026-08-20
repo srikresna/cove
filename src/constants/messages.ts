@@ -160,4 +160,16 @@ export const MESSAGES = {
   RESTORE_CONFIRM_DESC:
     "All current notes and workspaces will be replaced by the backup. The current database is kept next to it as cove.db.pre-restore. The app will restart, locked with the backup's passphrase.",
   RESTORE_CONFIRM_BUTTON: "Restore & Restart",
+  SETTINGS_CATEGORY_APPEARANCE: "Appearance",
+  SETTINGS_CATEGORY_EDITOR: "Editor",
+  SETTINGS_CATEGORY_SECURITY: "Security",
+  SETTINGS_CATEGORY_BACKUP: "Backup",
+  SETTINGS_CATEGORY_ABOUT: "About",
+  SETTINGS_EDITOR_HINT: "Changes apply the next time you open a note.",
+  SETTINGS_SHORTCUT_HINT: "to open settings",
+  SETTINGS_LOCK_NOW_DESC: "Clears the key from memory; unlock again to continue.",
+  SETTINGS_ABOUT_DESC:
+    "Cove Notes is a joyful desktop note-taking app with block-based editing, multi-workspace support, and client-side encryption.",
+  SETTINGS_ABOUT_VERSION_LABEL: "Version",
+  SETTINGS_ABOUT_IDENTIFIER_LABEL: "Identifier",
 } as const;
