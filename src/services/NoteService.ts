@@ -20,6 +20,10 @@ import type { INoteService, NoteMeta } from "./INoteService";
 import { coverAad, titleAad } from "./vault/aad";
 import type { IEncryptionService } from "./vault/IEncryptionService";
 
+const SEARCH_PAGE_SIZE = 500;
+const SEARCH_MAX_HITS = 50;
+const SEARCH_MAX_SCAN = 50_000;
+
 export class NoteService implements INoteService {
   constructor(
     private readonly notes: INoteRepository,
@@ -76,32 +80,46 @@ export class NoteService implements INoteService {
     const q = query.trim().toLowerCase();
     if (!q) return [];
 
-    const candidates = await this.notes.findRecentForSearch(1000);
     const hits: NoteSearchHit[] = [];
-    for (const rec of candidates) {
-      try {
-        const title = await this.decryptTitle(rec);
-        if (title.toLowerCase().includes(q)) {
-          hits.push({
-            id: rec.id,
-            workspaceId: rec.workspaceId,
-            title,
-            icon: rec.icon,
-            snippet: "",
-          });
-          continue;
-        }
-        const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
-        if (plain.toLowerCase().includes(q)) {
-          hits.push({
-            id: rec.id,
-            workspaceId: rec.workspaceId,
-            title,
-            icon: rec.icon,
-            snippet: buildSnippet(plain, q),
-          });
-        }
-      } catch {}
+    let scanned = 0;
+    let cursor: { updatedAt: number; id: string } | undefined;
+    for (;;) {
+      if (hits.length >= SEARCH_MAX_HITS || scanned >= SEARCH_MAX_SCAN) break;
+      const page = await this.notes.findNotesForKeyset(SEARCH_PAGE_SIZE, cursor);
+      if (page.length === 0) break;
+      scanned += page.length;
+
+      for (const rec of page) {
+        if (hits.length >= SEARCH_MAX_HITS) break;
+        try {
+          const title = await this.decryptTitle(rec);
+          if (title.toLowerCase().includes(q)) {
+            hits.push({
+              id: rec.id,
+              workspaceId: rec.workspaceId,
+              title,
+              icon: rec.icon,
+              snippet: "",
+            });
+            continue;
+          }
+          const plain = extractPlainText(await this.crypto.decryptPayload(rec.content, rec.id));
+          if (plain.toLowerCase().includes(q)) {
+            hits.push({
+              id: rec.id,
+              workspaceId: rec.workspaceId,
+              title,
+              icon: rec.icon,
+              snippet: buildSnippet(plain, q),
+            });
+          }
+        } catch {}
+      }
+
+      if (page.length < SEARCH_PAGE_SIZE) break;
+      const last = page[page.length - 1];
+      if (!last) break;
+      cursor = { updatedAt: last.updatedAt, id: last.id };
     }
     return hits;
   }

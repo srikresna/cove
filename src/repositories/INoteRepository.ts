@@ -13,6 +13,10 @@ export interface INoteRepository {
   getMetaByIds(ids: string[]): Promise<NoteRecord[]>;
   getNoteById(id: string): Promise<NoteRecord | null>;
   findRecentForSearch(limit: number): Promise<NoteRecord[]>;
+  findNotesForKeyset(
+    limit: number,
+    cursor?: { updatedAt: number; id: string },
+  ): Promise<NoteRecord[]>;
   createNote(note: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord>;
   updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord>;
   deleteNote(id: string): Promise<void>;

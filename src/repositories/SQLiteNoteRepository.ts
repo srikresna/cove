@@ -84,6 +84,27 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
+  async findNotesForKeyset(
+    limit: number,
+    cursor?: { updatedAt: number; id: string },
+  ): Promise<NoteRecord[]> {
+    try {
+      const db = await this.getDb();
+      const rows = cursor
+        ? await db.select<Array<Record<string, unknown>>>(
+            "SELECT * FROM notes WHERE deletedAt IS NULL AND (updatedAt < ? OR (updatedAt = ? AND id < ?)) ORDER BY updatedAt DESC, id DESC LIMIT ?",
+            [cursor.updatedAt, cursor.updatedAt, cursor.id, limit],
+          )
+        : await db.select<Array<Record<string, unknown>>>(
+            "SELECT * FROM notes WHERE deletedAt IS NULL ORDER BY updatedAt DESC, id DESC LIMIT ?",
+            [limit],
+          );
+      return rows.map((row) => this.mapRowToRecord(row));
+    } catch (err) {
+      throw toPersistenceError("findNotesForKeyset", err);
+    }
+  }
+
   async createNote(noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord> {
     const db = await this.getDb();
     const now = Date.now();

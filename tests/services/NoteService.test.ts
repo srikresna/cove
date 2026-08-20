@@ -384,4 +384,39 @@ describe("NoteService", () => {
     const none = await service.searchAcrossWorkspaces("nonexistent-term-xyz");
     expect(none).toHaveLength(0);
   });
+
+  it("searches beyond the first thousand notes via keyset pagination", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+
+    for (let i = 0; i < 1200; i++) {
+      fakeRepo.notes.push({
+        id: `note-${String(i).padStart(4, "0")}`,
+        workspaceId: "ws-1",
+        title: `Filler ${i}` as EncryptedPayload,
+        titleKmsVersion: 0,
+        content: "filler body" as EncryptedPayload,
+        isPinned: false,
+        isFavorite: false,
+        createdAt: 1000 + i,
+        updatedAt: 5000 - i,
+      });
+    }
+    fakeRepo.notes.push({
+      id: "note-deep-target",
+      workspaceId: "ws-1",
+      title: "Deep needle title" as EncryptedPayload,
+      titleKmsVersion: 0,
+      content: "no body match here" as EncryptedPayload,
+      isPinned: false,
+      isFavorite: false,
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    const hits = await service.searchAcrossWorkspaces("deep needle");
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.id).toBe("note-deep-target");
+  });
 });

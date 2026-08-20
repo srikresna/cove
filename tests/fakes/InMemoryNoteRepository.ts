@@ -43,6 +43,25 @@ export class InMemoryNoteRepository implements INoteRepository {
       .map((n) => ({ ...n }));
   }
 
+  async findNotesForKeyset(
+    limit: number,
+    cursor?: { updatedAt: number; id: string },
+  ): Promise<NoteRecord[]> {
+    this.callLog.push("findNotesForKeyset");
+    if (this.shouldFail) throw new Error("Fake repo error: findNotesForKeyset");
+    return this.notes
+      .filter(
+        (n) =>
+          n.deletedAt == null &&
+          (!cursor ||
+            n.updatedAt < cursor.updatedAt ||
+            (n.updatedAt === cursor.updatedAt && n.id < cursor.id)),
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+      .slice(0, limit)
+      .map((n) => ({ ...n }));
+  }
+
   async createNote(noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord> {
     this.callLog.push(`createNote:${noteInput.id}`);
     if (this.shouldFail) throw new Error("Fake repo error: createNote");
