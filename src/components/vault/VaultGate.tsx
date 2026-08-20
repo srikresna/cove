@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
+import { useSettingsStore } from "../../store/useSettingsStore";
 import { useVaultStore } from "../../store/useVaultStore";
 import { SetPassphraseScreen } from "./SetPassphraseScreen";
 import { UnlockScreen } from "./UnlockScreen";
@@ -27,12 +28,16 @@ export const VaultGate: React.FC<VaultGateProps> = ({ children }) => {
     const lock = () => {
       void useVaultStore.getState().lock();
     };
+    const idleLock = () => {
+      if (useSettingsStore.getState().autoUnlockOnLaunch) return;
+      lock();
+    };
     const resetIdle = () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(lock, IDLE_AUTO_LOCK_MS);
+      timer = window.setTimeout(idleLock, IDLE_AUTO_LOCK_MS);
     };
     const idleEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    let timer = window.setTimeout(lock, IDLE_AUTO_LOCK_MS);
+    let timer = window.setTimeout(idleLock, IDLE_AUTO_LOCK_MS);
     for (const ev of idleEvents) {
       window.addEventListener(ev, resetIdle);
     }

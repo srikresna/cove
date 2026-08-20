@@ -123,6 +123,36 @@ describe("useVaultStore", () => {
     expect(useSettingsStore.getState().autoUnlockOnLaunch).toBe(false);
   });
 
+  it("skips auto-unlock while a manual lock barrier is set", async () => {
+    useSettingsStore.getState().setAutoUnlockOnLaunch(true);
+    tryAutoUnlock.mockResolvedValue(true);
+    localStorage.setItem("cove-manual-lock", "1");
+    useVaultStore.setState({ status: "locked" });
+
+    await useVaultStore.getState().init();
+
+    expect(tryAutoUnlock).not.toHaveBeenCalled();
+    expect(useVaultStore.getState().status).toBe("locked");
+  });
+
+  it("lockManually sets the barrier; unlock clears it and auto-unlock works again", async () => {
+    useSettingsStore.getState().setAutoUnlockOnLaunch(true);
+    lock.mockResolvedValue(undefined);
+    computeStatus.mockResolvedValue("locked" as VaultStatus);
+    unlock.mockResolvedValue(undefined);
+
+    await useVaultStore.getState().lockManually();
+    expect(localStorage.getItem("cove-manual-lock")).toBe("1");
+    expect(useVaultStore.getState().status).toBe("locked");
+
+    await useVaultStore.getState().unlock("pass");
+    expect(localStorage.getItem("cove-manual-lock")).toBeNull();
+
+    tryAutoUnlock.mockResolvedValue(true);
+    await useVaultStore.getState().init();
+    expect(useVaultStore.getState().status).toBe("unlocked");
+  });
+
   it("lock refreshes the status; the onLock listener forces locked", async () => {
     lock.mockResolvedValue(undefined);
     computeStatus.mockResolvedValue("locked" as VaultStatus);

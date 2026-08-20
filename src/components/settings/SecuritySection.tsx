@@ -14,7 +14,7 @@ import { SectionHeading, SettingRow } from "./SettingRow";
 export const SecuritySection: React.FC = () => {
   const autoUnlockOnLaunch = useSettingsStore((s) => s.autoUnlockOnLaunch);
   const setTrustDevice = useVaultStore((s) => s.setTrustDevice);
-  const lock = useVaultStore((s) => s.lock);
+  const lockManually = useVaultStore((s) => s.lockManually);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const [isChangePassOpen, setChangePassOpen] = useState(false);
 
@@ -49,7 +49,7 @@ export const SecuritySection: React.FC = () => {
             size="sm"
             onClick={async () => {
               try {
-                await lock();
+                await lockManually();
                 setSettingsOpen(false);
               } catch (err) {
                 notifyError(err);

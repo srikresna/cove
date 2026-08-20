@@ -169,7 +169,8 @@ export const MESSAGES = {
   SETTINGS_CATEGORY_ABOUT: "About",
   SETTINGS_EDITOR_HINT: "Changes apply the next time you open a note.",
   SETTINGS_SHORTCUT_HINT: "to open settings",
-  SETTINGS_LOCK_NOW_DESC: "Clears the key from memory; unlock again to continue.",
+  SETTINGS_LOCK_NOW_DESC:
+    "Locks the vault; your passphrase is required to unlock again — even on a trusted device.",
   SETTINGS_ABOUT_DESC:
     "Cove Notes is a joyful desktop note-taking app with block-based editing, multi-workspace support, and client-side encryption.",
   SETTINGS_ABOUT_VERSION_LABEL: "Version",

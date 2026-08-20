@@ -13,8 +13,19 @@ interface VaultState {
   recover: (passphrase: string) => Promise<void>;
   tryAutoUnlock: () => Promise<boolean>;
   lock: () => Promise<void>;
+  lockManually: () => Promise<void>;
   setTrustDevice: (enabled: boolean) => Promise<void>;
   changePassphrase: (oldPassphrase: string, newPassphrase: string) => Promise<void>;
+}
+
+const MANUAL_LOCK_KEY = "cove-manual-lock";
+
+function manualLockBarrier(): boolean {
+  return localStorage.getItem(MANUAL_LOCK_KEY) === "1";
+}
+
+function clearManualLockBarrier(): void {
+  localStorage.removeItem(MANUAL_LOCK_KEY);
 }
 
 const refreshStatus = async (): Promise<VaultStatus> => {
@@ -44,7 +55,7 @@ export const useVaultStore = create<VaultState>((set) => ({
     if (initInFlight) return initInFlight;
     const attempt = (async () => {
       const auto = useSettingsStore.getState().autoUnlockOnLaunch;
-      if (auto) {
+      if (auto && !manualLockBarrier()) {
         let ok = await attemptAutoUnlock();
         if (!ok) {
           await new Promise((r) => setTimeout(r, AUTO_UNLOCK_RETRY_MS));
@@ -78,6 +89,7 @@ export const useVaultStore = create<VaultState>((set) => ({
   },
   unlock: async (passphrase) => {
     await vaultService.unlock(passphrase);
+    clearManualLockBarrier();
     if (useSettingsStore.getState().autoUnlockOnLaunch) {
       try {
         await vaultService.setKeychainEscrow(true);
@@ -89,6 +101,7 @@ export const useVaultStore = create<VaultState>((set) => ({
   },
   recover: async (passphrase) => {
     await vaultService.recoverViaKeychain(passphrase);
+    clearManualLockBarrier();
     set({ status: await refreshStatus() });
   },
   tryAutoUnlock: async () => {
@@ -97,6 +110,11 @@ export const useVaultStore = create<VaultState>((set) => ({
     return ok;
   },
   lock: async () => {
+    await vaultService.lock();
+    set({ status: await refreshStatus() });
+  },
+  lockManually: async () => {
+    localStorage.setItem(MANUAL_LOCK_KEY, "1");
     await vaultService.lock();
     set({ status: await refreshStatus() });
   },
