@@ -593,7 +593,8 @@ export class VaultService implements IVaultService {
       await this.setSessionDek(rawDek, await importAesGcmKey(rawDek));
       await this.resumeMigrationBestEffort();
       return true;
-    } catch {
+    } catch (err) {
+      Logger.warn("vault: device auto-unlock failed; falling back to passphrase", err);
       return false;
     }
   }
