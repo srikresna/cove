@@ -4,6 +4,13 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 
 #[tauri::command]
+pub fn pre_restore_backup_path(app: tauri::AppHandle) -> Option<String> {
+    let dir = app.path().app_config_dir().ok()?;
+    let path = dir.join("cove.db.pre-restore");
+    path.exists().then(|| path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub async fn backup_database(app: tauri::AppHandle, target_path: String) -> Result<(), String> {
     let data_dir = app
         .path()

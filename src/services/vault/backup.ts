@@ -23,6 +23,17 @@ export class TauriBackupService implements IBackupService {
     return typeof path === "string" ? path : null;
   }
 
+  async preRestoreBackupPath(): Promise<string | null> {
+    return invoke<string | null>("pre_restore_backup_path");
+  }
+
+  async rollbackPreRestore(): Promise<boolean> {
+    const path = await this.preRestoreBackupPath();
+    if (!path) return false;
+    await invoke("restore_database", { sourcePath: path });
+    return true;
+  }
+
   async restoreFromFile(path: string): Promise<void> {
     try {
       await this.db.suspend();

@@ -1,6 +1,6 @@
-import { Download, Upload } from "lucide-react";
+import { Download, History, Upload } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { backupService } from "../../di/container";
 import { notifyError } from "../../store/notify";
@@ -14,6 +14,22 @@ export const BackupSection: React.FC = () => {
   const [backupStatus, setBackupStatus] = useState<"idle" | "saving">("idle");
   const [pendingRestorePath, setPendingRestorePath] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [preRestorePath, setPreRestorePath] = useState<string | null>(null);
+  const [confirmRollback, setConfirmRollback] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    backupService
+      .preRestoreBackupPath()
+      .then((path) => {
+        if (!cancelled) setPreRestorePath(path);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleExportBackup = async () => {
     setBackupStatus("saving");
@@ -84,6 +100,50 @@ export const BackupSection: React.FC = () => {
             {restoring ? MESSAGES.SETTINGS_RESTORE_IN_PROGRESS : "Restore"}
           </Button>
         }
+      />
+      {preRestorePath && (
+        <SettingRow
+          label={MESSAGES.SETTINGS_ROLLBACK_LABEL}
+          description={MESSAGES.SETTINGS_ROLLBACK_DESC}
+          control={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={rollingBack}
+              onClick={() => setConfirmRollback(true)}
+            >
+              <History className="h-3.5 w-3.5" aria-hidden="true" />
+              {rollingBack
+                ? MESSAGES.SETTINGS_ROLLBACK_IN_PROGRESS
+                : MESSAGES.SETTINGS_ROLLBACK_BUTTON}
+            </Button>
+          }
+        />
+      )}
+      <ConfirmDialog
+        open={confirmRollback}
+        title={MESSAGES.SETTINGS_ROLLBACK_CONFIRM_TITLE}
+        description={MESSAGES.SETTINGS_ROLLBACK_CONFIRM_DESC}
+        confirmLabel={MESSAGES.SETTINGS_ROLLBACK_BUTTON}
+        danger
+        busy={rollingBack}
+        onConfirm={async () => {
+          setRollingBack(true);
+          try {
+            const done = await backupService.rollbackPreRestore();
+            if (done) {
+              setConfirmRollback(false);
+              window.location.reload();
+            }
+          } catch (err) {
+            notifyError(err);
+          } finally {
+            setRollingBack(false);
+          }
+        }}
+        onCancel={() => {
+          if (!rollingBack) setConfirmRollback(false);
+        }}
       />
       <ConfirmDialog
         open={pendingRestorePath !== null}

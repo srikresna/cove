@@ -33,6 +33,7 @@ fn main() {
         keychain::keychain_set,
         keychain::keychain_delete,
         backup::backup_database,
+        backup::pre_restore_backup_path,
         restore::restore_database,
         transaction::run_sql_transaction
     ])

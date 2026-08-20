@@ -172,4 +172,12 @@ export const MESSAGES = {
     "Cove Notes is a joyful desktop note-taking app with block-based editing, multi-workspace support, and client-side encryption.",
   SETTINGS_ABOUT_VERSION_LABEL: "Version",
   SETTINGS_ABOUT_IDENTIFIER_LABEL: "Identifier",
+  SETTINGS_ROLLBACK_LABEL: "Rollback to before the last restore",
+  SETTINGS_ROLLBACK_DESC:
+    "Puts back the database that was active before the last restore (cove.db.pre-restore). Only appears after a restore.",
+  SETTINGS_ROLLBACK_BUTTON: "Rollback",
+  SETTINGS_ROLLBACK_IN_PROGRESS: "Rolling back…",
+  SETTINGS_ROLLBACK_CONFIRM_TITLE: "Rollback to before the last restore?",
+  SETTINGS_ROLLBACK_CONFIRM_DESC:
+    "The current database replaces cove.db.pre-restore, so this step is one-way — you cannot come back to the current state afterwards. The app will restart, locked with the previous passphrase.",
 } as const;
