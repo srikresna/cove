@@ -25,6 +25,202 @@ const PEEK_CONTAINER_MAX_TRIES = 120;
 const COPIED_RESET_MS = 1500;
 const PEEK_VIEWPORT_PADDING: [number, number, number, number] = [60, 20, 20, 20];
 
+interface EdgelessPeekCallbacks {
+  onRevealed: () => void;
+  onFailed: () => void;
+}
+
+function mountEdgelessPeek(
+  container: HTMLDivElement,
+  docRequest: DocPeekRequest,
+  callbacks: EdgelessPeekCallbacks,
+): () => void {
+  const store = blockSuiteEditorService.getDocStoreForPeek(docRequest.docId);
+  if (!store) {
+    const empty = document.createElement("div");
+    empty.style.cssText = "padding:2rem;color:hsl(var(--muted-foreground));font-size:.875rem";
+    empty.textContent = "Referenced note is not loaded in this session.";
+    container.replaceChildren(empty);
+    callbacks.onRevealed();
+    return () => undefined;
+  }
+
+  let disposed = false;
+  let editor: TestAffineEditorContainer | null = null;
+  let raf = 0;
+  let safetyTimer = 0;
+  let fitTries = 0;
+  let canvasTries = 0;
+  let revealed = false;
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let savePending = false;
+  let lastSavedSnapshot: string | null = null;
+  let unregisterFlusher: (() => void) | null = null;
+  let finalFlush: () => void = () => {};
+  let detachSaveListener: () => void = () => {};
+
+  try {
+    editor = createEditorContainer();
+    editor.doc = store;
+    const common = buildCommonExtensions("edgeless");
+    editor.pageSpecs = [...blockSuiteEditorService.getViewSpecs("page"), ...common];
+    editor.edgelessSpecs = [...blockSuiteEditorService.getViewSpecs("edgeless"), ...common];
+    editor.mode = "edgeless";
+    editor.autofocus = false;
+
+    const encodeAndSave = () => {
+      if (!blockSuiteEditorService.isWorkspaceAlive()) return;
+      const snapshot = packBlockSuiteContent(encodeDocSnapshot(store.spaceDoc));
+      if (snapshot === lastSavedSnapshot) return;
+      void useNoteStore
+        .getState()
+        .updateNote(docRequest.docId, { content: snapshot })
+        .then(
+          () => {
+            lastSavedSnapshot = snapshot;
+          },
+          () => {},
+        );
+    };
+    const flush = () => {
+      const doEncode = () => {
+        savePending = false;
+        encodeAndSave();
+      };
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(doEncode, { timeout: 3000 });
+      } else {
+        setTimeout(doEncode, 0);
+      }
+    };
+    const onUpdate = () => {
+      savePending = true;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
+    };
+    store.spaceDoc.on("update", onUpdate);
+    finalFlush = () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      if (savePending) {
+        savePending = false;
+        encodeAndSave();
+      }
+    };
+    detachSaveListener = () => {
+      try {
+        store.spaceDoc.off("update", onUpdate);
+      } catch {}
+    };
+    unregisterFlusher = blockSuiteEditorService.registerPendingFlusher(finalFlush);
+
+    editor.style.position = "absolute";
+    editor.style.inset = "0";
+    editor.style.opacity = "0";
+    container.append(editor);
+
+    const reveal = () => {
+      if (disposed || revealed || !editor) return;
+      revealed = true;
+      editor.style.opacity = "1";
+      callbacks.onRevealed();
+    };
+
+    let fitDone = false;
+    const fitViewport = (): boolean => {
+      if (!editor || fitDone) return fitDone;
+      try {
+        const gfx = editor.std?.get?.(GfxControllerIdentifier);
+        const viewport = gfx?.viewport;
+        if (!viewport) return false;
+        viewport.onResize();
+        if (docRequest.xywh) {
+          viewport.setViewportByBound(
+            Bound.deserialize(docRequest.xywh),
+            PEEK_VIEWPORT_PADDING,
+            false,
+          );
+        } else {
+          gfx.fitToScreen({ smooth: false });
+        }
+        fitDone = true;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const poll = () => {
+      if (disposed || revealed) return;
+      raf = requestAnimationFrame(waitForCanvas);
+    };
+    const waitForCanvas = () => {
+      if (disposed || revealed) return;
+      if (fitViewport() || ++fitTries > PEEK_CANVAS_MAX_TRIES) {
+        raf = requestAnimationFrame(checkCanvas);
+        return;
+      }
+      raf = requestAnimationFrame(waitForCanvas);
+    };
+    const checkCanvas = () => {
+      if (disposed || revealed || !editor) return;
+      const canvas = editor.querySelector("canvas");
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        reveal();
+        return;
+      }
+      if (++canvasTries > PEEK_CANVAS_MAX_TRIES) {
+        reveal();
+        return;
+      }
+      raf = requestAnimationFrame(checkCanvas);
+    };
+    void editor.updateComplete.finally(poll).catch(() => {
+      if (!disposed && !revealed) reveal();
+    });
+    safetyTimer = window.setTimeout(reveal, PEEK_REVEAL_TIMEOUT_MS);
+  } catch (err) {
+    Logger.error("[cove-peek] mount failed", err);
+    callbacks.onFailed();
+  }
+
+  return () => {
+    disposed = true;
+    clearTimeout(safetyTimer);
+    cancelAnimationFrame(raf);
+    finalFlush();
+    detachSaveListener();
+    unregisterFlusher?.();
+    editor?.remove();
+  };
+}
+
+async function openPeekDoc(docId: string): Promise<boolean> {
+  try {
+    const n = await noteService.getNote(docId);
+    blockSuiteEditorService.openNoteDoc(docId, n?.content ?? "");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForNoteRecord(docId: string): Promise<boolean | null> {
+  const hasRecord = () => useNoteStore.getState().notes.some((n) => n.id === docId);
+  if (hasRecord()) return true;
+  const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+  if (!wsId) return null;
+  for (let i = 0; i < 20 && !hasRecord(); i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (i > 0 && i % 5 === 0) {
+      await useNoteStore.getState().refreshNotesInPlace(wsId);
+    }
+  }
+  return hasRecord();
+}
+
 export const PeekViewModal: React.FC = () => {
   const request = usePeekViewStore((s) => s.request);
   const close = usePeekViewStore((s) => s.close);
@@ -68,167 +264,12 @@ export const PeekViewModal: React.FC = () => {
     let waitRaf = 0;
     let waitTries = 0;
 
-    const mountEditor = (container: HTMLDivElement, docRequest: DocPeekRequest): (() => void) => {
-      const store = blockSuiteEditorService.getDocStoreForPeek(docRequest.docId);
-      if (!store) {
-        const empty = document.createElement("div");
-        empty.style.cssText = "padding:2rem;color:hsl(var(--muted-foreground));font-size:.875rem";
-        empty.textContent = "Referenced note is not loaded in this session.";
-        container.replaceChildren(empty);
-        setLoading(false);
-        return () => undefined;
-      }
-
-      let editor: TestAffineEditorContainer | null = null;
-      let raf = 0;
-      let safetyTimer = 0;
-      let fitTries = 0;
-      let canvasTries = 0;
-      let revealed = false;
-      let saveTimer: ReturnType<typeof setTimeout> | null = null;
-      let savePending = false;
-      let lastSavedSnapshot: string | null = null;
-      let unregisterFlusher: (() => void) | null = null;
-      let finalFlush: () => void = () => {};
-      let detachSaveListener: () => void = () => {};
-
-      try {
-        editor = createEditorContainer();
-        editor.doc = store;
-        const common = buildCommonExtensions("edgeless");
-        editor.pageSpecs = [...blockSuiteEditorService.getViewSpecs("page"), ...common];
-        editor.edgelessSpecs = [...blockSuiteEditorService.getViewSpecs("edgeless"), ...common];
-        editor.mode = "edgeless";
-        editor.autofocus = false;
-
-        const encodeAndSave = () => {
-          if (!blockSuiteEditorService.isWorkspaceAlive()) return;
-          const snapshot = packBlockSuiteContent(encodeDocSnapshot(store.spaceDoc));
-          if (snapshot === lastSavedSnapshot) return;
-          void useNoteStore
-            .getState()
-            .updateNote(docRequest.docId, { content: snapshot })
-            .then(
-              () => {
-                lastSavedSnapshot = snapshot;
-              },
-              () => {},
-            );
-        };
-        const flush = () => {
-          const doEncode = () => {
-            savePending = false;
-            encodeAndSave();
-          };
-          if (typeof requestIdleCallback === "function") {
-            requestIdleCallback(doEncode, { timeout: 3000 });
-          } else {
-            setTimeout(doEncode, 0);
-          }
-        };
-        const onUpdate = () => {
-          savePending = true;
-          if (saveTimer) clearTimeout(saveTimer);
-          saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
-        };
-        store.spaceDoc.on("update", onUpdate);
-        finalFlush = () => {
-          if (saveTimer) {
-            clearTimeout(saveTimer);
-            saveTimer = null;
-          }
-          if (savePending) {
-            savePending = false;
-            encodeAndSave();
-          }
-        };
-        detachSaveListener = () => {
-          try {
-            store.spaceDoc.off("update", onUpdate);
-          } catch {}
-        };
-        unregisterFlusher = blockSuiteEditorService.registerPendingFlusher(finalFlush);
-
-        editor.style.position = "absolute";
-        editor.style.inset = "0";
-        editor.style.opacity = "0";
-        container.append(editor);
-
-        const reveal = () => {
-          if (disposed || revealed || !editor) return;
-          revealed = true;
-          editor.style.opacity = "1";
-          setLoading(false);
-        };
-
-        let fitDone = false;
-        const fitViewport = (): boolean => {
-          if (!editor || fitDone) return fitDone;
-          try {
-            const gfx = editor.std?.get?.(GfxControllerIdentifier);
-            const viewport = gfx?.viewport;
-            if (!viewport) return false;
-            viewport.onResize();
-            if (docRequest.xywh) {
-              viewport.setViewportByBound(
-                Bound.deserialize(docRequest.xywh),
-                PEEK_VIEWPORT_PADDING,
-                false,
-              );
-            } else {
-              gfx.fitToScreen({ smooth: false });
-            }
-            fitDone = true;
-            return true;
-          } catch {
-            return false;
-          }
-        };
-
-        const poll = () => {
-          if (disposed || revealed) return;
-          raf = requestAnimationFrame(waitForCanvas);
-        };
-        const waitForCanvas = () => {
-          if (disposed || revealed) return;
-          if (fitViewport() || ++fitTries > PEEK_CANVAS_MAX_TRIES) {
-            raf = requestAnimationFrame(checkCanvas);
-            return;
-          }
-          raf = requestAnimationFrame(waitForCanvas);
-        };
-        const checkCanvas = () => {
-          if (disposed || revealed || !editor) return;
-          const canvas = editor.querySelector("canvas");
-          if (canvas && canvas.width > 0 && canvas.height > 0) {
-            reveal();
-            return;
-          }
-          if (++canvasTries > PEEK_CANVAS_MAX_TRIES) {
-            reveal();
-            return;
-          }
-          raf = requestAnimationFrame(checkCanvas);
-        };
-        void editor.updateComplete.finally(poll).catch(() => {
-          if (!disposed && !revealed) reveal();
-        });
-        safetyTimer = window.setTimeout(reveal, PEEK_REVEAL_TIMEOUT_MS);
-      } catch (err) {
-        Logger.error("[cove-peek] mount failed", err);
+    const callbacks: EdgelessPeekCallbacks = {
+      onRevealed: () => setLoading(false),
+      onFailed: () => {
         setError(true);
         setLoading(false);
-      }
-
-      return () => {
-        disposed = true;
-        clearTimeout(safetyTimer);
-        cancelAnimationFrame(raf);
-        finalFlush();
-        detachSaveListener();
-        unregisterFlusher?.();
-        editor?.remove();
-      };
+      },
     };
 
     const waitForContainer = () => {
@@ -236,38 +277,26 @@ export const PeekViewModal: React.FC = () => {
       const container = containerRef.current;
       const current = request;
       if (container && current?.type === "doc") {
-        cleanup = mountEditor(container, current);
+        cleanup = mountEdgelessPeek(container, current, callbacks);
         return;
       }
       if (++waitTries > PEEK_CONTAINER_MAX_TRIES) {
-        setError(true);
-        setLoading(false);
+        callbacks.onFailed();
         return;
       }
       waitRaf = requestAnimationFrame(waitForContainer);
     };
 
-    let loadFailed = false;
     const docRequest = request?.type === "doc" ? request : null;
     if (!docRequest) return;
-    noteService
-      .getNote(docRequest.docId)
-      .then((n) => {
-        if (disposed) return;
-        blockSuiteEditorService.openNoteDoc(docRequest.docId, n?.content ?? "");
-      })
-      .catch(() => {
-        loadFailed = true;
-      })
-      .finally(() => {
-        if (disposed) return;
-        if (loadFailed) {
-          setError(true);
-          setLoading(false);
-          return;
-        }
-        waitRaf = requestAnimationFrame(waitForContainer);
-      });
+    void openPeekDoc(docRequest.docId).then((ok) => {
+      if (disposed) return;
+      if (!ok) {
+        callbacks.onFailed();
+        return;
+      }
+      waitRaf = requestAnimationFrame(waitForContainer);
+    });
 
     return () => {
       disposed = true;
@@ -280,24 +309,14 @@ export const PeekViewModal: React.FC = () => {
     if (request?.type !== "doc") return;
     const docId = request.docId;
 
-    const hasRecord = () => useNoteStore.getState().notes.some((n) => n.id === docId);
-    if (!hasRecord()) {
-      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
-      if (!wsId) return;
-      for (let i = 0; i < 20 && !hasRecord(); i++) {
-        await new Promise((r) => setTimeout(r, 100));
-        if (i > 0 && i % 5 === 0) {
-          await useNoteStore.getState().refreshNotesInPlace(wsId);
-        }
-      }
-      if (!hasRecord()) {
-        useNotificationStore.getState().pushToast({
-          kind: "warning",
-          title: "Still registering this note",
-          description: "Try again in a moment.",
-        });
-        return;
-      }
+    const ready = await waitForNoteRecord(docId);
+    if (ready === false) {
+      useNotificationStore.getState().pushToast({
+        kind: "warning",
+        title: "Still registering this note",
+        description: "Try again in a moment.",
+      });
+      return;
     }
 
     useNoteStore.getState().setActiveNoteId(docId);
