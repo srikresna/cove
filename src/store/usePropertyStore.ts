@@ -1,0 +1,16 @@
+import { create } from "zustand";
+
+interface PropertyState {
+  /**
+   * Bumped after every property mutation so all mounted surfaces refetch.
+   * The Info panel can be mounted twice at once (editor header + right bar),
+   * so instances cannot rely on their own local reload alone.
+   */
+  version: number;
+  refresh: () => void;
+}
+
+export const usePropertyStore = create<PropertyState>((set) => ({
+  version: 0,
+  refresh: () => set((s) => ({ version: s.version + 1 })),
+}));

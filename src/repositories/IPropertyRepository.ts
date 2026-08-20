@@ -1,4 +1,4 @@
-import type { PropertyDefinition } from "../domain/property/Property";
+import type { PropertyDefinition, PropertyVisibility } from "../domain/property/Property";
 
 export interface NotePropertyRecord {
   noteId: string;
@@ -6,9 +6,16 @@ export interface NotePropertyRecord {
   valueJson: string;
 }
 
+export interface PropertyDefinitionPatch {
+  name?: string;
+  show?: PropertyVisibility;
+  orderIndex?: string;
+}
+
 export interface IPropertyRepository {
   listDefinitions(): Promise<PropertyDefinition[]>;
   createDefinition(def: PropertyDefinition): Promise<void>;
+  updateDefinition(id: string, patch: PropertyDefinitionPatch): Promise<void>;
   updateOptions(id: string, optionsJson: string): Promise<void>;
   appendOption(id: string, optionJson: string): Promise<void>;
   deleteDefinition(id: string): Promise<void>;

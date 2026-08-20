@@ -1,3 +1,4 @@
+import { generateKeyBetween } from "fractional-indexing";
 import { TAG_COLORS } from "../tag/Tag";
 
 export const PROPERTY_TYPES = [
@@ -16,6 +17,13 @@ export const PROPERTY_TYPES = [
 
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
+export const PROPERTY_VISIBILITY = ["always-show", "hide-when-empty", "always-hide"] as const;
+
+export type PropertyVisibility = (typeof PROPERTY_VISIBILITY)[number];
+
+export const isPropertyVisibility = (value: string): value is PropertyVisibility =>
+  (PROPERTY_VISIBILITY as readonly string[]).includes(value);
+
 export interface PropertyOption {
   readonly id: string;
   readonly name: string;
@@ -28,6 +36,8 @@ export interface PropertyDefinition {
   readonly type: PropertyType;
   readonly options: PropertyOption[];
   readonly createdAt: number;
+  readonly order: string;
+  readonly show: PropertyVisibility;
 }
 
 export type PropertyValue =
@@ -53,6 +63,14 @@ export const makePropertyId = (): string => crypto.randomUUID();
 
 export const nextOptionColor = (existingCount: number): string =>
   TAG_COLORS[existingCount % TAG_COLORS.length] as string;
+
+/**
+ * Fractional ordering key positioned strictly between two existing keys
+ * (either side may be null for list head/tail), so a reorder writes exactly
+ * one row instead of renumbering the whole list.
+ */
+export const orderKeyBetween = (before: string | null, after: string | null): string =>
+  generateKeyBetween(before || null, after || null);
 
 export const DEFAULT_STATUS_OPTIONS = ["To do", "In progress", "Done"] as const;
 

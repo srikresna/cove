@@ -2,11 +2,12 @@
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { tagService } from "../../di/container";
+import { propertyService, tagService } from "../../di/container";
 import type { Tag } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
+import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
@@ -19,7 +20,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { NotePropertiesRows } from "./NotePropertiesRows";
+import { NotePropertiesRows, summarizePropertyValue } from "./NotePropertiesRows";
 
 const OPEN_KEY = "cove-info-open";
 
@@ -46,11 +47,13 @@ const TagChip: React.FC<{ tag: Tag; onRemove?: () => void }> = ({ tag, onRemove 
 
 export const InfoRow: React.FC<{
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
+  handle?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ icon, label, children }) => (
+}> = ({ icon, label, handle, children }) => (
   <div className="flex min-h-[30px] flex-wrap gap-1">
     <div className="flex w-[150px] shrink-0 items-center gap-1.5 self-start rounded p-1 text-sm text-muted-foreground">
+      {handle}
       <span aria-hidden="true" className="[&_svg]:h-4 [&_svg]:w-4">
         {icon}
       </span>
@@ -75,8 +78,12 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
   const [isOpen, setIsOpen] = useState(() => localStorage.getItem(OPEN_KEY) === "true");
   const [tags, setTags] = useState<Tag[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [propertySummaries, setPropertySummaries] = useState<
+    Array<{ id: string; name: string; text: string }>
+  >([]);
   const [query, setQuery] = useState("");
   const tagVersion = useTagStore((s) => s.version);
+  const propertyVersion = usePropertyStore((s) => s.version);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const moveNoteToWorkspace = useNoteStore((s) => s.moveNoteToWorkspace);
 
@@ -103,6 +110,32 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
     setIsOpen(next);
     localStorage.setItem(OPEN_KEY, String(next));
   };
+
+  // Collapsed state shows a one-line summary instead of nothing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
+  useEffect(() => {
+    if (isOpen) return;
+    let alive = true;
+    Promise.all([propertyService.listDefinitions(), propertyService.valuesForNote(note.id)])
+      .then(([defs, vals]) => {
+        if (!alive) return;
+        const rows: Array<{ id: string; name: string; text: string }> = [];
+        for (const def of defs) {
+          if (def.show === "always-hide") continue;
+          const value = vals.get(def.id);
+          if (!value) continue;
+          const text = summarizePropertyValue(def, value);
+          if (text) rows.push({ id: def.id, name: def.name, text });
+        }
+        setPropertySummaries(rows);
+      })
+      .catch(() => {
+        if (alive) setPropertySummaries([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, note.id, propertyVersion]);
 
   const loadAllTags = () => {
     tagService.listTags().then(setAllTags).catch(notifyError);
@@ -158,6 +191,26 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
         />
       </button>
       <div className="h-px w-full bg-border" aria-hidden="true" />
+
+      {!isOpen && (tags.length > 0 || propertySummaries.length > 0) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1 pb-2">
+          {tags.map((tag) => (
+            <TagChip key={tag.id} tag={tag} />
+          ))}
+          {propertySummaries.slice(0, 8).map((row) => (
+            <span
+              key={row.id}
+              className="inline-flex h-[22px] max-w-56 items-center gap-1 truncate rounded-full border bg-card px-2 text-xs text-foreground"
+            >
+              <span className="shrink-0 text-muted-foreground">{row.name}</span>
+              <span className="truncate">{row.text}</span>
+            </span>
+          ))}
+          {propertySummaries.length > 8 && (
+            <span className="text-xs text-muted-foreground">+{propertySummaries.length - 8}</span>
+          )}
+        </div>
+      )}
 
       {isOpen && (
         <div className="mt-2 space-y-1 pb-2">

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
+import { generateKeyBetween } from "fractional-indexing";
 import { PersistenceError } from "../errors/AppError";
 
 export interface SqlStatement {
@@ -284,6 +285,43 @@ export class SQLiteDatabase {
         );
       }
       await db.execute("PRAGMA user_version = 13");
+    }
+
+    if (version < 14) {
+      const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
+      if (propCols.length > 0) {
+        const statements: SqlStatement[] = [];
+        if (!propCols.some((c) => c.name === "orderIndex")) {
+          statements.push({
+            sql: "ALTER TABLE property_defs ADD COLUMN orderIndex TEXT NOT NULL DEFAULT ''",
+          });
+        }
+        if (!propCols.some((c) => c.name === "show")) {
+          statements.push({
+            sql: "ALTER TABLE property_defs ADD COLUMN show TEXT NOT NULL DEFAULT 'always-show'",
+          });
+        }
+        // Recompute every key from creation order (not only unbackfilled rows):
+        // the whole step is data-idempotent, so a database left half-migrated
+        // by an interrupted earlier attempt heals on the next run.
+        const rows = await db.select<Array<{ id: string }>>(
+          "SELECT id FROM property_defs ORDER BY createdAt, id",
+        );
+        let prev: string | null = null;
+        for (const row of rows) {
+          const key = generateKeyBetween(prev, null);
+          statements.push({
+            sql: "UPDATE property_defs SET orderIndex = ? WHERE id = ?",
+            params: [key, row.id],
+          });
+          prev = key;
+        }
+        statements.push({ sql: "PRAGMA user_version = 14" });
+        // Atomic: ALTERs + backfill + version bump land together or not at all.
+        await SQLiteDatabase.runTransaction(statements);
+      } else {
+        await db.execute("PRAGMA user_version = 14");
+      }
     }
   }
 }

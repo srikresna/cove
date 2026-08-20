@@ -1,16 +1,28 @@
 import type { PropertyDefinition, PropertyOption } from "@/domain/property/Property";
-import type { IPropertyRepository, NotePropertyRecord } from "@/repositories/IPropertyRepository";
+import type {
+  IPropertyRepository,
+  NotePropertyRecord,
+  PropertyDefinitionPatch,
+} from "@/repositories/IPropertyRepository";
 
 export class InMemoryPropertyRepository implements IPropertyRepository {
   public definitions: PropertyDefinition[] = [];
   public values: NotePropertyRecord[] = [];
 
   async listDefinitions(): Promise<PropertyDefinition[]> {
-    return this.definitions.map((d) => ({ ...d, options: [...d.options] }));
+    return this.definitions
+      .map((d) => ({ ...d, options: [...d.options] }))
+      .sort((a, b) => (a.order > b.order ? 1 : a.order < b.order ? -1 : 0));
   }
 
   async createDefinition(def: PropertyDefinition): Promise<void> {
     this.definitions.push({ ...def, options: [...def.options] });
+  }
+
+  async updateDefinition(id: string, patch: PropertyDefinitionPatch): Promise<void> {
+    const { orderIndex, ...rest } = patch;
+    const domainPatch = orderIndex !== undefined ? { ...rest, order: orderIndex } : rest;
+    this.definitions = this.definitions.map((d) => (d.id === id ? { ...d, ...domainPatch } : d));
   }
 
   async updateOptions(id: string, optionsJson: string): Promise<void> {

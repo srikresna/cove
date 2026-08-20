@@ -1,10 +1,15 @@
 import {
   isPropertyType,
+  isPropertyVisibility,
   type PropertyDefinition,
   type PropertyOption,
 } from "../domain/property/Property";
 import { toPersistenceError } from "../errors/errorMappers";
-import type { IPropertyRepository, NotePropertyRecord } from "./IPropertyRepository";
+import type {
+  IPropertyRepository,
+  NotePropertyRecord,
+  PropertyDefinitionPatch,
+} from "./IPropertyRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
 function parseOptions(json: unknown): PropertyOption[] {
@@ -19,12 +24,15 @@ function parseOptions(json: unknown): PropertyOption[] {
 function rowToDefinition(row: Record<string, unknown>): PropertyDefinition | null {
   const type = String(row.type);
   if (!isPropertyType(type)) return null;
+  const show = String(row.show ?? "");
   return {
     id: String(row.id),
     name: String(row.name),
     type,
     options: parseOptions(row.optionsJson),
     createdAt: Number(row.createdAt),
+    order: String(row.orderIndex ?? ""),
+    show: isPropertyVisibility(show) ? show : "always-show",
   };
 }
 
@@ -37,7 +45,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, name, type, optionsJson, createdAt FROM property_defs ORDER BY createdAt",
+        "SELECT id, name, type, optionsJson, createdAt, orderIndex, show FROM property_defs ORDER BY orderIndex, createdAt",
       );
       return rows.map(rowToDefinition).filter((d): d is PropertyDefinition => d !== null);
     } catch (err) {
@@ -49,11 +57,43 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     try {
       const db = await this.getDb();
       await db.execute(
-        "INSERT INTO property_defs (id, name, type, optionsJson, createdAt) VALUES (?, ?, ?, ?, ?)",
-        [def.id, def.name, def.type, JSON.stringify(def.options), def.createdAt],
+        "INSERT INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+          def.id,
+          def.name,
+          def.type,
+          JSON.stringify(def.options),
+          def.createdAt,
+          def.order,
+          def.show,
+        ],
       );
     } catch (err) {
       throw toPersistenceError("properties.createDefinition", err);
+    }
+  }
+
+  async updateDefinition(id: string, patch: PropertyDefinitionPatch): Promise<void> {
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (patch.name !== undefined) {
+      sets.push("name = ?");
+      params.push(patch.name);
+    }
+    if (patch.show !== undefined) {
+      sets.push("show = ?");
+      params.push(patch.show);
+    }
+    if (patch.orderIndex !== undefined) {
+      sets.push("orderIndex = ?");
+      params.push(patch.orderIndex);
+    }
+    if (sets.length === 0) return;
+    try {
+      const db = await this.getDb();
+      await db.execute(`UPDATE property_defs SET ${sets.join(", ")} WHERE id = ?`, [...params, id]);
+    } catch (err) {
+      throw toPersistenceError("properties.updateDefinition", err);
     }
   }
 

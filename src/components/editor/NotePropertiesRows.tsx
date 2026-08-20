@@ -1,13 +1,28 @@
 import {
+  draggable,
+  dropTargetForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import {
+  attachClosestEdge,
+  type Edge,
+  extractClosestEdge,
+} from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
+import {
   CalendarDays,
+  Check,
   CircleDot,
+  Eye,
+  EyeOff,
   FileText,
+  GripVertical,
   Hash,
   Link,
   Link2,
   List,
   ListChecks,
+  MoreHorizontal,
   Paperclip,
+  Pencil,
   Plus,
   ToggleLeft,
   Trash2,
@@ -16,7 +31,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService } from "../../di/container";
 import type {
@@ -24,13 +39,24 @@ import type {
   PropertyOption,
   PropertyType,
   PropertyValue,
+  PropertyVisibility,
 } from "../../domain/property/Property";
-import { hasOptions, PROPERTY_TYPES } from "../../domain/property/Property";
+import { hasOptions, PROPERTY_TYPES, PROPERTY_VISIBILITY } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
+import { usePropertyStore } from "../../store/usePropertyStore";
 import type { Note } from "../../types";
+import { formatRelativeDay } from "../../utils/time";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { InfoRow } from "./NoteInfoPanel";
 
@@ -198,14 +224,272 @@ const ListEditor: React.FC<{
   );
 };
 
+const VISIBILITY_LABEL: Record<PropertyVisibility, string> = {
+  "always-show": MESSAGES.PROP_VIS_ALWAYS_SHOW,
+  "hide-when-empty": MESSAGES.PROP_VIS_HIDE_WHEN_EMPTY,
+  "always-hide": MESSAGES.PROP_VIS_ALWAYS_HIDE,
+};
+
+/** Compact value rendering used by the collapsed Info summary chips. */
+export const summarizePropertyValue = (
+  def: PropertyDefinition,
+  value: PropertyValue,
+): string | null => {
+  switch (value.type) {
+    case "text":
+      return value.text || null;
+    case "number":
+      return String(value.number);
+    case "select":
+    case "status":
+      return def.options.find((o) => o.id === value.optionId)?.name ?? null;
+    case "multiSelect": {
+      const names = def.options.filter((o) => value.optionIds.includes(o.id)).map((o) => o.name);
+      return names.length > 0 ? names.join(", ") : null;
+    }
+    case "date":
+      return formatRelativeDay(value.timestamp);
+    case "person":
+      return value.name || null;
+    case "files": {
+      const first = value.entries[0];
+      if (!first) return null;
+      return value.entries.length === 1 ? first : `${first} +${value.entries.length - 1}`;
+    }
+    case "checkbox":
+      return value.checked ? "✓" : null;
+    case "url":
+      if (!value.url) return null;
+      try {
+        return new URL(value.url).hostname;
+      } catch {
+        return value.url;
+      }
+    case "relation":
+      return value.noteIds.length > 0 ? `${value.noteIds.length} linked` : null;
+    default:
+      return null;
+  }
+};
+
+interface PropertyRowProps {
+  def: PropertyDefinition;
+  renaming: boolean;
+  onStartRename: (id: string) => void;
+  onCommitRename: (def: PropertyDefinition, name: string) => void;
+  onCancelRename: () => void;
+  onVisibility: (def: PropertyDefinition, show: PropertyVisibility) => void;
+  onDelete: (def: PropertyDefinition) => void;
+  onReorder: (id: string, targetId: string, position: "before" | "after") => void;
+  children: React.ReactNode;
+}
+
+const PropertyRow: React.FC<PropertyRowProps> = ({
+  def,
+  renaming,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
+  onVisibility,
+  onDelete,
+  onReorder,
+  children,
+}) => {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLButtonElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const cancelRenameRef = useRef(false);
+  // Radix returns focus to the menu trigger when the dropdown closes; when the
+  // close was caused by picking "Rename", that would steal focus from the
+  // rename input (after its exit animation) and blur-cancel it immediately.
+  const suppressTriggerFocusRef = useRef(false);
+  const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
+
+  useEffect(() => {
+    if (renaming) renameInputRef.current?.focus();
+  }, [renaming]);
+
+  useEffect(() => {
+    const element = rowRef.current;
+    if (!element) return;
+    return draggable({
+      element,
+      dragHandle: handleRef.current ?? undefined,
+      getInitialData: () => ({ propertyId: def.id }),
+    });
+  }, [def.id]);
+
+  useEffect(() => {
+    const element = rowRef.current;
+    if (!element) return;
+    return dropTargetForElements({
+      element,
+      // The edge must live on the drop-target data: attachClosestEdge returns
+      // a fresh object and never writes into self.data, so without getData
+      // the edge computed for the indicator would be lost by drop time.
+      getData: (args) =>
+        attachClosestEdge(
+          {},
+          {
+            input: args.input,
+            element: args.element,
+            allowedEdges: ["top", "bottom"],
+          },
+        ),
+      canDrop: ({ source }) =>
+        typeof source.data.propertyId === "string" && source.data.propertyId !== def.id,
+      getIsSticky: () => true,
+      onDragEnter: (event) => setClosestEdge(extractClosestEdge(event.self.data)),
+      onDrag: (event) => setClosestEdge(extractClosestEdge(event.self.data)),
+      onDragLeave: () => setClosestEdge(null),
+      onDrop: ({ source, self }) => {
+        setClosestEdge(null);
+        const propertyId = source.data.propertyId;
+        const edge = extractClosestEdge(self.data);
+        if (
+          typeof propertyId === "string" &&
+          propertyId !== def.id &&
+          (edge === "top" || edge === "bottom")
+        ) {
+          onReorder(propertyId, def.id, edge === "bottom" ? "after" : "before");
+        }
+      },
+    });
+  }, [def.id, onReorder]);
+
+  const label = renaming ? (
+    <input
+      ref={renameInputRef}
+      type="text"
+      defaultValue={def.name}
+      placeholder={MESSAGES.PROP_RENAME_PLACEHOLDER}
+      onBlur={(e) => {
+        if (cancelRenameRef.current) {
+          cancelRenameRef.current = false;
+          onCancelRename();
+          return;
+        }
+        const name = e.target.value.trim();
+        if (!name || name === def.name) onCancelRename();
+        else onCommitRename(def, name);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          cancelRenameRef.current = true;
+          e.currentTarget.blur();
+        }
+      }}
+      className="h-6 w-full rounded border border-border bg-background px-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    />
+  ) : (
+    def.name
+  );
+
+  return (
+    <div ref={rowRef} className="group/prop relative">
+      {closestEdge === "top" && (
+        <div
+          aria-hidden="true"
+          className="absolute -top-1 left-0 right-0 z-10 h-0.5 rounded-full bg-primary"
+        />
+      )}
+      {closestEdge === "bottom" && (
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-1 left-0 right-0 z-10 h-0.5 rounded-full bg-primary"
+        />
+      )}
+      <InfoRow
+        handle={
+          <button
+            type="button"
+            ref={handleRef}
+            aria-label={MESSAGES.PROP_DRAG_LABEL}
+            title={MESSAGES.PROP_DRAG_LABEL}
+            className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 active:cursor-grabbing group-hover/prop:opacity-100"
+          >
+            <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        }
+        icon={TYPE_META[def.type].icon}
+        label={label}
+      >
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
+          <div className="min-w-0 flex-1">{children}</div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${def.name}: ${MESSAGES.PROP_VISIBILITY_LABEL}`}
+                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/prop:opacity-100"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-48"
+              onCloseAutoFocus={(e) => {
+                if (suppressTriggerFocusRef.current) {
+                  suppressTriggerFocusRef.current = false;
+                  e.preventDefault();
+                }
+              }}
+            >
+              <DropdownMenuItem
+                onSelect={() => {
+                  suppressTriggerFocusRef.current = true;
+                  onStartRename(def.id);
+                }}
+              >
+                <Pencil aria-hidden="true" />
+                {MESSAGES.PROP_RENAME}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
+              {PROPERTY_VISIBILITY.map((visibility) => (
+                <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
+                  <span className="flex h-4 w-4 items-center justify-center">
+                    {def.show === visibility ? (
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : null}
+                  </span>
+                  {VISIBILITY_LABEL[visibility]}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                onSelect={() => onDelete(def)}
+              >
+                <Trash2 aria-hidden="true" />
+                {MESSAGES.PROP_DELETE}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </InfoRow>
+    </div>
+  );
+};
+
 export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   const [definitions, setDefinitions] = useState<PropertyDefinition[]>([]);
   const [values, setValues] = useState<Map<string, PropertyValue>>(new Map());
   const [deletingDef, setDeletingDef] = useState<PropertyDefinition | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  // A freshly created property stays visible on this note until it gains a
+  // value, so the user always has a row through which to set one.
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const notes = useNoteStore((s) => s.notes);
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const propertyVersion = usePropertyStore((s) => s.version);
+  const bumpProperties = usePropertyStore((s) => s.refresh);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   const reload = useCallback(() => {
     Promise.all([propertyService.listDefinitions(), propertyService.valuesForNote(note.id)])
       .then(([defs, vals]) => {
@@ -213,7 +497,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         setValues(vals);
       })
       .catch(notifyError);
-  }, [note.id]);
+  }, [note.id, propertyVersion]);
 
   useEffect(() => {
     reload();
@@ -221,10 +505,13 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
 
   const save = (propertyId: string, value: PropertyValue) => {
     setValues((prev) => new Map(prev).set(propertyId, value));
-    return propertyService.setValue(note.id, propertyId, value).catch((err) => {
-      notifyError(err);
-      reload();
-    });
+    return propertyService
+      .setValue(note.id, propertyId, value)
+      .then(() => bumpProperties())
+      .catch((err) => {
+        notifyError(err);
+        reload();
+      });
   };
 
   const clear = (propertyId: string) => {
@@ -233,10 +520,13 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
       next.delete(propertyId);
       return next;
     });
-    propertyService.removeValue(note.id, propertyId).catch((err) => {
-      notifyError(err);
-      reload();
-    });
+    propertyService
+      .removeValue(note.id, propertyId)
+      .then(() => bumpProperties())
+      .catch((err) => {
+        notifyError(err);
+        reload();
+      });
   };
 
   const createDefinition = (type: PropertyType) => {
@@ -244,7 +534,10 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     setNewName("");
     propertyService
       .createDefinition(name, type)
-      .then(() => reload())
+      .then((def) => {
+        setJustCreatedId(def.id);
+        bumpProperties();
+      })
       .catch(notifyError);
   };
 
@@ -252,7 +545,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     propertyService
       .addOption(def.id, name)
       .then(async (option) => {
-        if (!thenPick) return reload();
+        if (!thenPick) return bumpProperties();
         const current = values.get(def.id);
         if (def.type === "multiSelect") {
           const ids = current?.type === "multiSelect" ? current.optionIds : [];
@@ -260,7 +553,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         } else {
           await save(def.id, { type: def.type as "select" | "status", optionId: option.id });
         }
-        reload();
+        bumpProperties();
       })
       .catch(notifyError);
   };
@@ -269,6 +562,64 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     const found = notes.find((n) => n.id === id);
     return found ? found.title || MESSAGES.UNTITLED_NOTE : MESSAGES.UNTITLED_NOTE;
   };
+
+  const handleReorder = useCallback(
+    (id: string, targetId: string, position: "before" | "after") => {
+      setDefinitions((prev) => {
+        const from = prev.findIndex((d) => d.id === id);
+        const to = prev.findIndex((d) => d.id === targetId);
+        if (from === -1 || to === -1) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(from, 1);
+        if (!moved) return prev;
+        const insertAt =
+          position === "before" ? (from < to ? to - 1 : to) : from < to ? to : to + 1;
+        next.splice(insertAt, 0, moved);
+        return next;
+      });
+      propertyService
+        .reorderDefinition(id, targetId, position)
+        .then(() => bumpProperties())
+        .catch((err) => {
+          notifyError(err);
+          reload();
+        });
+    },
+    [bumpProperties, reload],
+  );
+
+  const commitRename = (def: PropertyDefinition, name: string) => {
+    setRenamingId(null);
+    if (name === def.name) return;
+    propertyService
+      .renameDefinition(def.id, name)
+      .then(() => bumpProperties())
+      .catch((err) => {
+        notifyError(err);
+        reload();
+      });
+  };
+
+  const handleVisibility = (def: PropertyDefinition, show: PropertyVisibility) => {
+    propertyService
+      .setDefinitionVisibility(def.id, show)
+      .then(() => bumpProperties())
+      .catch((err) => {
+        notifyError(err);
+        reload();
+      });
+  };
+
+  useEffect(() => {
+    if (justCreatedId && values.has(justCreatedId)) setJustCreatedId(null);
+  }, [values, justCreatedId]);
+
+  const isVisible = (def: PropertyDefinition): boolean =>
+    def.id === justCreatedId ||
+    (def.show !== "always-hide" && (def.show !== "hide-when-empty" || values.has(def.id)));
+
+  const visibleDefinitions = definitions.filter(isVisible);
+  const hiddenDefinitions = definitions.filter((def) => !isVisible(def));
 
   const renderValue = (def: PropertyDefinition) => {
     const value = values.get(def.id);
@@ -499,23 +850,71 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
 
   return (
     <>
-      {definitions.map((def) => (
-        <div key={def.id} className="group/prop relative">
-          <InfoRow icon={TYPE_META[def.type].icon} label={def.name}>
-            <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
-              <div className="min-w-0 flex-1">{renderValue(def)}</div>
-              <button
-                type="button"
-                aria-label={`${MESSAGES.PROP_DELETE}: ${def.name}`}
-                onClick={() => setDeletingDef(def)}
-                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-destructive focus-visible:opacity-100 group-hover/prop:opacity-100"
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          </InfoRow>
-        </div>
+      {visibleDefinitions.map((def) => (
+        <PropertyRow
+          key={def.id}
+          def={def}
+          renaming={renamingId === def.id}
+          onStartRename={setRenamingId}
+          onCommitRename={commitRename}
+          onCancelRename={() => setRenamingId(null)}
+          onVisibility={handleVisibility}
+          onDelete={setDeletingDef}
+          onReorder={handleReorder}
+        >
+          {renderValue(def)}
+        </PropertyRow>
       ))}
+
+      {hiddenDefinitions.length > 0 && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex h-[26px] w-full items-center gap-1.5 rounded p-1 text-xs text-muted-foreground/80 transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.PROP_HIDDEN_COUNT.replace("{n}", String(hiddenDefinitions.length))}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-2">
+            <div className="max-h-56 space-y-0.5 overflow-y-auto">
+              {hiddenDefinitions.map((def) => (
+                <div
+                  key={def.id}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="text-muted-foreground [&_svg]:h-4 [&_svg]:w-4"
+                  >
+                    {TYPE_META[def.type].icon}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{def.name}</span>
+                  <button
+                    type="button"
+                    aria-label={MESSAGES.PROP_VIS_ALWAYS_SHOW}
+                    title={MESSAGES.PROP_VIS_ALWAYS_SHOW}
+                    onClick={() => handleVisibility(def, "always-show")}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={MESSAGES.PROP_DELETE}
+                    title={MESSAGES.PROP_DELETE}
+                    onClick={() => setDeletingDef(def)}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Popover onOpenChange={(open) => !open && setNewName("")}>
         <PopoverTrigger asChild>
@@ -566,7 +965,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
           if (deletingDef) {
             propertyService
               .deleteDefinition(deletingDef.id)
-              .then(() => reload())
+              .then(() => bumpProperties())
               .catch(notifyError);
           }
           setDeletingDef(null);
