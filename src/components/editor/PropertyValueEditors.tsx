@@ -1,0 +1,496 @@
+import { FileText, Plus, X } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { MESSAGES } from "../../constants/messages";
+import type {
+  PropertyDefinition,
+  PropertyOption,
+  PropertyType,
+  PropertyValue,
+} from "../../domain/property/Property";
+import { cn } from "../../lib/utils";
+import { useNoteStore } from "../../store/useNoteStore";
+import type { Note } from "../../types";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+
+export const INPUT_CLASS =
+  "h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring";
+
+export function toLocalDateString(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = ({
+  option,
+  onRemove,
+}) => (
+  <span className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground">
+    <span
+      aria-hidden="true"
+      className="h-2 w-2 shrink-0 rounded-full"
+      style={{ backgroundColor: option.color }}
+    />
+    <span className="truncate">{option.name}</span>
+    {onRemove && (
+      <button
+        type="button"
+        aria-label={`Remove ${option.name}`}
+        onClick={onRemove}
+        className="shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/opt:opacity-100"
+      >
+        <X className="h-2.5 w-2.5" aria-hidden="true" />
+      </button>
+    )}
+  </span>
+);
+
+const OptionPicker: React.FC<{
+  def: PropertyDefinition;
+  selectedIds: string[];
+  multi: boolean;
+  onPick: (optionId: string) => void;
+  onCreate: (name: string) => void;
+}> = ({ def, selectedIds, multi, onPick, onCreate }) => {
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim();
+  const visible = def.options.filter(
+    (o) =>
+      (!trimmed || o.name.toLowerCase().includes(trimmed.toLowerCase())) &&
+      (multi ? !selectedIds.includes(o.id) : true),
+  );
+  const exactExists = def.options.some((o) => o.name.toLowerCase() === trimmed.toLowerCase());
+  return (
+    <PopoverContent align="start" className="w-60 p-2">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={MESSAGES.PROP_OPTION_PLACEHOLDER}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && trimmed && !exactExists) {
+            onCreate(trimmed);
+            setQuery("");
+          }
+        }}
+        className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <div className="max-h-48 space-y-0.5 overflow-y-auto">
+        {visible.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onPick(option.id)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: option.color }}
+            />
+            <span className="truncate">{option.name}</span>
+            {!multi && selectedIds.includes(option.id) && (
+              <span className="ml-auto text-xs text-muted-foreground">✓</span>
+            )}
+          </button>
+        ))}
+        {trimmed && !exactExists && (
+          <button
+            type="button"
+            onClick={() => {
+              onCreate(trimmed);
+              setQuery("");
+            }}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="truncate">
+              {MESSAGES.PROP_CREATE_OPTION_PREFIX} "{trimmed}"
+            </span>
+          </button>
+        )}
+      </div>
+    </PopoverContent>
+  );
+};
+
+const ListEditor: React.FC<{
+  entries: string[];
+  placeholder: string;
+  renderEntry?: (entry: string) => React.ReactNode;
+  onChange: (entries: string[]) => void;
+}> = ({ entries, placeholder, renderEntry, onChange }) => {
+  const [draft, setDraft] = useState("");
+  const trimmed = draft.trim();
+  return (
+    <PopoverContent align="start" className="w-64 p-2">
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={placeholder}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && trimmed) {
+            onChange([...entries, trimmed]);
+            setDraft("");
+          }
+        }}
+        className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <div className="max-h-48 space-y-0.5 overflow-y-auto">
+        {entries.map((entry, index) => (
+          <div
+            key={`${entry}-${
+              // biome-ignore lint/suspicious/noArrayIndexKey: duplicate entries are legal in this list
+              index
+            }`}
+            className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm"
+          >
+            <span className="truncate">{renderEntry ? renderEntry(entry) : entry}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${entry}`}
+              onClick={() => onChange(entries.filter((_, i) => i !== index))}
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </PopoverContent>
+  );
+};
+
+const RelationPicker: React.FC<{
+  excluded: string[];
+  onPick: (noteId: string) => void;
+}> = ({ excluded, onPick }) => {
+  const notes = useNoteStore((s) => s.notes);
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim().toLowerCase();
+  const candidates = notes
+    .filter((n) => !excluded.includes(n.id))
+    .filter((n) => !trimmed || (n.title || MESSAGES.UNTITLED_NOTE).toLowerCase().includes(trimmed))
+    .slice(0, 12);
+  return (
+    <PopoverContent align="start" className="w-64 p-2">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={MESSAGES.PROP_RELATION_PLACEHOLDER}
+        className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <div className="max-h-48 space-y-0.5 overflow-y-auto">
+        {candidates.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            onClick={() => onPick(n.id)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span aria-hidden="true" className="shrink-0 text-sm">
+              {n.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+            </span>
+            <span className="truncate">{n.title || MESSAGES.UNTITLED_NOTE}</span>
+          </button>
+        ))}
+      </div>
+    </PopoverContent>
+  );
+};
+
+export interface PropertyValueEditorProps {
+  def: PropertyDefinition;
+  value: PropertyValue | undefined;
+  noteId: string;
+  onSet: (value: PropertyValue) => void;
+  onClear: () => void;
+  createOption: (def: PropertyDefinition, name: string, thenPick: boolean) => void;
+}
+
+/** text / person / url share one inline text input. */
+const TextLikeValue: React.FC<PropertyValueEditorProps> = ({
+  def,
+  value,
+  noteId,
+  onSet,
+  onClear,
+}) => {
+  const current =
+    value?.type === "text"
+      ? value.text
+      : value?.type === "person"
+        ? value.name
+        : value?.type === "url"
+          ? value.url
+          : "";
+  return (
+    <input
+      key={`${noteId}-${def.id}-${current}`}
+      type="text"
+      defaultValue={current}
+      placeholder={MESSAGES.INFO_EMPTY_VALUE}
+      onBlur={(e) => {
+        const text = e.target.value.trim();
+        if (text === current) return;
+        if (!text) return onClear();
+        if (def.type === "text") onSet({ type: "text", text });
+        else if (def.type === "person") onSet({ type: "person", name: text });
+        else onSet({ type: "url", url: text });
+      }}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      className={cn(INPUT_CLASS, def.type === "url" && current && "text-primary underline")}
+    />
+  );
+};
+
+const NumberValue: React.FC<PropertyValueEditorProps> = ({
+  def,
+  value,
+  noteId,
+  onSet,
+  onClear,
+}) => {
+  const current = value?.type === "number" ? String(value.number) : "";
+  return (
+    <input
+      key={`${noteId}-${def.id}-${current}`}
+      type="number"
+      defaultValue={current}
+      placeholder={MESSAGES.INFO_EMPTY_VALUE}
+      onBlur={(e) => {
+        const raw = e.target.value.trim();
+        if (raw === current) return;
+        if (!raw) return onClear();
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) onSet({ type: "number", number: parsed });
+      }}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      className={INPUT_CLASS}
+    />
+  );
+};
+
+const CheckboxValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet }) => {
+  const checked = value?.type === "checkbox" && value.checked;
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onSet({ type: "checkbox", checked: e.target.checked })}
+      aria-label={def.name}
+      className="h-4 w-4 accent-[hsl(var(--primary))]"
+    />
+  );
+};
+
+const DateValueEditor: React.FC<PropertyValueEditorProps> = ({
+  def,
+  value,
+  noteId,
+  onSet,
+  onClear,
+}) => {
+  const current = value?.type === "date" ? toLocalDateString(value.timestamp) : "";
+  return (
+    <input
+      key={`${noteId}-${def.id}-${current}`}
+      type="date"
+      defaultValue={current}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (!raw) return onClear();
+        const [y, m, d] = raw.split("-").map(Number);
+        if (y && m && d) {
+          onSet({ type: "date", timestamp: new Date(y, m - 1, d).getTime() });
+        }
+      }}
+      className={cn(INPUT_CLASS, "max-w-40")}
+    />
+  );
+};
+
+const SelectValue: React.FC<PropertyValueEditorProps> = ({
+  def,
+  value,
+  onClear,
+  onSet,
+  createOption,
+}) => {
+  const optionId = value?.type === "select" || value?.type === "status" ? value.optionId : null;
+  const selected = def.options.find((o) => o.id === optionId);
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="flex flex-wrap items-center gap-1.5">
+          {selected ? (
+            <OptionChip option={selected} onRemove={onClear} />
+          ) : (
+            <span className="text-muted-foreground/60">{MESSAGES.INFO_EMPTY_VALUE}</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <OptionPicker
+        def={def}
+        selectedIds={optionId ? [optionId] : []}
+        multi={false}
+        onPick={(id) => onSet({ type: def.type as "select" | "status", optionId: id })}
+        onCreate={(name) => void createOption(def, name, true)}
+      />
+    </Popover>
+  );
+};
+
+const MultiSelectValue: React.FC<PropertyValueEditorProps> = ({
+  def,
+  value,
+  onClear,
+  onSet,
+  createOption,
+}) => {
+  const ids = value?.type === "multiSelect" ? value.optionIds : [];
+  const selected = def.options.filter((o) => ids.includes(o.id));
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {selected.map((option) => (
+        <OptionChip
+          key={option.id}
+          option={option}
+          onRemove={() => {
+            const next = ids.filter((id) => id !== option.id);
+            if (next.length > 0) onSet({ type: "multiSelect", optionIds: next });
+            else onClear();
+          }}
+        />
+      ))}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={MESSAGES.PROP_OPTION_PLACEHOLDER}
+            className="inline-flex h-[22px] items-center gap-1 rounded-full px-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Plus className="h-3 w-3" aria-hidden="true" />
+            {selected.length === 0 && <span>{MESSAGES.INFO_EMPTY_VALUE}</span>}
+          </button>
+        </PopoverTrigger>
+        <OptionPicker
+          def={def}
+          selectedIds={ids}
+          multi
+          onPick={(id) => onSet({ type: "multiSelect", optionIds: [...ids, id] })}
+          onCreate={(name) => void createOption(def, name, true)}
+        />
+      </Popover>
+    </div>
+  );
+};
+
+const FilesValue: React.FC<PropertyValueEditorProps> = ({ value, onClear, onSet }) => {
+  const entries = value?.type === "files" ? value.entries : [];
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded px-1 py-0.5 text-left transition-colors hover:bg-accent"
+        >
+          {entries.length === 0 ? (
+            <span className="text-muted-foreground/60">{MESSAGES.INFO_EMPTY_VALUE}</span>
+          ) : (
+            <span className="truncate">
+              {entries[0]}
+              {entries.length > 1 && (
+                <span className="text-muted-foreground"> +{entries.length - 1}</span>
+              )}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <ListEditor
+        entries={entries}
+        placeholder={MESSAGES.PROP_FILES_PLACEHOLDER}
+        onChange={(next) => (next.length > 0 ? onSet({ type: "files", entries: next }) : onClear())}
+      />
+    </Popover>
+  );
+};
+
+const RelationValue: React.FC<PropertyValueEditorProps> = ({ value, noteId, onClear, onSet }) => {
+  const notes = useNoteStore((s) => s.notes);
+  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const ids = value?.type === "relation" ? value.noteIds : [];
+  const noteTitle = (id: string): string => {
+    const found: Note | undefined = notes.find((n) => n.id === id);
+    return found ? found.title || MESSAGES.UNTITLED_NOTE : MESSAGES.UNTITLED_NOTE;
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {ids.map((id) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => setActiveNoteId(id)}
+          className="inline-flex h-[22px] max-w-40 items-center gap-1 rounded-full border bg-card px-2 text-xs text-foreground transition-colors hover:bg-accent"
+        >
+          <FileText className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="truncate">{noteTitle(id)}</span>
+        </button>
+      ))}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={MESSAGES.PROP_RELATION_PLACEHOLDER}
+            className="inline-flex h-[22px] items-center gap-1 rounded-full px-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Plus className="h-3 w-3" aria-hidden="true" />
+            {ids.length === 0 && <span>{MESSAGES.INFO_EMPTY_VALUE}</span>}
+          </button>
+        </PopoverTrigger>
+        <RelationPicker
+          excluded={[noteId, ...ids]}
+          onPick={(id) => onSet({ type: "relation", noteIds: [...ids, id] })}
+        />
+      </Popover>
+      {ids.length > 0 && (
+        <button
+          type="button"
+          aria-label={MESSAGES.PROP_CLEAR}
+          onClick={onClear}
+          className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <X className="h-3 w-3" aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Declarative per-type value editor registry (AFFI NE WorkspacePropertyTypes
+ * pattern): the Info panel renderValue path and any future surface (doc-list
+ * columns, filters) resolve editors from here instead of a switch statement.
+ */
+export const PROPERTY_VALUE_EDITORS: Record<PropertyType, React.FC<PropertyValueEditorProps>> = {
+  text: TextLikeValue,
+  number: NumberValue,
+  select: SelectValue,
+  multiSelect: MultiSelectValue,
+  status: SelectValue,
+  date: DateValueEditor,
+  person: TextLikeValue,
+  files: FilesValue,
+  checkbox: CheckboxValue,
+  url: TextLikeValue,
+  relation: RelationValue,
+  // System rows own their renderers inside the Info panel; these entries
+  // exist only to satisfy the Record and are never reached.
+  tags: TextLikeValue,
+  workspace: TextLikeValue,
+  created: TextLikeValue,
+  updated: TextLikeValue,
+};
