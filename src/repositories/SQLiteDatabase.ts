@@ -377,26 +377,47 @@ export class SQLiteDatabase {
         // Seed the journal row after the derived system rows: it is a date
         // property whose value lives in note_properties (local-midnight
         // timestamp), seeded hidden-until-set so only journal notes show it.
-        const rows = await db.select<Array<{ id: string; orderIndex: string }>>(
-          "SELECT id, orderIndex FROM property_defs ORDER BY orderIndex, createdAt, id",
+        //
+        // Rows are fully re-keyed in code (v15 pattern): an interim build of
+        // v15 seeded system rows with orderIndex '' and never backfilled them,
+        // and fractional-indexing throws on empty keys - generateKeyBetween
+        // (null, '') wedged every later launch inside migrate(). Recomputing
+        // all keys here heals such databases and is a no-op rearrangement for
+        // healthy ones, preserving each row's current relative order ('' rows
+        // sort first under BINARY collation, so they heal at the head).
+        const existing = await db.select<Array<{ id: string }>>(
+          "SELECT id FROM property_defs ORDER BY (CASE WHEN orderIndex = '' THEN 0 ELSE 1 END), orderIndex, createdAt, id",
         );
-        const updatedIndex = rows.findIndex((row) => row.id === "system:updated");
-        const updatedRow = updatedIndex >= 0 ? rows[updatedIndex] : undefined;
-        const afterRow = updatedIndex >= 0 ? rows[updatedIndex + 1] : undefined;
-        const journalKey = generateKeyBetween(
-          updatedRow?.orderIndex || null,
-          afterRow?.orderIndex ?? null,
-        );
-        await SQLiteDatabase.runTransaction([
+        const orderedIds = existing.map((row) => row.id);
+        let journalInsert: SqlStatement | null = null;
+        if (!orderedIds.includes("system:journal")) {
+          const updatedPos = orderedIds.indexOf("system:updated");
+          orderedIds.splice(
+            updatedPos >= 0 ? updatedPos + 1 : orderedIds.length,
+            0,
+            "system:journal",
+          );
+          journalInsert = {
+            sql: "INSERT OR IGNORE INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES ('system:journal', 'Journal', 'date', '[]', 0, '', 'hide-when-empty')",
+          };
+        }
+        const statements: SqlStatement[] = [
           {
             sql: "UPDATE property_defs SET name = name || ' (custom)' WHERE id NOT LIKE 'system:%' AND lower(name) = 'journal'",
           },
-          {
-            sql: "INSERT OR IGNORE INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES ('system:journal', 'Journal', 'date', '[]', 0, ?, 'hide-when-empty')",
-            params: [journalKey],
-          },
-          { sql: "PRAGMA user_version = 16" },
-        ]);
+          ...(journalInsert ? [journalInsert] : []),
+        ];
+        let prev: string | null = null;
+        for (const id of orderedIds) {
+          const key = generateKeyBetween(prev, null);
+          statements.push({
+            sql: "UPDATE property_defs SET orderIndex = ? WHERE id = ?",
+            params: [key, id],
+          });
+          prev = key;
+        }
+        statements.push({ sql: "PRAGMA user_version = 16" });
+        await SQLiteDatabase.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 16");
       }
