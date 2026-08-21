@@ -20,6 +20,7 @@ export interface IPropertyRepository {
   appendOption(id: string, optionJson: string): Promise<void>;
   deleteDefinition(id: string): Promise<void>;
   valuesForNote(noteId: string): Promise<NotePropertyRecord[]>;
+  valuesForPropertyAll(propertyId: string): Promise<NotePropertyRecord[]>;
   setValue(noteId: string, propertyId: string, valueJson: string): Promise<void>;
   removeValue(noteId: string, propertyId: string): Promise<void>;
 }

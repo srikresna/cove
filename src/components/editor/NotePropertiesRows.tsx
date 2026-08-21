@@ -49,6 +49,7 @@ import {
   CREATABLE_PROPERTY_TYPES,
   hasOptions,
   isSystemPropertyId,
+  JOURNAL_PROPERTY_ID,
   PROPERTY_VISIBILITY,
 } from "../../domain/property/Property";
 import type { Tag } from "../../domain/tag/Tag";
@@ -278,6 +279,49 @@ const DateValue: React.FC<{ timestamp: number }> = ({ timestamp }) => (
     </TooltipContent>
   </Tooltip>
 );
+
+/**
+ * Journal row editor (AFFiNE pattern): a checkbox marks the note as a journal
+ * note for the picked day; unchecking clears it. Checking without an existing
+ * date defaults to today.
+ */
+const JournalValue: React.FC<{
+  value: { timestamp: number } | undefined;
+  onSet: (timestamp: number) => void;
+  onClear: () => void;
+}> = ({ value, onSet, onClear }) => {
+  const todayTimestamp = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={value !== undefined}
+        aria-label={MESSAGES.JOURNAL_TOGGLE}
+        onChange={(e) =>
+          e.target.checked ? onSet(value?.timestamp ?? todayTimestamp()) : onClear()
+        }
+        className="h-4 w-4 accent-[hsl(var(--primary))]"
+      />
+      {value !== undefined && (
+        <input
+          type="date"
+          value={toLocalDateString(value.timestamp)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (!raw) return;
+            const [y, m, d] = raw.split("-").map(Number);
+            if (y && m && d) onSet(new Date(y, m - 1, d).getTime());
+          }}
+          className={cn(inputClass, "max-w-40")}
+        />
+      )}
+    </div>
+  );
+};
 
 /** System row: tags chips + create/pick popover, backed by the tag service. */
 const TagsValue: React.FC<{ noteId: string }> = ({ noteId }) => {
@@ -663,18 +707,19 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
               )}
               <DropdownMenuSeparator />
               <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-              {(isSystem ? (["always-show", "always-hide"] as const) : PROPERTY_VISIBILITY).map(
-                (visibility) => (
-                  <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
-                    <span className="flex h-4 w-4 items-center justify-center">
-                      {def.show === visibility ? (
-                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                      ) : null}
-                    </span>
-                    {VISIBILITY_LABEL[visibility]}
-                  </DropdownMenuItem>
-                ),
-              )}
+              {(isSystem && def.id !== JOURNAL_PROPERTY_ID
+                ? (["always-show", "always-hide"] as const)
+                : PROPERTY_VISIBILITY
+              ).map((visibility) => (
+                <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
+                  <span className="flex h-4 w-4 items-center justify-center">
+                    {def.show === visibility ? (
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : null}
+                  </span>
+                  {VISIBILITY_LABEL[visibility]}
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
               {!isSystem && (
                 <DropdownMenuItem
@@ -841,6 +886,15 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
 
   const renderValue = (def: PropertyDefinition) => {
     const value = values.get(def.id);
+    if (def.id === JOURNAL_PROPERTY_ID) {
+      return (
+        <JournalValue
+          value={value?.type === "date" ? value : undefined}
+          onSet={(timestamp) => save(def.id, { type: "date", timestamp })}
+          onClear={() => clear(def.id)}
+        />
+      );
+    }
     switch (def.type) {
       case "tags":
         return <TagsValue noteId={note.id} />;

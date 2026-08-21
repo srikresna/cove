@@ -147,6 +147,23 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     }
   }
 
+  async valuesForPropertyAll(propertyId: string): Promise<NotePropertyRecord[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT noteId, propertyId, valueJson FROM note_properties WHERE propertyId = ?",
+        [propertyId],
+      );
+      return rows.map((row) => ({
+        noteId: String(row.noteId),
+        propertyId: String(row.propertyId),
+        valueJson: String(row.valueJson),
+      }));
+    } catch (err) {
+      throw toPersistenceError("properties.valuesForPropertyAll", err);
+    }
+  }
+
   async setValue(noteId: string, propertyId: string, valueJson: string): Promise<void> {
     try {
       const db = await this.getDb();

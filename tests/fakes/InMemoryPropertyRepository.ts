@@ -46,6 +46,10 @@ export class InMemoryPropertyRepository implements IPropertyRepository {
     return this.values.filter((v) => v.noteId === noteId).map((v) => ({ ...v }));
   }
 
+  async valuesForPropertyAll(propertyId: string): Promise<NotePropertyRecord[]> {
+    return this.values.filter((v) => v.propertyId === propertyId).map((v) => ({ ...v }));
+  }
+
   async setValue(noteId: string, propertyId: string, valueJson: string): Promise<void> {
     const existing = this.values.find((v) => v.noteId === noteId && v.propertyId === propertyId);
     if (existing) {

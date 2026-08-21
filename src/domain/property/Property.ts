@@ -32,7 +32,15 @@ export const SYSTEM_PROPERTY_IDS = [
   "system:workspace",
   "system:created",
   "system:updated",
+  "system:journal",
 ] as const;
+
+/**
+ * The journal row is a value-backed system property: unlike the four derived
+ * rows, its value lives in note_properties (a local-midnight timestamp), so
+ * hide-when-empty is meaningful for it and it round-trips like a custom date.
+ */
+export const JOURNAL_PROPERTY_ID = "system:journal";
 
 export type SystemPropertyId = (typeof SYSTEM_PROPERTY_IDS)[number];
 

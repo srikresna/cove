@@ -370,5 +370,36 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 15");
       }
     }
+
+    if (version < 16) {
+      const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
+      if (propCols.length > 0) {
+        // Seed the journal row after the derived system rows: it is a date
+        // property whose value lives in note_properties (local-midnight
+        // timestamp), seeded hidden-until-set so only journal notes show it.
+        const rows = await db.select<Array<{ id: string; orderIndex: string }>>(
+          "SELECT id, orderIndex FROM property_defs ORDER BY orderIndex, createdAt, id",
+        );
+        const updatedIndex = rows.findIndex((row) => row.id === "system:updated");
+        const updatedRow = updatedIndex >= 0 ? rows[updatedIndex] : undefined;
+        const afterRow = updatedIndex >= 0 ? rows[updatedIndex + 1] : undefined;
+        const journalKey = generateKeyBetween(
+          updatedRow?.orderIndex || null,
+          afterRow?.orderIndex ?? null,
+        );
+        await SQLiteDatabase.runTransaction([
+          {
+            sql: "UPDATE property_defs SET name = name || ' (custom)' WHERE id NOT LIKE 'system:%' AND lower(name) = 'journal'",
+          },
+          {
+            sql: "INSERT OR IGNORE INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES ('system:journal', 'Journal', 'date', '[]', 0, ?, 'hide-when-empty')",
+            params: [journalKey],
+          },
+          { sql: "PRAGMA user_version = 16" },
+        ]);
+      } else {
+        await db.execute("PRAGMA user_version = 16");
+      }
+    }
   }
 }

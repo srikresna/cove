@@ -10,11 +10,13 @@ import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
 import { BlockSuiteEditorService } from "../services/blocksuite/BlockSuiteEditorService";
 import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuiteEditorService";
+import type { IJournalService } from "../services/IJournalService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
 import type { ITagService } from "../services/ITagService";
 import type { IVaultService } from "../services/IVaultService";
 import type { IWorkspaceService } from "../services/IWorkspaceService";
+import { JournalService } from "../services/JournalService";
 import { NoteService } from "../services/NoteService";
 import { PropertyService } from "../services/PropertyService";
 import { TagService } from "../services/TagService";
@@ -51,6 +53,7 @@ export const tagService: ITagService = new TagService(tagRepository);
 export const propertyService: IPropertyService = new PropertyService(
   new SQLitePropertyRepository(),
 );
+export const journalService: IJournalService = new JournalService(propertyService, noteService);
 export const workspaceService: IWorkspaceService = new WorkspaceService(workspaceRepository);
 const deviceBind = new DeviceBind();
 const deriveKeyFn: KdfDerive = async (passphrase, salt, kdfAlg, params) => {

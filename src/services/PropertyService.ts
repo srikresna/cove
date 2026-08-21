@@ -4,6 +4,7 @@ import {
   deserializePropertyValue,
   hasOptions,
   isSystemPropertyId,
+  JOURNAL_PROPERTY_ID,
   makePropertyId,
   nextOptionColor,
   orderKeyBetween,
@@ -84,9 +85,10 @@ export class PropertyService implements IPropertyService {
   }
 
   async setDefinitionVisibility(id: string, show: PropertyVisibility): Promise<void> {
-    if (isSystemPropertyId(id) && show === "hide-when-empty") {
-      // System values live outside note_properties, so "empty" never resolves
-      // and the row could never come back. Only show/hide are meaningful.
+    if (isSystemPropertyId(id) && id !== JOURNAL_PROPERTY_ID && show === "hide-when-empty") {
+      // Derived system values live outside note_properties, so "empty" never
+      // resolves and the row could never come back. The journal row is
+      // value-backed, so it accepts the full visibility range.
       throw new ValidationError("Built-in properties only support always-show or always-hide.");
     }
     const existing = await this.properties.listDefinitions();
@@ -170,6 +172,17 @@ export class PropertyService implements IPropertyService {
           propertyId: record.propertyId,
         });
       }
+    }
+    return values;
+  }
+
+  async valuesForDefinitionAllNotes(propertyId: string): Promise<Map<string, PropertyValue>> {
+    const def = (await this.properties.listDefinitions()).find((d) => d.id === propertyId);
+    if (!def) throw new NotFoundError("Property", propertyId);
+    const values = new Map<string, PropertyValue>();
+    for (const record of await this.properties.valuesForPropertyAll(propertyId)) {
+      const value = deserializePropertyValue(record.valueJson, def.type);
+      if (value) values.set(record.noteId, value);
     }
     return values;
   }

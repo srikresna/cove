@@ -1,14 +1,19 @@
-import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ChevronRight, FileText, Plus } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
+import { journalService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
+import { usePropertyStore } from "../../store/usePropertyStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 
-type DateField = "updatedAt" | "createdAt";
+type DateField = "journal" | "updatedAt" | "createdAt";
+
+const FIELD_KEY = "cove-calendar-field";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -16,33 +21,69 @@ const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth()}
 
 const keyOf = (timestamp: number): string => dayKey(new Date(timestamp));
 
+const isDateField = (value: string): value is DateField =>
+  value === "journal" || value === "updatedAt" || value === "createdAt";
+
 export const CalendarPanel: React.FC = () => {
   const notes = useNoteStore((s) => s.notes);
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const propertyVersion = usePropertyStore((s) => s.version);
 
-  const [field, setField] = useState<DateField>("updatedAt");
+  const [field, setField] = useState<DateField>(() => {
+    const stored = localStorage.getItem(FIELD_KEY) ?? "";
+    return isDateField(stored) ? stored : "journal";
+  });
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(() => dayKey(new Date()));
+  const [journalByNoteId, setJournalByNoteId] = useState<Map<string, number>>(new Map());
 
   const workspaceNotes = useMemo(
     () => notes.filter((n) => n.workspaceId === activeWorkspaceId),
     [notes, activeWorkspaceId],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
+  useEffect(() => {
+    let alive = true;
+    journalService
+      .journalValuesByNote()
+      .then((values) => {
+        if (!alive) return;
+        const map = new Map<string, number>();
+        for (const [noteId, value] of values) {
+          if (value.type === "date") map.set(noteId, value.timestamp);
+        }
+        setJournalByNoteId(map);
+      })
+      .catch(() => {
+        if (alive) setJournalByNoteId(new Map());
+      });
+    return () => {
+      alive = false;
+    };
+  }, [propertyVersion]);
+
   const notesByDay = useMemo(() => {
     const map = new Map<string, Note[]>();
     for (const note of workspaceNotes) {
-      const key = keyOf(note[field]);
+      let timestamp: number | undefined;
+      if (field === "journal") {
+        timestamp = journalByNoteId.get(note.id);
+      } else {
+        timestamp = note[field];
+      }
+      if (timestamp === undefined) continue;
+      const key = keyOf(timestamp);
       const list = map.get(key) ?? [];
       list.push(note);
       map.set(key, list);
     }
     return map;
-  }, [workspaceNotes, field]);
+  }, [workspaceNotes, field, journalByNoteId]);
 
   const cells = useMemo(() => {
     const year = monthCursor.getFullYear();
@@ -66,11 +107,64 @@ export const CalendarPanel: React.FC = () => {
   const shiftMonth = (delta: number) =>
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
 
+  const chooseField = (next: DateField) => {
+    setField(next);
+    localStorage.setItem(FIELD_KEY, next);
+  };
+
+  const dateOfSelectedDay = selectedDay
+    ? new Date(
+        Number(selectedDay.split("-")[0]),
+        Number(selectedDay.split("-")[1]),
+        Number(selectedDay.split("-")[2]),
+      )
+    : null;
+
+  const openJournalFor = useCallback(
+    (date: Date) => {
+      if (!activeWorkspaceId) return;
+      journalService
+        .ensureJournalByDate(activeWorkspaceId, date.getTime())
+        .then(async (noteId) => {
+          // The service bypasses the stores, so refresh both before pointing
+          // the UI at the (possibly just-created) journal note.
+          usePropertyStore.getState().refresh();
+          await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+          setSelectedDay(dayKey(date));
+          setActiveNoteId(noteId);
+        })
+        .catch(notifyError);
+    },
+    [activeWorkspaceId, setActiveNoteId],
+  );
+
+  const handleDayClick = (key: string, hasNotes: boolean) => {
+    if (!hasNotes && field === "journal" && activeWorkspaceId) {
+      const [y = 0, m = 0, d = 0] = key.split("-").map(Number);
+      openJournalFor(new Date(y, m, d));
+      return;
+    }
+    setSelectedDay((prev) => (prev === key ? null : key));
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col px-3">
       <div className="flex items-center justify-between pt-2">
         <span className="text-[13px] font-semibold text-foreground">{monthLabel}</span>
         <div className="flex items-center">
+          {field === "journal" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={MESSAGES.JOURNAL_TODAY}
+              title={MESSAGES.JOURNAL_TODAY}
+              onClick={() => openJournalFor(new Date())}
+              className="mr-1 h-7 gap-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.JOURNAL_TODAY}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="iconSm"
@@ -95,6 +189,7 @@ export const CalendarPanel: React.FC = () => {
       <div className="mt-1 flex gap-1">
         {(
           [
+            ["journal", MESSAGES.JOURNAL_FIELD],
             ["updatedAt", MESSAGES.CALENDAR_FILTER_UPDATED],
             ["createdAt", MESSAGES.CALENDAR_FILTER_CREATED],
           ] as const
@@ -103,7 +198,7 @@ export const CalendarPanel: React.FC = () => {
             key={value}
             type="button"
             aria-pressed={field === value}
-            onClick={() => setField(value)}
+            onClick={() => chooseField(value)}
             className={cn(
               "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               field === value
@@ -138,8 +233,9 @@ export const CalendarPanel: React.FC = () => {
             <button
               key={key}
               type="button"
-              onClick={() => setSelectedDay(isSelected ? null : key)}
+              onClick={() => handleDayClick(key, hasNotes)}
               aria-pressed={isSelected}
+              title={!hasNotes && field === "journal" ? MESSAGES.JOURNAL_NEW : undefined}
               className={cn(
                 "mx-auto flex h-8 w-8 flex-col items-center justify-center rounded-md text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isSelected
@@ -163,9 +259,20 @@ export const CalendarPanel: React.FC = () => {
 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border-t pt-2">
         {selectedNotes.length === 0 ? (
-          <p className="px-1 py-3 text-center text-xs text-muted-foreground">
-            {MESSAGES.CALENDAR_EMPTY_DAY}
-          </p>
+          field === "journal" && dateOfSelectedDay && activeWorkspaceId ? (
+            <button
+              type="button"
+              onClick={() => openJournalFor(dateOfSelectedDay)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>{MESSAGES.JOURNAL_NEW}</span>
+            </button>
+          ) : (
+            <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+              {MESSAGES.CALENDAR_EMPTY_DAY}
+            </p>
+          )
         ) : (
           selectedNotes.map((note) => (
             <button

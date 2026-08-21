@@ -17,6 +17,7 @@ export interface IPropertyService {
 
   addOption(definitionId: string, name: string): Promise<PropertyOption>;
   valuesForNote(noteId: string): Promise<Map<string, PropertyValue>>;
+  valuesForDefinitionAllNotes(propertyId: string): Promise<Map<string, PropertyValue>>;
   setValue(noteId: string, propertyId: string, value: PropertyValue): Promise<void>;
   removeValue(noteId: string, propertyId: string): Promise<void>;
 }
