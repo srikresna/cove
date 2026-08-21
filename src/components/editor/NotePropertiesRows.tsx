@@ -74,7 +74,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { InfoRow } from "./NoteInfoPanel";
 
-const TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> = {
+export const PROPERTY_TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> = {
   text: { label: "Text", icon: <Type /> },
   number: { label: "Number", icon: <Hash /> },
   select: { label: "Select", icon: <List /> },
@@ -569,7 +569,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
     return draggable({
       element,
       dragHandle: handleRef.current ?? undefined,
-      getInitialData: () => ({ propertyId: def.id }),
+      getInitialData: () => ({ propertyId: def.id, from: "note-info" }),
     });
   }, [def.id]);
 
@@ -591,7 +591,9 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
           },
         ),
       canDrop: ({ source }) =>
-        typeof source.data.propertyId === "string" && source.data.propertyId !== def.id,
+        source.data.from === "note-info" &&
+        typeof source.data.propertyId === "string" &&
+        source.data.propertyId !== def.id,
       getIsSticky: () => true,
       onDragEnter: (event) => setClosestEdge(extractClosestEdge(event.self.data)),
       onDrag: (event) => setClosestEdge(extractClosestEdge(event.self.data)),
@@ -669,7 +671,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
             <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         }
-        icon={TYPE_META[def.type].icon}
+        icon={PROPERTY_TYPE_META[def.type].icon}
         label={label}
       >
         <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
@@ -793,7 +795,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   };
 
   const createDefinition = (type: PropertyType) => {
-    const name = newName.trim() || TYPE_META[type].label;
+    const name = newName.trim() || PROPERTY_TYPE_META[type].label;
     setNewName("");
     propertyService
       .createDefinition(name, type)
@@ -1168,7 +1170,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
                     aria-hidden="true"
                     className="text-muted-foreground [&_svg]:h-4 [&_svg]:w-4"
                   >
-                    {TYPE_META[def.type].icon}
+                    {PROPERTY_TYPE_META[def.type].icon}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{def.name}</span>
                   <button
@@ -1224,8 +1226,8 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
                 onClick={() => createDefinition(type)}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-4 [&_svg]:w-4 [&_svg]:text-muted-foreground"
               >
-                {TYPE_META[type].icon}
-                <span>{TYPE_META[type].label}</span>
+                {PROPERTY_TYPE_META[type].icon}
+                <span>{PROPERTY_TYPE_META[type].label}</span>
                 {hasOptions(type) && (
                   <span className="ml-auto text-[10px] uppercase text-muted-foreground">
                     {MESSAGES.PROP_OPTIONS_BADGE}

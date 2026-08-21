@@ -18,8 +18,9 @@ import { CalendarPanel } from "./CalendarPanel";
 import { ExportMenu } from "./ExportMenu";
 import { FramePanelHost } from "./FramePanelHost";
 import { LivePreview } from "./LivePreview";
-import { NoteInfoPanel } from "./NoteInfoPanel";
+import { PROPERTY_TYPE_META } from "./NotePropertiesRows";
 import { OutlinePanelHost } from "./OutlinePanelHost";
+import { PropertyManagerPanel } from "./PropertyManagerPanel";
 
 const TAB_KEY = "cove-rightbar-tab";
 type RightBarTab = "toc" | "calendar" | "info" | "preview" | "frames";
@@ -179,11 +180,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
           )}
         >
           {tab === "calendar" && <CalendarPanel />}
-          {tab === "info" && (
-            <div className="px-2 pt-1">
-              <NoteInfoPanel note={note} />
-            </div>
-          )}
+          {tab === "info" && <PropertyManagerPanel typeMeta={PROPERTY_TYPE_META} />}
 
           <div className={cn("px-2 pt-1", tab !== "toc" && "hidden")}>
             <OutlinePanelHost editor={editorHost ?? null} />
