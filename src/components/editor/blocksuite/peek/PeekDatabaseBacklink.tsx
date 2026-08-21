@@ -1,21 +1,28 @@
 import type { DatabaseBlockModel } from "@blocksuite/affine/model";
+import type { Store } from "@blocksuite/affine/store";
 import { DatabaseBlockDataSource } from "@blocksuite/affine-block-database";
+import { DefaultInlineManagerExtension } from "@blocksuite/affine-inline-preset";
+import { RichText } from "@blocksuite/affine-rich-text";
+import { BlockStdScope } from "@blocksuite/std";
+import { Text } from "@blocksuite/store";
 import {
   Calendar,
   CaseSensitive,
   Check,
   CheckSquare,
   ChevronDown,
+  Database,
+  FileText,
   Gauge,
   Hash,
   Link2,
-  ListTodo,
   Plus,
   Tag,
   X,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import * as Y from "yjs";
 import { MESSAGES } from "../../../../constants/messages";
 import { blockSuiteEditorService, noteService } from "../../../../di/container";
 import { cn } from "../../../../lib/utils";
@@ -24,7 +31,6 @@ import { packBlockSuiteContent } from "../../../../services/editor/contentFormat
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
 import { Logger } from "../../../../services/Logger";
 import { useNoteStore } from "../../../../store/useNoteStore";
-import { Button } from "../../../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../ui/popover";
 import { InfoRow } from "../../NoteInfoPanel";
 
@@ -229,11 +235,68 @@ const OptionPickerPopover: React.FC<{
  * select and multi-select, string for text/link); rich-text, title and
  * created-time cells stay read-only (Y.Text / engine-managed values).
  */
+/**
+ * Rich-text cells hold a Y.Text; AFFiNE's backlink panel mounts the real
+ * BlockSuite RichText inline editor against it (not a plain input), sharing
+ * the page view's inline schema and renderer through a lightweight std scope.
+ */
+const RichTextCellEditor: React.FC<{
+  yText: Y.Text;
+  store: Store;
+  onLiveChange: () => void;
+}> = ({ yText, store, onLiveChange }) => {
+  const std = useMemo(() => {
+    try {
+      return new BlockStdScope({
+        store,
+        extensions: blockSuiteEditorService.getViewSpecs("page"),
+      });
+    } catch (err) {
+      Logger.warn("[cove-backlink] rich-text std scope failed", err);
+      return null;
+    }
+  }, [store]);
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !std) return;
+    try {
+      const inlineManager = std.get(DefaultInlineManagerExtension.identifier);
+      const richText = new RichText();
+      richText.yText = yText;
+      richText.undoManager = store.history?.undoManager;
+      richText.readonly = (store as { readonly?: boolean }).readonly ?? false;
+      richText.attributesSchema = inlineManager.getSchema() as never;
+      richText.attributeRenderer = inlineManager.getRenderer();
+      // The vendored RichText never dispatches a DOM 'change' event; observe
+      // the Y.Text directly instead (same mechanism as the vendored property
+      // config's onUpdate) so edits actually reach scheduleSave.
+      const listener = () => onLiveChange();
+      yText.observe(listener);
+      el.replaceChildren(richText);
+      return () => {
+        yText.unobserve(listener);
+        richText.remove();
+      };
+    } catch (err) {
+      Logger.warn("[cove-backlink] rich-text mount failed", err);
+      return;
+    }
+  }, [std, yText, store, onLiveChange]);
+
+  return <div ref={ref} className="min-h-7 w-full text-sm text-foreground" />;
+};
+
 const BacklinkCellEditor: React.FC<{
   cell: BacklinkCell;
   onChange: (next: unknown) => void;
   onCreateOption: (name: string) => void;
-}> = ({ cell, onChange, onCreateOption }) => {
+  /** Persists without bumping the shared rev - for in-place Y.Text mutation. */
+  onQuietChange: () => void;
+  dataSourceDoc: Store;
+}> = ({ cell, onChange, onCreateOption, onQuietChange, dataSourceDoc }) => {
   const commitNumber = (text: string) => {
     const trimmed = text.trim();
     if (trimmed === "") {
@@ -246,6 +309,17 @@ const BacklinkCellEditor: React.FC<{
   };
 
   switch (cell.type) {
+    case "rich-text": {
+      // The reactive props layer surfaces BlockSuite Text wrappers, not raw
+      // Y.Text - accept both and unwrap so the editor and observer see Y.Text.
+      if (cell.raw instanceof Text || cell.raw instanceof Y.Text) {
+        const yText = cell.raw instanceof Text ? cell.raw.yText : cell.raw;
+        return (
+          <RichTextCellEditor yText={yText} store={dataSourceDoc} onLiveChange={onQuietChange} />
+        );
+      }
+      return <span className="px-1 text-foreground/90">{cell.value || "—"}</span>;
+    }
     case "date":
       return (
         <input
@@ -438,6 +512,13 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
       const dbBlockModel = dbModel as unknown as DatabaseBlockModel;
 
       const ds = new DatabaseBlockDataSource(dbBlockModel);
+      let databaseName = "";
+      try {
+        const title = (dbBlockModel.props as { title?: { yText?: Y.Text } }).title;
+        databaseName = title?.yText?.toString().trim() ?? "";
+      } catch {
+        databaseName = "";
+      }
       const cells: BacklinkCell[] = [];
       for (const propertyId of ds.properties$.value) {
         const type = ds.propertyTypeGet(propertyId) ?? "";
@@ -455,7 +536,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
         }
         cells.push({
           propertyId,
-          name: ds.propertyNameGet(propertyId),
+          name: ds.propertyNameGet(propertyId) || MESSAGES.UNNAMED,
           type,
           value: formatCell(raw, type),
           raw,
@@ -463,12 +544,9 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
         });
       }
 
-      cells.sort((a, b) => {
-        if (a.type === "date" && b.type !== "date") return -1;
-        if (b.type === "date" && a.type !== "date") return 1;
-        return 0;
-      });
-      return { cells, ds };
+      // AFFiNE sorts the backlink cells alphabetically by property name.
+      cells.sort((a, b) => a.name.localeCompare(b.name));
+      return { cells, ds, databaseName, doc: ds.doc };
     } catch {
       return null;
     }
@@ -561,53 +639,59 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
     [data, databaseRowId, scheduleSave],
   );
 
-  if (!data) return null;
+  // AFFiNE hides the whole section when the row has no visible cells.
+  if (!data || data.cells.length === 0) return null;
+
+  const sectionTitle = `${data.databaseName || MESSAGES.UNNAMED} ${MESSAGES.PROPERTIES}`;
+  const canOpenSource = useNoteStore.getState().notes.some((n) => n.id === databaseDocId);
 
   return (
     <div className="mt-4">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="flex h-[30px] w-full items-center justify-between rounded p-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span>Calendar Properties</span>
-        <ChevronDown
-          aria-hidden="true"
-          className={cn("h-4 w-4 transition-transform duration-200", !open && "-rotate-90")}
-        />
-      </button>
+      <div className="flex h-[30px] items-center rounded text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/60">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Database className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">{sectionTitle}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              "h-4 w-4 shrink-0 transition-transform duration-200",
+              !open && "-rotate-90",
+            )}
+          />
+        </button>
+        {canOpenSource && (
+          <button
+            type="button"
+            aria-label={MESSAGES.BACKLINK_OPEN_SOURCE}
+            title={MESSAGES.BACKLINK_OPEN_SOURCE}
+            onClick={() => useNoteStore.getState().setActiveNoteId(databaseDocId)}
+            className="mr-1 flex items-center gap-1 rounded px-1 py-0.5 text-xs text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+            {MESSAGES.BACKLINK_OPEN_SOURCE}
+          </button>
+        )}
+      </div>
       <div className="h-px w-full bg-border" aria-hidden="true" />
 
       {open && (
         <div className="mt-2 space-y-1 pb-2">
-          {data.cells.length === 0 && (
-            <div className="p-1 text-sm text-muted-foreground/70">Empty</div>
-          )}
           {data.cells.map((cell) => (
             <InfoRow key={cell.propertyId} icon={typeIcon(cell.type)} label={cell.name}>
               <BacklinkCellEditor
                 cell={cell}
                 onChange={(next) => writeCell(cell, next)}
                 onCreateOption={(name) => createOption(cell, name)}
+                onQuietChange={scheduleSave}
+                dataSourceDoc={data.doc}
               />
             </InfoRow>
           ))}
-          <div className="px-1 pt-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2 text-muted-foreground"
-              onClick={() => {
-                if (useNoteStore.getState().notes.some((n) => n.id === databaseDocId)) {
-                  useNoteStore.getState().setActiveNoteId(databaseDocId);
-                }
-              }}
-            >
-              <ListTodo className="h-3.5 w-3.5" aria-hidden="true" />
-              Open Calendar
-            </Button>
-          </div>
         </div>
       )}
     </div>
