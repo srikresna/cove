@@ -42,6 +42,7 @@ export const MESSAGES = {
   JOURNAL_TODAY: "Today",
   JOURNAL_NEW: "New journal note",
   INFO_BACKLINKS_COUNT: "{n} linked",
+  PROP_UNKNOWN_OPTION: "Unknown option",
   LIBRARY_FAVORITES: "Favorites",
   LIBRARY_PINNED: "Pinned",
   SEARCH_PREVIEW_HINT: "Highlight a result to preview it.",
