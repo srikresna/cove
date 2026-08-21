@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Link2 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -9,6 +9,8 @@ import { notifyError } from "../../store/notify";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import type { Note } from "../../types";
+import { DatabaseBacklinkSection } from "./blocksuite/peek/PeekDatabaseBacklink";
+import { useNoteDatabaseBacklinks } from "./blocksuite/peek/useNoteDatabaseBacklinks";
 import { NotePropertiesRows, summarizePropertyValue, TagChip } from "./NotePropertiesRows";
 
 const OPEN_KEY = "cove-info-open";
@@ -31,13 +33,18 @@ export const InfoRow: React.FC<{
   </div>
 );
 
-export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
+export const NoteInfoPanel: React.FC<{
+  note: Note;
+  /** In the peek view, the row the doc was opened from starts expanded. */
+  defaultOpenBacklinkRef?: { databaseId: string; databaseRowId: string } | null;
+}> = ({ note, defaultOpenBacklinkRef = null }) => {
   const [isOpen, setIsOpen] = useState(() => localStorage.getItem(OPEN_KEY) === "true");
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagsHidden, setTagsHidden] = useState(false);
   const [propertySummaries, setPropertySummaries] = useState<
     Array<{ id: string; name: string; text: string }>
   >([]);
+  const backlinks = useNoteDatabaseBacklinks(note.id);
   const tagVersion = useTagStore((s) => s.version);
   const propertyVersion = usePropertyStore((s) => s.version);
 
@@ -106,29 +113,53 @@ export const NoteInfoPanel: React.FC<{ note: Note }> = ({ note }) => {
       </button>
       <div className="h-px w-full bg-border" aria-hidden="true" />
 
-      {!isOpen && ((!tagsHidden && tags.length > 0) || propertySummaries.length > 0) && (
-        <div className="mt-2 flex flex-wrap items-center gap-1 pb-2">
-          {!tagsHidden && tags.map((tag) => <TagChip key={tag.id} tag={tag} />)}
-          {propertySummaries.slice(0, 8).map((row) => (
-            <span
-              key={row.id}
-              className="inline-flex h-[22px] max-w-56 items-center gap-1 truncate rounded-full border bg-card px-2 text-xs text-foreground"
-            >
-              <span className="shrink-0 text-muted-foreground">{row.name}</span>
-              <span className="truncate">{row.text}</span>
-            </span>
-          ))}
-          {propertySummaries.length > 8 && (
-            <span className="text-xs text-muted-foreground">+{propertySummaries.length - 8}</span>
-          )}
-        </div>
-      )}
+      {!isOpen &&
+        ((!tagsHidden && tags.length > 0) ||
+          propertySummaries.length > 0 ||
+          backlinks.length > 0) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1 pb-2">
+            {!tagsHidden && tags.map((tag) => <TagChip key={tag.id} tag={tag} />)}
+            {propertySummaries.slice(0, 8).map((row) => (
+              <span
+                key={row.id}
+                className="inline-flex h-[22px] max-w-56 items-center gap-1 truncate rounded-full border bg-card px-2 text-xs text-foreground"
+              >
+                <span className="shrink-0 text-muted-foreground">{row.name}</span>
+                <span className="truncate">{row.text}</span>
+              </span>
+            ))}
+            {propertySummaries.length > 8 && (
+              <span className="text-xs text-muted-foreground">+{propertySummaries.length - 8}</span>
+            )}
+            {backlinks.length > 0 && (
+              <span className="inline-flex h-[22px] items-center gap-1 rounded-full border bg-card px-2 text-xs text-muted-foreground">
+                <Link2 className="h-3 w-3" aria-hidden="true" />
+                {MESSAGES.INFO_BACKLINKS_COUNT.replace("{n}", String(backlinks.length))}
+              </span>
+            )}
+          </div>
+        )}
 
-      {isOpen && (
-        <div className="mt-2 space-y-1 pb-2">
-          <NotePropertiesRows note={note} />
-        </div>
-      )}
+      {/* Stays mounted while collapsed (hidden via CSS) so expand/collapse
+          choices inside the rows and backlink sections survive Info toggles. */}
+      <div className={cn("mt-2 space-y-1 pb-2", !isOpen && "hidden")}>
+        <NotePropertiesRows note={note} />
+        {backlinks.length > 0 && (
+          <div className="mt-2 space-y-1 border-t pt-1">
+            {backlinks.map((ref) => (
+              <DatabaseBacklinkSection
+                key={`${ref.databaseId}:${ref.databaseRowId}`}
+                {...ref}
+                defaultOpen={
+                  defaultOpenBacklinkRef !== null &&
+                  defaultOpenBacklinkRef.databaseId === ref.databaseId &&
+                  defaultOpenBacklinkRef.databaseRowId === ref.databaseRowId
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

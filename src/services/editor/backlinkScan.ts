@@ -93,3 +93,25 @@ export async function scanNoteForDatabaseRows(
     rowsBySourceNoteId.set(noteId, []);
   }
 }
+
+const inflightScans = new Map<string, Promise<void>>();
+
+/**
+ * Several Info panels can be mounted at once (editor header, right bar, peek)
+ * and each wants the whole library scanned. The cache is only written after an
+ * await, so unguarded concurrent loops would fetch and decrypt every note one
+ * time per instance - this gate makes them share a single in-flight pass.
+ */
+export function ensureNoteScanned(
+  getNoteContent: (noteId: string) => Promise<string | undefined>,
+  noteId: string,
+): Promise<void> {
+  if (rowsBySourceNoteId.has(noteId)) return Promise.resolve();
+  const inFlight = inflightScans.get(noteId);
+  if (inFlight) return inFlight;
+  const pending = scanNoteForDatabaseRows(getNoteContent, noteId).finally(() => {
+    inflightScans.delete(noteId);
+  });
+  inflightScans.set(noteId, pending);
+  return pending;
+}

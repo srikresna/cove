@@ -41,6 +41,7 @@ export const MESSAGES = {
   JOURNAL_TOGGLE: "Mark as journal note",
   JOURNAL_TODAY: "Today",
   JOURNAL_NEW: "New journal note",
+  INFO_BACKLINKS_COUNT: "{n} linked",
   LIBRARY_FAVORITES: "Favorites",
   LIBRARY_PINNED: "Pinned",
   SEARCH_PREVIEW_HINT: "Highlight a result to preview it.",

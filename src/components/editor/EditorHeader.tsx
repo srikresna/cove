@@ -10,8 +10,6 @@ import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import type { Note } from "../../types";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { DatabaseBacklinkSection } from "./blocksuite/peek/PeekDatabaseBacklink";
-import { useNoteDatabaseBacklinks } from "./blocksuite/peek/useNoteDatabaseBacklinks";
 import { NoteInfoPanel } from "./NoteInfoPanel";
 
 interface EditorHeaderProps {
@@ -53,7 +51,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
   const removeCoverImage = useNoteStore((s) => s.removeCoverImage);
   const coverImage = useNoteStore((s) => s.activeCoverImage);
   const saveStatus = useSaveStatusStore((s) => s.status);
-  const backlinks = useNoteDatabaseBacklinks(note.id);
 
   return (
     <NoteHeaderBody
@@ -63,13 +60,6 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth })
       saveStatus={saveStatus}
       uploadCoverImage={uploadCoverImage}
       removeCoverImage={removeCoverImage}
-      extraInfo={
-        backlinks.length > 0
-          ? backlinks.map((ref) => (
-              <DatabaseBacklinkSection key={`${ref.databaseId}:${ref.databaseRowId}`} {...ref} />
-            ))
-          : null
-      }
     />
   );
 };
@@ -81,7 +71,8 @@ export const NoteHeaderBody: React.FC<{
   saveStatus?: string;
   uploadCoverImage: (id: string, file: File) => Promise<void>;
   removeCoverImage: (id: string) => Promise<void>;
-  extraInfo?: React.ReactNode;
+  /** Forwarded to the Info panel so the peek origin backlink starts open. */
+  backlinkDefaultOpenRef?: { databaseId: string; databaseRowId: string } | null;
 }> = ({
   note,
   coverImage,
@@ -89,7 +80,7 @@ export const NoteHeaderBody: React.FC<{
   saveStatus,
   uploadCoverImage,
   removeCoverImage,
-  extraInfo,
+  backlinkDefaultOpenRef = null,
 }) => {
   const updateNote = useNoteStore((s) => s.updateNote);
 
@@ -322,8 +313,7 @@ export const NoteHeaderBody: React.FC<{
           )}
         />
 
-        <NoteInfoPanel note={note} />
-        {extraInfo}
+        <NoteInfoPanel note={note} defaultOpenBacklinkRef={backlinkDefaultOpenRef} />
       </div>
     </div>
   );

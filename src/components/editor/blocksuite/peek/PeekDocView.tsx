@@ -11,7 +11,6 @@ import { TooltipProvider } from "../../../ui/tooltip";
 import { NoteHeaderBody } from "../../EditorHeader";
 import { buildCommonExtensions } from "../BlockSuiteSurface";
 import type { TestAffineEditorContainer } from "../editorContainer";
-import { DatabaseBacklinkSection } from "./PeekDatabaseBacklink";
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -207,15 +206,10 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
             isFullWidth={false}
             uploadCoverImage={uploadCoverImage}
             removeCoverImage={removeCoverImage}
-            extraInfo={
-              request.databaseId && request.databaseDocId && request.databaseRowId ? (
-                <DatabaseBacklinkSection
-                  databaseDocId={request.databaseDocId}
-                  databaseId={request.databaseId}
-                  databaseRowId={request.databaseRowId}
-                  defaultOpen={true}
-                />
-              ) : null
+            backlinkDefaultOpenRef={
+              request.databaseId && request.databaseRowId
+                ? { databaseId: request.databaseId, databaseRowId: request.databaseRowId }
+                : null
             }
           />
         )}

@@ -12,7 +12,7 @@ import {
   Tag,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { blockSuiteEditorService, noteService } from "../../../../di/container";
 import { cn } from "../../../../lib/utils";
 import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlockSuiteEditorService";
@@ -83,6 +83,29 @@ function toLocalInputValue(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Sections for the same backlink can be mounted side by side (header Info
+// panel + right-bar Info panel + peek) with independent cell snapshots; a
+// shared rev signal makes any instance's edit invalidate every copy.
+const backlinkRevListeners = new Set<() => void>();
+let backlinkRevCounter = 0;
+
+function bumpBacklinkRev(): void {
+  backlinkRevCounter += 1;
+  for (const listener of backlinkRevListeners) listener();
+}
+
+function useBacklinkRev(): number {
+  return useSyncExternalStore(
+    (onChange) => {
+      backlinkRevListeners.add(onChange);
+      return () => {
+        backlinkRevListeners.delete(onChange);
+      };
+    },
+    () => backlinkRevCounter,
+  );
+}
+
 export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOpen?: boolean }> = ({
   databaseDocId,
   databaseId,
@@ -90,8 +113,9 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
   defaultOpen = true,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
-  const [rev, setRev] = useState(0);
+  const rev = useBacklinkRev();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
     if (blockSuiteEditorService.isNoteDocLoaded(databaseDocId)) return;
@@ -103,7 +127,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setRev((r) => r + 1);
+        if (!cancelled) bumpBacklinkRev();
       });
     return () => {
       cancelled = true;
@@ -151,18 +175,31 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
+    // Only flush when an edit actually happened - sections remount on note
+    // switches and a no-op save would re-encrypt identical content, bump
+    // updatedAt, and drop the backlink scan cache for nothing.
+    if (!dirtyRef.current) return;
     try {
       if (!blockSuiteEditorService.isNoteDocLoaded(databaseDocId)) return;
       const store = blockSuiteEditorService.getDocStoreForPeek(databaseDocId);
       if (!store) return;
       const snapshot = packBlockSuiteContent(encodeDocSnapshot(store.spaceDoc));
-      void useNoteStore.getState().updateNote(databaseDocId, { content: snapshot });
+      void useNoteStore
+        .getState()
+        .updateNote(databaseDocId, { content: snapshot })
+        .then(
+          () => {
+            dirtyRef.current = false;
+          },
+          () => {},
+        );
     } catch {
       void 0;
     }
   }, [databaseDocId]);
 
   const scheduleSave = useCallback(() => {
+    dirtyRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(runSave, 500);
   }, [runSave]);
@@ -184,7 +221,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
           if (Number.isNaN(ts)) return;
           data.ds.cellValueChange(databaseRowId, cell.propertyId, ts);
         }
-        setRev((r) => r + 1);
+        bumpBacklinkRev();
         scheduleSave();
       } catch (err) {
         Logger.error("[cove-backlink] date write failed", err);

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import {
   clearBacklinkScans,
+  ensureNoteScanned,
   hasBacklinkScan,
   invalidateNoteBacklinkScan,
   scanNoteForDatabaseRows,
@@ -101,5 +102,31 @@ describe("backlinkScan", () => {
     clearBacklinkScans();
     expect(hasBacklinkScan("note-db")).toBe(false);
     expect(scannedBacklinksOf("target-1")).toEqual([]);
+  });
+
+  it("ensureNoteScanned shares one in-flight pass across concurrent callers", async () => {
+    const contents = new Map([["note-db", databaseContentWithLinkedRow()]]);
+    let fetches = 0;
+    const slowGetter = async (noteId: string) => {
+      fetches += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return contents.get(noteId);
+    };
+
+    // Several Info panels mounting at once race their scan loops; without the
+    // in-flight gate each would fetch and decrypt the same note.
+    await Promise.all([
+      ensureNoteScanned(slowGetter, "note-db"),
+      ensureNoteScanned(slowGetter, "note-db"),
+      ensureNoteScanned(slowGetter, "note-db"),
+    ]);
+
+    expect(fetches).toBe(1);
+    expect(hasBacklinkScan("note-db")).toBe(true);
+    expect(scannedBacklinksOf("target-1")).toHaveLength(1);
+
+    // Once cached, later callers resolve without another fetch.
+    await ensureNoteScanned(slowGetter, "note-db");
+    expect(fetches).toBe(1);
   });
 });
