@@ -1,4 +1,31 @@
-import { FileText, Plus, X } from "lucide-react";
+import {
+  Bookmark,
+  BookOpen,
+  Briefcase,
+  Calendar,
+  CalendarDays,
+  CircleDot,
+  Clock,
+  FileText,
+  Flag,
+  FolderOpen,
+  Hash,
+  Heart,
+  History,
+  Link,
+  Link2,
+  List,
+  ListChecks,
+  Paperclip,
+  Plus,
+  Star,
+  Tag as TagIcon,
+  Target,
+  ToggleLeft,
+  Type,
+  User,
+  X,
+} from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -15,6 +42,58 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export const INPUT_CLASS =
   "h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring";
+
+export const PROPERTY_TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> = {
+  text: { label: "Text", icon: <Type /> },
+  number: { label: "Number", icon: <Hash /> },
+  select: { label: "Select", icon: <List /> },
+  multiSelect: { label: "Multi-select", icon: <ListChecks /> },
+  status: { label: "Status", icon: <CircleDot /> },
+  date: { label: "Date", icon: <CalendarDays /> },
+  person: { label: "Person", icon: <User /> },
+  files: { label: "Files & media", icon: <Paperclip /> },
+  checkbox: { label: "Checkbox", icon: <ToggleLeft /> },
+  url: { label: "URL", icon: <Link /> },
+  relation: { label: "Relation", icon: <Link2 /> },
+  tags: { label: "Tags", icon: <TagIcon /> },
+  workspace: { label: "Workspace", icon: <FolderOpen /> },
+  created: { label: "Created", icon: <History /> },
+  updated: { label: "Updated", icon: <Calendar /> },
+};
+
+/** Selectable custom icons (PROPERTY_ICON_NAMES in the domain, one component each). */
+export const PROPERTY_ICONS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  type: Type,
+  hash: Hash,
+  list: List,
+  "list-checks": ListChecks,
+  "circle-dot": CircleDot,
+  calendar: CalendarDays,
+  user: User,
+  paperclip: Paperclip,
+  toggle: ToggleLeft,
+  link: Link,
+  link2: Link2,
+  tag: TagIcon,
+  star: Star,
+  flag: Flag,
+  bookmark: Bookmark,
+  clock: Clock,
+  target: Target,
+  briefcase: Briefcase,
+  book: BookOpen,
+  heart: Heart,
+};
+
+/** Custom icon when set, the type's default icon otherwise. */
+export const resolvePropertyIcon = (def: PropertyDefinition): React.ReactNode => {
+  const custom = def.icon != null ? PROPERTY_ICONS[def.icon] : undefined;
+  return custom ? <Icon icon={custom} /> : PROPERTY_TYPE_META[def.type].icon;
+};
+
+const Icon: React.FC<{ icon: React.FC<React.SVGProps<SVGSVGElement>> }> = ({ icon: Svg }) => (
+  <Svg />
+);
 
 export function toLocalDateString(ts: number): string {
   const d = new Date(ts);

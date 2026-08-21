@@ -150,6 +150,7 @@ describe("PropertyService", () => {
       createdAt: 0,
       order: "a0",
       show: "always-show",
+      icon: null,
     });
     const service = new PropertyService(repo);
 
@@ -161,6 +162,7 @@ describe("PropertyService", () => {
     await expect(
       service.setDefinitionVisibility("system:updated", "hide-when-empty"),
     ).rejects.toThrow(ValidationError);
+    await expect(service.setDefinitionIcon("system:tags", "star")).rejects.toThrow(ValidationError);
 
     // Reordering and show/hide stay allowed for system rows.
     const custom = await service.createDefinition("Owner", "text");
@@ -171,5 +173,18 @@ describe("PropertyService", () => {
       service.reorderDefinition(custom.id, "system:tags", "before"),
     ).resolves.toBeUndefined();
     expect((await service.listDefinitions()).map((d) => d.id)).toEqual([custom.id, "system:tags"]);
+  });
+
+  it("sets and clears custom icons with name validation", async () => {
+    const service = new PropertyService(new InMemoryPropertyRepository());
+    const a = await service.createDefinition("Owner", "text");
+
+    await service.setDefinitionIcon(a.id, "star");
+    expect((await service.listDefinitions()).find((d) => d.id === a.id)?.icon).toBe("star");
+
+    await service.setDefinitionIcon(a.id, null);
+    expect((await service.listDefinitions()).find((d) => d.id === a.id)?.icon).toBeNull();
+
+    await expect(service.setDefinitionIcon(a.id, "not-an-icon")).rejects.toThrow(ValidationError);
   });
 });

@@ -56,6 +56,8 @@ export const MESSAGES = {
   RIGHTBAR_TAB_CALENDAR: "Calendar",
   RIGHTBAR_TAB_INFO: "Properties",
   PROP_MANAGER_HINT: "Changes apply to every note.",
+  PROP_ICON_LABEL: "Icon",
+  PROP_ICON_DEFAULT: "Default",
   CALENDAR_FILTER_UPDATED: "Updated",
   CALENDAR_FILTER_CREATED: "Created",
   CALENDAR_EMPTY_DAY: "No notes on this day.",

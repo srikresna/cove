@@ -40,6 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { PROPERTY_ICONS, PROPERTY_TYPE_META, resolvePropertyIcon } from "./PropertyValueEditors";
 
 const VISIBILITY_LABEL: Record<PropertyVisibility, string> = {
   "always-show": MESSAGES.PROP_VIS_ALWAYS_SHOW,
@@ -55,6 +56,7 @@ interface ManagerRowProps {
   onCommitRename: (def: PropertyDefinition, name: string) => void;
   onCancelRename: () => void;
   onVisibility: (def: PropertyDefinition, show: PropertyVisibility) => void;
+  onIcon: (def: PropertyDefinition, icon: string | null) => void;
   onDelete: (def: PropertyDefinition) => void;
   onReorder: (id: string, targetId: string, position: "before" | "after") => void;
 }
@@ -67,6 +69,7 @@ const ManagerRow: React.FC<ManagerRowProps> = ({
   onCommitRename,
   onCancelRename,
   onVisibility,
+  onIcon,
   onDelete,
   onReorder,
 }) => {
@@ -220,6 +223,47 @@ const ManagerRow: React.FC<ManagerRowProps> = ({
               {MESSAGES.PROP_RENAME}
             </DropdownMenuItem>
           )}
+          {!isSystem && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{MESSAGES.PROP_ICON_LABEL}</DropdownMenuLabel>
+              <div className="grid grid-cols-7 gap-0.5 px-1 pb-1">
+                <button
+                  type="button"
+                  aria-label={MESSAGES.PROP_ICON_DEFAULT}
+                  title={MESSAGES.PROP_ICON_DEFAULT}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onIcon(def, null);
+                  }}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    def.icon == null && "bg-accent text-foreground",
+                  )}
+                >
+                  {PROPERTY_TYPE_META[def.type].icon}
+                </button>
+                {Object.entries(PROPERTY_ICONS).map(([name, Icon]) => (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-label={name}
+                    title={name}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onIcon(def, name);
+                    }}
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-3.5 [&_svg]:w-3.5",
+                      def.icon === name && "bg-accent text-foreground",
+                    )}
+                  >
+                    <Icon />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
           {(isSystem && def.id !== JOURNAL_PROPERTY_ID
@@ -320,6 +364,16 @@ export const PropertyManagerPanel: React.FC<{
       });
   };
 
+  const handleIcon = (def: PropertyDefinition, icon: string | null) => {
+    propertyService
+      .setDefinitionIcon(def.id, icon)
+      .then(() => bumpProperties())
+      .catch((err) => {
+        notifyError(err);
+        reload();
+      });
+  };
+
   const addProperty = (type: string) => {
     const meta = typeMeta[type];
     if (!meta) return;
@@ -358,12 +412,13 @@ export const PropertyManagerPanel: React.FC<{
             <ManagerRow
               key={def.id}
               def={def}
-              icon={typeMeta[def.type]?.icon}
+              icon={resolvePropertyIcon(def)}
               renaming={renamingId === def.id}
               onStartRename={setRenamingId}
               onCommitRename={commitRename}
               onCancelRename={() => setRenamingId(null)}
               onVisibility={handleVisibility}
+              onIcon={handleIcon}
               onDelete={setDeletingDef}
               onReorder={handleReorder}
             />

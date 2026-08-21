@@ -8,6 +8,7 @@ import {
   makePropertyId,
   nextOptionColor,
   orderKeyBetween,
+  PROPERTY_ICON_NAMES,
   type PropertyDefinition,
   type PropertyOption,
   type PropertyType,
@@ -62,9 +63,20 @@ export class PropertyService implements IPropertyService {
       order: orderKeyBetween(lastOrder, null),
       // New properties stay out of the way until they carry a value.
       show: "hide-when-empty",
+      icon: null,
     };
     await this.properties.createDefinition(def);
     return def;
+  }
+
+  async setDefinitionIcon(id: string, icon: string | null): Promise<void> {
+    if (isSystemPropertyId(id)) {
+      throw new ValidationError("Built-in properties cannot be customized.");
+    }
+    if (icon !== null && !(PROPERTY_ICON_NAMES as readonly string[]).includes(icon)) {
+      throw new ValidationError("Unknown property icon.");
+    }
+    await this.properties.updateDefinition(id, { icon });
   }
 
   async renameDefinition(id: string, name: string): Promise<void> {

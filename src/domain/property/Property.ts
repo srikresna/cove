@@ -55,6 +55,32 @@ export const CREATABLE_PROPERTY_TYPES = PROPERTY_TYPES.filter(
   (type) => !(SYSTEM_PROPERTY_TYPES as readonly string[]).includes(type),
 ) as Exclude<PropertyType, SystemPropertyType>[];
 
+/** Selectable custom icons for property rows (resolved to components in the UI). */
+export const PROPERTY_ICON_NAMES = [
+  "type",
+  "hash",
+  "list",
+  "list-checks",
+  "circle-dot",
+  "calendar",
+  "user",
+  "paperclip",
+  "toggle",
+  "link",
+  "link2",
+  "tag",
+  "star",
+  "flag",
+  "bookmark",
+  "clock",
+  "target",
+  "briefcase",
+  "book",
+  "heart",
+] as const;
+
+export type PropertyIconName = (typeof PROPERTY_ICON_NAMES)[number];
+
 export const PROPERTY_VISIBILITY = ["always-show", "hide-when-empty", "always-hide"] as const;
 
 export type PropertyVisibility = (typeof PROPERTY_VISIBILITY)[number];
@@ -76,6 +102,8 @@ export interface PropertyDefinition {
   readonly createdAt: number;
   readonly order: string;
   readonly show: PropertyVisibility;
+  /** Optional custom icon name; falls back to the type's default icon. */
+  readonly icon: string | null;
 }
 
 export type PropertyValue =

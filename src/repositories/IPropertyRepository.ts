@@ -10,6 +10,7 @@ export interface PropertyDefinitionPatch {
   name?: string;
   show?: PropertyVisibility;
   orderIndex?: string;
+  icon?: string | null;
 }
 
 export interface IPropertyRepository {

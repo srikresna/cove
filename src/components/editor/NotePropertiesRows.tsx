@@ -8,29 +8,14 @@ import {
   extractClosestEdge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import {
-  Calendar,
-  CalendarDays,
   Check,
-  CircleDot,
   Eye,
   EyeOff,
-  FolderOpen,
   GripVertical,
-  Hash,
-  History,
-  Link,
-  Link2,
-  List,
-  ListChecks,
   MoreHorizontal,
-  Paperclip,
   Pencil,
   Plus,
-  Tag as TagIcon,
-  ToggleLeft,
   Trash2,
-  Type,
-  User,
   X,
 } from "lucide-react";
 import type React from "react";
@@ -71,25 +56,16 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { InfoRow } from "./NoteInfoPanel";
-import { INPUT_CLASS, PROPERTY_VALUE_EDITORS, toLocalDateString } from "./PropertyValueEditors";
+import {
+  INPUT_CLASS,
+  PROPERTY_ICONS,
+  PROPERTY_TYPE_META,
+  PROPERTY_VALUE_EDITORS,
+  resolvePropertyIcon,
+  toLocalDateString,
+} from "./PropertyValueEditors";
 
-export const PROPERTY_TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> = {
-  text: { label: "Text", icon: <Type /> },
-  number: { label: "Number", icon: <Hash /> },
-  select: { label: "Select", icon: <List /> },
-  multiSelect: { label: "Multi-select", icon: <ListChecks /> },
-  status: { label: "Status", icon: <CircleDot /> },
-  date: { label: "Date", icon: <CalendarDays /> },
-  person: { label: "Person", icon: <User /> },
-  files: { label: "Files & media", icon: <Paperclip /> },
-  checkbox: { label: "Checkbox", icon: <ToggleLeft /> },
-  url: { label: "URL", icon: <Link /> },
-  relation: { label: "Relation", icon: <Link2 /> },
-  tags: { label: "Tags", icon: <TagIcon /> },
-  workspace: { label: "Workspace", icon: <FolderOpen /> },
-  created: { label: "Created", icon: <History /> },
-  updated: { label: "Updated", icon: <Calendar /> },
-};
+export { PROPERTY_TYPE_META };
 
 const VISIBILITY_LABEL: Record<PropertyVisibility, string> = {
   "always-show": MESSAGES.PROP_VIS_ALWAYS_SHOW,
@@ -382,6 +358,7 @@ interface PropertyRowProps {
   onCommitRename: (def: PropertyDefinition, name: string) => void;
   onCancelRename: () => void;
   onVisibility: (def: PropertyDefinition, show: PropertyVisibility) => void;
+  onIcon: (def: PropertyDefinition, icon: string | null) => void;
   onDelete: (def: PropertyDefinition) => void;
   onReorder: (id: string, targetId: string, position: "before" | "after") => void;
   children: React.ReactNode;
@@ -394,6 +371,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
   onCommitRename,
   onCancelRename,
   onVisibility,
+  onIcon,
   onDelete,
   onReorder,
   children,
@@ -520,7 +498,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
             <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         }
-        icon={PROPERTY_TYPE_META[def.type].icon}
+        icon={resolvePropertyIcon(def)}
         label={label}
       >
         <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
@@ -555,6 +533,47 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
                   <Pencil aria-hidden="true" />
                   {MESSAGES.PROP_RENAME}
                 </DropdownMenuItem>
+              )}
+              {!isSystem && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>{MESSAGES.PROP_ICON_LABEL}</DropdownMenuLabel>
+                  <div className="grid grid-cols-7 gap-0.5 px-1 pb-1">
+                    <button
+                      type="button"
+                      aria-label={MESSAGES.PROP_ICON_DEFAULT}
+                      title={MESSAGES.PROP_ICON_DEFAULT}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIcon(def, null);
+                      }}
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        def.icon == null && "bg-accent text-foreground",
+                      )}
+                    >
+                      {PROPERTY_TYPE_META[def.type].icon}
+                    </button>
+                    {Object.entries(PROPERTY_ICONS).map(([name, Icon]) => (
+                      <button
+                        key={name}
+                        type="button"
+                        aria-label={name}
+                        title={name}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onIcon(def, name);
+                        }}
+                        className={cn(
+                          "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-3.5 [&_svg]:w-3.5",
+                          def.icon === name && "bg-accent text-foreground",
+                        )}
+                      >
+                        <Icon />
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
@@ -717,6 +736,16 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
       });
   };
 
+  const handleIcon = (def: PropertyDefinition, icon: string | null) => {
+    propertyService
+      .setDefinitionIcon(def.id, icon)
+      .then(() => bumpProperties())
+      .catch((err) => {
+        notifyError(err);
+        reload();
+      });
+  };
+
   useEffect(() => {
     if (justCreatedId && values.has(justCreatedId)) setJustCreatedId(null);
   }, [values, justCreatedId]);
@@ -774,6 +803,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
           onCommitRename={commitRename}
           onCancelRename={() => setRenamingId(null)}
           onVisibility={handleVisibility}
+          onIcon={handleIcon}
           onDelete={setDeletingDef}
           onReorder={handleReorder}
         >
@@ -803,7 +833,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
                     aria-hidden="true"
                     className="text-muted-foreground [&_svg]:h-4 [&_svg]:w-4"
                   >
-                    {PROPERTY_TYPE_META[def.type].icon}
+                    {resolvePropertyIcon(def)}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{def.name}</span>
                   <button

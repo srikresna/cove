@@ -33,6 +33,7 @@ function rowToDefinition(row: Record<string, unknown>): PropertyDefinition | nul
     createdAt: Number(row.createdAt),
     order: String(row.orderIndex ?? ""),
     show: isPropertyVisibility(show) ? show : "always-show",
+    icon: row.icon != null ? String(row.icon) : null,
   };
 }
 
@@ -45,7 +46,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, name, type, optionsJson, createdAt, orderIndex, show FROM property_defs ORDER BY orderIndex, createdAt, id",
+        "SELECT id, name, type, optionsJson, createdAt, orderIndex, show, icon FROM property_defs ORDER BY orderIndex, createdAt, id",
       );
       return rows.map(rowToDefinition).filter((d): d is PropertyDefinition => d !== null);
     } catch (err) {
@@ -57,7 +58,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     try {
       const db = await this.getDb();
       await db.execute(
-        "INSERT INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
           def.id,
           def.name,
@@ -66,6 +67,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
           def.createdAt,
           def.order,
           def.show,
+          def.icon,
         ],
       );
     } catch (err) {
@@ -87,6 +89,10 @@ export class SQLitePropertyRepository implements IPropertyRepository {
     if (patch.orderIndex !== undefined) {
       sets.push("orderIndex = ?");
       params.push(patch.orderIndex);
+    }
+    if (patch.icon !== undefined) {
+      sets.push("icon = ?");
+      params.push(patch.icon);
     }
     if (sets.length === 0) return;
     try {

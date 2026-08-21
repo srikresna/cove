@@ -422,5 +422,13 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 16");
       }
     }
+
+    if (version < 17) {
+      const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
+      if (propCols.length > 0 && !propCols.some((c) => c.name === "icon")) {
+        await db.execute("ALTER TABLE property_defs ADD COLUMN icon TEXT");
+      }
+      await db.execute("PRAGMA user_version = 17");
+    }
   }
 }
