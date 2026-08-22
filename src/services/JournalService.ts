@@ -75,4 +75,18 @@ export class JournalService implements IJournalService {
     await this.setJournalDate(note.id, midnight);
     return note.id;
   }
+
+  async isJournalNote(noteId: string): Promise<boolean> {
+    const value = (await this.journalValuesByNote()).get(noteId);
+    return value?.type === "date";
+  }
+
+  async journalDateOf(noteId: string): Promise<number | null> {
+    const value = (await this.journalValuesByNote()).get(noteId);
+    return value?.type === "date" ? value.timestamp : null;
+  }
+
+  async openJournalByDate(workspaceId: string, timestamp: number): Promise<string> {
+    return this.ensureJournalByDate(workspaceId, timestamp);
+  }
 }
