@@ -30,6 +30,7 @@ export const MESSAGES = {
   PROP_DELETE_CONFIRM_DESC: "It will be removed from every note. This cannot be undone.",
   PROP_OPTIONS_BADGE: "options",
   PROP_RENAME: "Rename",
+  PROP_EDIT: "Edit",
   PROP_RENAME_PLACEHOLDER: "Property name",
   PROP_VISIBILITY_LABEL: "Visibility",
   PROP_VIS_ALWAYS_SHOW: "Always show",

@@ -5,6 +5,7 @@ import { DefaultInlineManagerExtension } from "@blocksuite/affine-inline-preset"
 import { RichText } from "@blocksuite/affine-rich-text";
 import { BlockStdScope } from "@blocksuite/std";
 import { Text } from "@blocksuite/store";
+import * as Slider from "@radix-ui/react-slider";
 import {
   Calendar,
   CaseSensitive,
@@ -16,6 +17,7 @@ import {
   Gauge,
   Hash,
   Link2,
+  Pencil,
   Plus,
   Tag,
   X,
@@ -31,6 +33,8 @@ import { packBlockSuiteContent } from "../../../../services/editor/contentFormat
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
 import { Logger } from "../../../../services/Logger";
 import { useNoteStore } from "../../../../store/useNoteStore";
+import { PropertyCalendar } from "../../../ui/PropertyCalendar";
+import { PropertyCheckbox } from "../../../ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../ui/popover";
 import { InfoRow } from "../../NoteInfoPanel";
 
@@ -95,12 +99,6 @@ function formatCell(raw: unknown, type: string): string {
   return "";
 }
 
-function toLocalInputValue(ts: number): string {
-  const d = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 // Sections for the same backlink can be mounted side by side (header Info
 // panel + right-bar Info panel + peek) with independent cell snapshots; a
 // shared rev signal makes any instance's edit invalidate every copy.
@@ -127,21 +125,22 @@ function useBacklinkRev(): number {
 const cellInputClass =
   "h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring";
 
+/** AFFI NE db-label chip: the whole chip is tinted with the option color. */
 const OptionChip: React.FC<{
   option: BacklinkOption;
   onRemove?: () => void;
 }> = ({ option, onRemove }) => (
-  <span className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground">
-    {typeof option.color === "string" && option.color.length > 0 && (
-      <span
-        aria-hidden="true"
-        className="h-2 w-2 shrink-0 rounded-full"
-        // BlockSuite stores theme tokens like var(--affine-v2-chip-label-red);
-        // they resolve as inline background-color via the globally imported theme css.
-        style={{ backgroundColor: option.color }}
-      />
-    )}
-    <span className="truncate">{option.value}</span>
+  <span
+    className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1 rounded border border-border px-2 text-xs text-foreground"
+    style={
+      typeof option.color === "string" && option.color.length > 0
+        ? { backgroundColor: option.color }
+        : undefined
+    }
+  >
+    <span className="truncate" title={option.value}>
+      {option.value}
+    </span>
     {onRemove && (
       <button
         type="button"
@@ -289,6 +288,165 @@ const RichTextCellEditor: React.FC<{
   return <div ref={ref} className="min-h-7 w-full text-sm text-foreground" />;
 };
 
+/** AFFI NE date cell: formatted text opening a calendar popover; the picker stays open after a pick. */
+const DateCellEditor: React.FC<{
+  timestamp: number | null;
+  onChange: (next: number | null) => void;
+}> = ({ timestamp, onChange }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="cursor-pointer text-left text-sm text-foreground">
+          {timestamp != null ? (
+            new Date(timestamp).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          ) : (
+            <span className="text-muted-foreground/70">{MESSAGES.INFO_EMPTY_VALUE}</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-1">
+        <PropertyCalendar value={timestamp} onChange={(ts) => onChange(ts)} />
+        {timestamp != null && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="mb-1 w-full rounded px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {MESSAGES.PROP_CLEAR}
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/**
+ * AFFI NE progress cell: a slider with a live percentage label, a
+ * hover-revealed thumb, track-click jump, and a single commit on blur.
+ */
+const ProgressSlider: React.FC<{
+  value: number;
+  ariaLabel: string;
+  onCommit: (value: number) => void;
+}> = ({ value, ariaLabel, onCommit }) => {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+  return (
+    <div className="group/prog flex h-5 w-full max-w-56 items-center gap-3">
+      <div className="relative h-2.5 flex-1 rounded-[5px] bg-muted">
+        <div
+          className={cn(
+            "absolute inset-y-0 left-0 rounded-[5px] bg-primary transition-[width]",
+            local >= 100 && "bg-green-600",
+          )}
+          style={{ width: `${local}%` }}
+          aria-hidden="true"
+        />
+        <Slider.Root
+          className="absolute inset-0 flex h-full w-full items-center"
+          value={[local]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={(v) => setLocal(v[0] ?? 0)}
+          onBlur={() => {
+            if (local !== value) onCommit(local);
+          }}
+        >
+          <Slider.Track className="relative h-full w-full grow rounded-[5px] bg-transparent">
+            <Slider.Range className="absolute h-full rounded-[5px] bg-transparent" />
+          </Slider.Track>
+          <Slider.Thumb
+            aria-label={ariaLabel}
+            className="block h-7 w-7 cursor-grab rounded-full bg-background shadow-md opacity-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none group-hover/prog:opacity-100 active:cursor-grabbing"
+          />
+        </Slider.Root>
+      </div>
+      <span className="w-10 shrink-0 text-right text-xs tabular-nums text-foreground">
+        {local}%
+      </span>
+    </div>
+  );
+};
+
+/** AFFI NE link cell: display mode is an anchor; editing commits on Enter/blur, Escape reverts. */
+const LinkCellEditor: React.FC<{
+  value: string;
+  onChange: (next: string) => void;
+}> = ({ value, onChange }) => {
+  const [editing, setEditing] = useState(false);
+  const [temp, setTemp] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => setTemp(value), [value]);
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  if (!editing) {
+    const isUrl = /^https?:\/\//.test(value);
+    return (
+      <div className="flex min-w-0 items-center gap-1">
+        {value ? (
+          <a
+            href={isUrl ? value : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="min-w-0 truncate text-left text-sm text-primary hover:underline"
+            title={value}
+          >
+            {value.replace(/^https?:\/\//, "")}
+          </a>
+        ) : (
+          <span className="text-sm text-muted-foreground/70">{MESSAGES.INFO_EMPTY_VALUE}</span>
+        )}
+        <button
+          type="button"
+          aria-label={MESSAGES.PROP_EDIT}
+          onClick={(e) => {
+            e.stopPropagation();
+            setTemp(value);
+            setEditing(true);
+          }}
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/cell:opacity-100"
+        >
+          <Pencil className="h-3 w-3" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  const commit = () => {
+    setEditing(false);
+    const next = temp.trim();
+    if (next !== value) onChange(next);
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={temp}
+      onChange={(e) => setTemp(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") {
+          setTemp(value);
+          setEditing(false);
+        }
+      }}
+      placeholder={MESSAGES.INFO_EMPTY_VALUE}
+      className="h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring"
+    />
+  );
+};
+
 const BacklinkCellEditor: React.FC<{
   cell: BacklinkCell;
   onChange: (next: unknown) => void;
@@ -300,12 +458,11 @@ const BacklinkCellEditor: React.FC<{
   const commitNumber = (text: string) => {
     const trimmed = text.trim();
     if (trimmed === "") {
-      onChange(cell.type === "progress" ? 0 : null);
+      onChange(null);
       return;
     }
     const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed)) return;
-    onChange(cell.type === "progress" ? Math.max(0, Math.min(100, parsed)) : parsed);
+    if (Number.isFinite(parsed)) onChange(parsed);
   };
 
   switch (cell.type) {
@@ -322,37 +479,34 @@ const BacklinkCellEditor: React.FC<{
     }
     case "date":
       return (
-        <input
-          type="datetime-local"
-          value={typeof cell.raw === "number" ? toLocalInputValue(cell.raw) : ""}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (raw === "") {
-              onChange(null);
-              return;
-            }
-            const ts = new Date(raw).getTime();
-            if (!Number.isNaN(ts)) onChange(ts);
-          }}
-          className="h-7 rounded border bg-background px-1.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        <DateCellEditor
+          timestamp={typeof cell.raw === "number" ? cell.raw : null}
+          onChange={onChange}
         />
       );
     case "checkbox":
       return (
-        <input
-          type="checkbox"
+        <PropertyCheckbox
           checked={cell.raw === true}
-          aria-label={cell.name}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4 accent-[hsl(var(--primary))]"
+          onChange={(next) => onChange(next)}
+          ariaLabel={cell.name}
+          className="w-full"
+        />
+      );
+    case "progress":
+      return (
+        <ProgressSlider
+          value={typeof cell.raw === "number" ? cell.raw : 0}
+          ariaLabel={cell.name}
+          onCommit={(next) => onChange(next)}
         />
       );
     case "number":
-    case "progress":
       return (
         <input
           key={`${cell.propertyId}-${cell.value}`}
           type="number"
+          inputMode="decimal"
           defaultValue={typeof cell.raw === "number" ? String(cell.raw) : ""}
           placeholder={MESSAGES.INFO_EMPTY_VALUE}
           onBlur={(e) => {
@@ -365,7 +519,6 @@ const BacklinkCellEditor: React.FC<{
         />
       );
     case "text":
-    case "link":
       return (
         <input
           key={`${cell.propertyId}-${cell.value}`}
@@ -381,12 +534,11 @@ const BacklinkCellEditor: React.FC<{
             onChange(next.trim());
           }}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          className={cn(
-            cellInputClass,
-            cell.type === "link" && cell.value && "text-primary underline",
-          )}
+          className={cellInputClass}
         />
       );
+    case "link":
+      return <LinkCellEditor value={cell.value} onChange={(next) => onChange(next)} />;
     case "select": {
       const selectedId = typeof cell.raw === "string" ? cell.raw : null;
       const selected = cell.options.find((o) => o.id === selectedId);
