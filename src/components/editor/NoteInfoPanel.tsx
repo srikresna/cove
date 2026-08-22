@@ -22,14 +22,16 @@ export const InfoRow: React.FC<{
   children: React.ReactNode;
 }> = ({ icon, label, handle, children }) => (
   <div className="flex min-h-[30px] flex-wrap gap-1">
-    <div className="flex w-[150px] shrink-0 items-center gap-1.5 self-start rounded p-1 text-sm text-muted-foreground">
+    <div className="flex h-[30px] w-[160px] shrink-0 items-center gap-1.5 self-start rounded p-1 text-sm leading-[22px] text-muted-foreground">
       {handle}
       <span aria-hidden="true" className="[&_svg]:h-4 [&_svg]:w-4">
         {icon}
       </span>
       <span className="truncate">{label}</span>
     </div>
-    <div className="flex min-w-0 flex-1 items-center rounded p-1 text-sm">{children}</div>
+    <div className="flex min-w-0 flex-1 flex-col items-start self-start rounded p-1 text-sm leading-[22px] hover:bg-accent/50 focus-within:bg-accent/50">
+      {children}
+    </div>
   </div>
 );
 
@@ -142,7 +144,7 @@ export const NoteInfoPanel: React.FC<{
 
       {/* Stays mounted while collapsed (hidden via CSS) so expand/collapse
           choices inside the rows and backlink sections survive Info toggles. */}
-      <div className={cn("mt-2 space-y-1 pb-2", !isOpen && "hidden")}>
+      <div className={cn("mt-2 space-y-2 pb-2", !isOpen && "hidden")}>
         <NotePropertiesRows note={note} />
         {backlinks.length > 0 && (
           <div className="mt-2 space-y-1 border-t pt-1">

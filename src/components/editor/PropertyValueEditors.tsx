@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import type {
   PropertyDefinition,
@@ -38,10 +38,19 @@ import type {
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
+import { PropertyCalendar } from "../ui/PropertyCalendar";
+import { PropertyCheckbox } from "../ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export const INPUT_CLASS =
-  "h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring";
+  "w-full rounded-[4px] border border-transparent bg-transparent px-[5px] py-[6px] text-sm leading-[22px] outline-none placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
+
+const formatDay = (ts: number): string =>
+  new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
 export const PROPERTY_TYPE_META: Record<PropertyType, { label: string; icon: React.ReactNode }> = {
   text: { label: "Text", icon: <Type /> },
@@ -290,14 +299,12 @@ export interface PropertyValueEditorProps {
   createOption: (def: PropertyDefinition, name: string, thenPick: boolean) => void;
 }
 
-/** text / person / url share one inline text input. */
-const TextLikeValue: React.FC<PropertyValueEditorProps> = ({
-  def,
-  value,
-  noteId,
-  onSet,
-  onClear,
-}) => {
+/**
+ * AFFiNE text editor: an auto-growing textarea over a hidden mirror div,
+ * multiline (Enter = newline), committed once on blur with trim. The blue
+ * focus treatment lives on the wrapper (focus-within), not the textarea.
+ */
+const TextLikeValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet, onClear }) => {
   const current =
     value?.type === "text"
       ? value.text
@@ -306,48 +313,61 @@ const TextLikeValue: React.FC<PropertyValueEditorProps> = ({
         : value?.type === "url"
           ? value.url
           : "";
+  const [temp, setTemp] = useState(current);
+  useEffect(() => setTemp(current), [current]);
+
+  const commit = () => {
+    const text = temp.trim();
+    if (text === current) return;
+    if (!text) return onClear();
+    if (def.type === "text") onSet({ type: "text", text });
+    else if (def.type === "person") onSet({ type: "person", name: text });
+    else onSet({ type: "url", url: text });
+  };
+
   return (
-    <input
-      key={`${noteId}-${def.id}-${current}`}
-      type="text"
-      defaultValue={current}
-      placeholder={MESSAGES.INFO_EMPTY_VALUE}
-      onBlur={(e) => {
-        const text = e.target.value.trim();
-        if (text === current) return;
-        if (!text) return onClear();
-        if (def.type === "text") onSet({ type: "text", text });
-        else if (def.type === "person") onSet({ type: "person", name: text });
-        else onSet({ type: "url", url: text });
-      }}
-      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-      className={cn(INPUT_CLASS, def.type === "url" && current && "text-primary underline")}
-    />
+    <div
+      className={cn(
+        "relative w-full rounded-[4px] focus-within:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]",
+        def.type === "url" && current && "text-primary",
+      )}
+    >
+      <div className="invisible whitespace-pre-wrap break-words px-[5px] py-[6px] text-sm leading-[22px]">
+        {temp}
+        {(temp.endsWith("\n") || !temp) && <br />}
+      </div>
+      <textarea
+        value={temp}
+        rows={1}
+        onChange={(e) => setTemp(e.target.value)}
+        onBlur={commit}
+        placeholder={MESSAGES.INFO_EMPTY_VALUE}
+        spellCheck={false}
+        className="absolute inset-0 h-full w-full resize-none whitespace-pre-wrap break-words border-none bg-transparent px-[5px] py-[6px] text-sm leading-[22px] outline-none placeholder:text-muted-foreground/70"
+      />
+    </div>
   );
 };
 
-const NumberValue: React.FC<PropertyValueEditorProps> = ({
-  def,
-  value,
-  noteId,
-  onSet,
-  onClear,
-}) => {
+const NumberValue: React.FC<PropertyValueEditorProps> = ({ value, onSet, onClear }) => {
   const current = value?.type === "number" ? String(value.number) : "";
+  const [temp, setTemp] = useState(current);
+  useEffect(() => setTemp(current), [current]);
+
   return (
     <input
-      key={`${noteId}-${def.id}-${current}`}
       type="number"
-      defaultValue={current}
-      placeholder={MESSAGES.INFO_EMPTY_VALUE}
-      onBlur={(e) => {
-        const raw = e.target.value.trim();
+      inputMode="decimal"
+      value={temp}
+      onChange={(e) => setTemp(e.target.value)}
+      onBlur={() => {
+        const raw = temp.trim();
         if (raw === current) return;
         if (!raw) return onClear();
         const parsed = Number(raw);
         if (Number.isFinite(parsed)) onSet({ type: "number", number: parsed });
       }}
-      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      placeholder={MESSAGES.INFO_EMPTY_VALUE}
       className={INPUT_CLASS}
     />
   );
@@ -356,39 +376,53 @@ const NumberValue: React.FC<PropertyValueEditorProps> = ({
 const CheckboxValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet }) => {
   const checked = value?.type === "checkbox" && value.checked;
   return (
-    <input
-      type="checkbox"
+    // The label stretches across the whole value cell, so the entire cell
+    // toggles through the hidden native input (AFFI NE pattern).
+    <PropertyCheckbox
       checked={checked}
-      onChange={(e) => onSet({ type: "checkbox", checked: e.target.checked })}
-      aria-label={def.name}
-      className="h-4 w-4 accent-[hsl(var(--primary))]"
+      onChange={(next) => onSet({ type: "checkbox", checked: next })}
+      ariaLabel={def.name}
+      className="w-full py-[2px]"
     />
   );
 };
 
-const DateValueEditor: React.FC<PropertyValueEditorProps> = ({
-  def,
-  value,
-  noteId,
-  onSet,
-  onClear,
-}) => {
-  const current = value?.type === "date" ? toLocalDateString(value.timestamp) : "";
+const DateValueEditor: React.FC<PropertyValueEditorProps> = ({ value, onSet, onClear }) => {
+  const [open, setOpen] = useState(false);
+  const timestamp = value?.type === "date" ? value.timestamp : null;
   return (
-    <input
-      key={`${noteId}-${def.id}-${current}`}
-      type="date"
-      defaultValue={current}
-      onChange={(e) => {
-        const raw = e.target.value;
-        if (!raw) return onClear();
-        const [y, m, d] = raw.split("-").map(Number);
-        if (y && m && d) {
-          onSet({ type: "date", timestamp: new Date(y, m - 1, d).getTime() });
-        }
-      }}
-      className={cn(INPUT_CLASS, "max-w-40")}
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="cursor-pointer text-left text-sm text-foreground">
+          {timestamp != null ? (
+            formatDay(timestamp)
+          ) : (
+            <span className="text-muted-foreground/70">{MESSAGES.INFO_EMPTY_VALUE}</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-1">
+        <PropertyCalendar
+          value={timestamp}
+          onChange={(ts) => {
+            onSet({ type: "date", timestamp: ts });
+            setOpen(false);
+          }}
+        />
+        {timestamp != null && (
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              setOpen(false);
+            }}
+            className="mb-1 w-full rounded px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {MESSAGES.PROP_CLEAR}
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 };
 

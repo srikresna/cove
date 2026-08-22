@@ -7,21 +7,11 @@ import {
   type Edge,
   extractClosestEdge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-import {
-  Check,
-  Eye,
-  EyeOff,
-  GripVertical,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, Eye, EyeOff, GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { propertyService, tagService } from "../../di/container";
+import { journalService, propertyService, tagService } from "../../di/container";
 import type {
   PropertyDefinition,
   PropertyType,
@@ -53,16 +43,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { PropertyCalendar } from "../ui/PropertyCalendar";
+import { PropertyCheckbox } from "../ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { InfoRow } from "./NoteInfoPanel";
 import {
-  INPUT_CLASS,
   PROPERTY_ICONS,
   PROPERTY_TYPE_META,
   PROPERTY_VALUE_EDITORS,
   resolvePropertyIcon,
-  toLocalDateString,
 } from "./PropertyValueEditors";
 
 export { PROPERTY_TYPE_META };
@@ -99,50 +89,106 @@ const DateValue: React.FC<{ timestamp: number }> = ({ timestamp }) => (
     <TooltipTrigger asChild>
       <span className="cursor-default">{formatRelativeDay(timestamp)}</span>
     </TooltipTrigger>
-    <TooltipContent side="top" align="start">
+    <TooltipContent side="top" align="end">
       {formatFullTimestamp(timestamp)}
     </TooltipContent>
   </Tooltip>
 );
 
 /**
- * Journal row editor (AFFiNE pattern): a checkbox marks the note as a journal
- * note for the picked day; unchecking clears it. Checking without an existing
- * date defaults to today.
+ * Journal row editor (AFFiNE pattern): a 24px checkbox marks the note as a
+ * journal note; when checked, the localized date opens the calendar popover,
+ * and a red conflict pill appears when another note shares the date.
  */
 const JournalValue: React.FC<{
+  noteId: string;
   value: { timestamp: number } | undefined;
   onSet: (timestamp: number) => void;
   onClear: () => void;
-}> = ({ value, onSet, onClear }) => {
+}> = ({ noteId, value, onSet, onClear }) => {
+  const [open, setOpen] = useState(false);
+  const [conflictCount, setConflictCount] = useState(0);
+  const propertyVersion = usePropertyStore((s) => s.version);
   const todayTimestamp = () => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   };
 
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="checkbox"
-        checked={value !== undefined}
-        aria-label={MESSAGES.JOURNAL_TOGGLE}
-        onChange={(e) =>
-          e.target.checked ? onSet(value?.timestamp ?? todayTimestamp()) : onClear()
+  const sameDay = (a: number, b: number) => {
+    const da = new Date(a);
+    const db = new Date(b);
+    return (
+      da.getFullYear() === db.getFullYear() &&
+      da.getMonth() === db.getMonth() &&
+      da.getDate() === db.getDate()
+    );
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
+  useEffect(() => {
+    if (value === undefined) {
+      setConflictCount(0);
+      return;
+    }
+    let alive = true;
+    journalService
+      .journalValuesByNote()
+      .then((values) => {
+        if (!alive) return;
+        let count = 0;
+        for (const [nid, v] of values) {
+          if (nid === noteId) continue;
+          if (v.type === "date" && sameDay(v.timestamp, value.timestamp)) count += 1;
         }
-        className="h-4 w-4 accent-[hsl(var(--primary))]"
+        setConflictCount(count);
+      })
+      .catch(() => {
+        if (alive) setConflictCount(0);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [noteId, value, propertyVersion]);
+
+  return (
+    <div className="flex w-full items-center gap-0.5 py-[2px]">
+      <PropertyCheckbox
+        checked={value !== undefined}
+        onChange={(next) => (next ? onSet(value?.timestamp ?? todayTimestamp()) : onClear())}
+        ariaLabel={MESSAGES.JOURNAL_TOGGLE}
       />
       {value !== undefined && (
-        <input
-          type="date"
-          value={toLocalDateString(value.timestamp)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (!raw) return;
-            const [y, m, d] = raw.split("-").map(Number);
-            if (y && m && d) onSet(new Date(y, m - 1, d).getTime());
-          }}
-          className={cn(INPUT_CLASS, "max-w-40")}
-        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="rounded px-1 text-sm leading-[22px] text-foreground transition-colors hover:bg-accent/60"
+            >
+              {new Date(value.timestamp).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" sideOffset={10} className="w-auto p-1">
+            <PropertyCalendar
+              value={value.timestamp}
+              onChange={(ts) => {
+                onSet(ts);
+                setOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+      )}
+      {conflictCount > 0 && (
+        <span
+          title={MESSAGES.JOURNAL_CONFLICT_HINT.replace("{n}", String(conflictCount))}
+          className="ml-1 rounded border border-destructive/40 bg-destructive/10 px-2 text-xs text-destructive"
+        >
+          {MESSAGES.JOURNAL_CONFLICT} {conflictCount + 1}
+        </span>
       )}
     </div>
   );
@@ -486,124 +532,119 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
           className="absolute -bottom-1 left-0 right-0 z-10 h-0.5 rounded-full bg-primary"
         />
       )}
-      <InfoRow
-        handle={
+      {/* AFFI NE drag affordance: a hover-revealed grip on the row's outer
+          left edge that consumes no layout space. */}
+      <button
+        type="button"
+        ref={handleRef}
+        aria-label={MESSAGES.PROP_DRAG_LABEL}
+        title={MESSAGES.PROP_DRAG_LABEL}
+        className="absolute -left-4 top-[15px] z-10 flex h-4 w-4 -translate-y-1/2 cursor-grab items-center justify-center rounded text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 active:cursor-grabbing group-hover/prop:opacity-100"
+      >
+        <GripVertical className="h-3 w-3" aria-hidden="true" />
+      </button>
+      <InfoRow icon={resolvePropertyIcon(def)} label={label}>
+        {children}
+      </InfoRow>
+      {/* The menu lives on an invisible layer above the name cell (clicking
+          the name opens it, like AFFI NE) without stealing value width. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <button
             type="button"
-            ref={handleRef}
-            aria-label={MESSAGES.PROP_DRAG_LABEL}
-            title={MESSAGES.PROP_DRAG_LABEL}
-            className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 active:cursor-grabbing group-hover/prop:opacity-100"
-          >
-            <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        }
-        icon={resolvePropertyIcon(def)}
-        label={label}
-      >
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
-          <div className="min-w-0 flex-1">{children}</div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={`${def.name}: ${MESSAGES.PROP_VISIBILITY_LABEL}`}
-                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/prop:opacity-100"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-48"
-              onCloseAutoFocus={(e) => {
-                if (suppressTriggerFocusRef.current) {
-                  suppressTriggerFocusRef.current = false;
-                  e.preventDefault();
-                }
+            aria-label={`${def.name}: ${MESSAGES.PROP_VISIBILITY_LABEL}`}
+            className="absolute left-0 top-0 h-[30px] w-[160px] rounded opacity-0 group-hover/prop:opacity-100"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className="w-48"
+          onCloseAutoFocus={(e) => {
+            if (suppressTriggerFocusRef.current) {
+              suppressTriggerFocusRef.current = false;
+              e.preventDefault();
+            }
+          }}
+        >
+          {!isSystem && (
+            <DropdownMenuItem
+              onSelect={() => {
+                suppressTriggerFocusRef.current = true;
+                onStartRename(def.id);
               }}
             >
-              {!isSystem && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    suppressTriggerFocusRef.current = true;
-                    onStartRename(def.id);
+              <Pencil aria-hidden="true" />
+              {MESSAGES.PROP_RENAME}
+            </DropdownMenuItem>
+          )}
+          {!isSystem && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{MESSAGES.PROP_ICON_LABEL}</DropdownMenuLabel>
+              <div className="grid grid-cols-7 gap-0.5 px-1 pb-1">
+                <button
+                  type="button"
+                  aria-label={MESSAGES.PROP_ICON_DEFAULT}
+                  title={MESSAGES.PROP_ICON_DEFAULT}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onIcon(def, null);
                   }}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    def.icon == null && "bg-accent text-foreground",
+                  )}
                 >
-                  <Pencil aria-hidden="true" />
-                  {MESSAGES.PROP_RENAME}
-                </DropdownMenuItem>
-              )}
-              {!isSystem && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>{MESSAGES.PROP_ICON_LABEL}</DropdownMenuLabel>
-                  <div className="grid grid-cols-7 gap-0.5 px-1 pb-1">
-                    <button
-                      type="button"
-                      aria-label={MESSAGES.PROP_ICON_DEFAULT}
-                      title={MESSAGES.PROP_ICON_DEFAULT}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onIcon(def, null);
-                      }}
-                      className={cn(
-                        "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        def.icon == null && "bg-accent text-foreground",
-                      )}
-                    >
-                      {PROPERTY_TYPE_META[def.type].icon}
-                    </button>
-                    {Object.entries(PROPERTY_ICONS).map(([name, Icon]) => (
-                      <button
-                        key={name}
-                        type="button"
-                        aria-label={name}
-                        title={name}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onIcon(def, name);
-                        }}
-                        className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-3.5 [&_svg]:w-3.5",
-                          def.icon === name && "bg-accent text-foreground",
-                        )}
-                      >
-                        <Icon />
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-              {(isSystem && def.id !== JOURNAL_PROPERTY_ID
-                ? (["always-show", "always-hide"] as const)
-                : PROPERTY_VISIBILITY
-              ).map((visibility) => (
-                <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
-                  <span className="flex h-4 w-4 items-center justify-center">
-                    {def.show === visibility ? (
-                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : null}
-                  </span>
-                  {VISIBILITY_LABEL[visibility]}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              {!isSystem && (
-                <DropdownMenuItem
-                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                  onSelect={() => onDelete(def)}
-                >
-                  <Trash2 aria-hidden="true" />
-                  {MESSAGES.PROP_DELETE}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </InfoRow>
+                  {PROPERTY_TYPE_META[def.type].icon}
+                </button>
+                {Object.entries(PROPERTY_ICONS).map(([name, Icon]) => (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-label={name}
+                    title={name}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onIcon(def, name);
+                    }}
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-3.5 [&_svg]:w-3.5",
+                      def.icon === name && "bg-accent text-foreground",
+                    )}
+                  >
+                    <Icon />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
+          {(isSystem && def.id !== JOURNAL_PROPERTY_ID
+            ? (["always-show", "always-hide"] as const)
+            : PROPERTY_VISIBILITY
+          ).map((visibility) => (
+            <DropdownMenuItem key={visibility} onSelect={() => onVisibility(def, visibility)}>
+              <span className="flex h-4 w-4 items-center justify-center">
+                {def.show === visibility ? (
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : null}
+              </span>
+              {VISIBILITY_LABEL[visibility]}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          {!isSystem && (
+            <DropdownMenuItem
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+              onSelect={() => onDelete(def)}
+            >
+              <Trash2 aria-hidden="true" />
+              {MESSAGES.PROP_DELETE}
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };
@@ -762,6 +803,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     if (def.id === JOURNAL_PROPERTY_ID) {
       return (
         <JournalValue
+          noteId={note.id}
           value={value?.type === "date" ? value : undefined}
           onSet={(timestamp) => save(def.id, { type: "date", timestamp })}
           onClear={() => clear(def.id)}
