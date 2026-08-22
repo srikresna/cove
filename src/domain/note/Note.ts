@@ -1,5 +1,9 @@
 export type DocMode = "page" | "edgeless";
 
+export type EdgelessTheme = "system" | "light" | "dark";
+
+export type PageWidth = "standard" | "fullWidth";
+
 export interface Note {
   readonly id: string;
   readonly workspaceId: string;
@@ -8,6 +12,9 @@ export interface Note {
   readonly icon?: string;
   readonly coverColor?: string;
   readonly docMode?: DocMode;
+  readonly edgelessTheme?: EdgelessTheme;
+  readonly pageWidth?: PageWidth;
+  readonly isTemplate?: boolean;
   readonly isPinned: boolean;
   readonly isFavorite: boolean;
   readonly createdAt: number;

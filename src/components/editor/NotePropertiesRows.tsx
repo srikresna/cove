@@ -355,6 +355,113 @@ const WorkspaceValue: React.FC<{ note: Note }> = ({ note }) => {
   );
 };
 
+/** AFFI NE PropertyRadioGroup: a small fixed-width segmented control. */
+const SegmentedValue: React.FC<{
+  options: Array<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}> = ({ options, value, onChange, ariaLabel }) => (
+  <div
+    className="inline-flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5"
+    style={{ width: 194 }}
+    role="radiogroup"
+    aria-label={ariaLabel}
+  >
+    {options.map((option) => {
+      const active = option.value === value;
+      return (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={active}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "h-5 min-w-0 flex-1 rounded-[6px] px-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            active
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <span className="truncate">{option.label}</span>
+        </button>
+      );
+    })}
+  </div>
+);
+
+const DOC_MODE_OPTIONS = [
+  { value: "page", label: "Page" },
+  { value: "edgeless", label: "Edgeless" },
+] as const;
+
+const PAGE_WIDTH_OPTIONS = [
+  { value: "standard", label: "Standard" },
+  { value: "fullWidth", label: "Full width" },
+] as const;
+
+const EDGELESS_THEME_OPTIONS = [
+  { value: "system", label: "Auto" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+] as const;
+
+const DocModeValue: React.FC<{ note: Note }> = ({ note }) => {
+  const updateNote = useNoteStore((s) => s.updateNote);
+  return (
+    <SegmentedValue
+      options={DOC_MODE_OPTIONS.map((o) => ({ ...o }))}
+      value={note.docMode ?? "page"}
+      onChange={(next) =>
+        void updateNote(note.id, { docMode: next === "edgeless" ? "edgeless" : "page" })
+      }
+      ariaLabel="Doc mode"
+    />
+  );
+};
+
+const PageWidthValue: React.FC<{ note: Note }> = ({ note }) => {
+  const updateNote = useNoteStore((s) => s.updateNote);
+  return (
+    <SegmentedValue
+      options={PAGE_WIDTH_OPTIONS.map((o) => ({ ...o }))}
+      value={note.pageWidth ?? "standard"}
+      onChange={(next) =>
+        void updateNote(note.id, { pageWidth: next === "fullWidth" ? "fullWidth" : "standard" })
+      }
+      ariaLabel="Page width"
+    />
+  );
+};
+
+const EdgelessThemeValue: React.FC<{ note: Note }> = ({ note }) => {
+  const updateNote = useNoteStore((s) => s.updateNote);
+  return (
+    <SegmentedValue
+      options={EDGELESS_THEME_OPTIONS.map((o) => ({ ...o }))}
+      value={note.edgelessTheme ?? "system"}
+      onChange={(next) =>
+        void updateNote(note.id, {
+          edgelessTheme: next === "light" || next === "dark" ? next : "system",
+        })
+      }
+      ariaLabel="Edgeless theme"
+    />
+  );
+};
+
+const TemplateValue: React.FC<{ note: Note }> = ({ note }) => {
+  const updateNote = useNoteStore((s) => s.updateNote);
+  return (
+    <PropertyCheckbox
+      checked={note.isTemplate === true}
+      onChange={(next) => void updateNote(note.id, { isTemplate: next })}
+      ariaLabel={MESSAGES.TEMPLATE_TOGGLE}
+      className="w-full py-[2px]"
+    />
+  );
+};
+
 /** Compact value rendering used by the collapsed Info summary chips. */
 export const summarizePropertyValue = (
   def: PropertyDefinition,
@@ -620,7 +727,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
           )}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-          {(isSystem && def.id !== JOURNAL_PROPERTY_ID
+          {(isSystem && def.id !== JOURNAL_PROPERTY_ID && def.id !== "system:template"
             ? (["always-show", "always-hide"] as const)
             : PROPERTY_VISIBILITY
           ).map((visibility) => (
@@ -791,9 +898,16 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     if (justCreatedId && values.has(justCreatedId)) setJustCreatedId(null);
   }, [values, justCreatedId]);
 
-  const isVisible = (def: PropertyDefinition): boolean =>
-    def.id === justCreatedId ||
-    (def.show !== "always-hide" && (def.show !== "hide-when-empty" || values.has(def.id)));
+  const isVisible = (def: PropertyDefinition): boolean => {
+    if (def.id === justCreatedId) return true;
+    if (def.show === "always-hide") return false;
+    if (def.show !== "hide-when-empty") return true;
+    // Value-backed rows check note_properties; note-field-backed rows check
+    // their note field instead.
+    if (def.id === "system:edgeless-theme") return note.edgelessTheme !== undefined;
+    if (def.id === "system:template") return note.isTemplate === true;
+    return values.has(def.id);
+  };
 
   const visibleDefinitions = definitions.filter(isVisible);
   const hiddenDefinitions = definitions.filter((def) => !isVisible(def));
@@ -809,6 +923,16 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
           onClear={() => clear(def.id)}
         />
       );
+    }
+    switch (def.id) {
+      case "system:doc-mode":
+        return <DocModeValue note={note} />;
+      case "system:page-width":
+        return <PageWidthValue note={note} />;
+      case "system:edgeless-theme":
+        return <EdgelessThemeValue note={note} />;
+      case "system:template":
+        return <TemplateValue note={note} />;
     }
     switch (def.type) {
       case "tags":

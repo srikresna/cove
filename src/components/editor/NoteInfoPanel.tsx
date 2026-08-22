@@ -82,6 +82,27 @@ export const NoteInfoPanel: React.FC<{
         if (!alive) return;
         setTagsHidden(defs.find((d) => d.id === "system:tags")?.show === "always-hide");
         const rows: Array<{ id: string; name: string; text: string }> = [];
+        const defById = new Map(defs.map((d) => [d.id, d]));
+        const visible = (id: string) => defById.get(id)?.show !== "always-hide";
+        // Note-field-backed rows (no note_properties value) summarize from the note.
+        const derived: Array<[string, string | undefined]> = [
+          ["system:doc-mode", note.docMode === "edgeless" ? "Edgeless" : "Page"],
+          ["system:page-width", note.pageWidth === "fullWidth" ? "Full width" : "Standard"],
+          [
+            "system:edgeless-theme",
+            note.edgelessTheme === "light" || note.edgelessTheme === "dark"
+              ? note.edgelessTheme === "light"
+                ? "Light"
+                : "Dark"
+              : undefined,
+          ],
+          ["system:template", note.isTemplate ? "Template" : undefined],
+        ];
+        for (const [id, text] of derived) {
+          const def = defById.get(id);
+          if (!def || !text || !visible(id)) continue;
+          rows.push({ id, name: def.name, text });
+        }
         for (const def of defs) {
           if (def.show === "always-hide") continue;
           const value = vals.get(def.id);

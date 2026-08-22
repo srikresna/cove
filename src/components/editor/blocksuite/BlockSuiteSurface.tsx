@@ -30,6 +30,7 @@ import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
+import { useUIStore } from "../../../store/useUIStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import type { Note } from "../../../types";
 import type { TestAffineEditorContainer } from "./editorContainer";
@@ -92,6 +93,12 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
   const noteId = note.id;
   const initialContent = useRef(note.content);
   initialContent.current = note.content;
+  // Per-doc edgeless theme (AFFI NE edgelessColorTheme): 'system' follows the
+  // app theme; explicit light/dark overrides it. Keying the effect on the
+  // resolved value remounts the editor only when the theme actually changes.
+  const isDarkMode = useUIStore((s) => s.isDarkMode);
+  const edgelessDark =
+    note.edgelessTheme === "dark" || (note.edgelessTheme !== "light" && isDarkMode);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -119,6 +126,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     ];
     editor.mode = mode;
     editor.autofocus = true;
+    editor.style.colorScheme = edgelessDark ? "dark" : "light";
 
     editor.style.pointerEvents = "none";
     container.append(editor);
@@ -262,7 +270,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
       editor.remove();
       onEditorReady?.(null);
     };
-  }, [noteId, mode, onEditorReady]);
+  }, [noteId, mode, edgelessDark, onEditorReady]);
 
   return <div ref={containerRef} className="h-full min-h-0 flex-1" />;
 };

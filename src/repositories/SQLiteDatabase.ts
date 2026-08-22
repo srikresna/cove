@@ -430,5 +430,76 @@ export class SQLiteDatabase {
       }
       await db.execute("PRAGMA user_version = 17");
     }
+
+    if (version < 18) {
+      // Per-doc behaviors live on the notes row (like AFFI NE's dedicated
+      // docProperties columns): edgeless theme, page width, template flag.
+      const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      const statements: SqlStatement[] = [];
+      if (noteCols.length > 0) {
+        if (!noteCols.some((c) => c.name === "edgelessTheme")) {
+          statements.push({ sql: "ALTER TABLE notes ADD COLUMN edgelessTheme TEXT" });
+        }
+        if (!noteCols.some((c) => c.name === "pageWidth")) {
+          statements.push({ sql: "ALTER TABLE notes ADD COLUMN pageWidth TEXT" });
+        }
+        if (!noteCols.some((c) => c.name === "isTemplate")) {
+          statements.push({
+            sql: "ALTER TABLE notes ADD COLUMN isTemplate INTEGER NOT NULL DEFAULT 0",
+          });
+        }
+      }
+      statements.push({ sql: "PRAGMA user_version = 18" });
+      await SQLiteDatabase.runTransaction(statements);
+    }
+
+    if (version < 19) {
+      const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
+      if (propCols.length > 0) {
+        // Seed the four behavior rows after system:journal (v16 re-key
+        // pattern: name-collision guard, full recompute with the seeds
+        // placed right after the journal row).
+        const seed = [
+          ["system:doc-mode", "Doc mode", "always-show"],
+          ["system:page-width", "Page width", "always-show"],
+          ["system:edgeless-theme", "Edgeless theme", "hide-when-empty"],
+          ["system:template", "Template", "hide-when-empty"],
+        ] as const;
+        const existing = await db.select<Array<{ id: string }>>(
+          "SELECT id FROM property_defs ORDER BY (CASE WHEN orderIndex = '' THEN 0 ELSE 1 END), orderIndex, createdAt, id",
+        );
+        const orderedIds = existing.map((row) => row.id);
+        let insertAfter = orderedIds.indexOf("system:journal");
+        if (insertAfter === -1) insertAfter = orderedIds.length - 1;
+        for (const [seedId] of seed) {
+          if (!orderedIds.includes(seedId)) {
+            orderedIds.splice(insertAfter + 1, 0, seedId);
+            insertAfter += 1;
+          }
+        }
+        const statements: SqlStatement[] = [
+          {
+            sql: "UPDATE property_defs SET name = name || ' (custom)' WHERE id NOT LIKE 'system:%' AND lower(name) IN ('doc mode','page width','edgeless theme','template')",
+          },
+          ...seed.map(([id, name, show]) => ({
+            sql: "INSERT OR IGNORE INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES (?, ?, 'text', '[]', 0, '', ?)",
+            params: [id, name, show],
+          })),
+        ];
+        let prev: string | null = null;
+        for (const id of orderedIds) {
+          const key = generateKeyBetween(prev, null);
+          statements.push({
+            sql: "UPDATE property_defs SET orderIndex = ? WHERE id = ?",
+            params: [key, id],
+          });
+          prev = key;
+        }
+        statements.push({ sql: "PRAGMA user_version = 19" });
+        await SQLiteDatabase.runTransaction(statements);
+      } else {
+        await db.execute("PRAGMA user_version = 19");
+      }
+    }
   }
 }

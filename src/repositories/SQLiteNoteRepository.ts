@@ -21,6 +21,12 @@ export class SQLiteNoteRepository implements INoteRepository {
       icon: row.icon ? String(row.icon) : undefined,
       coverColor: row.coverColor ? String(row.coverColor) : undefined,
       docMode: row.docMode === "edgeless" ? "edgeless" : undefined,
+      edgelessTheme:
+        row.edgelessTheme === "light" || row.edgelessTheme === "dark"
+          ? row.edgelessTheme
+          : undefined,
+      pageWidth: row.pageWidth === "fullWidth" ? "fullWidth" : undefined,
+      isTemplate: Boolean(row.isTemplate),
       isPinned: Boolean(row.isPinned),
       isFavorite: Boolean(row.isFavorite),
       createdAt: Number(row.createdAt),
@@ -118,8 +124,8 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute(
         `INSERT INTO notes
-        (id, workspaceId, title, titleKmsVersion, content, icon, coverColor, isPinned, isFavorite, kmsVersion, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workspaceId, title, titleKmsVersion, content, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, kmsVersion, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.id,
           note.workspaceId,
@@ -128,6 +134,12 @@ export class SQLiteNoteRepository implements INoteRepository {
           note.content,
           note.icon || null,
           note.coverColor || null,
+          note.docMode === "edgeless" ? "edgeless" : null,
+          note.edgelessTheme === "light" || note.edgelessTheme === "dark"
+            ? note.edgelessTheme
+            : null,
+          note.pageWidth === "fullWidth" ? "fullWidth" : null,
+          note.isTemplate ? 1 : 0,
           note.isPinned ? 1 : 0,
           note.isFavorite ? 1 : 0,
           KMS_VERSION_DEK,
@@ -172,6 +184,22 @@ export class SQLiteNoteRepository implements INoteRepository {
     if (updates.docMode !== undefined) {
       setClauses.push("docMode = ?");
       params.push(updates.docMode === "edgeless" ? "edgeless" : null);
+    }
+    if (updates.edgelessTheme !== undefined) {
+      setClauses.push("edgelessTheme = ?");
+      params.push(
+        updates.edgelessTheme === "light" || updates.edgelessTheme === "dark"
+          ? updates.edgelessTheme
+          : null,
+      );
+    }
+    if (updates.pageWidth !== undefined) {
+      setClauses.push("pageWidth = ?");
+      params.push(updates.pageWidth === "fullWidth" ? "fullWidth" : "standard");
+    }
+    if (updates.isTemplate !== undefined) {
+      setClauses.push("isTemplate = ?");
+      params.push(updates.isTemplate ? 1 : 0);
     }
     if (updates.isPinned !== undefined) {
       setClauses.push("isPinned = ?");

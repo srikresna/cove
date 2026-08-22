@@ -61,6 +61,7 @@ export const MESSAGES = {
   PROP_ICON_DEFAULT: "Default",
   JOURNAL_CONFLICT: "Duplicated",
   JOURNAL_CONFLICT_HINT: "{n} notes share this journal date.",
+  TEMPLATE_TOGGLE: "Use as template",
   CALENDAR_FILTER_UPDATED: "Updated",
   CALENDAR_FILTER_CREATED: "Created",
   CALENDAR_EMPTY_DAY: "No notes on this day.",

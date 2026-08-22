@@ -33,6 +33,10 @@ export const SYSTEM_PROPERTY_IDS = [
   "system:created",
   "system:updated",
   "system:journal",
+  "system:doc-mode",
+  "system:page-width",
+  "system:edgeless-theme",
+  "system:template",
 ] as const;
 
 /**

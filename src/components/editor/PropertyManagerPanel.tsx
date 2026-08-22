@@ -266,7 +266,7 @@ const ManagerRow: React.FC<ManagerRowProps> = ({
           )}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-          {(isSystem && def.id !== JOURNAL_PROPERTY_ID
+          {(isSystem && def.id !== JOURNAL_PROPERTY_ID && def.id !== "system:template"
             ? (["always-show", "always-hide"] as const)
             : PROPERTY_VISIBILITY
           ).map((visibility) => (

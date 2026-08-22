@@ -20,7 +20,16 @@ export interface INoteService {
     updates: Partial<
       Pick<
         Note,
-        "title" | "icon" | "coverColor" | "docMode" | "isPinned" | "isFavorite" | "workspaceId"
+        | "title"
+        | "icon"
+        | "coverColor"
+        | "docMode"
+        | "edgelessTheme"
+        | "pageWidth"
+        | "isTemplate"
+        | "isPinned"
+        | "isFavorite"
+        | "workspaceId"
       >
     >,
   ): Promise<Note>;

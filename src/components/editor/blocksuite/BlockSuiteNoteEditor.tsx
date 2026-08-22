@@ -22,7 +22,6 @@ interface BlockSuiteNoteEditorProps {
 
 export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note }) => {
   const updateNote = useNoteStore((s) => s.updateNote);
-  const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
   const [isRightBarOpen, setRightBarOpen] = useState(
     () => localStorage.getItem(RIGHTBAR_KEY) === "true",
@@ -30,6 +29,8 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
   const scrollRef = useRef<HTMLDivElement>(null);
   const [editorHost, setEditorHost] = useState<EditorHost | null>(null);
   const mode = note.docMode ?? "page";
+  // Page width is a persisted per-doc property (AFFI NE pageWidth row).
+  const isFullWidth = (note.pageWidth ?? "standard") === "fullWidth";
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),
     [note.content],
@@ -75,7 +76,9 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
             onToggleDocMode={() =>
               updateNote(note.id, { docMode: mode === "edgeless" ? "page" : "edgeless" })
             }
-            onToggleFullWidth={() => setIsFullWidth(!isFullWidth)}
+            onToggleFullWidth={() =>
+              updateNote(note.id, { pageWidth: isFullWidth ? "standard" : "fullWidth" })
+            }
             onToggleFullscreen={toggleFullscreen}
             onToggleRightBar={toggleRightBar}
           />

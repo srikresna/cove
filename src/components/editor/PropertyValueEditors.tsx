@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   Bookmark,
   BookOpen,
   Briefcase,
@@ -12,10 +13,12 @@ import {
   Hash,
   Heart,
   History,
+  LayoutTemplate,
   Link,
   Link2,
   List,
   ListChecks,
+  Palette,
   Paperclip,
   Plus,
   Star,
@@ -97,7 +100,12 @@ export const PROPERTY_ICONS: Record<string, React.FC<React.SVGProps<SVGSVGElemen
 /** Custom icon when set, the type's default icon otherwise. */
 export const resolvePropertyIcon = (def: PropertyDefinition): React.ReactNode => {
   const custom = def.icon != null ? PROPERTY_ICONS[def.icon] : undefined;
-  return custom ? <Icon icon={custom} /> : PROPERTY_TYPE_META[def.type].icon;
+  if (custom) return <Icon icon={custom} />;
+  if (def.id === "system:doc-mode") return <FolderOpen />;
+  if (def.id === "system:page-width") return <ArrowRightLeft />;
+  if (def.id === "system:edgeless-theme") return <Palette />;
+  if (def.id === "system:template") return <LayoutTemplate />;
+  return PROPERTY_TYPE_META[def.type].icon;
 };
 
 const Icon: React.FC<{ icon: React.FC<React.SVGProps<SVGSVGElement>> }> = ({ icon: Svg }) => (
