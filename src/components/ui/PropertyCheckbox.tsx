@@ -22,10 +22,12 @@ export const PropertyCheckbox: React.FC<{
   onChange: (checked: boolean) => void;
   ariaLabel?: string;
   className?: string;
-}> = ({ checked, indeterminate = false, onChange, ariaLabel, className }) => (
+  /** Extra content rendered inside the label (journal date, conflict pill...). */
+  children?: React.ReactNode;
+}> = ({ checked, indeterminate = false, onChange, ariaLabel, className, children }) => (
   <label
     className={cn(
-      "relative inline-flex h-6 min-w-6 cursor-pointer items-center justify-start text-muted-foreground",
+      "relative inline-flex h-6 min-w-6 cursor-pointer items-center justify-start gap-0.5 text-muted-foreground",
       className,
     )}
   >
@@ -44,6 +46,7 @@ export const PropertyCheckbox: React.FC<{
         <path fillRule="evenodd" clipRule="evenodd" d={UNCHECKED_PATH} fill="currentColor" />
       )}
     </svg>
+    {children}
     <input
       type="checkbox"
       checked={checked}

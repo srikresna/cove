@@ -64,7 +64,7 @@ const VISIBILITY_LABEL: Record<PropertyVisibility, string> = {
 };
 
 export const TagChip: React.FC<{ tag: Tag; onRemove?: () => void }> = ({ tag, onRemove }) => (
-  <span className="group/tag inline-flex h-[22px] max-w-32 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground">
+  <span className="group/tag inline-flex h-[22px] max-w-32 items-center gap-1 rounded-[10px] border bg-card px-2 text-sm text-foreground">
     <span
       aria-hidden="true"
       className="h-2 w-2 shrink-0 rounded-full"
@@ -113,6 +113,7 @@ const JournalValue: React.FC<{
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   };
+  const onSetOrClear = () => (value === undefined ? onSet(todayTimestamp()) : onClear());
 
   const sameDay = (a: number, b: number) => {
     const da = new Date(a);
@@ -151,12 +152,15 @@ const JournalValue: React.FC<{
   }, [noteId, value, propertyVersion]);
 
   return (
-    <div className="flex w-full items-center gap-0.5 py-[2px]">
-      <PropertyCheckbox
-        checked={value !== undefined}
-        onChange={(next) => (next ? onSet(value?.timestamp ?? todayTimestamp()) : onClear())}
-        ariaLabel={MESSAGES.JOURNAL_TOGGLE}
-      />
+    // AFFI NE pattern: the hidden input inside PropertyCheckbox covers the
+    // whole cell, so clicking anywhere toggles; the date trigger and the
+    // conflict pill are buttons that naturally stop the label activation.
+    <PropertyCheckbox
+      checked={value !== undefined}
+      onChange={() => onSetOrClear()}
+      ariaLabel={MESSAGES.JOURNAL_TOGGLE}
+      className="flex h-full min-h-[24px] w-full items-center gap-0.5"
+    >
       {value !== undefined && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
@@ -171,7 +175,7 @@ const JournalValue: React.FC<{
               })}
             </button>
           </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={10} className="w-auto p-1">
+          <PopoverContent align="start" sideOffset={10} className="w-auto p-2">
             <PropertyCalendar
               value={value.timestamp}
               onChange={(ts) => {
@@ -183,14 +187,15 @@ const JournalValue: React.FC<{
         </Popover>
       )}
       {conflictCount > 0 && (
-        <span
+        <button
+          type="button"
           title={MESSAGES.JOURNAL_CONFLICT_HINT.replace("{n}", String(conflictCount))}
-          className="ml-1 rounded border border-destructive/40 bg-destructive/10 px-2 text-xs text-destructive"
+          className="ml-1 rounded border border-destructive/40 bg-destructive/10 px-2 text-sm text-destructive"
         >
-          {MESSAGES.JOURNAL_CONFLICT} {conflictCount + 1}
-        </span>
+          {MESSAGES.JOURNAL_CONFLICT}
+        </button>
       )}
-    </div>
+    </PropertyCheckbox>
   );
 };
 
@@ -363,7 +368,7 @@ const SegmentedValue: React.FC<{
   ariaLabel: string;
 }> = ({ options, value, onChange, ariaLabel }) => (
   <div
-    className="inline-flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5"
+    className="inline-flex items-center gap-1 rounded-lg bg-muted/60 p-0.5"
     style={{ width: 194 }}
     role="radiogroup"
     aria-label={ariaLabel}
@@ -377,10 +382,10 @@ const SegmentedValue: React.FC<{
           aria-pressed={active}
           onClick={() => onChange(option.value)}
           className={cn(
-            "h-5 min-w-0 flex-1 rounded-[6px] px-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "h-5 min-w-0 flex-1 rounded-[6px] px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             active
               ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+              : "text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
         >
           <span className="truncate">{option.label}</span>
@@ -650,7 +655,25 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
       >
         <GripVertical className="h-3 w-3" aria-hidden="true" />
       </button>
-      <InfoRow icon={resolvePropertyIcon(def)} label={label}>
+      <InfoRow
+        icon={resolvePropertyIcon(def)}
+        label={label}
+        flush={
+          (def.id !== JOURNAL_PROPERTY_ID &&
+            (def.type === "text" ||
+              def.type === "number" ||
+              def.type === "person" ||
+              def.type === "url")) ||
+          def.id === "system:doc-mode" ||
+          def.id === "system:page-width" ||
+          def.id === "system:edgeless-theme"
+        }
+        noHover={
+          def.id === "system:doc-mode" ||
+          def.id === "system:page-width" ||
+          def.id === "system:edgeless-theme"
+        }
+      >
         {children}
       </InfoRow>
       {/* The menu lives on an invisible layer above the name cell (clicking
@@ -660,7 +683,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
           <button
             type="button"
             aria-label={`${def.name}: ${MESSAGES.PROP_VISIBILITY_LABEL}`}
-            className="absolute left-0 top-0 h-[30px] w-[160px] rounded opacity-0 group-hover/prop:opacity-100"
+            className="absolute left-0 top-0 h-[30px] w-[160px] rounded opacity-0 hover:bg-accent/50 group-hover/prop:opacity-100"
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent

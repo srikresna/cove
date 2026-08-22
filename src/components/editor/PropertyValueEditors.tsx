@@ -46,7 +46,7 @@ import { PropertyCheckbox } from "../ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export const INPUT_CLASS =
-  "w-full rounded-[4px] border border-transparent bg-transparent px-[5px] py-[6px] text-sm leading-[22px] outline-none placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
+  "w-full rounded-[4px] border border-transparent bg-transparent px-[5px] py-[6px] text-sm outline-none placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
 
 const formatDay = (ts: number): string =>
   new Date(ts).toLocaleDateString(undefined, {
@@ -122,7 +122,7 @@ const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = 
   option,
   onRemove,
 }) => (
-  <span className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground">
+  <span className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1 rounded-[10px] border bg-card px-2 text-sm text-foreground">
     <span
       aria-hidden="true"
       className="h-2 w-2 shrink-0 rounded-full"
@@ -170,7 +170,7 @@ const OptionPicker: React.FC<{
             setQuery("");
           }
         }}
-        className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring"
       />
       <div className="max-h-48 space-y-0.5 overflow-y-auto">
         {visible.map((option) => (
@@ -178,7 +178,7 @@ const OptionPicker: React.FC<{
             key={option.id}
             type="button"
             onClick={() => onPick(option.id)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span
               aria-hidden="true"
@@ -198,7 +198,7 @@ const OptionPicker: React.FC<{
               onCreate(trimmed);
               setQuery("");
             }}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="truncate">
@@ -336,11 +336,11 @@ const TextLikeValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet, 
   return (
     <div
       className={cn(
-        "relative w-full rounded-[4px] focus-within:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]",
+        "relative w-full rounded-[4px] border border-transparent focus-within:border-[#1e96eb] focus-within:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]",
         def.type === "url" && current && "text-primary",
       )}
     >
-      <div className="invisible whitespace-pre-wrap break-words px-[5px] py-[6px] text-sm leading-[22px]">
+      <div className="invisible [overflow-wrap:anywhere] [white-space:break-spaces] px-[5px] py-[6px] text-sm leading-[22px]">
         {temp}
         {(temp.endsWith("\n") || !temp) && <br />}
       </div>
@@ -350,8 +350,7 @@ const TextLikeValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet, 
         onChange={(e) => setTemp(e.target.value)}
         onBlur={commit}
         placeholder={MESSAGES.INFO_EMPTY_VALUE}
-        spellCheck={false}
-        className="absolute inset-0 h-full w-full resize-none whitespace-pre-wrap break-words border-none bg-transparent px-[5px] py-[6px] text-sm leading-[22px] outline-none placeholder:text-muted-foreground/70"
+        className="absolute inset-0 h-full w-full resize-none [overflow-wrap:anywhere] [white-space:break-spaces] border-none bg-transparent px-[5px] py-[6px] text-sm leading-[22px] outline-none placeholder:text-muted-foreground/70"
       />
     </div>
   );
@@ -409,7 +408,7 @@ const DateValueEditor: React.FC<PropertyValueEditorProps> = ({ value, onSet, onC
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-1">
+      <PopoverContent align="start" sideOffset={4} className="w-auto p-2">
         <PropertyCalendar
           value={timestamp}
           onChange={(ts) => {

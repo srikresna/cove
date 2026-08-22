@@ -46,24 +46,26 @@ export const PropertyCalendar: React.FC<{
 
   return (
     <div
-      className={cn("select-none p-2 text-sm", className)}
+      className={cn("select-none text-sm", className)}
       style={{ minWidth: `calc(${CELL}px * 7 + ${GAP}px * 6)` }}
     >
       <div className="mb-1 flex items-center justify-between" style={{ height: CELL }}>
-        <button
-          type="button"
-          onClick={() => setCursor((prev) => startOfMonth(prev))}
-          className="flex h-6 items-center rounded px-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
-        >
-          {format(cursor, "MMMM")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setCursor((prev) => startOfMonth(prev))}
-          className="flex h-6 items-center rounded px-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
-        >
-          {format(cursor, "yyyy")}
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setCursor((prev) => startOfMonth(prev))}
+            className="flex h-6 items-center rounded px-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+          >
+            {format(cursor, "MMMM")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCursor((prev) => startOfMonth(prev))}
+            className="flex h-6 items-center rounded px-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+          >
+            {format(cursor, "yyyy")}
+          </button>
+        </div>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -80,7 +82,7 @@ export const PropertyCalendar: React.FC<{
               setCursor(startOfMonth(now));
               onChange(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime());
             }}
-            className="flex h-6 items-center rounded px-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex h-6 items-center rounded px-1 text-sm font-normal uppercase text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             {MESSAGES.JOURNAL_TODAY}
           </button>
@@ -99,7 +101,7 @@ export const PropertyCalendar: React.FC<{
         {WEEKDAYS.map((weekday) => (
           <div
             key={weekday}
-            className="flex items-center justify-center text-[13px] font-medium text-muted-foreground"
+            className="flex items-center justify-center text-sm font-medium text-muted-foreground"
             style={{ height: CELL }}
           >
             {weekday}

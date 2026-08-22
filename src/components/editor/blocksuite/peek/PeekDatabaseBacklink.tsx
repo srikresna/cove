@@ -123,7 +123,7 @@ function useBacklinkRev(): number {
 }
 
 const cellInputClass =
-  "h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring";
+  "h-7 w-full rounded-[4px] border border-transparent bg-transparent px-[5px] text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
 
 /** AFFI NE db-label chip: the whole chip is tinted with the option color. */
 const OptionChip: React.FC<{
@@ -131,7 +131,7 @@ const OptionChip: React.FC<{
   onRemove?: () => void;
 }> = ({ option, onRemove }) => (
   <span
-    className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1 rounded border border-border px-2 text-xs text-foreground"
+    className="group/opt inline-flex h-[22px] max-w-40 items-center gap-1 rounded border border-border px-2 text-sm text-foreground"
     style={
       typeof option.color === "string" && option.color.length > 0
         ? { backgroundColor: option.color }
@@ -337,7 +337,7 @@ const ProgressSlider: React.FC<{
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);
   return (
-    <div className="group/prog flex h-5 w-full max-w-56 items-center gap-3">
+    <div className="group/prog flex h-5 w-full items-center gap-3">
       <div className="relative h-2.5 flex-1 rounded-[5px] bg-muted">
         <div
           className={cn(
@@ -389,11 +389,16 @@ const LinkCellEditor: React.FC<{
 
   if (!editing) {
     const isUrl = /^https?:\/\//.test(value);
+    const enterEditing = () => {
+      setTemp(value);
+      setEditing(true);
+    };
+
     return (
-      <div className="flex min-w-0 items-center gap-1">
-        {value ? (
+      <div className="group/cell flex min-w-0 w-full items-center gap-1">
+        {value && isUrl ? (
           <a
-            href={isUrl ? value : undefined}
+            href={value}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -402,16 +407,30 @@ const LinkCellEditor: React.FC<{
           >
             {value.replace(/^https?:\/\//, "")}
           </a>
+        ) : value ? (
+          <button
+            type="button"
+            onClick={enterEditing}
+            className="min-w-0 truncate text-left text-sm text-foreground"
+            title={value}
+          >
+            {value}
+          </button>
         ) : (
-          <span className="text-sm text-muted-foreground/70">{MESSAGES.INFO_EMPTY_VALUE}</span>
+          <button
+            type="button"
+            onClick={enterEditing}
+            className="text-left text-sm text-muted-foreground/70"
+          >
+            {MESSAGES.INFO_EMPTY_VALUE}
+          </button>
         )}
         <button
           type="button"
           aria-label={MESSAGES.PROP_EDIT}
           onClick={(e) => {
             e.stopPropagation();
-            setTemp(value);
-            setEditing(true);
+            enterEditing();
           }}
           className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/cell:opacity-100"
         >
@@ -442,7 +461,7 @@ const LinkCellEditor: React.FC<{
         }
       }}
       placeholder={MESSAGES.INFO_EMPTY_VALUE}
-      className="h-7 w-full max-w-56 rounded-md border border-transparent bg-transparent px-1 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 hover:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring"
+      className={cellInputClass}
     />
   );
 };
@@ -490,7 +509,7 @@ const BacklinkCellEditor: React.FC<{
           checked={cell.raw === true}
           onChange={(next) => onChange(next)}
           ariaLabel={cell.name}
-          className="w-full"
+          className="w-full py-[2px]"
         />
       );
     case "progress":

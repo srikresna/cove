@@ -14,14 +14,9 @@ describe("formatRelativeDay", () => {
     expect(formatRelativeDay(yesterday, NOON)).toBe("yesterday");
   });
 
-  it("labels 2-6 days with the days-ago suffix", () => {
+  it("shows an absolute date beyond yesterday (AFFI NE caps relativity at 1 day)", () => {
     const threeDaysAgo = new Date(2026, 7, 17, 10).getTime();
-    expect(formatRelativeDay(threeDaysAgo, NOON)).toBe("3 days ago");
-  });
-
-  it("falls back to a locale date a week or more back", () => {
-    const old = new Date(2026, 7, 5, 10).getTime();
-    const label = formatRelativeDay(old, NOON);
+    const label = formatRelativeDay(threeDaysAgo, NOON);
     expect(label).toContain("2026");
     expect(label).not.toContain("ago");
   });

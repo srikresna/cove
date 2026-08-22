@@ -19,8 +19,12 @@ export const InfoRow: React.FC<{
   icon: React.ReactNode;
   label: React.ReactNode;
   handle?: React.ReactNode;
+  /** Editors that carry their own 5/6px padding (text/number) sit flush. */
+  flush?: boolean;
+  /** Radio/segmented rows don't highlight on hover (AFFI NE hoverable={false}). */
+  noHover?: boolean;
   children: React.ReactNode;
-}> = ({ icon, label, handle, children }) => (
+}> = ({ icon, label, handle, flush = false, noHover = false, children }) => (
   <div className="flex min-h-[30px] flex-wrap gap-1">
     <div className="flex h-[30px] w-[160px] shrink-0 items-center gap-1.5 self-start rounded p-1 text-sm leading-[22px] text-muted-foreground">
       {handle}
@@ -29,7 +33,13 @@ export const InfoRow: React.FC<{
       </span>
       <span className="truncate">{label}</span>
     </div>
-    <div className="flex min-w-0 flex-1 flex-col items-start self-start rounded p-1 text-sm leading-[22px] hover:bg-accent/50 focus-within:bg-accent/50">
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 flex-col items-start self-start rounded text-sm leading-[22px]",
+        !flush && "p-1",
+        !noHover && "hover:bg-accent/50 focus-within:bg-accent/50",
+      )}
+    >
       {children}
     </div>
   </div>
