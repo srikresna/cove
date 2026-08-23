@@ -37,6 +37,7 @@ export class SQLiteTagRepository implements ITagRepository {
       const rows = await db.select<Array<{ tagId: string; noteCount: number }>>(
         `SELECT t.id as tagId, COUNT(nt.noteId) as noteCount
          FROM tags t LEFT JOIN note_tags nt ON nt.tagId = t.id
+           AND nt.noteId IN (SELECT id FROM notes WHERE deletedAt IS NULL)
          WHERE t.workspaceId = ?
          GROUP BY t.id`,
         [workspaceId],

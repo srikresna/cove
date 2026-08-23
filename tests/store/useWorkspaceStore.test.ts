@@ -25,11 +25,17 @@ const {
 vi.mock("@/di/container", () => ({
   workspaceService: { getAllWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace },
   noteService: { collectWorkspaceBlobCandidates, gcOrphanBlobs },
+  // Pulled in transitively by the tag/view stores the workspace store resets.
+  tagService: {},
+  savedViewService: {},
+  vaultService: { onLock: vi.fn() },
 }));
 
 vi.mock("@/store/notify", () => ({ notifyError }));
 
+import { useTagStore } from "@/store/useTagStore";
 import { useUIStore } from "@/store/useUIStore";
+import { useViewStore } from "@/store/useViewStore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
 function makeWorkspace(id: string, overrides: Partial<Workspace> = {}): Workspace {
@@ -154,5 +160,40 @@ describe("useWorkspaceStore", () => {
 
     expect(order).toEqual(["collect", "delete", "gc"]);
     expect(collectWorkspaceBlobCandidates).toHaveBeenCalledWith("w1");
+  });
+
+  it("switching workspaces resets tag filters and saved-view rules", () => {
+    useWorkspaceStore.setState({
+      workspaces: [makeWorkspace("w1"), makeWorkspace("w2")],
+      activeWorkspaceId: "w1",
+    });
+    useTagStore.setState({
+      activeTagId: "tag-from-w1",
+      taggedNoteIds: new Set(["n1"]),
+    });
+    useViewStore.setState({
+      activeViewId: "view-from-w1",
+      draftRules: [{ id: "r1", kind: "tags", op: "has-any-of", tagIds: ["tag-from-w1"] }],
+    });
+
+    useWorkspaceStore.getState().setActiveWorkspace("w2");
+
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("w2");
+    expect(useTagStore.getState().activeTagId).toBeNull();
+    expect(useTagStore.getState().taggedNoteIds).toBeNull();
+    expect(useViewStore.getState().activeViewId).toBeNull();
+    expect(useViewStore.getState().draftRules).toEqual([]);
+  });
+
+  it("re-selecting the active workspace keeps filters intact", () => {
+    useWorkspaceStore.setState({
+      workspaces: [makeWorkspace("w1"), makeWorkspace("w2")],
+      activeWorkspaceId: "w1",
+    });
+    useTagStore.setState({ activeTagId: "t1", taggedNoteIds: new Set(["n1"]) });
+
+    useWorkspaceStore.getState().setActiveWorkspace("w1");
+
+    expect(useTagStore.getState().activeTagId).toBe("t1");
   });
 });

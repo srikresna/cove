@@ -245,13 +245,9 @@ export const CalendarPanel: React.FC = () => {
           const isSelected = key === selectedDay;
           const notCurrentMonth = date.getMonth() !== monthCursor.getMonth();
           // Typed dots: journal = primary, activity (created/updated) = muted.
-          const journalDay =
-            field === "journal" &&
-            workspaceNotes.some((n) =>
-              journalByNoteId.get(n.id) === undefined
-                ? false
-                : keyOf(journalByNoteId.get(n.id) ?? 0) === key,
-            );
+          // In journal mode notesByDay is keyed by the same journal-day
+          // predicate, so hasNotes already answers this — no per-cell rescan.
+          const journalDay = field === "journal" && hasNotes;
           return (
             <button
               // biome-ignore lint/suspicious/noArrayIndexKey: fixed 42-cell grid with duplicate day keys across months

@@ -45,7 +45,9 @@ import type {
 } from "../../domain/property/Property";
 import { TAG_COLORS } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
+import { usePropertyStore } from "../../store/usePropertyStore";
 import type { Note } from "../../types";
 import {
   DropdownMenu,
@@ -57,7 +59,7 @@ import {
 } from "../ui/dropdown-menu";
 import { PropertyCalendar } from "../ui/PropertyCalendar";
 import { PropertyCheckbox } from "../ui/PropertyCheckbox";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export const INPUT_CLASS =
   "w-full rounded-[4px] border border-transparent bg-transparent px-[5px] py-[6px] text-sm outline-none placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
@@ -280,17 +282,15 @@ const OptionPicker: React.FC<{
           </p>
         )}
       </div>
-      <button
-        type="button"
-        className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={() => {
-          // Close the popover: dispatch Escape on the Radix-popover layer.
-          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-        }}
-      >
-        <Check className="h-3.5 w-3.5" aria-hidden="true" />
-        {MESSAGES.PROP_OPTION_DONE}
-      </button>
+      <PopoverClose asChild>
+        <button
+          type="button"
+          className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+          {MESSAGES.PROP_OPTION_DONE}
+        </button>
+      </PopoverClose>
     </PopoverContent>
   );
 };
@@ -313,10 +313,16 @@ const OptionRow: React.FC<{
     if (renaming) inputRef.current?.focus();
   }, [renaming]);
 
+  // Option mutations write through PropertyService, which has no reactive
+  // layer of its own — bumping the property store is what makes every
+  // mounted surface (this picker, the Info chips, filters, sidebar) refetch.
   const commitRename = (name: string) => {
     const next = name.trim();
     if (next && next !== option.name) {
-      void propertyService.renameOption(defId, option.id, next).catch(() => {});
+      void propertyService
+        .renameOption(defId, option.id, next)
+        .then(() => usePropertyStore.getState().refresh())
+        .catch(notifyError);
     }
   };
 
@@ -395,7 +401,10 @@ const OptionRow: React.FC<{
                 title={color}
                 onClick={(e) => {
                   e.stopPropagation();
-                  void propertyService.setOptionColor(defId, option.id, color).catch(() => {});
+                  void propertyService
+                    .setOptionColor(defId, option.id, color)
+                    .then(() => usePropertyStore.getState().refresh())
+                    .catch(notifyError);
                 }}
                 className={cn(
                   "flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -408,7 +417,12 @@ const OptionRow: React.FC<{
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-            onSelect={() => void propertyService.deleteOption(defId, option.id).catch(() => {})}
+            onSelect={() =>
+              void propertyService
+                .deleteOption(defId, option.id)
+                .then(() => usePropertyStore.getState().refresh())
+                .catch(notifyError)
+            }
           >
             <Trash2 aria-hidden="true" />
             {MESSAGES.PROP_DELETE}

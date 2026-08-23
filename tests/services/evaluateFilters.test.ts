@@ -151,4 +151,36 @@ describe("evaluateFilters", () => {
     ];
     expect(evaluateFilters(items, rules).map((i) => i.note.id)).toEqual(["a"]);
   });
+
+  it("rules without a chosen value are inactive and match everything", () => {
+    const items = [makeItem("a"), makeItem("b")];
+    const incomplete: FilterRule[] = [
+      // Fresh from the "+ Filter" menu, before the user picks anything.
+      { id: rid(), kind: "text", propertyId: "p", op: "contains", value: "" },
+      { id: rid(), kind: "number", propertyId: "p", op: "=", value: undefined },
+      { id: rid(), kind: "date", propertyId: "p", op: "is", value: undefined },
+      { id: rid(), kind: "select", propertyId: "p", op: "is", optionIds: [] },
+      { id: rid(), kind: "multiSelect", propertyId: "p", op: "is", optionIds: [] },
+      { id: rid(), kind: "tags", op: "has-any-of", tagIds: [] },
+    ];
+    expect(evaluateFilters(items, incomplete).map((i) => i.note.id)).toEqual(["a", "b"]);
+  });
+
+  it("an incomplete rule does not mask a complete sibling rule", () => {
+    const items = [makeItem("a", { tagIds: ["t1"] }), makeItem("b"), makeItem("c")];
+    const rules: FilterRule[] = [
+      { id: rid(), kind: "number", propertyId: "p", op: ">", value: undefined },
+      { id: rid(), kind: "tags", op: "has-any-of", tagIds: ["t1"] },
+    ];
+    expect(evaluateFilters(items, rules).map((i) => i.note.id)).toEqual(["a"]);
+  });
+
+  it("emptiness operators stay active without a value", () => {
+    const items = [
+      makeItem("a", { propertyValues: [["p", { type: "number", number: 1 }]] }),
+      makeItem("b"),
+    ];
+    const rule: FilterRule = { id: rid(), kind: "number", propertyId: "p", op: "is-empty" };
+    expect(evaluateFilters(items, [rule]).map((i) => i.note.id)).toEqual(["b"]);
+  });
 });

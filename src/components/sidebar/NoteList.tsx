@@ -221,7 +221,10 @@ export const NoteList: React.FC = () => {
   const virtualizer = useVirtualizer({
     count: workspaceNotes.length,
     getScrollElement: () => parentRef.current,
+    // 54px covers a bare row; property stack rows below the title grow the
+    // row, so real heights come from measureElement on each rendered row.
     estimateSize: () => 54,
+    measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 5,
   });
 
@@ -302,6 +305,8 @@ export const NoteList: React.FC = () => {
             return (
               <div
                 key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
                 style={{
                   position: "absolute",
                   top: 0,

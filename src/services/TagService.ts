@@ -55,7 +55,18 @@ export class TagService implements ITagService {
       color: nextTagColor(await this.tags.countInWorkspace(note.workspaceId)),
       createdAt: Date.now(),
     };
-    await this.tags.create(tag);
+    try {
+      await this.tags.create(tag);
+    } catch (err) {
+      // Lost a create race against a concurrent addTag of the same name
+      // (UNIQUE(workspaceId, name)): reuse the winner instead of failing.
+      const winner = await this.tags.findByName(note.workspaceId, normalized);
+      if (winner) {
+        await this.tags.addToNote(noteId, winner.id);
+        return winner;
+      }
+      throw err;
+    }
     await this.tags.addToNote(noteId, tag.id);
     return tag;
   }

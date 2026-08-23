@@ -95,9 +95,11 @@ const RuleChip: React.FC<{
           inputMode="decimal"
           defaultValue={numberValue ?? ""}
           onBlur={(e) => {
-            const parsed = Number(e.target.value);
+            const raw = e.target.value.trim();
+            // Blurring an untouched input must leave the rule valueless
+            // (Number("") would coerce it to 0 and start filtering).
             onUpdate({
-              value: Number.isFinite(parsed) ? parsed : undefined,
+              value: raw !== "" && Number.isFinite(Number(raw)) ? Number(raw) : undefined,
             } as Partial<FilterRule>);
           }}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}

@@ -65,6 +65,27 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
     }
   }
 
+  async findById(id: string): Promise<SavedView | null> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT id, workspaceId, name, rulesJson, createdAt FROM saved_views WHERE id = ?",
+        [id],
+      );
+      const row = rows[0];
+      if (!row) return null;
+      return {
+        id: String(row.id),
+        workspaceId: String(row.workspaceId),
+        name: String(row.name),
+        rules: decodeRules(String(row.rulesJson ?? "[]")),
+        createdAt: Number(row.createdAt),
+      };
+    } catch (err) {
+      throw toPersistenceError("savedViews.findById", err);
+    }
+  }
+
   async create(view: SavedView): Promise<void> {
     try {
       const db = await this.getDb();

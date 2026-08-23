@@ -2,7 +2,20 @@ import { create } from "zustand";
 import { noteService, workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
 import { notifyError } from "./notify";
+import { useTagStore } from "./useTagStore";
 import { useUIStore } from "./useUIStore";
+import { useViewStore } from "./useViewStore";
+
+/**
+ * Tag filters and saved-view rules are workspace-scoped (tag ids and property
+ * ids belong to one workspace). Whenever the active workspace actually
+ * changes, drop them so the previous workspace's filters never leak into the
+ * new one's note list.
+ */
+function resetWorkspaceScopedFilters(): void {
+  useTagStore.setState({ activeTagId: null, taggedNoteIds: null });
+  useViewStore.setState({ activeViewId: null, draftRules: [] });
+}
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -23,18 +36,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
 
-  setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
+  setActiveWorkspace: (id) => {
+    if (get().activeWorkspaceId === id) return;
+    set({ activeWorkspaceId: id });
+    resetWorkspaceScopedFilters();
+  },
 
   fetchWorkspaces: async () => {
     try {
       const workspaces = await workspaceService.getAllWorkspaces();
-      set((state) => ({
-        workspaces,
-        activeWorkspaceId:
+      set((state) => {
+        const activeWorkspaceId =
           state.activeWorkspaceId && workspaces.some((w) => w.id === state.activeWorkspaceId)
             ? state.activeWorkspaceId
-            : (workspaces[0]?.id ?? null),
-      }));
+            : (workspaces[0]?.id ?? null);
+        if (activeWorkspaceId !== state.activeWorkspaceId) resetWorkspaceScopedFilters();
+        return { workspaces, activeWorkspaceId };
+      });
     } catch (err) {
       notifyError(err);
     }
@@ -83,6 +101,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await workspaceService.deleteWorkspace(id);
       set({ workspaces: filtered, activeWorkspaceId: nextActive });
+      resetWorkspaceScopedFilters();
       if (blobCandidates.length > 0) {
         void noteService.gcOrphanBlobs(blobCandidates).catch(() => {});
       }

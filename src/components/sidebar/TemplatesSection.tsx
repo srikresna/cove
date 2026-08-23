@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
@@ -103,9 +103,14 @@ export const TemplatesSection: React.FC = () => {
   const duplicateNote = useNoteStore((s) => s.duplicateNote);
   const updateNote = useNoteStore((s) => s.updateNote);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const [journalTemplateId, setJournalTemplateIdState] = useState(() =>
-    activeWorkspaceId ? getJournalTemplateId(activeWorkspaceId) : null,
-  );
+  const [journalTemplateId, setJournalTemplateIdState] = useState<string | null>(null);
+
+  // The setting is per workspace and the workspace id arrives async at launch
+  // (and changes on switch without remount), so resync instead of capturing
+  // once in a lazy initializer.
+  useEffect(() => {
+    setJournalTemplateIdState(activeWorkspaceId ? getJournalTemplateId(activeWorkspaceId) : null);
+  }, [activeWorkspaceId]);
 
   const templates = notes.filter(
     (n) => n.workspaceId === activeWorkspaceId && n.isTemplate === true,

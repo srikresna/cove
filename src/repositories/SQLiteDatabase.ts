@@ -517,12 +517,18 @@ export class SQLiteDatabase {
         const oldTags = await db.select<
           Array<{ id: string; name: string; color: string; createdAt: number }>
         >("SELECT id, name, color, createdAt FROM tags");
+        // The junction is staged WITHOUT the tagId FK: a FK to the old tags
+        // table both fails the cross-workspace remap UPDATE below (new ids
+        // don't exist in the old table yet) and cascade-wipes every staged
+        // row when DROP TABLE tags runs its implicit DELETE. The full FK set
+        // is added to the final table only after the new tags table is in
+        // place and populated.
         const statements: SqlStatement[] = [
           {
             sql: "CREATE TABLE tags_v20 (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, createdAt INTEGER NOT NULL, UNIQUE(workspaceId, name))",
           },
           {
-            sql: "CREATE TABLE note_tags_v20 (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE)",
+            sql: "CREATE TABLE note_tags_stage (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE)",
           },
         ];
         const duplicates: Array<{ oldId: string; newId: string; workspaceId: string }> = [];
@@ -547,11 +553,11 @@ export class SQLiteDatabase {
           }
         }
         statements.push({
-          sql: "INSERT INTO note_tags_v20 (noteId, tagId) SELECT noteId, tagId FROM note_tags",
+          sql: "INSERT INTO note_tags_stage (noteId, tagId) SELECT noteId, tagId FROM note_tags",
         });
         for (const dup of duplicates) {
           statements.push({
-            sql: "UPDATE note_tags_v20 SET tagId = ? WHERE tagId = ? AND noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
+            sql: "UPDATE note_tags_stage SET tagId = ? WHERE tagId = ? AND noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
             params: [dup.newId, dup.oldId, dup.workspaceId],
           });
         }
@@ -559,6 +565,17 @@ export class SQLiteDatabase {
           { sql: "DROP TABLE note_tags" },
           { sql: "DROP TABLE tags" },
           { sql: "ALTER TABLE tags_v20 RENAME TO tags" },
+          // Final junction with the complete FK set, now resolved against
+          // the rebuilt tags table. The IN guard drops junction rows whose
+          // tagId no longer exists (possible only if FK enforcement was off
+          // earlier in this database's life).
+          {
+            sql: "CREATE TABLE note_tags_v20 (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE)",
+          },
+          {
+            sql: "INSERT INTO note_tags_v20 (noteId, tagId) SELECT noteId, tagId FROM note_tags_stage WHERE tagId IN (SELECT id FROM tags)",
+          },
+          { sql: "DROP TABLE note_tags_stage" },
           { sql: "ALTER TABLE note_tags_v20 RENAME TO note_tags" },
           { sql: "PRAGMA user_version = 20" },
         );

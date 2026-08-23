@@ -1,3 +1,4 @@
+import { NotFoundError } from "../domain/errors";
 import type { FilterRules } from "../domain/filters/FilterRule";
 import type { SavedView } from "../domain/filters/SavedView";
 import { makeSavedViewId } from "../domain/filters/SavedView";
@@ -40,6 +41,13 @@ export class SavedViewService implements ISavedViewService {
   async renameView(id: string, name: string): Promise<void> {
     const normalized = normalizeViewName(name);
     if (!normalized) throw new ValidationError("View name cannot be empty.");
+    const view = await this.views.findById(id);
+    if (!view) throw new NotFoundError("SavedView", id);
+    // Same uniqueness rule as createView, scoped to the view's workspace.
+    const existing = await this.views.listByWorkspace(view.workspaceId);
+    if (existing.some((v) => v.id !== id && v.name.toLowerCase() === normalized.toLowerCase())) {
+      throw new ValidationError("A view with this name already exists.");
+    }
     await this.views.rename(id, normalized);
   }
 

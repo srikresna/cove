@@ -207,6 +207,29 @@ export class PropertyService implements IPropertyService {
       definitionId,
       JSON.stringify(def.options.filter((o) => o.id !== optionId)),
     );
+    // Sweep note values still pointing at the deleted option: select/status
+    // rows are removed, multiSelect rows drop the id (and are removed when
+    // nothing is left). Without this, hide-when-empty rows keep rendering
+    // "Empty" with no way to clear them, and is-empty filters disagree with
+    // the stored value.
+    for (const record of await this.properties.valuesForPropertyAll(definitionId)) {
+      const value = deserializePropertyValue(record.valueJson, def.type);
+      if (!value) continue;
+      if (value.type === "select" || value.type === "status") {
+        if (value.optionId === optionId) {
+          await this.properties.removeValue(record.noteId, definitionId);
+        }
+      } else if (value.type === "multiSelect" && value.optionIds.includes(optionId)) {
+        const next = value.optionIds.filter((id) => id !== optionId);
+        if (next.length === 0) await this.properties.removeValue(record.noteId, definitionId);
+        else
+          await this.properties.setValue(
+            record.noteId,
+            definitionId,
+            serializePropertyValue({ type: "multiSelect", optionIds: next }),
+          );
+      }
+    }
   }
 
   async valuesForNote(noteId: string): Promise<Map<string, PropertyValue>> {

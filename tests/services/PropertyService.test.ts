@@ -61,6 +61,45 @@ describe("PropertyService", () => {
     expect((await service.valuesForNote("n1")).size).toBe(0);
   });
 
+  it("deleting an option sweeps values referencing it", async () => {
+    const repo = new InMemoryPropertyRepository();
+    const service = new PropertyService(repo);
+    const select = await service.createDefinition("Stage", "select");
+    const multi = await service.createDefinition("Topics", "multiSelect");
+    const gone = await service.addOption(select.id, "Draft");
+    const kept = await service.addOption(select.id, "Shipped");
+    const mGone = await service.addOption(multi.id, "rust");
+    const mKept = await service.addOption(multi.id, "tauri");
+
+    await service.setValue("n1", select.id, { type: "select", optionId: gone.id });
+    await service.setValue("n2", select.id, { type: "select", optionId: kept.id });
+    await service.setValue("n3", multi.id, { type: "multiSelect", optionIds: [mGone.id] });
+    await service.setValue("n4", multi.id, {
+      type: "multiSelect",
+      optionIds: [mGone.id, mKept.id],
+    });
+
+    await service.deleteOption(select.id, gone.id);
+    await service.deleteOption(multi.id, mGone.id);
+
+    // select rows holding the deleted option are removed; others survive.
+    expect((await service.valuesForNote("n1")).has(select.id)).toBe(false);
+    expect((await service.valuesForNote("n2")).get(select.id)).toEqual({
+      type: "select",
+      optionId: kept.id,
+    });
+    // multiSelect rows drop the id; empty arrays remove the row entirely.
+    expect((await service.valuesForNote("n3")).has(multi.id)).toBe(false);
+    expect((await service.valuesForNote("n4")).get(multi.id)).toEqual({
+      type: "multiSelect",
+      optionIds: [mKept.id],
+    });
+    // The definition no longer lists the deleted options.
+    const defs = await service.listDefinitions();
+    expect(defs.find((d) => d.id === select.id)?.options.map((o) => o.id)).toEqual([kept.id]);
+    expect(defs.find((d) => d.id === multi.id)?.options.map((o) => o.id)).toEqual([mKept.id]);
+  });
+
   it("new definitions append in order and default to hide-when-empty", async () => {
     const service = new PropertyService(new InMemoryPropertyRepository());
     const a = await service.createDefinition("Owner", "text");

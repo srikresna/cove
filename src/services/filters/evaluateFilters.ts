@@ -157,8 +157,33 @@ function matchRule(rule: FilterRule, item: FilterableNote): boolean {
   }
 }
 
+/**
+ * A rule whose value has not been chosen yet (fresh from the "+ Filter"
+ * menu: empty text/number/date, no options, no tags) is not active — it
+ * matches everything instead of blanking the list, mirroring AFFI NE's
+ * rule rows that only start filtering once a value is picked.
+ */
+function ruleIsComplete(rule: FilterRule): boolean {
+  switch (rule.kind) {
+    case "text":
+      return rule.op === "is-empty" || rule.op === "is-not-empty" || (rule.value ?? "") !== "";
+    case "number":
+    case "date":
+      return rule.op === "is-empty" || rule.op === "is-not-empty" || rule.value != null;
+    case "select":
+    case "multiSelect":
+      return rule.op === "is-empty" || rule.op === "is-not-empty" || rule.optionIds.length > 0;
+    case "tags":
+      return rule.op === "is-empty" || rule.op === "is-not-empty" || rule.tagIds.length > 0;
+    default:
+      return true;
+  }
+}
+
 /** All rules AND-combined, as in AFFI NE collection filters (no OR yet). */
 export function evaluateFilters(items: FilterableNote[], rules: FilterRules): FilterableNote[] {
   if (rules.length === 0) return items;
-  return items.filter((item) => rules.every((rule) => matchRule(rule, item)));
+  const active = rules.filter(ruleIsComplete);
+  if (active.length === 0) return items;
+  return items.filter((item) => active.every((rule) => matchRule(rule, item)));
 }
