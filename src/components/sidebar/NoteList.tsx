@@ -4,7 +4,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
-import { propertyService } from "../../di/container";
+import { propertyService, tagService } from "../../di/container";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import type { FilterableNote } from "../../services/filters/evaluateFilters";
 import { evaluateFilters } from "../../services/filters/evaluateFilters";
@@ -111,6 +111,7 @@ export const NoteList: React.FC = () => {
   const taggedNoteIds = useTagStore((s) => s.taggedNoteIds);
   const activeTagId = useTagStore((s) => s.activeTagId);
   const tags = useTagStore((s) => s.tags);
+  const tagVersion = useTagStore((s) => s.version);
   const setTagFilter = useTagStore((s) => s.setTagFilter);
   const activeTag = tags.find((t) => t.id === activeTagId);
 
@@ -121,7 +122,7 @@ export const NoteList: React.FC = () => {
   const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(null);
   const rulesActive = draftRules.length > 0;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion/propertyVersion are intentional refresh signals, not body inputs
+  // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion/propertyVersion/tagVersion are intentional refresh signals, not body inputs
   useEffect(() => {
     if (!rulesActive) {
       setFilterable(null);
@@ -138,9 +139,30 @@ export const NoteList: React.FC = () => {
           })),
         ),
       ),
+      // Per-tag note ids feed the tags filter rule (tags live in note_tags,
+      // not note_properties, so they need their own bulk load).
+      tagService
+        .listTags(activeWorkspaceId ?? "")
+        .then((wsTags) =>
+          Promise.all(
+            wsTags.map(async (tag) => ({
+              tagId: tag.id,
+              noteIds: await tagService.notesForTag(tag.id),
+            })),
+          ),
+        )
+        .catch(() => [] as Array<{ tagId: string; noteIds: string[] }>),
     ])
-      .then(([journalValues, perDef]) => {
+      .then(([journalValues, perDef, tagLists]) => {
         if (!alive) return;
+        const tagIdsByNote = new Map<string, string[]>();
+        for (const { tagId, noteIds } of tagLists) {
+          for (const noteId of noteIds) {
+            const ids = tagIdsByNote.get(noteId) ?? [];
+            ids.push(tagId);
+            tagIdsByNote.set(noteId, ids);
+          }
+        }
         const map = new Map<string, FilterableNote>();
         for (const note of notes) {
           if (note.workspaceId !== activeWorkspaceId) continue;
@@ -148,7 +170,7 @@ export const NoteList: React.FC = () => {
           map.set(note.id, {
             note,
             propertyValues: new Map(),
-            tagIds: [],
+            tagIds: tagIdsByNote.get(note.id) ?? [],
             journalTimestamp:
               journal?.type === "date" ? (journal as { timestamp: number }).timestamp : null,
           });
@@ -166,7 +188,7 @@ export const NoteList: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [rulesActive, notes, activeWorkspaceId, viewVersion, propertyVersion]);
+  }, [rulesActive, notes, activeWorkspaceId, viewVersion, propertyVersion, tagVersion]);
 
   const workspaceNotes = useMemo(() => {
     const base = notes.filter(
