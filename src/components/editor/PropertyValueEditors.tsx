@@ -48,6 +48,7 @@ import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
+import { useViewStore } from "../../store/useViewStore";
 import type { Note } from "../../types";
 import {
   DropdownMenu,
@@ -420,7 +421,12 @@ const OptionRow: React.FC<{
             onSelect={() =>
               void propertyService
                 .deleteOption(defId, option.id)
-                .then(() => usePropertyStore.getState().refresh())
+                .then(async () => {
+                  // Saved views + draft rules may filter on the deleted
+                  // option; prune them so no view silently goes empty.
+                  await useViewStore.getState().syncAfterOptionDelete(defId, option.id);
+                  usePropertyStore.getState().refresh();
+                })
                 .catch(notifyError)
             }
           >

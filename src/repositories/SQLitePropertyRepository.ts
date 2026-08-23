@@ -8,6 +8,7 @@ import { toPersistenceError } from "../errors/errorMappers";
 import type {
   IPropertyRepository,
   NotePropertyRecord,
+  OptionDeletionWrite,
   PropertyDefinitionPatch,
 } from "./IPropertyRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
@@ -133,6 +134,40 @@ export class SQLitePropertyRepository implements IPropertyRepository {
       ]);
     } catch (err) {
       throw toPersistenceError("properties.deleteDefinition", err);
+    }
+  }
+
+  async applyOptionDeletion(
+    definitionId: string,
+    optionsJson: string | null,
+    writes: OptionDeletionWrite[],
+  ): Promise<void> {
+    const statements = [
+      ...(optionsJson !== null
+        ? [
+            {
+              sql: "UPDATE property_defs SET optionsJson = ? WHERE id = ?",
+              params: [optionsJson, definitionId],
+            },
+          ]
+        : []),
+      ...writes.map((write) =>
+        write.valueJson === null
+          ? {
+              sql: "DELETE FROM note_properties WHERE noteId = ? AND propertyId = ?",
+              params: [write.noteId, definitionId],
+            }
+          : {
+              sql: "INSERT INTO note_properties (noteId, propertyId, valueJson) VALUES (?, ?, ?) ON CONFLICT(noteId, propertyId) DO UPDATE SET valueJson = excluded.valueJson",
+              params: [write.noteId, definitionId, write.valueJson],
+            },
+      ),
+    ];
+    if (statements.length === 0) return;
+    try {
+      await SQLiteDatabase.runTransaction(statements);
+    } catch (err) {
+      throw toPersistenceError("properties.applyOptionDeletion", err);
     }
   }
 

@@ -106,6 +106,27 @@ describe("useWorkspaceStore", () => {
     expect(useUIStore.getState().isCreateModalOpen).toBe(false);
   });
 
+  it("createWorkspace resets the previous workspace's tag/view filters", async () => {
+    const created = makeWorkspace("w9", { name: "New" });
+    createWorkspace.mockResolvedValue(created);
+    useWorkspaceStore.setState({
+      workspaces: [makeWorkspace("w1")],
+      activeWorkspaceId: "w1",
+    });
+    useTagStore.setState({ activeTagId: "t1", taggedNoteIds: new Set(["n1"]) });
+    useViewStore.setState({
+      activeViewId: "v1",
+      draftRules: [{ id: "r1", kind: "tags", op: "has-any-of", tagIds: ["t1"] }],
+    });
+
+    await useWorkspaceStore.getState().createWorkspace("New", "🚀", "#fff", undefined);
+
+    expect(useTagStore.getState().activeTagId).toBeNull();
+    expect(useTagStore.getState().taggedNoteIds).toBeNull();
+    expect(useViewStore.getState().activeViewId).toBeNull();
+    expect(useViewStore.getState().draftRules).toEqual([]);
+  });
+
   it("createWorkspace returns null on failure", async () => {
     createWorkspace.mockRejectedValue(new Error("nope"));
 

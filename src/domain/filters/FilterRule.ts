@@ -179,4 +179,29 @@ export function isFilterKind(value: string): value is FilterRule["kind"] {
   return value in FILTER_OPERATORS;
 }
 
+/**
+ * A rule whose value has not been chosen yet (fresh from the "+ Filter"
+ * menu: empty text/number/date, no options, no tags) is incomplete — it is
+ * treated as inactive (matches everything) instead of blanking the list,
+ * mirroring AFFI NE's rule rows that only start filtering once a value is
+ * picked. Emptiness operators never need a value.
+ */
+export function isRuleComplete(rule: FilterRule): boolean {
+  const emptiness = rule.op === "is-empty" || rule.op === "is-not-empty";
+  switch (rule.kind) {
+    case "text":
+      return emptiness || (rule.value ?? "") !== "";
+    case "number":
+    case "date":
+      return emptiness || rule.value != null;
+    case "select":
+    case "multiSelect":
+      return emptiness || rule.optionIds.length > 0;
+    case "tags":
+      return emptiness || rule.tagIds.length > 0;
+    default:
+      return true;
+  }
+}
+
 export type { PropertyDefinition };

@@ -517,18 +517,19 @@ export class SQLiteDatabase {
         const oldTags = await db.select<
           Array<{ id: string; name: string; color: string; createdAt: number }>
         >("SELECT id, name, color, createdAt FROM tags");
-        // The junction is staged WITHOUT the tagId FK: a FK to the old tags
+        // The junction is staged WITHOUT any FK: a tagId FK to the old tags
         // table both fails the cross-workspace remap UPDATE below (new ids
         // don't exist in the old table yet) and cascade-wipes every staged
-        // row when DROP TABLE tags runs its implicit DELETE. The full FK set
-        // is added to the final table only after the new tags table is in
-        // place and populated.
+        // row when DROP TABLE tags runs its implicit DELETE; a noteId FK
+        // would abort the unguarded staging copy on orphan rows from
+        // FK-off-era edits. The full FK set is added to the final table only
+        // after the new tags table is in place and populated.
         const statements: SqlStatement[] = [
           {
             sql: "CREATE TABLE tags_v20 (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, createdAt INTEGER NOT NULL, UNIQUE(workspaceId, name))",
           },
           {
-            sql: "CREATE TABLE note_tags_stage (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE)",
+            sql: "CREATE TABLE note_tags_stage (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId))",
           },
         ];
         const duplicates: Array<{ oldId: string; newId: string; workspaceId: string }> = [];
@@ -566,14 +567,14 @@ export class SQLiteDatabase {
           { sql: "DROP TABLE tags" },
           { sql: "ALTER TABLE tags_v20 RENAME TO tags" },
           // Final junction with the complete FK set, now resolved against
-          // the rebuilt tags table. The IN guard drops junction rows whose
-          // tagId no longer exists (possible only if FK enforcement was off
-          // earlier in this database's life).
+          // the rebuilt tags table. The IN guards drop junction rows whose
+          // noteId or tagId no longer exists (possible only if FK
+          // enforcement was off earlier in this database's life).
           {
             sql: "CREATE TABLE note_tags_v20 (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE)",
           },
           {
-            sql: "INSERT INTO note_tags_v20 (noteId, tagId) SELECT noteId, tagId FROM note_tags_stage WHERE tagId IN (SELECT id FROM tags)",
+            sql: "INSERT INTO note_tags_v20 (noteId, tagId) SELECT noteId, tagId FROM note_tags_stage WHERE noteId IN (SELECT id FROM notes) AND tagId IN (SELECT id FROM tags)",
           },
           { sql: "DROP TABLE note_tags_stage" },
           { sql: "ALTER TABLE note_tags_v20 RENAME TO note_tags" },
@@ -591,6 +592,73 @@ export class SQLiteDatabase {
         "CREATE TABLE IF NOT EXISTS saved_views (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, rulesJson TEXT NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
       );
       await db.execute("PRAGMA user_version = 21");
+    }
+
+    if (version < 22) {
+      // Saved views created before the completeness gate could persist rules
+      // without values. Those views matched NOTHING under the old strict
+      // evaluation but would match EVERYTHING now that value-less rules are
+      // inactive — drop the incomplete rules, and delete views left with
+      // none (they could never match anything their author intended).
+      const viewRows = await db.select<Array<{ id: string; rulesJson: string }>>(
+        "SELECT id, rulesJson FROM saved_views",
+      );
+      const statements: SqlStatement[] = [];
+      for (const row of viewRows) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(row.rulesJson);
+        } catch {
+          continue;
+        }
+        if (!Array.isArray(parsed)) continue;
+        const kept = parsed.filter((entry): boolean => {
+          if (!entry || typeof entry !== "object") return false;
+          const rule = entry as {
+            kind?: unknown;
+            op?: unknown;
+            value?: unknown;
+            optionIds?: unknown;
+            tagIds?: unknown;
+          };
+          const op = typeof rule.op === "string" ? rule.op : "";
+          const emptiness = op === "is-empty" || op === "is-not-empty";
+          switch (rule.kind) {
+            case "text":
+              return emptiness || (typeof rule.value === "string" && rule.value !== "");
+            case "number":
+            case "date":
+              return emptiness || typeof rule.value === "number";
+            case "select":
+            case "multiSelect":
+              return emptiness || (Array.isArray(rule.optionIds) && rule.optionIds.length > 0);
+            case "tags":
+              return emptiness || (Array.isArray(rule.tagIds) && rule.tagIds.length > 0);
+            case "checkbox":
+            case "journal":
+            case "template":
+              return true;
+            default:
+              // Unknown kinds are dropped by the loader too.
+              return false;
+          }
+        });
+        if (kept.length === parsed.length) continue;
+        if (kept.length === 0) {
+          statements.push({ sql: "DELETE FROM saved_views WHERE id = ?", params: [row.id] });
+        } else {
+          statements.push({
+            sql: "UPDATE saved_views SET rulesJson = ? WHERE id = ?",
+            params: [JSON.stringify(kept), row.id],
+          });
+        }
+      }
+      if (statements.length > 0) {
+        statements.push({ sql: "PRAGMA user_version = 22" });
+        await SQLiteDatabase.runTransaction(statements);
+      } else {
+        await db.execute("PRAGMA user_version = 22");
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 import { NotFoundError } from "../domain/errors";
 import type { FilterRules } from "../domain/filters/FilterRule";
+import { isRuleComplete } from "../domain/filters/FilterRule";
 import type { SavedView } from "../domain/filters/SavedView";
 import { makeSavedViewId } from "../domain/filters/SavedView";
 import { ValidationError } from "../errors/AppError";
@@ -21,6 +22,12 @@ export class SavedViewService implements ISavedViewService {
     const normalized = normalizeViewName(name);
     if (!normalized) throw new ValidationError("View name cannot be empty.");
     if (rules.length === 0) throw new ValidationError("A view needs at least one rule.");
+    // A view whose every rule is incomplete evaluates to match-all (the
+    // gate treats value-less rules as inactive), which is never what the
+    // user meant when they hit Save — refuse it up front.
+    if (rules.filter(isRuleComplete).length === 0) {
+      throw new ValidationError("Pick a value for at least one rule before saving.");
+    }
 
     const existing = await this.views.listByWorkspace(workspaceId);
     if (existing.some((v) => v.name.toLowerCase() === normalized.toLowerCase())) {
@@ -53,5 +60,42 @@ export class SavedViewService implements ISavedViewService {
 
   deleteView(id: string): Promise<void> {
     return this.views.delete(id);
+  }
+
+  /**
+   * Removes a deleted select/multiSelect option from every saved view's
+   * rules (property defs are global, so views in all workspaces can
+   * reference them). Rules left with no option under a value-requiring op
+   * are dropped; views left with no rules are deleted — after the value
+   * sweep they could never match anything. Returns the deleted view ids.
+   */
+  async pruneOption(definitionId: string, optionId: string): Promise<string[]> {
+    const deleted: string[] = [];
+    for (const view of await this.views.listAll()) {
+      let changed = false;
+      const rules: FilterRules = [];
+      for (const rule of view.rules) {
+        if (
+          (rule.kind === "select" || rule.kind === "multiSelect") &&
+          rule.propertyId === definitionId &&
+          rule.optionIds.includes(optionId)
+        ) {
+          changed = true;
+          const optionIds = rule.optionIds.filter((id) => id !== optionId);
+          if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) continue;
+          rules.push({ ...rule, optionIds });
+        } else {
+          rules.push(rule);
+        }
+      }
+      if (!changed) continue;
+      if (rules.length === 0) {
+        await this.views.delete(view.id);
+        deleted.push(view.id);
+      } else {
+        await this.views.updateRules(view.id, rules);
+      }
+    }
+    return deleted;
   }
 }

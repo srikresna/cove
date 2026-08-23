@@ -65,6 +65,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         workspaces: [...state.workspaces, created],
         activeWorkspaceId: created.id,
       }));
+      // created.id is brand new, so the workspace always actually changed —
+      // without the reset, the previous workspace's tag filter would hide
+      // every note in the fresh workspace with no visible chip to clear it.
+      resetWorkspaceScopedFilters();
 
       useUIStore.getState().setCreateModalOpen(false);
       return created;

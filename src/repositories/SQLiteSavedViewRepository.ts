@@ -41,6 +41,16 @@ function decodeRules(json: string): FilterRules {
   }
 }
 
+function rowToView(row: Record<string, unknown>): SavedView {
+  return {
+    id: String(row.id),
+    workspaceId: String(row.workspaceId),
+    name: String(row.name),
+    rules: decodeRules(String(row.rulesJson ?? "[]")),
+    createdAt: Number(row.createdAt),
+  };
+}
+
 export class SQLiteSavedViewRepository implements ISavedViewRepository {
   private getDb() {
     return SQLiteDatabase.getInstance();
@@ -53,15 +63,21 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
         "SELECT id, workspaceId, name, rulesJson, createdAt FROM saved_views WHERE workspaceId = ? ORDER BY createdAt, id",
         [workspaceId],
       );
-      return rows.map((row) => ({
-        id: String(row.id),
-        workspaceId: String(row.workspaceId),
-        name: String(row.name),
-        rules: decodeRules(String(row.rulesJson ?? "[]")),
-        createdAt: Number(row.createdAt),
-      }));
+      return rows.map(rowToView);
     } catch (err) {
       throw toPersistenceError("savedViews.listByWorkspace", err);
+    }
+  }
+
+  async listAll(): Promise<SavedView[]> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<Record<string, unknown>>>(
+        "SELECT id, workspaceId, name, rulesJson, createdAt FROM saved_views ORDER BY createdAt, id",
+      );
+      return rows.map(rowToView);
+    } catch (err) {
+      throw toPersistenceError("savedViews.listAll", err);
     }
   }
 
@@ -74,13 +90,7 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
       );
       const row = rows[0];
       if (!row) return null;
-      return {
-        id: String(row.id),
-        workspaceId: String(row.workspaceId),
-        name: String(row.name),
-        rules: decodeRules(String(row.rulesJson ?? "[]")),
-        createdAt: Number(row.createdAt),
-      };
+      return rowToView(row);
     } catch (err) {
       throw toPersistenceError("savedViews.findById", err);
     }
@@ -104,6 +114,18 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
       await db.execute("UPDATE saved_views SET name = ? WHERE id = ?", [name, id]);
     } catch (err) {
       throw toPersistenceError("savedViews.rename", err);
+    }
+  }
+
+  async updateRules(id: string, rules: FilterRules): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("UPDATE saved_views SET rulesJson = ? WHERE id = ?", [
+        JSON.stringify(rules),
+        id,
+      ]);
+    } catch (err) {
+      throw toPersistenceError("savedViews.updateRules", err);
     }
   }
 

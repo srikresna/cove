@@ -23,6 +23,8 @@ interface ViewState {
   saveDraftAsView: (workspaceId: string, name: string) => Promise<SavedView | null>;
   renameView: (id: string, name: string) => Promise<void>;
   deleteView: (id: string) => Promise<void>;
+  /** Sync saved views + drafts after a select option was deleted. */
+  syncAfterOptionDelete: (propertyId: string, optionId: string) => Promise<void>;
 }
 
 export const useViewStore = create<ViewState>((set, get) => ({
@@ -99,6 +101,35 @@ export const useViewStore = create<ViewState>((set, get) => ({
       if (get().activeViewId === id) {
         set((s) => ({ activeViewId: null, draftRules: [], version: s.version + 1 }));
       }
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
+  syncAfterOptionDelete: async (propertyId, optionId) => {
+    try {
+      const deletedViewIds = await savedViewService.pruneOption(propertyId, optionId);
+      const activeDeleted =
+        get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
+      set((s) => ({
+        // Draft rules may still reference the dead option id; the rule
+        // dropdown only renders live options, so it could never be cleared.
+        draftRules: activeDeleted
+          ? []
+          : s.draftRules.flatMap((r) => {
+              if (
+                (r.kind === "select" || r.kind === "multiSelect") &&
+                r.propertyId === propertyId
+              ) {
+                const optionIds = r.optionIds.filter((id) => id !== optionId);
+                if (optionIds.length === 0 && (r.op === "is" || r.op === "is-not")) return [];
+                return [{ ...r, optionIds }];
+              }
+              return [r];
+            }),
+        activeViewId: activeDeleted ? null : s.activeViewId,
+        version: s.version + 1,
+      }));
     } catch (err) {
       notifyError(err);
     }

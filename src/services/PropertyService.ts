@@ -18,7 +18,7 @@ import {
   serializePropertyValue,
 } from "../domain/property/Property";
 import { ValidationError } from "../errors/AppError";
-import type { IPropertyRepository } from "../repositories/IPropertyRepository";
+import type { IPropertyRepository, OptionDeletionWrite } from "../repositories/IPropertyRepository";
 import type { IPropertyService } from "./IPropertyService";
 import { Logger } from "./Logger";
 
@@ -202,34 +202,40 @@ export class PropertyService implements IPropertyService {
   async deleteOption(definitionId: string, optionId: string): Promise<void> {
     const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
     if (!def) throw new NotFoundError("Property", definitionId);
-    if (!def.options.some((o) => o.id === optionId)) throw new NotFoundError("Option", optionId);
-    await this.properties.updateOptions(
-      definitionId,
-      JSON.stringify(def.options.filter((o) => o.id !== optionId)),
-    );
-    // Sweep note values still pointing at the deleted option: select/status
-    // rows are removed, multiSelect rows drop the id (and are removed when
-    // nothing is left). Without this, hide-when-empty rows keep rendering
-    // "Empty" with no way to clear them, and is-empty filters disagree with
-    // the stored value.
+    const hasOption = def.options.some((o) => o.id === optionId);
+    // Compute the whole sweep up front: select/status rows pointing at the
+    // option are removed, multiSelect rows drop the id (and are removed when
+    // nothing is left). Without the sweep, hide-when-empty rows keep
+    // rendering "Empty" with no way to clear them and is-empty filters
+    // disagree with the stored value.
+    const writes: OptionDeletionWrite[] = [];
     for (const record of await this.properties.valuesForPropertyAll(definitionId)) {
       const value = deserializePropertyValue(record.valueJson, def.type);
       if (!value) continue;
       if (value.type === "select" || value.type === "status") {
-        if (value.optionId === optionId) {
-          await this.properties.removeValue(record.noteId, definitionId);
-        }
+        if (value.optionId === optionId) writes.push({ noteId: record.noteId, valueJson: null });
       } else if (value.type === "multiSelect" && value.optionIds.includes(optionId)) {
         const next = value.optionIds.filter((id) => id !== optionId);
-        if (next.length === 0) await this.properties.removeValue(record.noteId, definitionId);
-        else
-          await this.properties.setValue(
-            record.noteId,
-            definitionId,
-            serializePropertyValue({ type: "multiSelect", optionIds: next }),
-          );
+        writes.push({
+          noteId: record.noteId,
+          valueJson:
+            next.length === 0
+              ? null
+              : serializePropertyValue({ type: "multiSelect", optionIds: next }),
+        });
       }
     }
+    // Idempotent retry: if a previous deleteOption committed the definition
+    // update but crashed mid-sweep, the option is gone yet values still
+    // reference it — finish the sweep instead of throwing NotFound.
+    if (!hasOption && writes.length === 0) throw new NotFoundError("Option", optionId);
+    // One transaction: either the option disappears together with every
+    // value referencing it, or neither happens.
+    await this.properties.applyOptionDeletion(
+      definitionId,
+      hasOption ? JSON.stringify(def.options.filter((o) => o.id !== optionId)) : null,
+      writes,
+    );
   }
 
   async valuesForNote(noteId: string): Promise<Map<string, PropertyValue>> {

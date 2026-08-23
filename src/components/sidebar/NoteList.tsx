@@ -312,7 +312,10 @@ export const NoteList: React.FC = () => {
                   top: 0,
                   left: 0,
                   width: "100%",
-                  height: `${virtualRow.size}px`,
+                  // No inline height: the row must be content-sized so
+                  // measureElement can observe real heights (stack rows grow
+                  // past the 54px estimate); pinning it to virtualRow.size
+                  // would freeze measurement at the estimate forever.
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >

@@ -2,6 +2,7 @@ import type { PropertyDefinition, PropertyOption } from "@/domain/property/Prope
 import type {
   IPropertyRepository,
   NotePropertyRecord,
+  OptionDeletionWrite,
   PropertyDefinitionPatch,
 } from "@/repositories/IPropertyRepository";
 
@@ -40,6 +41,21 @@ export class InMemoryPropertyRepository implements IPropertyRepository {
   async deleteDefinition(id: string): Promise<void> {
     this.definitions = this.definitions.filter((d) => d.id !== id);
     this.values = this.values.filter((v) => v.propertyId !== id);
+  }
+
+  async applyOptionDeletion(
+    definitionId: string,
+    optionsJson: string | null,
+    writes: OptionDeletionWrite[],
+  ): Promise<void> {
+    if (optionsJson !== null) await this.updateOptions(definitionId, optionsJson);
+    for (const write of writes) {
+      if (write.valueJson === null) {
+        await this.removeValue(write.noteId, definitionId);
+      } else {
+        await this.setValue(write.noteId, definitionId, write.valueJson);
+      }
+    }
   }
 
   async valuesForNote(noteId: string): Promise<NotePropertyRecord[]> {

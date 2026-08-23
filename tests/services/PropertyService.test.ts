@@ -100,6 +100,24 @@ describe("PropertyService", () => {
     expect(defs.find((d) => d.id === multi.id)?.options.map((o) => o.id)).toEqual([mKept.id]);
   });
 
+  it("deleteOption finishes an interrupted sweep when the option is already gone", async () => {
+    const repo = new InMemoryPropertyRepository();
+    const service = new PropertyService(repo);
+    const select = await service.createDefinition("Stage", "select");
+    const gone = await service.addOption(select.id, "Draft");
+    await service.setValue("n1", select.id, { type: "select", optionId: gone.id });
+
+    // Simulate a crash between the optionsJson commit and the sweep: the
+    // option is missing from the definition but the note value survives.
+    await repo.updateOptions(select.id, JSON.stringify([]));
+
+    // The retry must sweep instead of throwing NotFound, and a fully-clean
+    // retry afterwards must throw NotFound (the option truly no longer exists).
+    await expect(service.deleteOption(select.id, gone.id)).resolves.toBeUndefined();
+    expect((await service.valuesForNote("n1")).has(select.id)).toBe(false);
+    await expect(service.deleteOption(select.id, gone.id)).rejects.toThrow(NotFoundError);
+  });
+
   it("new definitions append in order and default to hide-when-empty", async () => {
     const service = new PropertyService(new InMemoryPropertyRepository());
     const a = await service.createDefinition("Owner", "text");
