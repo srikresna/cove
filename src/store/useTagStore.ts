@@ -1,31 +1,44 @@
 import { create } from "zustand";
 import { tagService, vaultService } from "../di/container";
-import type { Tag } from "../domain/tag/Tag";
+import type { Tag, TagCount } from "../domain/tag/Tag";
 import { notifyError } from "./notify";
 
 interface TagState {
   tags: Tag[];
+  tagCounts: TagCount[];
   activeTagId: string | null;
   version: number;
 
   taggedNoteIds: Set<string> | null;
-  fetchTags: () => Promise<void>;
+  fetchTags: (workspaceId: string) => Promise<void>;
   setTagFilter: (tagId: string | null) => Promise<void>;
+
+  renameTag: (tagId: string, name: string) => Promise<void>;
+  setTagColor: (tagId: string, color: string) => Promise<void>;
+  deleteTag: (tagId: string) => Promise<void>;
 
   refresh: () => Promise<void>;
 }
 
 let reqId = 0;
+let lastWorkspaceId: string | null = null;
 
 export const useTagStore = create<TagState>((set, get) => ({
   tags: [],
+  tagCounts: [],
   activeTagId: null,
   version: 0,
   taggedNoteIds: null,
 
-  fetchTags: async () => {
+  fetchTags: async (workspaceId) => {
+    lastWorkspaceId = workspaceId;
     try {
-      set({ tags: await tagService.listTags() });
+      const [tags, tagCounts] = await Promise.all([
+        tagService.listTags(workspaceId),
+        tagService.tagCounts(workspaceId),
+      ]);
+      if (lastWorkspaceId !== workspaceId) return;
+      set({ tags, tagCounts });
     } catch (err) {
       notifyError(err);
     }
@@ -48,9 +61,42 @@ export const useTagStore = create<TagState>((set, get) => ({
     }
   },
 
+  renameTag: async (tagId, name) => {
+    try {
+      await tagService.renameTag(tagId, name);
+      await get().refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
+  setTagColor: async (tagId, color) => {
+    try {
+      await tagService.setTagColor(tagId, color);
+      await get().refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
+  deleteTag: async (tagId) => {
+    try {
+      await tagService.deleteTag(tagId);
+      if (get().activeTagId === tagId) {
+        set({ activeTagId: null, taggedNoteIds: null });
+      }
+      await get().refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
   refresh: async () => {
     set((s) => ({ version: s.version + 1 }));
-    await get().fetchTags();
+    const workspaceId = lastWorkspaceId;
+    if (workspaceId) {
+      await get().fetchTags(workspaceId);
+    }
     const activeTagId = get().activeTagId;
     if (!activeTagId) return;
     try {
@@ -64,5 +110,5 @@ export const useTagStore = create<TagState>((set, get) => ({
 }));
 
 vaultService.onLock(() => {
-  useTagStore.setState({ tags: [], activeTagId: null, taggedNoteIds: null });
+  useTagStore.setState({ tags: [], tagCounts: [], activeTagId: null, taggedNoteIds: null });
 });

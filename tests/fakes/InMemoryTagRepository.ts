@@ -1,32 +1,52 @@
-import { makeTagId, type Tag } from "@/domain/tag/Tag";
+import type { Tag, TagCount } from "@/domain/tag/Tag";
 import type { ITagRepository } from "@/repositories/ITagRepository";
 
 export class InMemoryTagRepository implements ITagRepository {
   public tags: Tag[] = [];
   public noteTags = new Map<string, Set<string>>();
 
-  async listAll(): Promise<Tag[]> {
-    return [...this.tags].sort((a, b) => a.name.localeCompare(b.name));
+  async listByWorkspace(workspaceId: string): Promise<Tag[]> {
+    return this.tags
+      .filter((t) => t.workspaceId === workspaceId)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async findByName(name: string): Promise<Tag | null> {
-    return this.tags.find((t) => t.name.toLowerCase() === name.toLowerCase()) ?? null;
+  async countsByWorkspace(workspaceId: string): Promise<TagCount[]> {
+    return this.tags
+      .filter((t) => t.workspaceId === workspaceId)
+      .map((t) => ({
+        tagId: t.id,
+        noteCount: this.noteIdsForTagSync(t.id).length,
+      }));
   }
 
-  async findOrCreateByName(name: string, color: string): Promise<Tag> {
-    const existing = this.tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
-    if (existing) return { ...existing };
-    const tag: Tag = { id: makeTagId(), name, color, createdAt: Date.now() };
-    this.tags.push(tag);
-    return { ...tag };
+  async findById(tagId: string): Promise<Tag | null> {
+    return this.tags.find((t) => t.id === tagId) ?? null;
+  }
+
+  async findByName(workspaceId: string, name: string): Promise<Tag | null> {
+    return (
+      this.tags.find(
+        (t) => t.workspaceId === workspaceId && t.name.toLowerCase() === name.toLowerCase(),
+      ) ?? null
+    );
   }
 
   async create(tag: Tag): Promise<void> {
     this.tags.push({ ...tag });
   }
 
-  async count(): Promise<number> {
-    return this.tags.length;
+  async update(tagId: string, patch: { name?: string; color?: string }): Promise<void> {
+    this.tags = this.tags.map((t) => (t.id === tagId ? { ...t, ...patch } : t));
+  }
+
+  async delete(tagId: string): Promise<void> {
+    this.tags = this.tags.filter((t) => t.id !== tagId);
+    for (const set of this.noteTags.values()) set.delete(tagId);
+  }
+
+  async countInWorkspace(workspaceId: string): Promise<number> {
+    return this.tags.filter((t) => t.workspaceId === workspaceId).length;
   }
 
   async tagsForNote(noteId: string): Promise<Tag[]> {
@@ -34,12 +54,16 @@ export class InMemoryTagRepository implements ITagRepository {
     return this.tags.filter((t) => ids.has(t.id)).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async noteIdsForTag(tagId: string): Promise<string[]> {
+  private noteIdsForTagSync(tagId: string): string[] {
     const ids: string[] = [];
     for (const [noteId, tagIds] of this.noteTags.entries()) {
       if (tagIds.has(tagId)) ids.push(noteId);
     }
     return ids;
+  }
+
+  async noteIdsForTag(tagId: string): Promise<string[]> {
+    return this.noteIdsForTagSync(tagId);
   }
 
   async addToNote(noteId: string, tagId: string): Promise<void> {

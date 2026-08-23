@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Tag } from "@/domain/tag/Tag";
+import type { Tag, TagCount } from "@/domain/tag/Tag";
 
-const { listTags, notesForTag, notifyError, onLockHandlers } = vi.hoisted(() => ({
-  listTags: vi.fn<() => Promise<Tag[]>>(),
+const { listTags, tagCounts, notesForTag, notifyError, onLockHandlers } = vi.hoisted(() => ({
+  listTags: vi.fn<(workspaceId: string) => Promise<Tag[]>>(),
+  tagCounts: vi.fn<(workspaceId: string) => Promise<TagCount[]>>(),
   notesForTag: vi.fn<(tagId: string) => Promise<string[]>>(),
   notifyError: vi.fn<(err: unknown) => void>(),
   onLockHandlers: { lock: null as (() => void) | null },
 }));
 
 vi.mock("@/di/container", () => ({
-  tagService: { listTags, notesForTag },
+  tagService: { listTags, tagCounts, notesForTag },
   vaultService: {
     onLock: (fn: () => void) => {
       onLockHandlers.lock = fn;
@@ -22,27 +23,49 @@ vi.mock("@/store/notify", () => ({ notifyError }));
 import { useTagStore } from "@/store/useTagStore";
 
 function makeTag(id: string): Tag {
-  return { id, name: id, color: "#000000", createdAt: 1 } as Tag;
+  return {
+    id,
+    workspaceId: "ws",
+    name: id,
+    color: "#000000",
+    createdAt: 1,
+  } as Tag;
 }
 
 describe("useTagStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useTagStore.setState({ tags: [], activeTagId: null, version: 0, taggedNoteIds: null });
+    tagCounts.mockResolvedValue([]);
+    useTagStore.setState({
+      tags: [],
+      tagCounts: [],
+      activeTagId: null,
+      version: 0,
+      taggedNoteIds: null,
+    });
   });
 
-  it("fetchTags populates the tag list", async () => {
+  it("fetchTags populates the tag list for the workspace", async () => {
     listTags.mockResolvedValue([makeTag("t1"), makeTag("t2")]);
+    tagCounts.mockResolvedValue([
+      { tagId: "t1", noteCount: 3 },
+      { tagId: "t2", noteCount: 0 },
+    ]);
 
-    await useTagStore.getState().fetchTags();
+    await useTagStore.getState().fetchTags("ws");
 
+    expect(listTags).toHaveBeenCalledWith("ws");
     expect(useTagStore.getState().tags).toHaveLength(2);
+    expect(useTagStore.getState().tagCounts).toEqual([
+      { tagId: "t1", noteCount: 3 },
+      { tagId: "t2", noteCount: 0 },
+    ]);
   });
 
   it("fetchTags reports failures through notifyError", async () => {
     listTags.mockRejectedValue(new Error("db down"));
 
-    await useTagStore.getState().fetchTags();
+    await useTagStore.getState().fetchTags("ws");
 
     expect(notifyError).toHaveBeenCalledTimes(1);
     expect(useTagStore.getState().tags).toEqual([]);

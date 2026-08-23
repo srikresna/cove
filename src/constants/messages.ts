@@ -17,6 +17,7 @@ export const MESSAGES = {
   ICON_ADD: "Add icon",
   ICON_REMOVE: "Remove icon",
   TAGS_HEADER: "Tags",
+  TAG_DELETE: "Delete tag",
   LIBRARY_HEADER: "Library",
   PROP_ADD: "Add a property",
   PROP_NAME_PLACEHOLDER: "Property name (optional)",

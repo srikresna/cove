@@ -501,5 +501,71 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 19");
       }
     }
+
+    if (version < 20) {
+      // Tags become workspace-scoped: the tags table is rebuilt with a
+      // workspaceId column and a per-workspace name unique constraint
+      // (replacing the global one). Tags used in several workspaces are
+      // duplicated per workspace and their note_tags rows remapped; orphan
+      // tags land in the first workspace.
+      const tagCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(tags)");
+      if (tagCols.length > 0 && !tagCols.some((c) => c.name === "workspaceId")) {
+        const workspaces = await db.select<Array<{ id: string }>>(
+          "SELECT id FROM workspaces ORDER BY createdAt, id",
+        );
+        const fallbackWs = workspaces[0]?.id ?? "__local__";
+        const oldTags = await db.select<
+          Array<{ id: string; name: string; color: string; createdAt: number }>
+        >("SELECT id, name, color, createdAt FROM tags");
+        const statements: SqlStatement[] = [
+          {
+            sql: "CREATE TABLE tags_v20 (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, createdAt INTEGER NOT NULL, UNIQUE(workspaceId, name))",
+          },
+          {
+            sql: "CREATE TABLE note_tags_v20 (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE)",
+          },
+        ];
+        const duplicates: Array<{ oldId: string; newId: string; workspaceId: string }> = [];
+        for (const tag of oldTags) {
+          const wsRows = await db.select<Array<{ workspaceId: string }>>(
+            "SELECT DISTINCT n.workspaceId FROM note_tags nt JOIN notes n ON n.id = nt.noteId WHERE nt.tagId = ?",
+            [tag.id],
+          );
+          const wsIds = wsRows.map((r) => r.workspaceId);
+          if (wsIds.length === 0) wsIds.push(fallbackWs);
+          statements.push({
+            sql: "INSERT INTO tags_v20 (id, workspaceId, name, color, createdAt) VALUES (?, ?, ?, ?, ?)",
+            params: [tag.id, wsIds[0], tag.name, tag.color, tag.createdAt],
+          });
+          for (const ws of wsIds.slice(1)) {
+            const newId = crypto.randomUUID();
+            duplicates.push({ oldId: tag.id, newId, workspaceId: ws });
+            statements.push({
+              sql: "INSERT INTO tags_v20 (id, workspaceId, name, color, createdAt) VALUES (?, ?, ?, ?, ?)",
+              params: [newId, ws, tag.name, tag.color, tag.createdAt],
+            });
+          }
+        }
+        statements.push({
+          sql: "INSERT INTO note_tags_v20 (noteId, tagId) SELECT noteId, tagId FROM note_tags",
+        });
+        for (const dup of duplicates) {
+          statements.push({
+            sql: "UPDATE note_tags_v20 SET tagId = ? WHERE tagId = ? AND noteId IN (SELECT id FROM notes WHERE workspaceId = ?)",
+            params: [dup.newId, dup.oldId, dup.workspaceId],
+          });
+        }
+        statements.push(
+          { sql: "DROP TABLE note_tags" },
+          { sql: "DROP TABLE tags" },
+          { sql: "ALTER TABLE tags_v20 RENAME TO tags" },
+          { sql: "ALTER TABLE note_tags_v20 RENAME TO note_tags" },
+          { sql: "PRAGMA user_version = 20" },
+        );
+        await SQLiteDatabase.runTransaction(statements);
+      } else {
+        await db.execute("PRAGMA user_version = 20");
+      }
+    }
   }
 }

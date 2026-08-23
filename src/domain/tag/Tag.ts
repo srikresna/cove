@@ -1,8 +1,14 @@
 export interface Tag {
   readonly id: string;
+  readonly workspaceId: string;
   readonly name: string;
   readonly color: string;
   readonly createdAt: number;
+}
+
+export interface TagCount {
+  readonly tagId: string;
+  readonly noteCount: number;
 }
 
 export const TAG_COLORS = [

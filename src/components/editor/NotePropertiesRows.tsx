@@ -200,7 +200,7 @@ const JournalValue: React.FC<{
 };
 
 /** System row: tags chips + create/pick popover, backed by the tag service. */
-const TagsValue: React.FC<{ noteId: string }> = ({ noteId }) => {
+const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({ noteId, workspaceId }) => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [query, setQuery] = useState("");
@@ -223,7 +223,7 @@ const TagsValue: React.FC<{ noteId: string }> = ({ noteId }) => {
   }, [refreshTags, tagVersion]);
 
   const loadAllTags = () => {
-    tagService.listTags().then(setAllTags).catch(notifyError);
+    tagService.listTags(workspaceId).then(setAllTags).catch(notifyError);
   };
 
   const addTag = async (name: string) => {
@@ -959,7 +959,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     }
     switch (def.type) {
       case "tags":
-        return <TagsValue noteId={note.id} />;
+        return <TagsValue noteId={note.id} workspaceId={note.workspaceId} />;
       case "workspace":
         return <WorkspaceValue note={note} />;
       case "created":

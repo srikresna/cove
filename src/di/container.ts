@@ -49,7 +49,7 @@ export const noteService: INoteService = new NoteService(
   noteLinkRepository,
   blobSource,
 );
-export const tagService: ITagService = new TagService(tagRepository);
+export const tagService: ITagService = new TagService(tagRepository, noteService);
 export const propertyService: IPropertyService = new PropertyService(
   new SQLitePropertyRepository(),
 );
