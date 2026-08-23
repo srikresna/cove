@@ -129,20 +129,24 @@ export class NoteService implements INoteService {
     title = DEFAULT_NOTE_TITLE,
     content = EMPTY_NOTE_CONTENT,
     icon?: string,
+    opts?: { createdAt?: number },
   ): Promise<Note> {
     this.assertUnlocked();
     const id = makeNoteId();
-    const rec = await this.notes.createNote({
-      id,
-      workspaceId,
-      title: await this.crypto.encryptPayload(title, titleAad(id)),
-      titleKmsVersion: 1,
-      content: await this.crypto.encryptPayload(content, id),
-      icon,
-      coverColor: undefined,
-      isPinned: false,
-      isFavorite: false,
-    });
+    const rec = await this.notes.createNote(
+      {
+        id,
+        workspaceId,
+        title: await this.crypto.encryptPayload(title, titleAad(id)),
+        titleKmsVersion: 1,
+        content: await this.crypto.encryptPayload(content, id),
+        icon,
+        coverColor: undefined,
+        isPinned: false,
+        isFavorite: false,
+      },
+      opts,
+    );
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
   }

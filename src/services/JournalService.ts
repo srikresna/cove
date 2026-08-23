@@ -81,7 +81,15 @@ export class JournalService implements IJournalService {
         content = template.content;
       }
     }
-    const note = await this.notes.createNote(workspaceId, journalTitleFor(midnight), content);
+    const note = await this.notes.createNote(
+      workspaceId,
+      journalTitleFor(midnight),
+      content,
+      undefined,
+      {
+        createdAt: midnight,
+      },
+    );
     await this.setJournalDate(note.id, midnight);
     return note.id;
   }

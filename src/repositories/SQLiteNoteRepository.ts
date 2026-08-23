@@ -111,13 +111,16 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
-  async createNote(noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord> {
+  async createNote(
+    noteInput: Omit<NoteRecord, "createdAt" | "updatedAt">,
+    opts?: { createdAt?: number },
+  ): Promise<NoteRecord> {
     const db = await this.getDb();
     const now = Date.now();
 
     const note: NoteRecord = {
       ...noteInput,
-      createdAt: now,
+      createdAt: opts?.createdAt ?? now,
       updatedAt: now,
     };
 

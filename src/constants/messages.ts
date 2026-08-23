@@ -36,6 +36,7 @@ export const MESSAGES = {
   VIEW_CLEAR: "Clear",
   VIEW_ACTIVE: "view",
   VIEW_DELETE: "Delete view",
+  JOURNAL_PICK_DATE: "Today's journal",
   LIBRARY_HEADER: "Library",
   PROP_ADD: "Add a property",
   PROP_NAME_PLACEHOLDER: "Property name (optional)",

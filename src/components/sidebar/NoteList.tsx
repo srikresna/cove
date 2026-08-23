@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService } from "../../di/container";
+import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import type { FilterableNote } from "../../services/filters/evaluateFilters";
 import { evaluateFilters } from "../../services/filters/evaluateFilters";
 import { useNoteStore } from "../../store/useNoteStore";
@@ -40,6 +41,73 @@ export const NoteList: React.FC = () => {
     })),
   );
 
+  // Property stacks under each note title (AFFI NE docs-view stack rows).
+  const [stackDefs, setStackDefs] = useState<PropertyDefinition[]>([]);
+  const [stackValues, setStackValues] = useState<Map<string, Map<string, PropertyValue>> | null>(
+    null,
+  );
+  const propertyVersion = usePropertyStore((s) => s.version);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
+  useEffect(() => {
+    let alive = true;
+    propertyService
+      .listDefinitions()
+      .then(async (defs) => {
+        // Stack-eligible custom properties with values load one pass per def.
+        const eligible = defs.filter(
+          (d) =>
+            d.show !== "always-hide" &&
+            !d.id.startsWith("system:") &&
+            [
+              "text",
+              "number",
+              "date",
+              "select",
+              "status",
+              "multiSelect",
+              "checkbox",
+              "person",
+              "url",
+            ].includes(d.type),
+        );
+        if (!alive) return;
+        setStackDefs(eligible);
+        if (eligible.length === 0) {
+          setStackValues(null);
+          return;
+        }
+        const perDef = await Promise.all(
+          eligible.map(async (def) => ({
+            propertyId: def.id,
+            values: await propertyService.valuesForDefinitionAllNotes(def.id),
+          })),
+        );
+        if (!alive) return;
+        const byNote = new Map<string, Map<string, PropertyValue>>();
+        for (const { propertyId, values } of perDef) {
+          for (const [noteId, value] of values) {
+            let row = byNote.get(noteId);
+            if (!row) {
+              row = new Map();
+              byNote.set(noteId, row);
+            }
+            row.set(propertyId, value);
+          }
+        }
+        setStackValues(byNote);
+      })
+      .catch(() => {
+        if (alive) {
+          setStackDefs([]);
+          setStackValues(null);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [propertyVersion]);
+
   const taggedNoteIds = useTagStore((s) => s.taggedNoteIds);
   const activeTagId = useTagStore((s) => s.activeTagId);
   const tags = useTagStore((s) => s.tags);
@@ -48,7 +116,6 @@ export const NoteList: React.FC = () => {
 
   const draftRules = useViewStore((s) => s.draftRules);
   const viewVersion = useViewStore((s) => s.version);
-  const propertyVersion = usePropertyStore((s) => s.version);
 
   // Filter inputs (property values + journal dates) reload when rules exist.
   const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(null);
@@ -112,6 +179,20 @@ export const NoteList: React.FC = () => {
       .filter((i): i is FilterableNote => i != null);
     return evaluateFilters(items, draftRules).map((i) => i.note);
   }, [notes, activeWorkspaceId, taggedNoteIds, rulesActive, filterable, draftRules]);
+
+  const stackRowsOf = useCallback(
+    (noteId: string): Array<{ def: PropertyDefinition; value: PropertyValue }> => {
+      const row = stackValues?.get(noteId);
+      if (!row) return [];
+      return stackDefs
+        .map((def) => {
+          const value = row.get(def.id);
+          return value ? { def, value } : null;
+        })
+        .filter((r): r is { def: PropertyDefinition; value: PropertyValue } => r !== null);
+    },
+    [stackDefs, stackValues],
+  );
 
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -216,6 +297,7 @@ export const NoteList: React.FC = () => {
                   onToggleFavorite={handleToggleFavorite}
                   onDuplicate={handleDuplicate}
                   onDelete={handleDelete}
+                  stackRows={stackRowsOf(note.id)}
                 />
               </div>
             );

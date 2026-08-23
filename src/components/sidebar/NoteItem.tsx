@@ -3,7 +3,9 @@ import { Copy, FileText, MoreHorizontal, Pin, Star, Trash2 } from "lucide-react"
 import React from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
+import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
+import { resolvePropertyIcon } from "../editor/PropertyValueEditors";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -27,6 +29,8 @@ interface NoteItemProps {
   onToggleFavorite: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Stack rows under the title (AFFI NE docs-view stack properties). */
+  stackRows?: Array<{ def: PropertyDefinition; value: PropertyValue }>;
 }
 
 const updatedTimeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -64,9 +68,55 @@ const MenuEntries: React.FC<{
   </>
 );
 
+/** Stack value formatter for note rows (compact, no editors). */
+function stackValueText(def: PropertyDefinition, value: PropertyValue): string | null {
+  switch (value.type) {
+    case "text":
+      return value.text || null;
+    case "number":
+      return String(value.number);
+    case "select":
+    case "status":
+      return def.options.find((o) => o.id === value.optionId)?.name ?? null;
+    case "multiSelect": {
+      const names = def.options.filter((o) => value.optionIds.includes(o.id)).map((o) => o.name);
+      return names.length > 0 ? names.join(", ") : null;
+    }
+    case "date":
+      return new Date(value.timestamp).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    case "person":
+      return value.name || null;
+    case "checkbox":
+      return value.checked ? "✓" : null;
+    case "url":
+      return value.url || null;
+    default:
+      return null;
+  }
+}
+
 export const NoteItem: React.FC<NoteItemProps> = React.memo(
-  ({ note, isActive, onSelect, onTogglePin, onToggleFavorite, onDuplicate, onDelete }) => {
+  ({
+    note,
+    isActive,
+    onSelect,
+    onTogglePin,
+    onToggleFavorite,
+    onDuplicate,
+    onDelete,
+    stackRows = [],
+  }) => {
     const menuHandlers = { note, onTogglePin, onToggleFavorite, onDuplicate, onDelete };
+    const visibleStacks = stackRows
+      .map((row) => ({ ...row, text: stackValueText(row.def, row.value) }))
+      .filter((row): row is { def: PropertyDefinition; value: PropertyValue; text: string } =>
+        Boolean(row.text),
+      )
+      .slice(0, 3);
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>
@@ -103,6 +153,27 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 <div className="truncate font-mono text-[10px] text-muted-foreground">
                   {note.updatedAt ? updatedTimeFormatter.format(note.updatedAt) : "Just now"}
                 </div>
+                {visibleStacks.length > 0 && (
+                  <div className="mt-0.5 space-y-px">
+                    {visibleStacks.map((row) => (
+                      <div
+                        key={row.def.id}
+                        className="flex items-center gap-1.5 truncate text-[11px] leading-4 text-muted-foreground"
+                      >
+                        <span aria-hidden="true" className="shrink-0 [&_svg]:h-3 [&_svg]:w-3">
+                          {resolvePropertyIcon(row.def)}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground/70">{row.def.name}</span>
+                        <span className="truncate text-foreground/80">{row.text}</span>
+                      </div>
+                    ))}
+                    {stackRows.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground/60">
+                        +{stackRows.length - 3}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

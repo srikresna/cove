@@ -17,7 +17,10 @@ export interface INoteRepository {
     limit: number,
     cursor?: { updatedAt: number; id: string },
   ): Promise<NoteRecord[]>;
-  createNote(note: Omit<NoteRecord, "createdAt" | "updatedAt">): Promise<NoteRecord>;
+  createNote(
+    note: Omit<NoteRecord, "createdAt" | "updatedAt">,
+    opts?: { createdAt?: number },
+  ): Promise<NoteRecord>;
   updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord>;
   deleteNote(id: string): Promise<void>;
   getCover(noteId: string): Promise<EncryptedPayload | null>;
