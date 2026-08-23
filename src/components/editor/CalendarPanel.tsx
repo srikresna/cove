@@ -1,4 +1,4 @@
-import { CalendarCheck, ChevronLeft, ChevronRight, FileText, Plus } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ChevronRight, FileText, Plus, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -86,13 +86,16 @@ export const CalendarPanel: React.FC = () => {
   }, [workspaceNotes, field, journalByNoteId]);
 
   const cells = useMemo(() => {
+    // AFFI NE calendar: full 6-week grid; adjacent-month days render faded
+    // (and clickable) instead of leaving leading blanks.
     const year = monthCursor.getFullYear();
     const month = monthCursor.getMonth();
-    const firstWeekday = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const list: Array<Date | null> = [];
-    for (let i = 0; i < firstWeekday; i++) list.push(null);
-    for (let day = 1; day <= daysInMonth; day++) list.push(new Date(year, month, day));
+    const firstOfMonth = new Date(year, month, 1);
+    const start = new Date(year, month, 1 - firstOfMonth.getDay());
+    const list: Date[] = [];
+    for (let i = 0; i < 42; i++) {
+      list.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    }
     return list;
   }, [monthCursor]);
 
@@ -103,6 +106,23 @@ export const CalendarPanel: React.FC = () => {
 
   const todayKey = dayKey(new Date());
   const selectedNotes = selectedDay ? (notesByDay.get(selectedDay) ?? []) : [];
+  // Journal notes sharing the selected day (conflict block input).
+  const journalNotesForSelected = useMemo(() => {
+    if (!selectedDay) return [];
+    return workspaceNotes.filter((n) => {
+      const ts = journalByNoteId.get(n.id);
+      return ts != null && keyOf(ts) === selectedDay;
+    });
+  }, [workspaceNotes, journalByNoteId, selectedDay]);
+
+  const removeJournalMark = (noteId: string) => {
+    journalService
+      .removeJournalDate(noteId)
+      .then(() => {
+        usePropertyStore.getState().refresh();
+      })
+      .catch(notifyError);
+  };
 
   const shiftMonth = (delta: number) =>
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -139,11 +159,9 @@ export const CalendarPanel: React.FC = () => {
   );
 
   const handleDayClick = (key: string, hasNotes: boolean) => {
-    if (!hasNotes && field === "journal" && activeWorkspaceId) {
-      const [y = 0, m = 0, d = 0] = key.split("-").map(Number);
-      openJournalFor(new Date(y, m, d));
-      return;
-    }
+    // Explicit create (AFFI NE placeholder pattern): day click only selects;
+    // the New-journal-note row/button is the single creation path.
+    void hasNotes;
     setSelectedDay((prev) => (prev === key ? null : key));
   };
 
@@ -222,16 +240,22 @@ export const CalendarPanel: React.FC = () => {
           </span>
         ))}
         {cells.map((date, index) => {
-          if (!date) {
-            // biome-ignore lint/suspicious/noArrayIndexKey: leading blanks of a fixed month grid
-            return <span key={index} />;
-          }
           const key = dayKey(date);
           const hasNotes = notesByDay.has(key);
           const isSelected = key === selectedDay;
+          const notCurrentMonth = date.getMonth() !== monthCursor.getMonth();
+          // Typed dots: journal = primary, activity (created/updated) = muted.
+          const journalDay =
+            field === "journal" &&
+            workspaceNotes.some((n) =>
+              journalByNoteId.get(n.id) === undefined
+                ? false
+                : keyOf(journalByNoteId.get(n.id) ?? 0) === key,
+            );
           return (
             <button
-              key={key}
+              // biome-ignore lint/suspicious/noArrayIndexKey: fixed 42-cell grid with duplicate day keys across months
+              key={`${key}-${index}`}
               type="button"
               onClick={() => handleDayClick(key, hasNotes)}
               aria-pressed={isSelected}
@@ -242,6 +266,7 @@ export const CalendarPanel: React.FC = () => {
                   ? "border bg-card font-semibold text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                 key === todayKey && !isSelected && "font-semibold text-primary",
+                notCurrentMonth && !isSelected && "text-muted-foreground/40",
               )}
             >
               <span className="leading-none">{date.getDate()}</span>
@@ -249,7 +274,11 @@ export const CalendarPanel: React.FC = () => {
                 aria-hidden="true"
                 className={cn(
                   "mt-0.5 h-1 w-1 rounded-full",
-                  hasNotes ? "bg-primary" : "bg-transparent",
+                  journalDay
+                    ? "bg-primary"
+                    : hasNotes
+                      ? "bg-muted-foreground/50"
+                      : "bg-transparent",
                 )}
               />
             </button>
@@ -257,7 +286,41 @@ export const CalendarPanel: React.FC = () => {
         })}
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto border-t pt-2">
+      <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto border-t pt-2">
+        {/* Journal conflict block: >1 journal notes sharing the selected day. */}
+        {field === "journal" && dateOfSelectedDay && journalNotesForSelected.length > 1 && (
+          <div className="space-y-0.5">
+            {journalNotesForSelected.map((note, index) => (
+              <div key={note.id} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveNoteId(note.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span aria-hidden="true" className="shrink-0 text-sm">
+                    {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </span>
+                  <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
+                  {index > 0 && (
+                    <span className="ml-1 shrink-0 rounded border border-destructive/40 bg-destructive/10 px-1.5 text-[10px] text-destructive">
+                      {MESSAGES.JOURNAL_CONFLICT}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  aria-label={MESSAGES.JOURNAL_REMOVE_MARK}
+                  title={MESSAGES.JOURNAL_REMOVE_MARK}
+                  onClick={() => removeJournalMark(note.id)}
+                  className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {selectedNotes.length === 0 ? (
           field === "journal" && dateOfSelectedDay && activeWorkspaceId ? (
             <button

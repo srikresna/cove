@@ -843,9 +843,14 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
       .catch(notifyError);
   };
 
-  const createOption = (def: PropertyDefinition, name: string, thenPick: boolean) => {
+  const createOption = (
+    def: PropertyDefinition,
+    name: string,
+    thenPick: boolean,
+    color?: string,
+  ) => {
     propertyService
-      .addOption(def.id, name)
+      .addOption(def.id, name, color)
       .then(async (option) => {
         if (!thenPick) return bumpProperties();
         const current = values.get(def.id);

@@ -5,6 +5,7 @@ import {
   Briefcase,
   Calendar,
   CalendarDays,
+  Check,
   CircleDot,
   Clock,
   FileText,
@@ -18,29 +19,42 @@ import {
   Link2,
   List,
   ListChecks,
+  MoreHorizontal,
   Palette,
   Paperclip,
+  Pencil,
   Plus,
   Star,
   Tag as TagIcon,
   Target,
   ToggleLeft,
+  Trash2,
   Type,
   User,
   X,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
+import { propertyService } from "../../di/container";
 import type {
   PropertyDefinition,
   PropertyOption,
   PropertyType,
   PropertyValue,
 } from "../../domain/property/Property";
+import { TAG_COLORS } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
 import type { Note } from "../../types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { PropertyCalendar } from "../ui/PropertyCalendar";
 import { PropertyCheckbox } from "../ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -142,63 +156,117 @@ const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = 
   </span>
 );
 
+/**
+ * AFFI NE tags-editor parity: keyboard Up/Down/Enter navigation with a
+ * focused row, Backspace on empty input removes the last selected chip,
+ * hover-revealed "..." per-option menu (rename / 9-swatch recolor / delete
+ * writing through PropertyService), rotating random create colors, a Done
+ * row, and 400px-hug width.
+ */
 const OptionPicker: React.FC<{
   def: PropertyDefinition;
   selectedIds: string[];
   multi: boolean;
   onPick: (optionId: string) => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, color: string) => void;
 }> = ({ def, selectedIds, multi, onPick, onCreate }) => {
   const [query, setQuery] = useState("");
+  const [focusedIndex, setFocusedIndex] = useState(0);
   const trimmed = query.trim();
+  const exactExists = def.options.some((o) => o.name.toLowerCase() === trimmed.toLowerCase());
   const visible = def.options.filter(
     (o) =>
       (!trimmed || o.name.toLowerCase().includes(trimmed.toLowerCase())) &&
       (multi ? !selectedIds.includes(o.id) : true),
   );
-  const exactExists = def.options.some((o) => o.name.toLowerCase() === trimmed.toLowerCase());
+  // The Create row participates in keyboard navigation as the last row.
+  const showCreate = trimmed.length > 0 && !exactExists;
+  const rowCount = visible.length + (showCreate ? 1 : 0);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Random-start rotating palette index, like AFFI NE's useReducer approach.
+  const colorOffset = useRef(Math.floor(Math.random() * TAG_COLORS.length));
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: trimmed is the intentional reset signal; listing query would re-run on every keystroke anyway
+  useEffect(() => {
+    setFocusedIndex(0);
+  }, [trimmed]);
+
+  const nextCreateColor = () => {
+    const color = TAG_COLORS[colorOffset.current % TAG_COLORS.length] as string;
+    colorOffset.current += 1;
+    return color;
+  };
+
+  const activateRow = (index: number) => {
+    if (index < visible.length) {
+      onPick(visible[index]?.id ?? "");
+    } else if (showCreate) {
+      onCreate(trimmed, nextCreateColor());
+      setQuery("");
+    }
+  };
+
+  const focusRow = (index: number) => {
+    const next = ((index % rowCount) + rowCount) % rowCount;
+    setFocusedIndex(next);
+    listRef.current
+      ?.querySelector(`[data-option-index="${next}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  };
+
   return (
-    <PopoverContent align="start" className="w-60 p-2">
+    <PopoverContent align="start" className="w-[400px] max-w-[calc(100vw-2rem)] p-2">
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={MESSAGES.PROP_OPTION_PLACEHOLDER}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && trimmed && !exactExists) {
-            onCreate(trimmed);
-            setQuery("");
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            focusRow(focusedIndex + 1);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            focusRow(focusedIndex - 1);
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            activateRow(focusedIndex);
+          } else if (e.key === "Backspace" && query === "" && multi && selectedIds.length > 0) {
+            e.preventDefault();
+            // Remove the last selected chip, like AFFI NE.
+            onPick(selectedIds[selectedIds.length - 1] ?? "");
           }
         }}
         className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring"
       />
-      <div className="max-h-48 space-y-0.5 overflow-y-auto">
-        {visible.map((option) => (
-          <button
+      <div ref={listRef} className="max-h-48 space-y-0.5 overflow-y-auto">
+        {visible.map((option, index) => (
+          <OptionRow
             key={option.id}
-            type="button"
-            onClick={() => onPick(option.id)}
-            className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: option.color }}
-            />
-            <span className="truncate">{option.name}</span>
-            {!multi && selectedIds.includes(option.id) && (
-              <span className="ml-auto text-xs text-muted-foreground">✓</span>
-            )}
-          </button>
+            option={option}
+            index={index}
+            focused={index === focusedIndex}
+            selected={selectedIds.includes(option.id)}
+            multi={multi}
+            onHover={() => setFocusedIndex(index)}
+            onPick={() => onPick(option.id)}
+            defId={def.id}
+          />
         ))}
-        {trimmed && !exactExists && (
+        {showCreate && (
           <button
             type="button"
+            data-option-index={visible.length}
+            onMouseEnter={() => setFocusedIndex(visible.length)}
             onClick={() => {
-              onCreate(trimmed);
+              onCreate(trimmed, nextCreateColor());
               setQuery("");
             }}
-            className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+              "flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              focusedIndex === visible.length && "bg-accent",
+            )}
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="truncate">
@@ -206,8 +274,148 @@ const OptionPicker: React.FC<{
             </span>
           </button>
         )}
+        {rowCount === 0 && (
+          <p className="px-2 py-1.5 text-xs text-muted-foreground/70">
+            {MESSAGES.PROP_OPTION_EMPTY}
+          </p>
+        )}
       </div>
+      <button
+        type="button"
+        className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => {
+          // Close the popover: dispatch Escape on the Radix-popover layer.
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        }}
+      >
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+        {MESSAGES.PROP_OPTION_DONE}
+      </button>
     </PopoverContent>
+  );
+};
+
+const OptionRow: React.FC<{
+  option: PropertyOption;
+  index: number;
+  focused: boolean;
+  selected: boolean;
+  multi: boolean;
+  onHover: () => void;
+  onPick: () => void;
+  defId: string;
+}> = ({ option, index, focused, selected, multi, onHover, onPick, defId }) => {
+  const [renaming, setRenaming] = useState(false);
+  const cancelRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renaming) inputRef.current?.focus();
+  }, [renaming]);
+
+  const commitRename = (name: string) => {
+    const next = name.trim();
+    if (next && next !== option.name) {
+      void propertyService.renameOption(defId, option.id, next).catch(() => {});
+    }
+  };
+
+  if (renaming) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        defaultValue={option.name}
+        aria-label={`${MESSAGES.PROP_RENAME}: ${option.name}`}
+        onBlur={(e) => {
+          if (cancelRef.current) {
+            cancelRef.current = false;
+            setRenaming(false);
+            return;
+          }
+          setRenaming(false);
+          commitRename(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            cancelRef.current = true;
+            e.currentTarget.blur();
+          }
+        }}
+        className="h-7 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+    );
+  }
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover tracking for visual focus only; the inner button is the interactive element
+    // biome-ignore lint/a11y/useKeyWithMouseEvents: keyboard users navigate via ArrowUp/Down on the picker input
+    <div
+      data-option-index={index}
+      className={cn(
+        "group/optrow flex items-center rounded px-2 py-1 text-left text-sm transition-colors",
+        focused && "bg-accent",
+      )}
+      onMouseOver={onHover}
+    >
+      <button type="button" onClick={onPick} className="flex min-w-0 flex-1 items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ backgroundColor: option.color }}
+        />
+        <span className="truncate">{option.name}</span>
+        {selected && !multi && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`${option.name}: ${MESSAGES.PROP_OPTION_MANAGE}`}
+            className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/optrow:opacity-100"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onSelect={() => setRenaming(true)}>
+            <Pencil aria-hidden="true" />
+            {MESSAGES.PROP_RENAME}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{MESSAGES.PROP_ICON_LABEL}</DropdownMenuLabel>
+          <div className="grid grid-cols-5 gap-0.5 px-1 pb-1">
+            {TAG_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                aria-label={color}
+                title={color}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void propertyService.setOptionColor(defId, option.id, color).catch(() => {});
+                }}
+                className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  option.color === color && "ring-2 ring-ring ring-offset-1",
+                )}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+            onSelect={() => void propertyService.deleteOption(defId, option.id).catch(() => {})}
+          >
+            <Trash2 aria-hidden="true" />
+            {MESSAGES.PROP_DELETE}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 };
 
@@ -304,7 +512,7 @@ export interface PropertyValueEditorProps {
   noteId: string;
   onSet: (value: PropertyValue) => void;
   onClear: () => void;
-  createOption: (def: PropertyDefinition, name: string, thenPick: boolean) => void;
+  createOption: (def: PropertyDefinition, name: string, thenPick: boolean, color?: string) => void;
 }
 
 /**
@@ -458,7 +666,7 @@ const SelectValue: React.FC<PropertyValueEditorProps> = ({
         selectedIds={optionId ? [optionId] : []}
         multi={false}
         onPick={(id) => onSet({ type: def.type as "select" | "status", optionId: id })}
-        onCreate={(name) => void createOption(def, name, true)}
+        onCreate={(name, color) => void createOption(def, name, true, color)}
       />
     </Popover>
   );
@@ -501,8 +709,13 @@ const MultiSelectValue: React.FC<PropertyValueEditorProps> = ({
           def={def}
           selectedIds={ids}
           multi
-          onPick={(id) => onSet({ type: "multiSelect", optionIds: [...ids, id] })}
-          onCreate={(name) => void createOption(def, name, true)}
+          onPick={(id) =>
+            onSet({
+              type: "multiSelect",
+              optionIds: ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id],
+            })
+          }
+          onCreate={(name, color) => void createOption(def, name, true, color)}
         />
       </Popover>
     </div>

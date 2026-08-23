@@ -148,7 +148,7 @@ export class PropertyService implements IPropertyService {
     return this.properties.deleteDefinition(id);
   }
 
-  async addOption(definitionId: string, name: string): Promise<PropertyOption> {
+  async addOption(definitionId: string, name: string, color?: string): Promise<PropertyOption> {
     const normalized = normalizePropertyName(name);
     if (!normalized) throw new ValidationError("Option name cannot be empty.");
 
@@ -164,10 +164,49 @@ export class PropertyService implements IPropertyService {
     const option: PropertyOption = {
       id: makePropertyId(),
       name: normalized,
-      color: nextOptionColor(def.options.length),
+      color: color ?? nextOptionColor(def.options.length),
     };
     await this.properties.appendOption(definitionId, JSON.stringify(option));
     return option;
+  }
+
+  async renameOption(definitionId: string, optionId: string, name: string): Promise<void> {
+    const normalized = normalizePropertyName(name);
+    if (!normalized) throw new ValidationError("Option name cannot be empty.");
+    const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
+    if (!def) throw new NotFoundError("Property", definitionId);
+    const option = def.options.find((o) => o.id === optionId);
+    if (!option) throw new NotFoundError("Option", optionId);
+    if (option.name.toLowerCase() === normalized.toLowerCase()) return;
+    const duplicate = def.options.find(
+      (o) => o.id !== optionId && o.name.toLowerCase() === normalized.toLowerCase(),
+    );
+    if (duplicate) throw new ValidationError("An option with this name already exists.");
+    await this.properties.updateOptions(
+      definitionId,
+      JSON.stringify(def.options.map((o) => (o.id === optionId ? { ...o, name: normalized } : o))),
+    );
+  }
+
+  async setOptionColor(definitionId: string, optionId: string, color: string): Promise<void> {
+    const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
+    if (!def) throw new NotFoundError("Property", definitionId);
+    const option = def.options.find((o) => o.id === optionId);
+    if (!option) throw new NotFoundError("Option", optionId);
+    await this.properties.updateOptions(
+      definitionId,
+      JSON.stringify(def.options.map((o) => (o.id === optionId ? { ...o, color } : o))),
+    );
+  }
+
+  async deleteOption(definitionId: string, optionId: string): Promise<void> {
+    const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
+    if (!def) throw new NotFoundError("Property", definitionId);
+    if (!def.options.some((o) => o.id === optionId)) throw new NotFoundError("Option", optionId);
+    await this.properties.updateOptions(
+      definitionId,
+      JSON.stringify(def.options.filter((o) => o.id !== optionId)),
+    );
   }
 
   async valuesForNote(noteId: string): Promise<Map<string, PropertyValue>> {
