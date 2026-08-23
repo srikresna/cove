@@ -218,9 +218,19 @@ export const NoteList: React.FC = () => {
 
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // Keyed by note id, not index: notes re-sort under unchanged indexes
+  // (journal opens, creates, trash), and an index-keyed measurement cache
+  // would stamp each row with the previous occupant's height for a frame —
+  // plus stale total sizes for rows outside the window.
+  const getItemKey = useCallback(
+    (index: number) => workspaceNotes[index]?.id ?? index,
+    [workspaceNotes],
+  );
+
   const virtualizer = useVirtualizer({
     count: workspaceNotes.length,
     getScrollElement: () => parentRef.current,
+    getItemKey,
     // 54px covers a bare row; property stack rows below the title grow the
     // row, so real heights come from measureElement on each rendered row.
     estimateSize: () => 54,

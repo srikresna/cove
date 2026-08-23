@@ -31,6 +31,7 @@ import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
+import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
@@ -1106,7 +1107,12 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
           if (deletingDef) {
             propertyService
               .deleteDefinition(deletingDef.id)
-              .then(() => bumpProperties())
+              .then(async () => {
+                // Saved views may filter on the deleted definition; prune
+                // their rules so no view silently goes empty or undead.
+                await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
+                bumpProperties();
+              })
               .catch(notifyError);
           }
           setDeletingDef(null);

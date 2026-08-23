@@ -129,6 +129,28 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
     }
   }
 
+  async applyPrune(
+    updates: Array<{ id: string; rulesJson: string }>,
+    deleteIds: string[],
+  ): Promise<void> {
+    if (updates.length === 0 && deleteIds.length === 0) return;
+    const statements = [
+      ...updates.map((u) => ({
+        sql: "UPDATE saved_views SET rulesJson = ? WHERE id = ?",
+        params: [u.rulesJson, u.id],
+      })),
+      ...deleteIds.map((id) => ({
+        sql: "DELETE FROM saved_views WHERE id = ?",
+        params: [id],
+      })),
+    ];
+    try {
+      await SQLiteDatabase.runTransaction(statements);
+    } catch (err) {
+      throw toPersistenceError("savedViews.applyPrune", err);
+    }
+  }
+
   async delete(id: string): Promise<void> {
     try {
       const db = await this.getDb();

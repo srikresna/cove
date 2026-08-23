@@ -14,6 +14,7 @@ import { Button } from "./components/ui/button";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
+import { propertyService, savedViewService } from "./di/container";
 import type { Note } from "./domain/note/Note";
 import { useNoteStore } from "./store/useNoteStore";
 import { useUIStore } from "./store/useUIStore";
@@ -40,6 +41,14 @@ export const AppContent: React.FC = () => {
   useEffect(() => {
     fetchWorkspaces();
     void purgeExpiredTrash();
+    // Startup self-heal: saved-view rules referencing property defs or
+    // options deleted by older builds (or by an interrupted prune) are
+    // rewritten/deleted before any view is applied. Best-effort — a failure
+    // here never blocks the app.
+    void propertyService
+      .listDefinitions()
+      .then((defs) => savedViewService.healRules(defs))
+      .catch(() => {});
   }, [fetchWorkspaces, purgeExpiredTrash]);
 
   useEffect(() => {

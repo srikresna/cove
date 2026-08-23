@@ -8,5 +8,11 @@ export interface ISavedViewRepository {
   create(view: SavedView): Promise<void>;
   rename(id: string, name: string): Promise<void>;
   updateRules(id: string, rules: FilterRules): Promise<void>;
+  /**
+   * Applies a set of rule rewrites and view deletions in ONE transaction,
+   * so a prune either lands on every view or none (a per-view autocommit
+   * loop crash-strands the rest with no retry path).
+   */
+  applyPrune(updates: Array<{ id: string; rulesJson: string }>, deleteIds: string[]): Promise<void>;
   delete(id: string): Promise<void>;
 }

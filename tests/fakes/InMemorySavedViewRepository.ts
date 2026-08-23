@@ -30,6 +30,17 @@ export class InMemorySavedViewRepository implements ISavedViewRepository {
     this.views = this.views.map((v) => (v.id === id ? { ...v, rules } : v));
   }
 
+  async applyPrune(
+    updates: Array<{ id: string; rulesJson: string }>,
+    deleteIds: string[],
+  ): Promise<void> {
+    for (const update of updates) {
+      const rules = JSON.parse(update.rulesJson) as FilterRules;
+      await this.updateRules(update.id, rules);
+    }
+    for (const id of deleteIds) await this.delete(id);
+  }
+
   async delete(id: string): Promise<void> {
     this.views = this.views.filter((v) => v.id !== id);
   }

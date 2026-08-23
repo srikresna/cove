@@ -596,10 +596,14 @@ export class SQLiteDatabase {
 
     if (version < 22) {
       // Saved views created before the completeness gate could persist rules
-      // without values. Those views matched NOTHING under the old strict
-      // evaluation but would match EVERYTHING now that value-less rules are
-      // inactive — drop the incomplete rules, and delete views left with
-      // none (they could never match anything their author intended).
+      // without values. POSITIVE value-less rules (select is [], tags
+      // has-any-of [], number/date without a value) matched NOTHING under
+      // the old strict evaluation but would match EVERYTHING now that
+      // value-less rules are inactive — drop them, and delete views left
+      // with no complete rule. NEGATIVE value-less rules (is-not [],
+      // has-none-of [], has-all-of [], text is-not "") matched EVERYTHING
+      // back then and the new gate preserves exactly that — their views must
+      // survive as match-all (empty rule list), not be deleted.
       const viewRows = await db.select<Array<{ id: string; rulesJson: string }>>(
         "SELECT id, rulesJson FROM saved_views",
       );
@@ -612,6 +616,7 @@ export class SQLiteDatabase {
           continue;
         }
         if (!Array.isArray(parsed)) continue;
+        let droppedVacuousMatchAll = false;
         const kept = parsed.filter((entry): boolean => {
           if (!entry || typeof entry !== "object") return false;
           const rule = entry as {
@@ -623,29 +628,44 @@ export class SQLiteDatabase {
           };
           const op = typeof rule.op === "string" ? rule.op : "";
           const emptiness = op === "is-empty" || op === "is-not-empty";
-          switch (rule.kind) {
-            case "text":
-              return emptiness || (typeof rule.value === "string" && rule.value !== "");
-            case "number":
-            case "date":
-              return emptiness || typeof rule.value === "number";
-            case "select":
-            case "multiSelect":
-              return emptiness || (Array.isArray(rule.optionIds) && rule.optionIds.length > 0);
-            case "tags":
-              return emptiness || (Array.isArray(rule.tagIds) && rule.tagIds.length > 0);
-            case "checkbox":
-            case "journal":
-            case "template":
-              return true;
-            default:
-              // Unknown kinds are dropped by the loader too.
-              return false;
+          const wasComplete = (() => {
+            switch (rule.kind) {
+              case "text":
+                return emptiness || (typeof rule.value === "string" && rule.value !== "");
+              case "number":
+              case "date":
+                return emptiness || typeof rule.value === "number";
+              case "select":
+              case "multiSelect":
+                return emptiness || (Array.isArray(rule.optionIds) && rule.optionIds.length > 0);
+              case "tags":
+                return emptiness || (Array.isArray(rule.tagIds) && rule.tagIds.length > 0);
+              case "checkbox":
+              case "journal":
+              case "template":
+                return true;
+              default:
+                // Unknown kinds are dropped by the loader too.
+                return false;
+            }
+          })();
+          if (!wasComplete && SQLiteDatabase.vacuousRuleWasMatchAll(rule, op)) {
+            droppedVacuousMatchAll = true;
           }
+          return wasComplete;
         });
         if (kept.length === parsed.length) continue;
         if (kept.length === 0) {
-          statements.push({ sql: "DELETE FROM saved_views WHERE id = ?", params: [row.id] });
+          if (droppedVacuousMatchAll) {
+            // The view has been match-all since the day it was saved; an
+            // empty rule list keeps it that way.
+            statements.push({
+              sql: "UPDATE saved_views SET rulesJson = ? WHERE id = ?",
+              params: ["[]", row.id],
+            });
+          } else {
+            statements.push({ sql: "DELETE FROM saved_views WHERE id = ?", params: [row.id] });
+          }
         } else {
           statements.push({
             sql: "UPDATE saved_views SET rulesJson = ? WHERE id = ?",
@@ -659,6 +679,33 @@ export class SQLiteDatabase {
       } else {
         await db.execute("PRAGMA user_version = 22");
       }
+    }
+  }
+
+  /**
+   * Old-evaluator semantics for a value-less rule: negative operators were
+   * vacuously TRUE for every note (is-not [] / has-none-of [] / has-all-of
+   * [] / text is-not ""), positive operators matched nothing.
+   */
+  private static vacuousRuleWasMatchAll(rule: Record<string, unknown>, op: string): boolean {
+    switch (rule.kind) {
+      case "select":
+      case "multiSelect":
+        return (
+          op === "is-not" &&
+          Array.isArray(rule.optionIds) &&
+          (rule.optionIds as unknown[]).length === 0
+        );
+      case "tags":
+        return (
+          (op === "has-none-of" || op === "has-all-of") &&
+          Array.isArray(rule.tagIds) &&
+          (rule.tagIds as unknown[]).length === 0
+        );
+      case "text":
+        return op === "is-not" && (rule.value ?? "") === "";
+      default:
+        return false;
     }
   }
 }

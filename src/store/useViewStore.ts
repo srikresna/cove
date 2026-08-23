@@ -25,6 +25,8 @@ interface ViewState {
   deleteView: (id: string) => Promise<void>;
   /** Sync saved views + drafts after a select option was deleted. */
   syncAfterOptionDelete: (propertyId: string, optionId: string) => Promise<void>;
+  /** Sync saved views + drafts after a property definition was deleted. */
+  syncAfterPropertyDelete: (propertyId: string) => Promise<void>;
 }
 
 export const useViewStore = create<ViewState>((set, get) => ({
@@ -107,31 +109,51 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
 
   syncAfterOptionDelete: async (propertyId, optionId) => {
+    // Prune drafts FIRST and unconditionally: the rule dropdown only renders
+    // live options, so a dead id could never be cleared from a draft — even
+    // if the service-side prune itself fails, the in-memory state must not
+    // keep it (the startup heal repairs the persisted side later).
+    let deletedViewIds: string[] = [];
+    set((s) => ({
+      draftRules: s.draftRules.flatMap((r) => {
+        if ((r.kind === "select" || r.kind === "multiSelect") && r.propertyId === propertyId) {
+          const optionIds = r.optionIds.filter((id) => id !== optionId);
+          if (optionIds.length === 0 && (r.op === "is" || r.op === "is-not")) return [];
+          return [{ ...r, optionIds }];
+        }
+        return [r];
+      }),
+      version: s.version + 1,
+    }));
     try {
-      const deletedViewIds = await savedViewService.pruneOption(propertyId, optionId);
-      const activeDeleted =
-        get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
-      set((s) => ({
-        // Draft rules may still reference the dead option id; the rule
-        // dropdown only renders live options, so it could never be cleared.
-        draftRules: activeDeleted
-          ? []
-          : s.draftRules.flatMap((r) => {
-              if (
-                (r.kind === "select" || r.kind === "multiSelect") &&
-                r.propertyId === propertyId
-              ) {
-                const optionIds = r.optionIds.filter((id) => id !== optionId);
-                if (optionIds.length === 0 && (r.op === "is" || r.op === "is-not")) return [];
-                return [{ ...r, optionIds }];
-              }
-              return [r];
-            }),
-        activeViewId: activeDeleted ? null : s.activeViewId,
-        version: s.version + 1,
-      }));
+      deletedViewIds = await savedViewService.pruneOption(propertyId, optionId);
     } catch (err) {
       notifyError(err);
+      return;
+    }
+    const activeDeleted =
+      get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
+    if (activeDeleted) {
+      set((s) => ({ activeViewId: null, draftRules: [], version: s.version + 1 }));
+    }
+  },
+
+  syncAfterPropertyDelete: async (propertyId) => {
+    set((s) => ({
+      draftRules: s.draftRules.filter((r) => !("propertyId" in r) || r.propertyId !== propertyId),
+      version: s.version + 1,
+    }));
+    let deletedViewIds: string[] = [];
+    try {
+      deletedViewIds = await savedViewService.pruneProperty(propertyId);
+    } catch (err) {
+      notifyError(err);
+      return;
+    }
+    const activeDeleted =
+      get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
+    if (activeDeleted) {
+      set((s) => ({ activeViewId: null, draftRules: [], version: s.version + 1 }));
     }
   },
 }));

@@ -31,6 +31,7 @@ import {
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { usePropertyStore } from "../../store/usePropertyStore";
+import { useViewStore } from "../../store/useViewStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {
   DropdownMenu,
@@ -479,7 +480,12 @@ export const PropertyManagerPanel: React.FC<{
           if (deletingDef) {
             propertyService
               .deleteDefinition(deletingDef.id)
-              .then(() => bumpProperties())
+              .then(async () => {
+                // Saved views may filter on the deleted definition; prune
+                // their rules so no view silently goes empty or undead.
+                await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
+                bumpProperties();
+              })
               .catch(notifyError);
           }
           setDeletingDef(null);
