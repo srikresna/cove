@@ -113,7 +113,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
     // live options, so a dead id could never be cleared from a draft — even
     // if the service-side prune itself fails, the in-memory state must not
     // keep it (the startup heal repairs the persisted side later).
-    let deletedViewIds: string[] = [];
     set((s) => ({
       draftRules: s.draftRules.flatMap((r) => {
         if ((r.kind === "select" || r.kind === "multiSelect") && r.propertyId === propertyId) {
@@ -123,8 +122,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
         }
         return [r];
       }),
-      version: s.version + 1,
     }));
+    let deletedViewIds: string[] = [];
     try {
       deletedViewIds = await savedViewService.pruneOption(propertyId, optionId);
     } catch (err) {
@@ -133,15 +132,19 @@ export const useViewStore = create<ViewState>((set, get) => ({
     }
     const activeDeleted =
       get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
-    if (activeDeleted) {
-      set((s) => ({ activeViewId: null, draftRules: [], version: s.version + 1 }));
-    }
+    // Bump AFTER the prune commits: CollectionsSection refetches on version
+    // changes, so an earlier bump would race the prune transaction and cache
+    // pre-commit rows (draft subscribers re-render off draftRules directly
+    // and do not need the pre-set bump).
+    set((s) => ({
+      ...(activeDeleted ? { activeViewId: null, draftRules: [] } : {}),
+      version: s.version + 1,
+    }));
   },
 
   syncAfterPropertyDelete: async (propertyId) => {
     set((s) => ({
       draftRules: s.draftRules.filter((r) => !("propertyId" in r) || r.propertyId !== propertyId),
-      version: s.version + 1,
     }));
     let deletedViewIds: string[] = [];
     try {
@@ -152,9 +155,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
     }
     const activeDeleted =
       get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
-    if (activeDeleted) {
-      set((s) => ({ activeViewId: null, draftRules: [], version: s.version + 1 }));
-    }
+    set((s) => ({
+      ...(activeDeleted ? { activeViewId: null, draftRules: [] } : {}),
+      version: s.version + 1,
+    }));
   },
 }));
 

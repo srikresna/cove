@@ -1,21 +1,43 @@
-import type { FilterRules } from "@/domain/filters/FilterRule";
+import type { FilterRule, FilterRules } from "@/domain/filters/FilterRule";
 import type { SavedView } from "@/domain/filters/SavedView";
 import type { ISavedViewRepository } from "@/repositories/ISavedViewRepository";
+
+/**
+ * Mirrors SQLiteSavedViewRepository.decodeRules: every rule read back from
+ * storage carries ALL keys, with propertyId defaulting to "" and the id
+ * arrays to []. Service code must therefore never rely on `"propertyId" in
+ * rule` — tags/journal/template rules come back stamped with propertyId "".
+ */
+function stampRules(rules: FilterRules): FilterRules {
+  return rules.map((rule) => {
+    const stamped = { ...rule } as FilterRule & {
+      propertyId: string;
+      optionIds: string[];
+      tagIds: string[];
+    };
+    stamped.propertyId = "propertyId" in rule ? rule.propertyId : "";
+    stamped.optionIds = "optionIds" in rule ? rule.optionIds : [];
+    stamped.tagIds = "tagIds" in rule ? rule.tagIds : [];
+    return stamped as unknown as FilterRule;
+  });
+}
 
 export class InMemorySavedViewRepository implements ISavedViewRepository {
   public views: SavedView[] = [];
 
   async listByWorkspace(workspaceId: string): Promise<SavedView[]> {
-    return this.views.filter((v) => v.workspaceId === workspaceId).map((v) => ({ ...v }));
+    return this.views
+      .filter((v) => v.workspaceId === workspaceId)
+      .map((v) => ({ ...v, rules: stampRules(v.rules) }));
   }
 
   async listAll(): Promise<SavedView[]> {
-    return this.views.map((v) => ({ ...v }));
+    return this.views.map((v) => ({ ...v, rules: stampRules(v.rules) }));
   }
 
   async findById(id: string): Promise<SavedView | null> {
     const view = this.views.find((v) => v.id === id);
-    return view ? { ...view } : null;
+    return view ? { ...view, rules: stampRules(view.rules) } : null;
   }
 
   async create(view: SavedView): Promise<void> {

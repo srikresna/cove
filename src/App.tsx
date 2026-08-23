@@ -18,6 +18,7 @@ import { propertyService, savedViewService } from "./di/container";
 import type { Note } from "./domain/note/Note";
 import { useNoteStore } from "./store/useNoteStore";
 import { useUIStore } from "./store/useUIStore";
+import { useViewStore } from "./store/useViewStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
 const BlockSuiteNoteEditor = lazy(
@@ -44,10 +45,15 @@ export const AppContent: React.FC = () => {
     // Startup self-heal: saved-view rules referencing property defs or
     // options deleted by older builds (or by an interrupted prune) are
     // rewritten/deleted before any view is applied. Best-effort — a failure
-    // here never blocks the app.
+    // here never blocks the app. The version bump afterwards is required:
+    // the initial fetchViews races the heal transaction and can snapshot
+    // pre-heal rows, which would resurrect stranded rules from the store.
     void propertyService
       .listDefinitions()
-      .then((defs) => savedViewService.healRules(defs))
+      .then(async (defs) => {
+        await savedViewService.healRules(defs);
+        useViewStore.setState((s) => ({ version: s.version + 1 }));
+      })
       .catch(() => {});
   }, [fetchWorkspaces, purgeExpiredTrash]);
 

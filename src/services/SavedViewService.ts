@@ -13,24 +13,41 @@ function normalizeViewName(name: string): string {
 }
 
 /**
- * A value-less rule with a NEGATIVE operator matched EVERYTHING under the
- * old strict evaluator (is-not [] is true for every note), unlike positive
- * ops which matched nothing. Views emptied down to such rules must keep
- * their match-all behavior, not be deleted.
+ * Semantics of a rule in the POST-deletion universe (its property/option
+ * gone, so no note can carry the referenced value): negative operators are
+ * vacuously true for every note, positive operators match nothing.
  */
-function ruleWasVacuousMatchAll(rule: FilterRule): boolean {
+function droppedRuleMatchesAllPostDelete(rule: FilterRule): boolean {
   switch (rule.kind) {
     case "select":
     case "multiSelect":
-      return rule.op === "is-not" && rule.optionIds.length === 0;
+      return rule.op === "is-not";
     case "tags":
-      return (rule.op === "has-none-of" || rule.op === "has-all-of") && rule.tagIds.length === 0;
+      return rule.op === "has-none-of" || rule.op === "has-all-of";
     case "text":
-      return rule.op === "is-not" && (rule.value ?? "") === "";
+      return rule.op === "is-not";
     default:
       return false;
   }
 }
+
+/** The rule kinds whose filter references a property definition. */
+function ruleHasPropertyId(rule: FilterRule): rule is Extract<FilterRule, { propertyId: string }> {
+  return (
+    rule.kind === "text" ||
+    rule.kind === "number" ||
+    rule.kind === "date" ||
+    rule.kind === "select" ||
+    rule.kind === "multiSelect" ||
+    rule.kind === "checkbox"
+  );
+}
+
+/**
+ * Rewrite outcome for one rule inside applyViewPrune: the replacement rule
+ * (or the drop reason, used for the keep-vs-delete classification).
+ */
+type RuleRewrite = { drop: false; rule: FilterRule } | { drop: true; postDeleteMatchAll: boolean };
 
 export class SavedViewService implements ISavedViewService {
   constructor(private readonly views: ISavedViewRepository) {}
@@ -84,42 +101,47 @@ export class SavedViewService implements ISavedViewService {
   }
 
   /**
-   * Shared prune engine: rewriteRule maps each rule to its replacement (or
-   * null to drop it). Computes every view's outcome FIRST, then applies all
-   * rewrites + deletions in ONE transaction, so an interrupted prune can
-   * never land on some views but not others. Returns the deleted view ids.
+   * Shared prune engine: rewriteRule maps each rule to its replacement or a
+   * drop (classified by its post-deletion match semantics). Computes every
+   * view's outcome FIRST, then applies all rewrites + deletions in ONE
+   * transaction, so an interrupted prune can never land on some views but
+   * not others. Returns the deleted view ids.
    *
-   * View classification when no complete rule survives: a vacuous match-all
-   * rule (`is-not []` etc.) kept the view showing everything, so the view is
-   * kept with `[]` rules (same match-all under the completeness gate);
-   * otherwise the view could never match anything again and is deleted.
-   * Surviving views are persisted with only their complete rules — the same
-   * shape createView accepts.
+   * Keep-vs-delete when no complete rule survives: the view's fate follows
+   * the rules that were ACTIVE before the prune. If every active rule is
+   * vacuously match-all in the post-deletion universe (negative operators),
+   * the view has been showing everything all along and is kept with `[]`
+   * rules (identical match-all under the completeness gate). Otherwise the
+   * view filtered something real that no note can carry anymore and is
+   * deleted. Inactive (incomplete) rules were already no-ops and never
+   * influence the decision. Surviving views are persisted with only their
+   * complete rules — the shape createView accepts.
    */
-  private async applyViewPrune(
-    rewriteRule: (rule: FilterRule) => FilterRule | null,
-  ): Promise<string[]> {
+  private async applyViewPrune(rewriteRule: (rule: FilterRule) => RuleRewrite): Promise<string[]> {
     const updates: Array<{ id: string; rulesJson: string }> = [];
     const deletes: string[] = [];
     for (const view of await this.views.listAll()) {
       let changed = false;
-      let droppedVacuousMatchAll = false;
+      let wasMatchAllBeforePrune = true;
       const kept: FilterRules = [];
       for (const rule of view.rules) {
-        const next = rewriteRule(rule);
-        if (next === null) {
+        const outcome = rewriteRule(rule);
+        if (outcome.drop) {
           changed = true;
-          if (ruleWasVacuousMatchAll(rule)) droppedVacuousMatchAll = true;
+          // Only pre-prune ACTIVE rules shaped the view's behavior.
+          if (isRuleComplete(rule) && !outcome.postDeleteMatchAll) {
+            wasMatchAllBeforePrune = false;
+          }
           continue;
         }
-        if (next !== rule) changed = true;
-        kept.push(next);
+        if (outcome.rule !== rule) changed = true;
+        kept.push(outcome.rule);
       }
       if (!changed) continue;
       const complete = kept.filter(isRuleComplete);
       if (complete.length > 0) {
         updates.push({ id: view.id, rulesJson: JSON.stringify(complete) });
-      } else if (droppedVacuousMatchAll) {
+      } else if (wasMatchAllBeforePrune) {
         updates.push({ id: view.id, rulesJson: "[]" });
       } else {
         deletes.push(view.id);
@@ -144,10 +166,12 @@ export class SavedViewService implements ISavedViewService {
         rule.optionIds.includes(optionId)
       ) {
         const optionIds = rule.optionIds.filter((id) => id !== optionId);
-        if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) return null;
-        return { ...rule, optionIds };
+        if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) {
+          return { drop: true, postDeleteMatchAll: rule.op === "is-not" };
+        }
+        return { drop: false, rule: { ...rule, optionIds } };
       }
-      return rule;
+      return { drop: false, rule };
     });
   }
 
@@ -157,9 +181,12 @@ export class SavedViewService implements ISavedViewService {
    * deleted view ids.
    */
   pruneProperty(definitionId: string): Promise<string[]> {
-    return this.applyViewPrune((rule) =>
-      "propertyId" in rule && rule.propertyId === definitionId ? null : rule,
-    );
+    return this.applyViewPrune((rule) => {
+      if (ruleHasPropertyId(rule) && rule.propertyId === definitionId) {
+        return { drop: true, postDeleteMatchAll: droppedRuleMatchesAllPostDelete(rule) };
+      }
+      return { drop: false, rule };
+    });
   }
 
   /**
@@ -167,6 +194,11 @@ export class SavedViewService implements ISavedViewService {
    * option ids that no longer exist (stranded by an interrupted prune or by
    * deletions from older builds). Idempotent; rewrites land in one
    * transaction.
+   *
+   * Kinds are narrowed explicitly: the SQLite loader stamps EVERY decoded
+   * rule with a propertyId key (defaulting to ""), so `in`-checks are
+   * meaningless on loaded rules — tags/journal/template rules carry no
+   * property and must pass through untouched.
    */
   async healRules(liveDefs: PropertyDefinition[]): Promise<void> {
     const liveDefIds = new Set(liveDefs.map((d) => d.id));
@@ -174,16 +206,21 @@ export class SavedViewService implements ISavedViewService {
       liveDefs.map((d) => [d.id, new Set(d.options.map((o) => o.id))]),
     );
     await this.applyViewPrune((rule) => {
-      if ("propertyId" in rule) {
-        if (!liveDefIds.has(rule.propertyId)) return null;
-        if (rule.kind === "select" || rule.kind === "multiSelect") {
-          const live = liveOptions.get(rule.propertyId) ?? new Set<string>();
-          const optionIds = rule.optionIds.filter((id) => live.has(id));
-          if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) return null;
-          if (optionIds.length !== rule.optionIds.length) return { ...rule, optionIds };
+      if (!ruleHasPropertyId(rule)) return { drop: false, rule };
+      if (!liveDefIds.has(rule.propertyId)) {
+        return { drop: true, postDeleteMatchAll: droppedRuleMatchesAllPostDelete(rule) };
+      }
+      if (rule.kind === "select" || rule.kind === "multiSelect") {
+        const live = liveOptions.get(rule.propertyId) ?? new Set<string>();
+        const optionIds = rule.optionIds.filter((id) => live.has(id));
+        if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) {
+          return { drop: true, postDeleteMatchAll: rule.op === "is-not" };
+        }
+        if (optionIds.length !== rule.optionIds.length) {
+          return { drop: false, rule: { ...rule, optionIds } };
         }
       }
-      return rule;
+      return { drop: false, rule };
     });
   }
 }
