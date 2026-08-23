@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -35,6 +35,10 @@ export const NoteList: React.FC = () => {
   );
 
   const taggedNoteIds = useTagStore((s) => s.taggedNoteIds);
+  const activeTagId = useTagStore((s) => s.activeTagId);
+  const tags = useTagStore((s) => s.tags);
+  const setTagFilter = useTagStore((s) => s.setTagFilter);
+  const activeTag = tags.find((t) => t.id === activeTagId);
 
   const workspaceNotes = useMemo(
     () =>
@@ -93,6 +97,27 @@ export const NoteList: React.FC = () => {
           <Plus className="w-4 h-4" aria-hidden="true" />
         </Button>
       </div>
+
+      {activeTag && (
+        <div className="flex items-center justify-between gap-1 rounded-md border bg-card px-2 py-1">
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: activeTag.color }}
+            />
+            <span className="truncate">{activeTag.name}</span>
+          </span>
+          <button
+            type="button"
+            aria-label={MESSAGES.TAG_FILTER_CLEAR}
+            onClick={() => void setTagFilter(null)}
+            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-3 w-3" aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       <div ref={parentRef} className="flex-1 overflow-y-auto relative space-y-1 pr-1">
         <div

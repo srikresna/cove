@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { ChevronDown, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarCheck, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
+import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -19,6 +20,7 @@ import { TooltipProvider } from "../ui/tooltip";
 import { LibrarySection } from "./LibrarySection";
 import { NoteList } from "./NoteList";
 import { TagsSection } from "./TagsSection";
+import { TemplatesSection } from "./TemplatesSection";
 import { WorkspaceRail } from "./WorkspaceRail";
 
 export const Sidebar: React.FC = () => {
@@ -28,6 +30,7 @@ export const Sidebar: React.FC = () => {
   const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const notes = useNoteStore((s) => s.notes);
+  const openJournal = useOpenJournal();
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
   const noteCount = notes.filter((n) => n.workspaceId === activeWorkspace?.id).length;
@@ -96,26 +99,38 @@ export const Sidebar: React.FC = () => {
               </DropdownMenu>
             </div>
 
-            <div className="px-3 pt-3">
+            <div className="flex items-center gap-1.5 px-3 pt-3">
               <button
                 type="button"
                 aria-label="Quick Search"
                 onClick={() => setQuickSearchOpen(true)}
-                className="flex w-full items-center justify-between rounded-full border bg-card py-1.5 pl-3 pr-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-8 min-w-0 flex-1 items-center justify-between rounded-full border bg-card pl-3 pr-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="flex items-center gap-2 truncate">
-                  <Search className="h-4 w-4" aria-hidden="true" />
-                  <span>Search</span>
+                <span className="flex min-w-0 items-center gap-2 truncate">
+                  <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Search</span>
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex shrink-0 items-center gap-1">
                   <Kbd>⌘</Kbd>
                   <Kbd>K</Kbd>
                 </span>
               </button>
             </div>
 
+            <div className="px-3 pt-2">
+              <button
+                type="button"
+                onClick={() => openJournal(Date.now())}
+                className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <CalendarCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{MESSAGES.NAV_TODAY}</span>
+              </button>
+            </div>
+
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               <LibrarySection />
+              <TemplatesSection />
               <TagsSection />
               <NoteList />
             </div>

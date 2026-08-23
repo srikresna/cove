@@ -2,6 +2,7 @@ import { JOURNAL_PROPERTY_ID, type PropertyValue } from "../domain/property/Prop
 import type { IJournalService } from "./IJournalService";
 import type { INoteService } from "./INoteService";
 import type { IPropertyService } from "./IPropertyService";
+import { getJournalTemplateId } from "./journalTemplateSetting";
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
@@ -71,7 +72,16 @@ export class JournalService implements IJournalService {
       // must not hijack the day, so only live notes are reusable.
       if (note && note.deletedAt == null && note.workspaceId === workspaceId) return noteId;
     }
-    const note = await this.notes.createNote(workspaceId, journalTitleFor(midnight));
+    // Apply the workspace journal template's content, when one is configured.
+    let content: string | undefined;
+    const templateId = getJournalTemplateId(workspaceId);
+    if (templateId) {
+      const template = await this.notes.getNote(templateId).catch(() => null);
+      if (template && template.deletedAt == null && template.isTemplate) {
+        content = template.content;
+      }
+    }
+    const note = await this.notes.createNote(workspaceId, journalTitleFor(midnight), content);
     await this.setJournalDate(note.id, midnight);
     return note.id;
   }
