@@ -567,5 +567,13 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 20");
       }
     }
+
+    if (version < 21) {
+      // Saved views (AFFI NE collections): named filter-rule sets per workspace.
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS saved_views (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, rulesJson TEXT NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
+      );
+      await db.execute("PRAGMA user_version = 21");
+    }
   }
 }

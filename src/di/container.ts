@@ -6,6 +6,7 @@ import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationReposi
 import { SQLiteNoteLinkRepository } from "../repositories/SQLiteNoteLinkRepository";
 import { SQLiteNoteRepository } from "../repositories/SQLiteNoteRepository";
 import { SQLitePropertyRepository } from "../repositories/SQLitePropertyRepository";
+import { SQLiteSavedViewRepository } from "../repositories/SQLiteSavedViewRepository";
 import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
 import { BlockSuiteEditorService } from "../services/blocksuite/BlockSuiteEditorService";
@@ -13,12 +14,14 @@ import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuit
 import type { IJournalService } from "../services/IJournalService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
+import type { ISavedViewService } from "../services/ISavedViewService";
 import type { ITagService } from "../services/ITagService";
 import type { IVaultService } from "../services/IVaultService";
 import type { IWorkspaceService } from "../services/IWorkspaceService";
 import { JournalService } from "../services/JournalService";
 import { NoteService } from "../services/NoteService";
 import { PropertyService } from "../services/PropertyService";
+import { SavedViewService } from "../services/SavedViewService";
 import { TagService } from "../services/TagService";
 import { type KdfDerive, VaultService } from "../services/VaultService";
 import { TauriBackupService } from "../services/vault/backup";
@@ -54,6 +57,9 @@ export const propertyService: IPropertyService = new PropertyService(
   new SQLitePropertyRepository(),
 );
 export const journalService: IJournalService = new JournalService(propertyService, noteService);
+export const savedViewService: ISavedViewService = new SavedViewService(
+  new SQLiteSavedViewRepository(),
+);
 export const workspaceService: IWorkspaceService = new WorkspaceService(workspaceRepository);
 const deviceBind = new DeviceBind();
 const deriveKeyFn: KdfDerive = async (passphrase, salt, kdfAlg, params) => {

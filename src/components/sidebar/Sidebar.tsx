@@ -17,6 +17,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Kbd } from "../ui/kbd";
 import { TooltipProvider } from "../ui/tooltip";
+import { CollectionsSection } from "./CollectionsSection";
 import { LibrarySection } from "./LibrarySection";
 import { NoteList } from "./NoteList";
 import { TagsSection } from "./TagsSection";
@@ -130,6 +131,7 @@ export const Sidebar: React.FC = () => {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               <LibrarySection />
+              <CollectionsSection />
               <TemplatesSection />
               <TagsSection />
               <NoteList />

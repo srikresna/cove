@@ -1,13 +1,19 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Plus, X } from "lucide-react";
 import type React from "react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
+import { propertyService } from "../../di/container";
+import type { FilterableNote } from "../../services/filters/evaluateFilters";
+import { evaluateFilters } from "../../services/filters/evaluateFilters";
 import { useNoteStore } from "../../store/useNoteStore";
+import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
+import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
+import { FilterBar } from "./FilterBar";
 import { NoteItem } from "./NoteItem";
 
 export const NoteList: React.FC = () => {
@@ -40,15 +46,72 @@ export const NoteList: React.FC = () => {
   const setTagFilter = useTagStore((s) => s.setTagFilter);
   const activeTag = tags.find((t) => t.id === activeTagId);
 
-  const workspaceNotes = useMemo(
-    () =>
-      notes.filter(
-        (n) =>
-          n.workspaceId === activeWorkspaceId &&
-          (taggedNoteIds === null || taggedNoteIds.has(n.id)),
+  const draftRules = useViewStore((s) => s.draftRules);
+  const viewVersion = useViewStore((s) => s.version);
+  const propertyVersion = usePropertyStore((s) => s.version);
+
+  // Filter inputs (property values + journal dates) reload when rules exist.
+  const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(null);
+  const rulesActive = draftRules.length > 0;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion/propertyVersion are intentional refresh signals, not body inputs
+  useEffect(() => {
+    if (!rulesActive) {
+      setFilterable(null);
+      return;
+    }
+    let alive = true;
+    Promise.all([
+      propertyService.valuesForDefinitionAllNotes("system:journal"),
+      propertyService.listDefinitions().then((defs) =>
+        Promise.all(
+          defs.map(async (def) => ({
+            propertyId: def.id,
+            values: await propertyService.valuesForDefinitionAllNotes(def.id),
+          })),
+        ),
       ),
-    [notes, activeWorkspaceId, taggedNoteIds],
-  );
+    ])
+      .then(([journalValues, perDef]) => {
+        if (!alive) return;
+        const map = new Map<string, FilterableNote>();
+        for (const note of notes) {
+          if (note.workspaceId !== activeWorkspaceId) continue;
+          const journal = journalValues.get(note.id);
+          map.set(note.id, {
+            note,
+            propertyValues: new Map(),
+            tagIds: [],
+            journalTimestamp:
+              journal?.type === "date" ? (journal as { timestamp: number }).timestamp : null,
+          });
+        }
+        for (const { propertyId, values } of perDef) {
+          for (const [noteId, value] of values) {
+            map.get(noteId)?.propertyValues.set(propertyId, value);
+          }
+        }
+        setFilterable(map);
+      })
+      .catch(() => {
+        if (alive) setFilterable(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [rulesActive, notes, activeWorkspaceId, viewVersion, propertyVersion]);
+
+  const workspaceNotes = useMemo(() => {
+    const base = notes.filter(
+      (n) =>
+        n.workspaceId === activeWorkspaceId && (taggedNoteIds === null || taggedNoteIds.has(n.id)),
+    );
+    if (!rulesActive || !filterable) return base;
+    const items = base
+      .map((n) => filterable.get(n.id))
+      .filter((i): i is FilterableNote => i != null);
+    return evaluateFilters(items, draftRules).map((i) => i.note);
+  }, [notes, activeWorkspaceId, taggedNoteIds, rulesActive, filterable, draftRules]);
 
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +181,8 @@ export const NoteList: React.FC = () => {
           </button>
         </div>
       )}
+
+      <FilterBar />
 
       <div ref={parentRef} className="flex-1 overflow-y-auto relative space-y-1 pr-1">
         <div

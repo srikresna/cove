@@ -1,0 +1,380 @@
+import { Plus, Save, X } from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
+
+import { MESSAGES } from "../../constants/messages";
+import { propertyService } from "../../di/container";
+import type { FilterRule } from "../../domain/filters/FilterRule";
+import { FILTER_OPERATORS, filterKindForType } from "../../domain/filters/FilterRule";
+import type { PropertyDefinition } from "../../domain/property/Property";
+import { cn } from "../../lib/utils";
+import { usePropertyStore } from "../../store/usePropertyStore";
+import { useTagStore } from "../../store/useTagStore";
+import { useViewStore } from "../../store/useViewStore";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { PropertyCalendar } from "../ui/PropertyCalendar";
+
+const makeRuleId = () => crypto.randomUUID();
+
+function opLabel(kind: FilterRule["kind"], op: string): string {
+  return FILTER_OPERATORS[kind].find((o) => o.value === op)?.label ?? op;
+}
+
+const RuleChip: React.FC<{
+  rule: FilterRule;
+  propertyDefs: PropertyDefinition[];
+  onUpdate: (patch: Partial<FilterRule>) => void;
+  onRemove: () => void;
+}> = ({ rule, propertyDefs, onUpdate, onRemove }) => {
+  const tags = useTagStore((s) => s.tags);
+  const def = propertyDefs.find((d) => d.id === (rule as { propertyId?: string }).propertyId);
+  const ruleName =
+    rule.kind === "tags"
+      ? MESSAGES.TAGS_HEADER
+      : rule.kind === "journal"
+        ? "Journal"
+        : rule.kind === "template"
+          ? "Template"
+          : (def?.name ?? "?");
+  const ops = FILTER_OPERATORS[rule.kind];
+  const currentOp = (rule as { op: string }).op;
+  const needsValue = !currentOp.startsWith("is-empty") && !currentOp.startsWith("is-not-empty");
+
+  const numberValue = rule.kind === "number" ? rule.value : undefined;
+  const dateValue = rule.kind === "date" ? rule.value : undefined;
+  const boolValue =
+    rule.kind === "checkbox" || rule.kind === "journal" || rule.kind === "template"
+      ? rule.value
+      : undefined;
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border bg-card px-1.5 py-1 text-xs">
+      <span className="shrink-0 font-medium text-foreground">{ruleName}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="shrink-0 rounded px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {opLabel(rule.kind, currentOp)}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-40">
+          {ops.map((op) => (
+            <DropdownMenuItem
+              key={op.value}
+              onSelect={() => onUpdate({ op: op.value } as Partial<FilterRule>)}
+            >
+              {op.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {needsValue && rule.kind === "text" && (
+        <input
+          type="text"
+          defaultValue={rule.value ?? ""}
+          onBlur={(e) => onUpdate({ value: e.target.value } as Partial<FilterRule>)}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          placeholder="text"
+          className="h-5 w-20 rounded border border-transparent bg-transparent px-1 outline-none hover:border-border focus-visible:border-border"
+        />
+      )}
+      {needsValue && rule.kind === "number" && (
+        <input
+          type="number"
+          inputMode="decimal"
+          defaultValue={numberValue ?? ""}
+          onBlur={(e) => {
+            const parsed = Number(e.target.value);
+            onUpdate({
+              value: Number.isFinite(parsed) ? parsed : undefined,
+            } as Partial<FilterRule>);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          placeholder="0"
+          className="h-5 w-16 rounded border border-transparent bg-transparent px-1 outline-none hover:border-border focus-visible:border-border"
+        />
+      )}
+      {needsValue && rule.kind === "date" && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {dateValue != null
+                ? new Date(dateValue).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : MESSAGES.INFO_EMPTY_VALUE}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-auto p-2">
+            <PropertyCalendar
+              value={dateValue ?? null}
+              onChange={(ts) => onUpdate({ value: ts } as Partial<FilterRule>)}
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      {(rule.kind === "checkbox" || rule.kind === "journal" || rule.kind === "template") && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {boolValue === true ? "✓" : "✗"}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-24">
+            <DropdownMenuItem onSelect={() => onUpdate({ value: true } as Partial<FilterRule>)}>
+              ✓ true
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onUpdate({ value: false } as Partial<FilterRule>)}>
+              ✗ false
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      {(rule.kind === "select" || rule.kind === "multiSelect") && def && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {(rule as { optionIds: string[] }).optionIds.length > 0
+                ? `${(rule as { optionIds: string[] }).optionIds.length} opts`
+                : MESSAGES.INFO_EMPTY_VALUE}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            {def.options.map((option) => {
+              const selected = (rule as { optionIds: string[] }).optionIds.includes(option.id);
+              return (
+                <DropdownMenuItem
+                  key={option.id}
+                  onSelect={() => {
+                    const ids = (rule as { optionIds: string[] }).optionIds;
+                    onUpdate({
+                      optionIds: selected
+                        ? ids.filter((i) => i !== option.id)
+                        : [...ids, option.id],
+                    } as Partial<FilterRule>);
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: option.color }}
+                  />
+                  <span className="truncate">{option.name}</span>
+                  {selected && <span className="ml-auto text-muted-foreground">✓</span>}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      {rule.kind === "tags" && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {rule.tagIds.length > 0 ? `${rule.tagIds.length}` : MESSAGES.INFO_EMPTY_VALUE}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            {tags.map((tag) => {
+              const selected = rule.tagIds.includes(tag.id);
+              return (
+                <DropdownMenuItem
+                  key={tag.id}
+                  onSelect={() =>
+                    onUpdate({
+                      tagIds: selected
+                        ? rule.tagIds.filter((i) => i !== tag.id)
+                        : [...rule.tagIds, tag.id],
+                    } as Partial<FilterRule>)
+                  }
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: tag.color }}
+                  />
+                  <span className="truncate">{tag.name}</span>
+                  {selected && <span className="ml-auto text-muted-foreground">✓</span>}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      <button
+        type="button"
+        aria-label="Remove rule"
+        onClick={onRemove}
+        className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <X className="h-3 w-3" aria-hidden="true" />
+      </button>
+    </div>
+  );
+};
+
+export const FilterBar: React.FC = () => {
+  const draftRules = useViewStore((s) => s.draftRules);
+  const addDraftRule = useViewStore((s) => s.addDraftRule);
+  const updateDraftRule = useViewStore((s) => s.updateDraftRule);
+  const removeDraftRule = useViewStore((s) => s.removeDraftRule);
+  const clearDraft = useViewStore((s) => s.clearDraft);
+  const saveDraftAsView = useViewStore((s) => s.saveDraftAsView);
+  const activeViewId = useViewStore((s) => s.activeViewId);
+  const propertyVersion = usePropertyStore((s) => s.version);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const [defs, setDefs] = useState<PropertyDefinition[]>([]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
+  useEffect(() => {
+    propertyService
+      .listDefinitions()
+      .then(setDefs)
+      .catch(() => setDefs([]));
+  }, [propertyVersion]);
+
+  const filterableDefs = defs.filter(
+    (d) => d.show !== "always-hide" && d.id !== "system:tags" && filterKindForType(d.type) !== null,
+  );
+
+  const handleAdd = (kind: FilterRule["kind"], propertyId?: string) => {
+    const base = { id: makeRuleId(), propertyId: propertyId ?? "" };
+    switch (kind) {
+      case "text":
+        addDraftRule({ ...base, kind: "text", op: "contains", value: "" });
+        break;
+      case "number":
+        addDraftRule({ ...base, kind: "number", op: "=", value: undefined });
+        break;
+      case "date":
+        addDraftRule({ ...base, kind: "date", op: "is", value: undefined });
+        break;
+      case "select":
+        addDraftRule({ ...base, kind: "select", op: "is", optionIds: [] });
+        break;
+      case "multiSelect":
+        addDraftRule({ ...base, kind: "multiSelect", op: "is", optionIds: [] });
+        break;
+      case "checkbox":
+        addDraftRule({ ...base, kind: "checkbox", op: "is", value: true });
+        break;
+      case "tags":
+        addDraftRule({ id: makeRuleId(), kind: "tags", op: "has-any-of", tagIds: [] });
+        break;
+      case "journal":
+        addDraftRule({ id: makeRuleId(), kind: "journal", op: "is", value: true });
+        break;
+      case "template":
+        addDraftRule({ id: makeRuleId(), kind: "template", op: "is", value: false });
+        break;
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      {draftRules.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          {draftRules.map((rule) => (
+            <RuleChip
+              key={rule.id}
+              rule={rule}
+              propertyDefs={filterableDefs}
+              onUpdate={(patch) => updateDraftRule(rule.id, patch)}
+              onRemove={() => removeDraftRule(rule.id)}
+            />
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground",
+              )}
+            >
+              <Plus className="h-3 w-3" aria-hidden="true" />
+              {MESSAGES.VIEW_ADD_RULE}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            {filterableDefs.map((def) => {
+              const kind = filterKindForType(def.type);
+              if (!kind) return null;
+              return (
+                <DropdownMenuItem key={def.id} onSelect={() => handleAdd(kind, def.id)}>
+                  <span className="truncate">{def.name}</span>
+                  <span className="ml-auto text-[10px] uppercase text-muted-foreground">
+                    {def.type}
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{MESSAGES.VIEW_SPECIAL}</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => handleAdd("tags")}>
+              {MESSAGES.TAGS_HEADER}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => handleAdd("journal")}>Journal</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => handleAdd("template")}>Template</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {draftRules.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                const name = window.prompt(MESSAGES.VIEW_SAVE_PROMPT);
+                if (name && activeWorkspaceId) void saveDraftAsView(activeWorkspaceId, name);
+              }}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+            >
+              <Save className="h-3 w-3" aria-hidden="true" />
+              {MESSAGES.VIEW_SAVE}
+            </button>
+            <button
+              type="button"
+              onClick={clearDraft}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              {MESSAGES.VIEW_CLEAR}
+            </button>
+          </>
+        )}
+        {activeViewId && (
+          <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">
+            {MESSAGES.VIEW_ACTIVE}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
