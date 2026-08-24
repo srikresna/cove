@@ -127,6 +127,16 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
         setStackDefs(eligible);
         if (eligible.length === 0) {
           setStackValues(null);
+          // Write the empty state through to the cache too, or a deleted
+          // last definition replays ghost stack rows on every remount.
+          if (activeWorkspaceId) {
+            const prev = listCache.get(activeWorkspaceId);
+            listCache.set(activeWorkspaceId, {
+              stackDefs: [],
+              stackValues: null,
+              filterable: prev?.filterable ?? null,
+            });
+          }
           return;
         }
         const perDef = await Promise.all(
@@ -264,14 +274,20 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
       !rulesActive || !filterable
         ? base
         : evaluateFilters(
-            // The cached filterable map may hold stale note objects; always
-            // evaluate with the LIVE note from the store.
-            base
-              .map((n) => {
-                const item = filterable.get(n.id);
-                return item ? { ...item, note: n } : null;
-              })
-              .filter((i): i is FilterableNote => i != null),
+            // The cached filterable map may hold stale note objects and may
+            // not know notes created since the last visit — always evaluate
+            // with the LIVE note, and treat unknown notes as having empty
+            // property/tag inputs (true for a just-created note) instead of
+            // dropping them from the filtered view.
+            base.map((n) => ({
+              ...(filterable.get(n.id) ?? {
+                note: n,
+                propertyValues: new Map(),
+                tagIds: [],
+                journalTimestamp: null,
+              }),
+              note: n,
+            })),
             draftRules,
           ).map((i) => i.note);
     return [...filtered].sort(compareBy(sort));
