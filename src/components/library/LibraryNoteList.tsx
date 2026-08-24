@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService, tagService } from "../../di/container";
+import type { FilterRule } from "../../domain/filters/FilterRule";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import type { FilterableNote } from "../../services/filters/evaluateFilters";
 import { evaluateFilters } from "../../services/filters/evaluateFilters";
@@ -41,6 +42,37 @@ const listCache = new Map<
     filterable: Map<string, FilterableNote> | null;
   }
 >();
+
+/**
+ * Rules whose predicate EMPTY inputs would satisfy (is-empty everywhere,
+ * tags has-none-of, journal-is-false, checkbox-is-false). For a note with
+ * UNKNOWN inputs (absent from the SWR cache — could be brand-new and truly
+ * empty, or could have acquired values while the page was unmounted, e.g.
+ * today's journal is created WITH its journal date), fabricated emptiness
+ * must not decide these predicates: such views defer unknown notes to
+ * revalidation (brief omission reads as loading; admission-then-vanish
+ * reads as a glitch). Views without these rules keep unknown notes visible
+ * immediately — live-note-field rules (template) and positive rules decide
+ * on data we actually have.
+ */
+function satisfiedByEmptyInputs(rule: FilterRule): boolean {
+  switch (rule.kind) {
+    case "text":
+    case "number":
+    case "date":
+    case "select":
+    case "multiSelect":
+      return rule.op === "is-empty";
+    case "tags":
+      return rule.op === "is-empty" || rule.op === "has-none-of";
+    case "journal":
+      return rule.value === false;
+    case "checkbox":
+      return rule.value === false;
+    default:
+      return false;
+  }
+}
 
 const compareBy = (sort: LibrarySort) => {
   switch (sort) {
@@ -270,24 +302,30 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
       (n) =>
         n.workspaceId === activeWorkspaceId && (taggedNoteIds === null || taggedNoteIds.has(n.id)),
     );
+    // Defer cache-unknown notes only when some rule's predicate empty
+    // inputs would satisfy (see satisfiedByEmptyInputs).
+    const deferUnknown = draftRules.some(satisfiedByEmptyInputs);
     const filtered =
       !rulesActive || !filterable
         ? base
         : evaluateFilters(
             // The cached filterable map may hold stale note objects and may
             // not know notes created since the last visit — always evaluate
-            // with the LIVE note, and treat unknown notes as having empty
-            // property/tag inputs (true for a just-created note) instead of
-            // dropping them from the filtered view.
-            base.map((n) => ({
-              ...(filterable.get(n.id) ?? {
+            // with the LIVE note. Notes absent from the cache are
+            // synthesized with empty inputs ONLY in views where fabricated
+            // emptiness cannot decide the outcome; views with
+            // emptiness-satisfiable rules defer them to revalidation.
+            base
+              .filter((n) => deferUnknown || filterable.has(n.id))
+              .map((n) => ({
+                ...(filterable.get(n.id) ?? {
+                  note: n,
+                  propertyValues: new Map(),
+                  tagIds: [],
+                  journalTimestamp: null,
+                }),
                 note: n,
-                propertyValues: new Map(),
-                tagIds: [],
-                journalTimestamp: null,
-              }),
-              note: n,
-            })),
+              })),
             draftRules,
           ).map((i) => i.note);
     return [...filtered].sort(compareBy(sort));
