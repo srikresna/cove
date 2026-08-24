@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { savedViewService, vaultService } from "../di/container";
 import type { FilterRule, FilterRules } from "../domain/filters/FilterRule";
 import type { SavedView } from "../domain/filters/SavedView";
+import type { PropertyDefinition } from "../domain/property/Property";
 import { notifyError } from "./notify";
 
 interface ViewState {
@@ -27,6 +28,8 @@ interface ViewState {
   syncAfterOptionDelete: (propertyId: string, optionId: string) => Promise<void>;
   /** Sync saved views + drafts after a property definition was deleted. */
   syncAfterPropertyDelete: (propertyId: string) => Promise<void>;
+  /** Prune draft rules referencing dead defs/options (startup heal). */
+  healDrafts: (defs: PropertyDefinition[]) => void;
 }
 
 export const useViewStore = create<ViewState>((set, get) => ({
@@ -37,7 +40,18 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   fetchViews: async (workspaceId) => {
     try {
-      set({ views: await savedViewService.listViews(workspaceId) });
+      const fresh = await savedViewService.listViews(workspaceId);
+      // Self-reconciling: a refresh can land after the active view was
+      // deleted underneath it (startup heal, prune, interrupted flows) —
+      // an activeViewId naming a view absent from the fresh list is a
+      // stranded selection and is cleared with its drafts. Only fires when
+      // the id is genuinely absent, so newly created/applied views (always
+      // present in their own refresh) are never affected.
+      set((s) =>
+        s.activeViewId && !fresh.some((v) => v.id === s.activeViewId)
+          ? { views: fresh, activeViewId: null, draftRules: [] }
+          : { views: fresh },
+      );
     } catch (err) {
       notifyError(err);
     }
@@ -157,6 +171,40 @@ export const useViewStore = create<ViewState>((set, get) => ({
       get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
     set((s) => ({
       ...(activeDeleted ? { activeViewId: null, draftRules: [] } : {}),
+      version: s.version + 1,
+    }));
+  },
+
+  healDrafts: (defs) => {
+    const defsById = new Map(defs.map((d) => [d.id, d]));
+    set((s) => ({
+      // Same contract as the runtime sync paths: drafts referencing dead
+      // defs/options are pruned unconditionally — the FilterBar can never
+      // render or clear a dead reference. Kinds are narrowed explicitly
+      // because drafts copied from loaded views carry the loader's stamped
+      // propertyId key on tags/journal/template rules too.
+      draftRules: s.draftRules.flatMap((r): FilterRule[] => {
+        switch (r.kind) {
+          case "text":
+          case "number":
+          case "date":
+          case "checkbox": {
+            return defsById.has(r.propertyId) ? [r] : [];
+          }
+          case "select":
+          case "multiSelect": {
+            const def = defsById.get(r.propertyId);
+            if (!def) return [];
+            const live = new Set(def.options.map((o) => o.id));
+            const optionIds = r.optionIds.filter((id) => live.has(id));
+            if (optionIds.length === 0 && (r.op === "is" || r.op === "is-not")) return [];
+            if (optionIds.length !== r.optionIds.length) return [{ ...r, optionIds }];
+            return [r];
+          }
+          default:
+            return [r];
+        }
+      }),
       version: s.version + 1,
     }));
   },

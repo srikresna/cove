@@ -234,7 +234,7 @@ describe("SavedViewService", () => {
       rules: [{ id: "r1", kind: "select", propertyId: "p1", op: "is-not", optionIds: ["dead"] }],
     });
 
-    await service.healRules([liveDef("p1", ["live"])]);
+    const deletedByHeal = await service.healRules([liveDef("p1", ["live"])]);
 
     // Kind-based rules without a property pass through untouched.
     expect((await repo.findById("vTags"))?.rules).toEqual(tagRule(["work"]).map(decoded));
@@ -247,6 +247,8 @@ describe("SavedViewService", () => {
     ]);
     // Positive op on a fully-dead option: view can never match again.
     expect(await repo.findById("vAllDead")).toBeNull();
+    // The App.tsx reconcile contract: healRules returns the deleted ids.
+    expect(deletedByHeal).toEqual(["vAllDead"]);
     // is-not [deadOption] has been match-all since the option died: keep.
     expect((await repo.findById("vNotDead"))?.rules).toEqual([]);
   });

@@ -53,6 +53,11 @@ export const AppContent: React.FC = () => {
       .listDefinitions()
       .then(async (defs) => {
         const deleted = await savedViewService.healRules(defs);
+        // Prune drafts of dead references unconditionally (rewritten and
+        // deselected views strand drafts just like deleted ones — drafts are
+        // the note list's only filter input), then clear a deleted ACTIVE
+        // selection; the fetchViews reconcile covers any straggler clicks.
+        useViewStore.getState().healDrafts(defs);
         useViewStore.setState((s) =>
           s.activeViewId && deleted.includes(s.activeViewId)
             ? { activeViewId: null, draftRules: [], version: s.version + 1 }
