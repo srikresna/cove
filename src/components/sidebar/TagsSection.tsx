@@ -1,10 +1,11 @@
-import { ChevronDown, ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { TAG_COLORS } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
 import { useTagStore } from "../../store/useTagStore";
+import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import {
   DropdownMenu,
@@ -14,8 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-
-const OPEN_KEY = "cove-tags-open";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 const TagRow: React.FC<{
   tagId: string;
@@ -140,7 +140,6 @@ const TagRow: React.FC<{
 };
 
 export const TagsSection: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "false");
   const tags = useTagStore((s) => s.tags);
   const tagCounts = useTagStore((s) => s.tagCounts);
   const tagVersion = useTagStore((s) => s.version);
@@ -156,46 +155,35 @@ export const TagsSection: React.FC = () => {
 
   if (tags.length === 0) return null;
 
-  const toggleOpen = () => {
-    const next = !isOpen;
-    localStorage.setItem(OPEN_KEY, String(next));
-    setIsOpen(next);
-  };
-
   const countOf = (tagId: string): number =>
     tagCounts.find((c) => c.tagId === tagId)?.noteCount ?? 0;
 
   return (
-    <div className="space-y-1 pb-2">
-      <button
-        type="button"
-        onClick={toggleOpen}
-        aria-expanded={isOpen}
-        className="flex w-full items-center gap-1 rounded px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {isOpen ? (
-          <ChevronDown className="h-3 w-3" aria-hidden="true" />
-        ) : (
-          <ChevronRight className="h-3 w-3" aria-hidden="true" />
-        )}
-        {MESSAGES.TAGS_HEADER}
-      </button>
-
-      {isOpen && (
-        <div className="space-y-0.5">
-          {tags.map((tag) => (
-            <TagRow
-              key={tag.id}
-              tagId={tag.id}
-              name={tag.name}
-              color={tag.color}
-              noteCount={countOf(tag.id)}
-              isActive={tag.id === activeTagId}
-              onSelect={() => void setTagFilter(tag.id === activeTagId ? null : tag.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    <CollapsibleSection
+      storageKey="cove-tags-open"
+      label={MESSAGES.TAGS_HEADER}
+      count={tags.length}
+    >
+      <div className="space-y-0.5">
+        {tags.map((tag) => (
+          <TagRow
+            key={tag.id}
+            tagId={tag.id}
+            name={tag.name}
+            color={tag.color}
+            noteCount={countOf(tag.id)}
+            isActive={tag.id === activeTagId}
+            onSelect={() => {
+              // AFFI NE parity: a tag click filters the all-docs page.
+              const next = tag.id === activeTagId ? null : tag.id;
+              void setTagFilter(next);
+              if (next !== null) {
+                useUIStore.getState().setActivePage("library");
+              }
+            }}
+          />
+        ))}
+      </div>
+    </CollapsibleSection>
   );
 };

@@ -18,8 +18,9 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
   const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore();
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
-  const isTrashOpen = useUIStore((s) => s.isTrashOpen);
-  const setTrashOpen = useUIStore((s) => s.setTrashOpen);
+  const activePage = useUIStore((s) => s.activePage);
+  const setActivePage = useUIStore((s) => s.setActivePage);
+  const isTrashOpen = activePage === "trash";
 
   return (
     <div className="flex h-full w-[52px] flex-shrink-0 flex-col items-center gap-2 py-3">
@@ -95,7 +96,7 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
             type="button"
             aria-label={MESSAGES.TRASH_TITLE}
             aria-pressed={isTrashOpen}
-            onClick={() => setTrashOpen(!isTrashOpen)}
+            onClick={() => setActivePage(isTrashOpen ? "editor" : "trash")}
             className={cn(
               tile,
               isTrashOpen

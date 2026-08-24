@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronRight, Layers, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Layers, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
+import { useUIStore } from "../../store/useUIStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import {
@@ -11,11 +12,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-
-const OPEN_KEY = "cove-collections-open";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 export const CollectionsSection: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "false");
   const views = useViewStore((s) => s.views);
   const activeViewId = useViewStore((s) => s.activeViewId);
   const fetchViews = useViewStore((s) => s.fetchViews);
@@ -32,45 +31,33 @@ export const CollectionsSection: React.FC = () => {
 
   if (views.length === 0) return null;
 
-  const toggleOpen = () => {
-    const next = !isOpen;
-    localStorage.setItem(OPEN_KEY, String(next));
-    setIsOpen(next);
-  };
-
   return (
-    <div className="space-y-1 pb-2">
-      <button
-        type="button"
-        onClick={toggleOpen}
-        aria-expanded={isOpen}
-        className="flex w-full items-center gap-1 rounded px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {isOpen ? (
-          <ChevronDown className="h-3 w-3" aria-hidden="true" />
-        ) : (
-          <ChevronRight className="h-3 w-3" aria-hidden="true" />
-        )}
-        {MESSAGES.VIEW_HEADER}
-        <span className="font-mono">({views.length})</span>
-      </button>
-
-      {isOpen && (
-        <div className="space-y-0.5">
-          {views.map((view) => (
-            <ViewRow
-              key={view.id}
-              name={view.name}
-              ruleCount={view.rules.length}
-              isActive={view.id === activeViewId}
-              onSelect={() => setActiveView(view.id === activeViewId ? null : view.id)}
-              onRename={(next) => void renameView(view.id, next)}
-              onDelete={() => void deleteView(view.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    <CollapsibleSection
+      storageKey="cove-collections-open"
+      label={MESSAGES.VIEW_HEADER}
+      count={views.length}
+    >
+      <div className="space-y-0.5">
+        {views.map((view) => (
+          <ViewRow
+            key={view.id}
+            name={view.name}
+            ruleCount={view.rules.length}
+            isActive={view.id === activeViewId}
+            onSelect={() => {
+              // AFFI NE parity: applying a collection from the sidebar
+              // navigates to the all-docs page with the view active.
+              setActiveView(view.id === activeViewId ? null : view.id);
+              if (view.id !== activeViewId) {
+                useUIStore.getState().setActivePage("library");
+              }
+            }}
+            onRename={(next) => void renameView(view.id, next)}
+            onDelete={() => void deleteView(view.id)}
+          />
+        ))}
+      </div>
+    </CollapsibleSection>
   );
 };
 

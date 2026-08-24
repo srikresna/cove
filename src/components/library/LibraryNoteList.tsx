@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -13,11 +13,44 @@ import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { NoteItem } from "../sidebar/NoteItem";
 import { Button } from "../ui/button";
-import { FilterBar } from "./FilterBar";
-import { NoteItem } from "./NoteItem";
 
-export const NoteList: React.FC = () => {
+export type LibrarySort =
+  | "updated-desc"
+  | "updated-asc"
+  | "created-desc"
+  | "created-asc"
+  | "title-asc"
+  | "title-desc";
+
+const compareBy = (sort: LibrarySort) => {
+  switch (sort) {
+    case "updated-asc":
+      return (a: { updatedAt: number }, b: { updatedAt: number }) => a.updatedAt - b.updatedAt;
+    case "created-desc":
+      return (a: { createdAt: number }, b: { createdAt: number }) => b.createdAt - a.createdAt;
+    case "created-asc":
+      return (a: { createdAt: number }, b: { createdAt: number }) => a.createdAt - b.createdAt;
+    case "title-asc":
+      return (a: { title: string }, b: { title: string }) =>
+        (a.title || "").localeCompare(b.title || "");
+    case "title-desc":
+      return (a: { title: string }, b: { title: string }) =>
+        (b.title || "").localeCompare(a.title || "");
+    default:
+      return (a: { updatedAt: number }, b: { updatedAt: number }) => b.updatedAt - a.updatedAt;
+  }
+};
+
+/**
+ * The all-docs list (AFFI NE Explorer equivalent), migrated from the old
+ * sidebar NoteList: tag pre-filter + saved-view rules + sort, property
+ * stack rows, and the id-keyed dynamic-measurement virtualizer. The
+ * component's outer container IS the scroll element — the page keeps its
+ * header fixed, like AFFI NE's all-docs page.
+ */
+export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const {
     notes,
@@ -109,11 +142,7 @@ export const NoteList: React.FC = () => {
   }, [propertyVersion]);
 
   const taggedNoteIds = useTagStore((s) => s.taggedNoteIds);
-  const activeTagId = useTagStore((s) => s.activeTagId);
-  const tags = useTagStore((s) => s.tags);
   const tagVersion = useTagStore((s) => s.version);
-  const setTagFilter = useTagStore((s) => s.setTagFilter);
-  const activeTag = tags.find((t) => t.id === activeTagId);
 
   const draftRules = useViewStore((s) => s.draftRules);
   const viewVersion = useViewStore((s) => s.version);
@@ -195,12 +224,15 @@ export const NoteList: React.FC = () => {
       (n) =>
         n.workspaceId === activeWorkspaceId && (taggedNoteIds === null || taggedNoteIds.has(n.id)),
     );
-    if (!rulesActive || !filterable) return base;
-    const items = base
-      .map((n) => filterable.get(n.id))
-      .filter((i): i is FilterableNote => i != null);
-    return evaluateFilters(items, draftRules).map((i) => i.note);
-  }, [notes, activeWorkspaceId, taggedNoteIds, rulesActive, filterable, draftRules]);
+    const filtered =
+      !rulesActive || !filterable
+        ? base
+        : evaluateFilters(
+            base.map((n) => filterable.get(n.id)).filter((i): i is FilterableNote => i != null),
+            draftRules,
+          ).map((i) => i.note);
+    return [...filtered].sort(compareBy(sort));
+  }, [notes, activeWorkspaceId, taggedNoteIds, rulesActive, filterable, draftRules, sort]);
 
   const stackRowsOf = useCallback(
     (noteId: string): Array<{ def: PropertyDefinition; value: PropertyValue }> => {
@@ -262,86 +294,73 @@ export const NoteList: React.FC = () => {
   }, [createNote, activeWorkspaceId]);
 
   return (
-    <div className="space-y-3 h-full flex flex-col">
-      <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          {MESSAGES.NOTES_HEADER} <span className="font-mono">({workspaceNotes.length})</span>
-        </span>
-        <Button
-          variant="secondary"
-          size="iconSm"
-          aria-label={MESSAGES.CREATE_NEW_NOTE}
-          onClick={handleCreate}
-        >
-          <Plus className="w-4 h-4" aria-hidden="true" />
-        </Button>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mx-auto w-full max-w-4xl px-6">
+        <div className="flex items-center justify-between pb-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {MESSAGES.NOTES_HEADER} <span className="font-mono">({workspaceNotes.length})</span>
+          </span>
+          <Button
+            variant="secondary"
+            size="iconSm"
+            aria-label={MESSAGES.CREATE_NEW_NOTE}
+            onClick={handleCreate}
+          >
+            <Plus className="w-4 h-4" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
 
-      {activeTag && (
-        <div className="flex items-center justify-between gap-1 rounded-md border bg-card px-2 py-1">
-          <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: activeTag.color }}
-            />
-            <span className="truncate">{activeTag.name}</span>
-          </span>
-          <button
-            type="button"
-            aria-label={MESSAGES.TAG_FILTER_CLEAR}
-            onClick={() => void setTagFilter(null)}
-            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <X className="h-3 w-3" aria-hidden="true" />
-          </button>
-        </div>
-      )}
+      <div ref={parentRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-4xl px-6 pb-16">
+          {workspaceNotes.length === 0 && (rulesActive || taggedNoteIds !== null) ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {MESSAGES.LIBRARY_EMPTY_FILTERED}
+            </p>
+          ) : (
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const note = workspaceNotes[virtualRow.index];
+                if (!note) return null;
 
-      <FilterBar />
-
-      <div ref={parentRef} className="flex-1 overflow-y-auto relative space-y-1 pr-1">
-        <div
-          style={{
-            height: `${virtualizer.getTotalSize()}px`,
-            width: "100%",
-            position: "relative",
-          }}
-        >
-          {virtualizer.getVirtualItems().map((virtualRow) => {
-            const note = workspaceNotes[virtualRow.index];
-            if (!note) return null;
-
-            return (
-              <div
-                key={virtualRow.key}
-                data-index={virtualRow.index}
-                ref={virtualizer.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  // No inline height: the row must be content-sized so
-                  // measureElement can observe real heights (stack rows grow
-                  // past the 54px estimate); pinning it to virtualRow.size
-                  // would freeze measurement at the estimate forever.
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <NoteItem
-                  note={note}
-                  isActive={note.id === activeNoteId}
-                  onSelect={handleSelect}
-                  onTogglePin={handleTogglePin}
-                  onToggleFavorite={handleToggleFavorite}
-                  onDuplicate={handleDuplicate}
-                  onDelete={handleDelete}
-                  stackRows={stackRowsOf(note.id)}
-                />
-              </div>
-            );
-          })}
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      // No inline height: the row must be content-sized so
+                      // measureElement can observe real heights (stack rows grow
+                      // past the 54px estimate); pinning it to virtualRow.size
+                      // would freeze measurement at the estimate forever.
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <NoteItem
+                      note={note}
+                      isActive={note.id === activeNoteId}
+                      onSelect={handleSelect}
+                      onTogglePin={handleTogglePin}
+                      onToggleFavorite={handleToggleFavorite}
+                      onDuplicate={handleDuplicate}
+                      onDelete={handleDelete}
+                      stackRows={stackRowsOf(note.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

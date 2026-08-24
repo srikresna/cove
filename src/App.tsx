@@ -4,6 +4,8 @@ import { lazy, Suspense, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BlockSuiteDialogs } from "./components/editor/BlockSuiteDialogs";
 import { PeekViewModal } from "./components/editor/blocksuite/peek/PeekViewModal";
+import { JournalsPage } from "./components/journals/JournalsPage";
+import { LibraryPage } from "./components/library/LibraryPage";
 import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./components/modals/QuickSearchModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
@@ -30,7 +32,7 @@ export const AppContent: React.FC = () => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
   const isDarkMode = useUIStore((s) => s.isDarkMode);
-  const isTrashOpen = useUIStore((s) => s.isTrashOpen);
+  const activePage = useUIStore((s) => s.activePage);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const notes = useNoteStore((s) => s.notes);
   const activeNoteId = useNoteStore((s) => s.activeNoteId);
@@ -98,8 +100,12 @@ export const AppContent: React.FC = () => {
         <Sidebar />
 
         <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
-          {isTrashOpen ? (
+          {activePage === "trash" ? (
             <TrashPage />
+          ) : activePage === "library" ? (
+            <LibraryPage />
+          ) : activePage === "journals" ? (
+            <JournalsPage />
           ) : activeNote ? (
             activeNote.content === "" ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">

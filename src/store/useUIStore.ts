@@ -1,17 +1,20 @@
 import { create } from "zustand";
 
+/** Main-area pages, AFFI NE-style: one visible at a time. */
+export type ActivePage = "editor" | "library" | "journals" | "trash";
+
 interface UIState {
   isCreateModalOpen: boolean;
   isQuickSearchOpen: boolean;
   isSettingsOpen: boolean;
-  isTrashOpen: boolean;
+  activePage: ActivePage;
   isDarkMode: boolean;
 
   pickerResolve: ((id: string | null) => void) | null;
   setCreateModalOpen: (open: boolean) => void;
   setQuickSearchOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
-  setTrashOpen: (open: boolean) => void;
+  setActivePage: (page: ActivePage) => void;
   toggleDarkMode: () => void;
 
   pickNote: () => Promise<string | null>;
@@ -27,7 +30,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isCreateModalOpen: false,
   isQuickSearchOpen: false,
   isSettingsOpen: false,
-  isTrashOpen: false,
+  activePage: "editor",
   isDarkMode: getInitialDarkMode(),
   pickerResolve: null,
 
@@ -40,7 +43,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ isQuickSearchOpen: open });
   },
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
-  setTrashOpen: (open) => set({ isTrashOpen: open }),
+  setActivePage: (page) => set({ activePage: page }),
   toggleDarkMode: () =>
     set((state) => {
       const nextMode = !state.isDarkMode;

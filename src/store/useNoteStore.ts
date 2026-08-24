@@ -89,7 +89,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
     activeCoverImage: null,
 
     setActiveNoteId: (id) => {
-      useUIStore.getState().setTrashOpen(false);
+      // Opening a note always returns the main area to the editor page
+      // (leaving Library/Journals/Trash behind).
+      useUIStore.getState().setActivePage("editor");
       set({ activeNoteId: id, activeCoverImage: null });
     },
 

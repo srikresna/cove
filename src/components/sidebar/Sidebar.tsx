@@ -1,9 +1,8 @@
 import { motion } from "framer-motion";
-import { CalendarCheck, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarCheck, ChevronDown, Library, Plus, Search, Trash2 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -18,11 +17,14 @@ import {
 import { Kbd } from "../ui/kbd";
 import { TooltipProvider } from "../ui/tooltip";
 import { CollectionsSection } from "./CollectionsSection";
-import { LibrarySection } from "./LibrarySection";
-import { NoteList } from "./NoteList";
+import { FavoritesSection } from "./FavoritesSection";
+import { RecentSection } from "./RecentSection";
 import { TagsSection } from "./TagsSection";
 import { TemplatesSection } from "./TemplatesSection";
 import { WorkspaceRail } from "./WorkspaceRail";
+
+const navRow =
+  "flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -30,8 +32,10 @@ export const Sidebar: React.FC = () => {
   const { workspaces, activeWorkspaceId, deleteWorkspace } = useWorkspaceStore();
   const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
+  const activePage = useUIStore((s) => s.activePage);
+  const setActivePage = useUIStore((s) => s.setActivePage);
+  const createNote = useNoteStore((s) => s.createNote);
   const notes = useNoteStore((s) => s.notes);
-  const openJournal = useOpenJournal();
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
   const noteCount = notes.filter((n) => n.workspaceId === activeWorkspace?.id).length;
@@ -39,6 +43,10 @@ export const Sidebar: React.FC = () => {
   const handleDeleteWorkspace = () => {
     if (activeWorkspace) deleteWorkspace(activeWorkspace.id);
     setDeleteWorkspaceOpen(false);
+  };
+
+  const handleNewNote = () => {
+    if (activeWorkspaceId) createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE);
   };
 
   return (
@@ -100,6 +108,9 @@ export const Sidebar: React.FC = () => {
               </DropdownMenu>
             </div>
 
+            {/* AFFI NE pattern: search + new-page row, then flat nav links
+                (All docs -> Library, Journal -> Journals) above the
+                scrollable accordion area. */}
             <div className="flex items-center gap-1.5 px-3 pt-3">
               <button
                 type="button"
@@ -116,25 +127,55 @@ export const Sidebar: React.FC = () => {
                   <Kbd>K</Kbd>
                 </span>
               </button>
-            </div>
-
-            <div className="px-3 pt-2">
               <button
                 type="button"
-                onClick={() => openJournal(Date.now())}
-                className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={MESSAGES.CREATE_NEW_NOTE}
+                title={MESSAGES.CREATE_NEW_NOTE}
+                onClick={handleNewNote}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <CalendarCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{MESSAGES.NAV_TODAY}</span>
+                <Plus className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
+            <div className="space-y-0.5 px-3 pt-2">
+              <button
+                type="button"
+                aria-current={activePage === "library" ? "page" : undefined}
+                onClick={() => setActivePage("library")}
+                className={`${navRow} ${
+                  activePage === "library"
+                    ? "border-border bg-card font-medium text-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                }`}
+              >
+                <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{MESSAGES.NAV_LIBRARY}</span>
+              </button>
+              <button
+                type="button"
+                aria-current={activePage === "journals" ? "page" : undefined}
+                onClick={() => setActivePage("journals")}
+                className={`${navRow} ${
+                  activePage === "journals"
+                    ? "border-border bg-card font-medium text-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                }`}
+              >
+                <CalendarCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{MESSAGES.NAV_JOURNALS}</span>
+              </button>
+            </div>
+
+            {/* The ONLY scrolling element in the sidebar: bounded accordions,
+                never a nested list scroller (that was the double-scrollbar
+                bug). */}
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              <LibrarySection />
+              <RecentSection />
+              <FavoritesSection />
               <CollectionsSection />
               <TemplatesSection />
               <TagsSection />
-              <NoteList />
             </div>
           </div>
         </motion.div>

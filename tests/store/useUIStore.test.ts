@@ -9,7 +9,7 @@ describe("useUIStore", () => {
       isCreateModalOpen: false,
       isQuickSearchOpen: false,
       isSettingsOpen: false,
-      isTrashOpen: false,
+      activePage: "editor",
       pickerResolve: null,
     });
   });
@@ -70,5 +70,16 @@ describe("useUIStore", () => {
 
     expect(useUIStore.getState().isDarkMode).toBe(!initial);
     expect(localStorage.getItem("cove_theme")).toBe(!initial ? "dark" : "light");
+  });
+
+  it("setActivePage switches pages and back to editor", () => {
+    useUIStore.getState().setActivePage("library");
+    expect(useUIStore.getState().activePage).toBe("library");
+
+    useUIStore.getState().setActivePage("journals");
+    expect(useUIStore.getState().activePage).toBe("journals");
+
+    useUIStore.getState().setActivePage("editor");
+    expect(useUIStore.getState().activePage).toBe("editor");
   });
 });

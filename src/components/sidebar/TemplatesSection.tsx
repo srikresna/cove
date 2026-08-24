@@ -1,13 +1,4 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  LayoutTemplate,
-  MoreHorizontal,
-  Plus,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { FileText, LayoutTemplate, MoreHorizontal, Plus, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -23,8 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-
-const OPEN_KEY = "cove-templates-open";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 const TemplateRow: React.FC<{
   note: Note;
@@ -95,7 +85,6 @@ const TemplateRow: React.FC<{
 );
 
 export const TemplatesSection: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== "false");
   const notes = useNoteStore((s) => s.notes);
   const activeNoteId = useNoteStore((s) => s.activeNoteId);
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
@@ -116,12 +105,6 @@ export const TemplatesSection: React.FC = () => {
     (n) => n.workspaceId === activeWorkspaceId && n.isTemplate === true,
   );
 
-  const toggleOpen = () => {
-    const next = !isOpen;
-    localStorage.setItem(OPEN_KEY, String(next));
-    setIsOpen(next);
-  };
-
   const handleCreate = () => {
     if (!activeWorkspaceId) return;
     void createNote(activeWorkspaceId, MESSAGES.TPL_DEFAULT_TITLE).then((note) => {
@@ -130,66 +113,51 @@ export const TemplatesSection: React.FC = () => {
   };
 
   return (
-    <div className="space-y-1 pb-2">
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={toggleOpen}
-          aria-expanded={isOpen}
-          className="flex w-full items-center gap-1 rounded px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {isOpen ? (
-            <ChevronDown className="h-3 w-3" aria-hidden="true" />
-          ) : (
-            <ChevronRight className="h-3 w-3" aria-hidden="true" />
-          )}
-          {MESSAGES.TPL_HEADER}
-          <span className="font-mono">({templates.length})</span>
-        </button>
+    <CollapsibleSection
+      storageKey="cove-templates-open"
+      label={MESSAGES.TPL_HEADER}
+      count={templates.length}
+      action={
         <button
           type="button"
           aria-label={MESSAGES.TPL_NEW}
           title={MESSAGES.TPL_NEW}
           onClick={handleCreate}
-          className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-      </div>
-
-      {isOpen && (
-        <div className="space-y-0.5">
-          {templates.length === 0 ? (
-            <div className="flex items-center gap-1.5 px-2 py-1.5 text-[13px] text-muted-foreground/70">
-              <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
-              {MESSAGES.TPL_EMPTY}
-            </div>
-          ) : (
-            templates.map((note) => (
-              <TemplateRow
-                key={note.id}
-                note={note}
-                isActive={note.id === activeNoteId}
-                isJournalTemplate={note.id === journalTemplateId}
-                onSelect={() => setActiveNoteId(note.id)}
-                onUse={() => void duplicateNote(note.id)}
-                onSetJournalTemplate={() => {
-                  if (!activeWorkspaceId) return;
-                  setJournalTemplateId(activeWorkspaceId, note.id);
-                  setJournalTemplateIdState(note.id);
-                }}
-                onRemoveFlag={() => {
-                  if (activeWorkspaceId && note.id === journalTemplateId) {
-                    setJournalTemplateId(activeWorkspaceId, null);
-                    setJournalTemplateIdState(null);
-                  }
-                  void updateNote(note.id, { isTemplate: false });
-                }}
-              />
-            ))
-          )}
+      }
+    >
+      {templates.length === 0 ? (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 text-[13px] text-muted-foreground/70">
+          <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
+          {MESSAGES.TPL_EMPTY}
         </div>
+      ) : (
+        templates.map((note) => (
+          <TemplateRow
+            key={note.id}
+            note={note}
+            isActive={note.id === activeNoteId}
+            isJournalTemplate={note.id === journalTemplateId}
+            onSelect={() => setActiveNoteId(note.id)}
+            onUse={() => void duplicateNote(note.id)}
+            onSetJournalTemplate={() => {
+              if (!activeWorkspaceId) return;
+              setJournalTemplateId(activeWorkspaceId, note.id);
+              setJournalTemplateIdState(note.id);
+            }}
+            onRemoveFlag={() => {
+              if (activeWorkspaceId && note.id === journalTemplateId) {
+                setJournalTemplateId(activeWorkspaceId, null);
+                setJournalTemplateIdState(null);
+              }
+              void updateNote(note.id, { isTemplate: false });
+            }}
+          />
+        ))
       )}
-    </div>
+    </CollapsibleSection>
   );
 };

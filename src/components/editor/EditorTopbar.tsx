@@ -16,11 +16,10 @@ import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
 import type { DocMode } from "../../domain/note/Note";
+import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { cn } from "../../lib/utils";
-import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
-import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { Note } from "../../types";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -80,9 +79,8 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   const duplicateNote = useNoteStore((s) => s.duplicateNote);
   const togglePinNote = useNoteStore((s) => s.togglePinNote);
   const toggleFavoriteNote = useNoteStore((s) => s.toggleFavoriteNote);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const propertyVersion = usePropertyStore((s) => s.version);
+  const openJournal = useOpenJournal();
   const [journalDate, setJournalDate] = useState<number | null>(null);
 
   // AFFI NE pattern: the topbar of a journal note swaps the meta strip for a
@@ -103,16 +101,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     };
   }, [note.id, propertyVersion]);
 
-  const openJournalFor = (timestamp: number) => {
-    if (!activeWorkspaceId) return;
-    journalService
-      .openJournalByDate(activeWorkspaceId, timestamp)
-      .then((noteId) => {
-        if (noteId !== note.id) setActiveNoteId(noteId);
-      })
-      .catch(notifyError);
-  };
-
   const formattedDate = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -122,17 +110,24 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     <div className="flex h-10 flex-shrink-0 items-center justify-between border-b bg-card px-3">
       {journalDate != null ? (
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-          <WeekDatePicker value={journalDate} onChange={openJournalFor} className="min-w-0" />
+          <WeekDatePicker value={journalDate} onChange={openJournal} className="min-w-0" />
           <Button
             variant="ghost"
             size="sm"
             aria-label={MESSAGES.JOURNAL_TODAY}
-            onClick={() => openJournalFor(Date.now())}
+            onClick={() => openJournal(Date.now())}
             className="h-7 shrink-0 gap-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
           >
             <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
             {MESSAGES.JOURNAL_TODAY}
           </Button>
+          {/* AFFI NE TemplateMark parity: journals made from a template show
+              a small badge next to the Today button. */}
+          {note.isTemplate && (
+            <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {MESSAGES.TEMPLATE_BADGE}
+            </span>
+          )}
           <SaveStatusBadge />
         </div>
       ) : (
