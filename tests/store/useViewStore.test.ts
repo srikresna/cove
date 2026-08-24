@@ -199,22 +199,26 @@ describe("useViewStore", () => {
   });
 
   it("user-tweaked drafts are never overwritten by a fetch", async () => {
-    const rules = [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live"] }];
+    const applied = [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live"] }];
     const tweaked = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["other"] },
+    ];
+    // The DB rules ALSO changed after the apply (e.g. an option was deleted
+    // and the view pruned) — the re-copy quadrant that matters.
+    const pruned = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: [] as string[] },
     ];
     useViewStore.setState({
       activeViewId: "v1",
       draftRules: tweaked.map((r) => ({ ...r })),
-      // Snapshot differs from the tweaks — the user edited after applying.
-      appliedRulesSnapshot: JSON.stringify(rules),
+      appliedRulesSnapshot: JSON.stringify(applied),
     });
     listViews.mockResolvedValue([
       {
         id: "v1",
         workspaceId: "ws1",
         name: "v1",
-        rules: rules.map((r) => ({ ...r })),
+        rules: pruned.map((r) => ({ ...r })),
         createdAt: 1,
       },
     ]);
@@ -222,5 +226,30 @@ describe("useViewStore", () => {
     await useViewStore.getState().fetchViews("ws1");
 
     expect(useViewStore.getState().draftRules).toEqual(tweaked);
+  });
+
+  it("untouched drafts ARE re-copied when the view's rules changed", async () => {
+    const applied = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["todo", "doing"] },
+    ];
+    const pruned = [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["todo"] }];
+    useViewStore.setState({
+      activeViewId: "v1",
+      draftRules: applied.map((r) => ({ ...r })),
+      appliedRulesSnapshot: JSON.stringify(applied),
+    });
+    listViews.mockResolvedValue([
+      {
+        id: "v1",
+        workspaceId: "ws1",
+        name: "v1",
+        rules: pruned.map((r) => ({ ...r })),
+        createdAt: 1,
+      },
+    ]);
+
+    await useViewStore.getState().fetchViews("ws1");
+
+    expect(useViewStore.getState().draftRules).toEqual(pruned);
   });
 });

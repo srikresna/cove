@@ -67,13 +67,16 @@ export const useViewStore = create<ViewState>((set, get) => ({
           // fetch (startup heal, prune) — clear the stranded selection.
           return { views: fresh, activeViewId: null, draftRules: [], appliedRulesSnapshot: null };
         }
-        // Straggler guard: the applied copy still matches what setActiveView
-        // snapshotted (user hasn't tweaked it) yet the fresh rules differ —
-        // the copy came from a stale pre-heal row; re-copy the healed rules.
+        // Straggler guard: the drafts still match what setActiveView
+        // snapshotted (the user hasn't tweaked them) yet the fresh rules
+        // differ — the copy came from a stale pre-heal row; re-copy the
+        // healed rules. Tweaked drafts (no longer equal to the snapshot)
+        // are never touched.
         if (
           active &&
           s.appliedRulesSnapshot != null &&
-          JSON.stringify(active.rules) !== s.appliedRulesSnapshot
+          JSON.stringify(active.rules) !== s.appliedRulesSnapshot &&
+          JSON.stringify(s.draftRules) === s.appliedRulesSnapshot
         ) {
           return {
             views: fresh,
@@ -117,13 +120,25 @@ export const useViewStore = create<ViewState>((set, get) => ({
       version: s.version + 1,
     })),
 
-  clearDraft: () => set((s) => ({ draftRules: [], activeViewId: null, version: s.version + 1 })),
+  clearDraft: () =>
+    set((s) => ({
+      draftRules: [],
+      activeViewId: null,
+      appliedRulesSnapshot: null,
+      version: s.version + 1,
+    })),
 
   saveDraftAsView: async (workspaceId, name) => {
     try {
       const view = await savedViewService.createView(workspaceId, name, get().draftRules);
       await get().fetchViews(workspaceId);
-      set((s) => ({ activeViewId: view.id, version: s.version + 1 }));
+      // The saved view's rules ARE the drafts — stamp the snapshot so the
+      // straggler guard doesn't treat the next fetch as a stale copy.
+      set((s) => ({
+        activeViewId: view.id,
+        appliedRulesSnapshot: JSON.stringify(view.rules),
+        version: s.version + 1,
+      }));
       return view;
     } catch (err) {
       notifyError(err);
@@ -147,7 +162,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const ws = get().views.find((v) => v.id === id)?.workspaceId;
       if (ws) await get().fetchViews(ws);
       if (get().activeViewId === id) {
-        set((s) => ({ activeViewId: null, draftRules: [], version: s.version + 1 }));
+        set((s) => ({
+          activeViewId: null,
+          draftRules: [],
+          appliedRulesSnapshot: null,
+          version: s.version + 1,
+        }));
       }
     } catch (err) {
       notifyError(err);
@@ -163,8 +183,17 @@ export const useViewStore = create<ViewState>((set, get) => ({
       draftRules: s.draftRules.flatMap((r) => {
         if ((r.kind === "select" || r.kind === "multiSelect") && r.propertyId === propertyId) {
           const optionIds = r.optionIds.filter((id) => id !== optionId);
-          if (optionIds.length === 0 && (r.op === "is" || r.op === "is-not")) return [];
-          return [{ ...r, optionIds }];
+          // Born-empty rules are the FilterBar's mid-composition state —
+          // keep them; only rules that just lost their last id are dropped.
+          if (
+            r.optionIds.length > 0 &&
+            optionIds.length === 0 &&
+            (r.op === "is" || r.op === "is-not")
+          ) {
+            return [];
+          }
+          if (optionIds.length !== r.optionIds.length) return [{ ...r, optionIds }];
+          return [r];
         }
         return [r];
       }),
@@ -183,7 +212,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     // pre-commit rows (draft subscribers re-render off draftRules directly
     // and do not need the pre-set bump).
     set((s) => ({
-      ...(activeDeleted ? { activeViewId: null, draftRules: [] } : {}),
+      ...(activeDeleted ? { activeViewId: null, draftRules: [], appliedRulesSnapshot: null } : {}),
       version: s.version + 1,
     }));
   },
@@ -202,7 +231,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     const activeDeleted =
       get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
     set((s) => ({
-      ...(activeDeleted ? { activeViewId: null, draftRules: [] } : {}),
+      ...(activeDeleted ? { activeViewId: null, draftRules: [], appliedRulesSnapshot: null } : {}),
       version: s.version + 1,
     }));
   },
@@ -253,5 +282,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
 }));
 
 vaultService.onLock(() => {
-  useViewStore.setState({ views: [], activeViewId: null, draftRules: [] });
+  useViewStore.setState({
+    views: [],
+    activeViewId: null,
+    draftRules: [],
+    appliedRulesSnapshot: null,
+  });
 });
