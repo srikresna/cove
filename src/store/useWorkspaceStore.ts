@@ -14,7 +14,15 @@ import { useViewStore } from "./useViewStore";
  */
 function resetWorkspaceScopedFilters(): void {
   useTagStore.setState({ activeTagId: null, taggedNoteIds: null });
-  useViewStore.setState({ activeViewId: null, draftRules: [] });
+  // Bumping fetchSeq also invalidates any in-flight views fetch from the
+  // previous workspace: letting it land would swap in the old workspace's
+  // list (and reconcile away the next workspace's legitimate selection).
+  useViewStore.setState((s) => ({
+    activeViewId: null,
+    draftRules: [],
+    appliedRulesSnapshot: null,
+    fetchSeq: s.fetchSeq + 1,
+  }));
 }
 
 interface WorkspaceState {

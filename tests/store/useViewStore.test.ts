@@ -123,4 +123,104 @@ describe("useViewStore", () => {
 
     expect(useViewStore.getState().draftRules).toEqual([]);
   });
+
+  it("healDrafts keeps freshly-added empty select rules (mid-composition)", () => {
+    useViewStore.setState({
+      draftRules: [
+        // FilterBar's "+ Filter" creates exactly this shape before the
+        // user picks an option — it is inactive, not stranded.
+        { id: "r1", kind: "select", propertyId: "pLive", op: "is", optionIds: [] },
+      ],
+    });
+
+    useViewStore.getState().healDrafts([
+      {
+        id: "pLive",
+        name: "Live",
+        type: "select",
+        options: [{ id: "live", name: "Live", color: "#000" }],
+        createdAt: 0,
+        order: "a0",
+        show: "always-show",
+        icon: null,
+      },
+    ]);
+
+    expect(useViewStore.getState().draftRules).toHaveLength(1);
+  });
+
+  it("a superseded fetch is dropped entirely and cannot clear a later selection", async () => {
+    // Stale fetch for workspace A is slow; a fetch for B dispatches and
+    // resolves first; the user then re-applies a view; the stale fetch
+    // lands last — it must be dropped, not applied.
+    let releaseStale: (views: SavedView[]) => void = () => {};
+    const stalePromise = new Promise<SavedView[]>((resolve) => {
+      releaseStale = resolve;
+    });
+    let call = 0;
+    listViews.mockImplementation(() => {
+      call += 1;
+      return call === 1 ? stalePromise : Promise.resolve([makeView("vb", "wsB")]);
+    });
+
+    const staleFetch = useViewStore.getState().fetchViews("wsA");
+    await useViewStore.getState().fetchViews("wsB");
+    useViewStore.setState({ activeViewId: "vb", draftRules: [], appliedRulesSnapshot: "[]" });
+
+    releaseStale([makeView("va", "wsA")]);
+    await staleFetch;
+
+    expect(useViewStore.getState().views.map((v) => v.id)).toEqual(["vb"]);
+    expect(useViewStore.getState().activeViewId).toBe("vb");
+  });
+
+  it("an untouched applied view whose fresh rules differ gets its drafts re-copied", async () => {
+    const staleRules = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["dead"] },
+    ];
+    const healedRules = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: [] as string[] },
+    ];
+    useViewStore.setState({
+      views: [{ id: "v1", workspaceId: "ws1", name: "v1", rules: staleRules, createdAt: 1 }],
+      activeViewId: "v1",
+      // Simulates a straggler click on a stale row: drafts hold pre-heal
+      // rules and the snapshot matches them (user hasn't tweaked anything).
+      draftRules: staleRules.map((r) => ({ ...r })),
+      appliedRulesSnapshot: JSON.stringify(staleRules),
+    });
+    listViews.mockResolvedValue([
+      { id: "v1", workspaceId: "ws1", name: "v1", rules: healedRules, createdAt: 1 },
+    ]);
+
+    await useViewStore.getState().fetchViews("ws1");
+
+    expect(useViewStore.getState().draftRules).toEqual(healedRules);
+  });
+
+  it("user-tweaked drafts are never overwritten by a fetch", async () => {
+    const rules = [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live"] }];
+    const tweaked = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["other"] },
+    ];
+    useViewStore.setState({
+      activeViewId: "v1",
+      draftRules: tweaked.map((r) => ({ ...r })),
+      // Snapshot differs from the tweaks — the user edited after applying.
+      appliedRulesSnapshot: JSON.stringify(rules),
+    });
+    listViews.mockResolvedValue([
+      {
+        id: "v1",
+        workspaceId: "ws1",
+        name: "v1",
+        rules: rules.map((r) => ({ ...r })),
+        createdAt: 1,
+      },
+    ]);
+
+    await useViewStore.getState().fetchViews("ws1");
+
+    expect(useViewStore.getState().draftRules).toEqual(tweaked);
+  });
 });

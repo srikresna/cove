@@ -10,9 +10,19 @@ interface ViewState {
   views: SavedView[];
   /** The applied saved view, when any. */
   activeViewId: string | null;
+  /**
+   * JSON snapshot of the rules setActiveView copied into the drafts. Used
+   * by fetchViews to detect that the applied copy came from a STALE row
+   * (straggler click between a heal/prune commit and the refresh) and
+   * re-copy the healed rules — without ever touching user-tweaked drafts,
+   * which no longer match the snapshot.
+   */
+  appliedRulesSnapshot: string | null;
   /** Ad-hoc rules the user is composing in the filter bar (unsaved). */
   draftRules: FilterRules;
   version: number;
+  /** Monotonic fetch generation: a late stale fetch is dropped entirely. */
+  fetchSeq: number;
 
   fetchViews: (workspaceId: string) => Promise<void>;
   setActiveView: (viewId: string | null) => void;
@@ -35,23 +45,44 @@ interface ViewState {
 export const useViewStore = create<ViewState>((set, get) => ({
   views: [],
   activeViewId: null,
+  appliedRulesSnapshot: null,
   draftRules: [],
   version: 0,
+  fetchSeq: 0,
 
   fetchViews: async (workspaceId) => {
+    const seq = get().fetchSeq + 1;
+    set({ fetchSeq: seq });
     try {
       const fresh = await savedViewService.listViews(workspaceId);
-      // Self-reconciling: a refresh can land after the active view was
-      // deleted underneath it (startup heal, prune, interrupted flows) —
-      // an activeViewId naming a view absent from the fresh list is a
-      // stranded selection and is cleared with its drafts. Only fires when
-      // the id is genuinely absent, so newly created/applied views (always
-      // present in their own refresh) are never affected.
-      set((s) =>
-        s.activeViewId && !fresh.some((v) => v.id === s.activeViewId)
-          ? { views: fresh, activeViewId: null, draftRules: [] }
-          : { views: fresh },
-      );
+      // A fetch for a superseded generation (rapid workspace switches race
+      // their fetches) must be dropped entirely — applying it would swap in
+      // another workspace's list and, via the reconcile below, clear a
+      // legitimate active selection.
+      if (get().fetchSeq !== seq) return;
+      set((s) => {
+        const active = s.activeViewId ? fresh.find((v) => v.id === s.activeViewId) : undefined;
+        if (s.activeViewId && !active) {
+          // Self-reconciling: the active view was deleted underneath the
+          // fetch (startup heal, prune) — clear the stranded selection.
+          return { views: fresh, activeViewId: null, draftRules: [], appliedRulesSnapshot: null };
+        }
+        // Straggler guard: the applied copy still matches what setActiveView
+        // snapshotted (user hasn't tweaked it) yet the fresh rules differ —
+        // the copy came from a stale pre-heal row; re-copy the healed rules.
+        if (
+          active &&
+          s.appliedRulesSnapshot != null &&
+          JSON.stringify(active.rules) !== s.appliedRulesSnapshot
+        ) {
+          return {
+            views: fresh,
+            draftRules: active.rules.map((r) => ({ ...r })),
+            appliedRulesSnapshot: JSON.stringify(active.rules),
+          };
+        }
+        return { views: fresh };
+      });
     } catch (err) {
       notifyError(err);
     }
@@ -64,6 +95,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // Applying a view loads its rules into the draft so the filter bar
       // shows and can tweak them; clearing keeps the drafts untouched.
       draftRules: view ? view.rules.map((r) => ({ ...r })) : viewId === null ? s.draftRules : [],
+      appliedRulesSnapshot: view ? JSON.stringify(view.rules) : null,
       version: s.version + 1,
     }));
   },
@@ -197,7 +229,17 @@ export const useViewStore = create<ViewState>((set, get) => ({
             if (!def) return [];
             const live = new Set(def.options.map((o) => o.id));
             const optionIds = r.optionIds.filter((id) => live.has(id));
-            if (optionIds.length === 0 && (r.op === "is" || r.op === "is-not")) return [];
+            // Drop only rules that HAD options and lost them all to dead
+            // ids — an already-empty rule is the FilterBar's normal
+            // mid-composition state ("is" with nothing picked yet) and
+            // stays as an inactive chip until the user picks one.
+            if (
+              r.optionIds.length > 0 &&
+              optionIds.length === 0 &&
+              (r.op === "is" || r.op === "is-not")
+            ) {
+              return [];
+            }
             if (optionIds.length !== r.optionIds.length) return [{ ...r, optionIds }];
             return [r];
           }
