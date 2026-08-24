@@ -24,6 +24,24 @@ export type LibrarySort =
   | "title-asc"
   | "title-desc";
 
+/**
+ * Stale-while-revalidate cache for the bulk-loaded filter/stack inputs.
+ * The old sidebar NoteList stayed mounted forever, so its maps persisted
+ * across note opens; as a page, this list unmounts on every note open, and
+ * rebuilding the maps per mount would flash the UNFILTERED list (rules not
+ * applied) before the async loads land. The cache restores the old
+ * semantics: mount with the last-known maps for this workspace, revalidate
+ * in the background (the version signals still gate freshness).
+ */
+const listCache = new Map<
+  string,
+  {
+    stackDefs: PropertyDefinition[];
+    stackValues: Map<string, Map<string, PropertyValue>> | null;
+    filterable: Map<string, FilterableNote> | null;
+  }
+>();
+
 const compareBy = (sort: LibrarySort) => {
   switch (sort) {
     case "updated-asc":
@@ -75,9 +93,10 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
   );
 
   // Property stacks under each note title (AFFI NE docs-view stack rows).
-  const [stackDefs, setStackDefs] = useState<PropertyDefinition[]>([]);
+  const cached = activeWorkspaceId ? listCache.get(activeWorkspaceId) : undefined;
+  const [stackDefs, setStackDefs] = useState<PropertyDefinition[]>(cached?.stackDefs ?? []);
   const [stackValues, setStackValues] = useState<Map<string, Map<string, PropertyValue>> | null>(
-    null,
+    cached?.stackValues ?? null,
   );
   const propertyVersion = usePropertyStore((s) => s.version);
 
@@ -129,6 +148,13 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
           }
         }
         setStackValues(byNote);
+        if (activeWorkspaceId) {
+          listCache.set(activeWorkspaceId, {
+            stackDefs: eligible,
+            stackValues: byNote,
+            filterable: listCache.get(activeWorkspaceId)?.filterable ?? null,
+          });
+        }
       })
       .catch(() => {
         if (alive) {
@@ -148,7 +174,9 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
   const viewVersion = useViewStore((s) => s.version);
 
   // Filter inputs (property values + journal dates) reload when rules exist.
-  const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(null);
+  const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(
+    cached?.filterable ?? null,
+  );
   const rulesActive = draftRules.length > 0;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion/propertyVersion/tagVersion are intentional refresh signals, not body inputs
@@ -210,6 +238,14 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
           }
         }
         setFilterable(map);
+        if (activeWorkspaceId) {
+          const prev = listCache.get(activeWorkspaceId);
+          listCache.set(activeWorkspaceId, {
+            stackDefs: prev?.stackDefs ?? [],
+            stackValues: prev?.stackValues ?? null,
+            filterable: map,
+          });
+        }
       })
       .catch(() => {
         if (alive) setFilterable(null);
@@ -228,7 +264,14 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
       !rulesActive || !filterable
         ? base
         : evaluateFilters(
-            base.map((n) => filterable.get(n.id)).filter((i): i is FilterableNote => i != null),
+            // The cached filterable map may hold stale note objects; always
+            // evaluate with the LIVE note from the store.
+            base
+              .map((n) => {
+                const item = filterable.get(n.id);
+                return item ? { ...item, note: n } : null;
+              })
+              .filter((i): i is FilterableNote => i != null),
             draftRules,
           ).map((i) => i.note);
     return [...filtered].sort(compareBy(sort));

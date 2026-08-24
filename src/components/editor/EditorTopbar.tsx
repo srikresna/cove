@@ -121,8 +121,9 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
             <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
             {MESSAGES.JOURNAL_TODAY}
           </Button>
-          {/* AFFI NE TemplateMark parity: journals made from a template show
-              a small badge next to the Today button. */}
+          {/* AFFI NE TemplateMark parity: the badge marks a journal note that
+              IS itself flagged as a template (same semantics as AFFI NE's
+              doc-is-template mark). */}
           {note.isTemplate && (
             <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {MESSAGES.TEMPLATE_BADGE}

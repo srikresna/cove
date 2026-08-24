@@ -72,6 +72,14 @@ export const JournalsPage: React.FC = () => {
     setMonthCursor(new Date(now.getFullYear(), now.getMonth(), 1));
   };
 
+  // Week-strip picks must sync the month grid too — the strip can walk into
+  // an adjacent month whose cells the grid isn't showing.
+  const selectFromStrip = (timestamp: number) => {
+    setSelectedDate(timestamp);
+    const date = new Date(timestamp);
+    setMonthCursor(new Date(date.getFullYear(), date.getMonth(), 1));
+  };
+
   const removeJournalMark = (noteId: string) => {
     journalService
       .removeJournalDate(noteId)
@@ -112,7 +120,7 @@ export const JournalsPage: React.FC = () => {
             )}
           </div>
           <div className="mt-3">
-            <WeekDatePicker value={selectedDate} onChange={setSelectedDate} />
+            <WeekDatePicker value={selectedDate} onChange={selectFromStrip} />
           </div>
         </div>
       </div>

@@ -143,6 +143,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
         const created = await noteService.createNote(workspaceId, title, content, icon);
 
         blockSuiteEditorService.registerExistingNotes([{ id: created.id, title: created.title }]);
+        // Creating a note opens it: return the main area to the editor even
+        // when the trigger sits on the Library/Journals/Trash page.
+        useUIStore.getState().setActivePage("editor");
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
