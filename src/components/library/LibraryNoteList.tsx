@@ -6,6 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService, tagService } from "../../di/container";
 import type { FilterRule } from "../../domain/filters/FilterRule";
+import { isRuleComplete } from "../../domain/filters/FilterRule";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import type { FilterableNote } from "../../services/filters/evaluateFilters";
 import { evaluateFilters } from "../../services/filters/evaluateFilters";
@@ -16,6 +17,7 @@ import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { NoteItem } from "../sidebar/NoteItem";
 import { Button } from "../ui/button";
+import { listCache } from "./libraryListCache";
 
 export type LibrarySort =
   | "updated-desc"
@@ -24,24 +26,6 @@ export type LibrarySort =
   | "created-asc"
   | "title-asc"
   | "title-desc";
-
-/**
- * Stale-while-revalidate cache for the bulk-loaded filter/stack inputs.
- * The old sidebar NoteList stayed mounted forever, so its maps persisted
- * across note opens; as a page, this list unmounts on every note open, and
- * rebuilding the maps per mount would flash the UNFILTERED list (rules not
- * applied) before the async loads land. The cache restores the old
- * semantics: mount with the last-known maps for this workspace, revalidate
- * in the background (the version signals still gate freshness).
- */
-const listCache = new Map<
-  string,
-  {
-    stackDefs: PropertyDefinition[];
-    stackValues: Map<string, Map<string, PropertyValue>> | null;
-    filterable: Map<string, FilterableNote> | null;
-  }
->();
 
 /**
  * Rules whose predicate EMPTY inputs would satisfy (is-empty everywhere,
@@ -167,6 +151,7 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
               stackDefs: [],
               stackValues: null,
               filterable: prev?.filterable ?? null,
+              knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
             });
           }
           return;
@@ -191,10 +176,12 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
         }
         setStackValues(byNote);
         if (activeWorkspaceId) {
+          const prev = listCache.get(activeWorkspaceId);
           listCache.set(activeWorkspaceId, {
             stackDefs: eligible,
             stackValues: byNote,
-            filterable: listCache.get(activeWorkspaceId)?.filterable ?? null,
+            filterable: prev?.filterable ?? null,
+            knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
           });
         }
       })
@@ -286,6 +273,10 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
             stackDefs: prev?.stackDefs ?? [],
             stackValues: prev?.stackValues ?? null,
             filterable: map,
+            // The fresh map has real entries for every live note, so the
+            // just-created markers have served their purpose; keep only ids
+            // the reload could not have covered (none in practice).
+            knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
           });
         }
       })
@@ -302,9 +293,15 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
       (n) =>
         n.workspaceId === activeWorkspaceId && (taggedNoteIds === null || taggedNoteIds.has(n.id)),
     );
-    // Defer cache-unknown notes only when some rule's predicate empty
-    // inputs would satisfy (see satisfiedByEmptyInputs).
-    const deferUnknown = draftRules.some(satisfiedByEmptyInputs);
+    // Defer cache-unknown notes only when some rule's predicate empty inputs
+    // would satisfy (see satisfiedByEmptyInputs) — counting only rules the
+    // evaluator actually applies (an incomplete draft, e.g. has-none-of with
+    // no tags picked, filters nothing and must not defer either). Notes the
+    // app itself just created are provably empty and bypass the deferral.
+    const knownEmptyIds = activeWorkspaceId
+      ? listCache.get(activeWorkspaceId)?.knownEmptyIds
+      : undefined;
+    const deferUnknown = draftRules.filter(isRuleComplete).some(satisfiedByEmptyInputs);
     const filtered =
       !rulesActive || !filterable
         ? base
@@ -316,7 +313,9 @@ export const LibraryNoteList: React.FC<{ sort: LibrarySort }> = ({ sort }) => {
             // emptiness cannot decide the outcome; views with
             // emptiness-satisfiable rules defer them to revalidation.
             base
-              .filter((n) => deferUnknown || filterable.has(n.id))
+              .filter(
+                (n) => !deferUnknown || filterable.has(n.id) || (knownEmptyIds?.has(n.id) ?? false),
+              )
               .map((n) => ({
                 ...(filterable.get(n.id) ?? {
                   note: n,

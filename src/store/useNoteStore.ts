@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { seedKnownEmptyNote } from "../components/library/libraryListCache";
 import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
@@ -146,6 +147,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
         // Creating a note opens it: return the main area to the editor even
         // when the trigger sits on the Library/Journals/Trash page.
         useUIStore.getState().setActivePage("editor");
+        // A created note has provably empty filter inputs — record it so
+        // emptiness-rule views in the Library can show it immediately
+        // instead of deferring it to revalidation.
+        seedKnownEmptyNote(workspaceId, created.id);
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
