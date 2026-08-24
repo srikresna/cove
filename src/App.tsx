@@ -47,12 +47,17 @@ export const AppContent: React.FC = () => {
     // rewritten/deleted before any view is applied. Best-effort — a failure
     // here never blocks the app. The version bump afterwards is required:
     // the initial fetchViews races the heal transaction and can snapshot
-    // pre-heal rows, which would resurrect stranded rules from the store.
+    // pre-heal rows; if the user clicked a doomed view in that window, its
+    // active selection and drafts are cleared with it.
     void propertyService
       .listDefinitions()
       .then(async (defs) => {
-        await savedViewService.healRules(defs);
-        useViewStore.setState((s) => ({ version: s.version + 1 }));
+        const deleted = await savedViewService.healRules(defs);
+        useViewStore.setState((s) =>
+          s.activeViewId && deleted.includes(s.activeViewId)
+            ? { activeViewId: null, draftRules: [], version: s.version + 1 }
+            : { version: s.version + 1 },
+        );
       })
       .catch(() => {});
   }, [fetchWorkspaces, purgeExpiredTrash]);

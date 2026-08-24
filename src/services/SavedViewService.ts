@@ -14,18 +14,25 @@ function normalizeViewName(name: string): string {
 
 /**
  * Semantics of a rule in the POST-deletion universe (its property/option
- * gone, so no note can carry the referenced value): negative operators are
- * vacuously true for every note, positive operators match nothing.
+ * gone, so no note can carry the referenced value): `is-not X` and
+ * `is-empty` are vacuously true for every note (a nonexistent property is
+ * empty on every note), `checkbox is false` is true (a missing value reads
+ * as unchecked); positive operators and is-not-empty match nothing.
  */
 function droppedRuleMatchesAllPostDelete(rule: FilterRule): boolean {
   switch (rule.kind) {
+    case "text":
+    case "number":
+    case "date":
     case "select":
     case "multiSelect":
-      return rule.op === "is-not";
+      return rule.op === "is-not" || rule.op === "is-empty";
+    case "checkbox":
+      return rule.value === false;
     case "tags":
-      return rule.op === "has-none-of" || rule.op === "has-all-of";
-    case "text":
-      return rule.op === "is-not";
+      // Latent: no prune path drops tags rules today. Dead tags can be on
+      // no note, so has-none-of matches everything and has-all-of nothing.
+      return rule.op === "has-none-of";
     default:
       return false;
   }
@@ -193,19 +200,20 @@ export class SavedViewService implements ISavedViewService {
    * Startup self-heal: drops saved-view rules referencing property defs or
    * option ids that no longer exist (stranded by an interrupted prune or by
    * deletions from older builds). Idempotent; rewrites land in one
-   * transaction.
+   * transaction. Returns the deleted view ids so callers can reconcile
+   * active-view state.
    *
    * Kinds are narrowed explicitly: the SQLite loader stamps EVERY decoded
    * rule with a propertyId key (defaulting to ""), so `in`-checks are
    * meaningless on loaded rules — tags/journal/template rules carry no
    * property and must pass through untouched.
    */
-  async healRules(liveDefs: PropertyDefinition[]): Promise<void> {
+  async healRules(liveDefs: PropertyDefinition[]): Promise<string[]> {
     const liveDefIds = new Set(liveDefs.map((d) => d.id));
     const liveOptions = new Map<string, Set<string>>(
       liveDefs.map((d) => [d.id, new Set(d.options.map((o) => o.id))]),
     );
-    await this.applyViewPrune((rule) => {
+    return this.applyViewPrune((rule) => {
       if (!ruleHasPropertyId(rule)) return { drop: false, rule };
       if (!liveDefIds.has(rule.propertyId)) {
         return { drop: true, postDeleteMatchAll: droppedRuleMatchesAllPostDelete(rule) };

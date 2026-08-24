@@ -11,6 +11,6 @@ export interface ISavedViewService {
   pruneOption(definitionId: string, optionId: string): Promise<string[]>;
   /** Drop all rules referencing a deleted property; returns deleted view ids. */
   pruneProperty(definitionId: string): Promise<string[]>;
-  /** Startup self-heal of rules referencing dead defs/options. */
-  healRules(liveDefs: PropertyDefinition[]): Promise<void>;
+  /** Startup self-heal of rules referencing dead defs/options; returns deleted view ids. */
+  healRules(liveDefs: PropertyDefinition[]): Promise<string[]>;
 }

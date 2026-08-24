@@ -163,6 +163,33 @@ describe("SavedViewService", () => {
     expect(await repo.findById(view.id)).toBeNull();
   });
 
+  it("pruneProperty keeps is-empty and checkbox-false views as match-all, deletes their positives", async () => {
+    const repo = new InMemorySavedViewRepository();
+    const service = new SavedViewService(repo);
+    // A deleted property is empty/unchecked on every note: these views have
+    // shown everything since the property died.
+    const noDueDate = await service.createView("ws1", "No due date", [
+      { id: "r1", kind: "date", propertyId: "pDue", op: "is-empty" },
+    ]);
+    const unreviewed = await service.createView("ws1", "Unreviewed", [
+      { id: "r1", kind: "checkbox", propertyId: "pDone", op: "is", value: false },
+    ]);
+    const hasDue = await service.createView("ws1", "Has due date", [
+      { id: "r1", kind: "date", propertyId: "pDue", op: "is-not-empty" },
+    ]);
+    const done = await service.createView("ws1", "Done", [
+      { id: "r1", kind: "checkbox", propertyId: "pDone", op: "is", value: true },
+    ]);
+
+    const deletedDue = await service.pruneProperty("pDue");
+    const deletedDone = await service.pruneProperty("pDone");
+
+    expect(deletedDue).toEqual([hasDue.id]);
+    expect((await repo.findById(noDueDate.id))?.rules).toEqual([]);
+    expect(deletedDone).toEqual([done.id]);
+    expect((await repo.findById(unreviewed.id))?.rules).toEqual([]);
+  });
+
   it("healRules keeps tags/journal/template views and rewrites dead references", async () => {
     const repo = new InMemorySavedViewRepository();
     const service = new SavedViewService(repo);
