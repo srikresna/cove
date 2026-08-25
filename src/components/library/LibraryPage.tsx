@@ -1,11 +1,12 @@
 import { Check, Plus, Save, Tag as TagIcon, X } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { propertyService } from "../../di/container";
+import { blockSuiteEditorService, propertyService } from "../../di/container";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
@@ -27,8 +28,10 @@ import { LibraryNoteList, type LibrarySort } from "./LibraryNoteList";
 import { TagsTab } from "./TagsTab";
 
 const VIEW_MODE_KEY = "cove-library-viewmode";
-const DISPLAY_KEY = "cove-library-display";
+const DISPLAY_KEY_PREFIX = "cove-library-display:";
 const SORT_KEY = "cove-library-sort";
+
+const displayKeyFor = (mode: LibraryViewMode): string => `${DISPLAY_KEY_PREFIX}${mode}`;
 
 const isViewMode = (value: string): value is LibraryViewMode =>
   ["list", "grid", "masonry"].includes(value);
@@ -68,6 +71,7 @@ const isDisplayPrefs = (value: unknown): value is LibraryDisplayPrefs => {
  */
 export const LibraryPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const notes = useNoteStore((s) => s.notes);
   const createNote = useNoteStore((s) => s.createNote);
   const updateNote = useNoteStore((s) => s.updateNote);
   const tags = useTagStore((s) => s.tags);
@@ -91,13 +95,19 @@ export const LibraryPage: React.FC = () => {
     const stored = localStorage.getItem(SORT_KEY) ?? "";
     return isLibrarySort(stored) ? stored : "updated-desc";
   });
+  // Display prefs persist PER VIEW MODE (list/grid/masonry), like AFFI NE's
+  // allDocsDisplayPreference:<mode> keys.
   const [prefs, setPrefs] = useState<LibraryDisplayPrefs>(() => {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(DISPLAY_KEY) ?? "null");
-      return isDisplayPrefs(parsed) ? parsed : DEFAULT_PREFS;
-    } catch {
-      return DEFAULT_PREFS;
-    }
+    const readPrefs = (mode: LibraryViewMode): LibraryDisplayPrefs => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(displayKeyFor(mode)) ?? "null");
+        return isDisplayPrefs(parsed) ? parsed : DEFAULT_PREFS;
+      } catch {
+        return DEFAULT_PREFS;
+      }
+    };
+    const initialMode = localStorage.getItem(VIEW_MODE_KEY) ?? "";
+    return readPrefs(isViewMode(initialMode) ? initialMode : "list");
   });
   const [filterEditing, setFilterEditing] = useState(false);
   const [savePromptOpen, setSavePromptOpen] = useState(false);
@@ -114,21 +124,34 @@ export const LibraryPage: React.FC = () => {
       .catch(() => setDefs([]));
   }, [propertyVersion]);
 
-  const changePrefs = useCallback((next: Partial<LibraryDisplayPrefs>) => {
-    setPrefs((prev) => {
-      const merged = { ...prev, ...next };
-      localStorage.setItem(DISPLAY_KEY, JSON.stringify(merged));
-      return merged;
-    });
-  }, []);
+  const changePrefs = useCallback(
+    (next: Partial<LibraryDisplayPrefs>) => {
+      setPrefs((prev) => {
+        const merged = { ...prev, ...next };
+        localStorage.setItem(displayKeyFor(viewMode), JSON.stringify(merged));
+        return merged;
+      });
+    },
+    [viewMode],
+  );
 
   const chooseSort = (next: LibrarySort) => {
     setSort(next);
     localStorage.setItem(SORT_KEY, next);
   };
   const chooseViewMode = (next: LibraryViewMode) => {
-    setViewMode(next);
-    localStorage.setItem(VIEW_MODE_KEY, next);
+    // Swap the per-mode prefs alongside the mode itself.
+    setViewMode((prevMode) => {
+      localStorage.setItem(displayKeyFor(prevMode), JSON.stringify(prefs));
+      localStorage.setItem(VIEW_MODE_KEY, next);
+      try {
+        const parsed = JSON.parse(localStorage.getItem(displayKeyFor(next)) ?? "null");
+        setPrefs(isDisplayPrefs(parsed) ? parsed : DEFAULT_PREFS);
+      } catch {
+        setPrefs(DEFAULT_PREFS);
+      }
+      return next;
+    });
   };
 
   const handleNewNote = useCallback(() => {
@@ -141,6 +164,46 @@ export const LibraryPage: React.FC = () => {
       if (note) void updateNote(note.id, { docMode: "edgeless" });
     });
   }, [activeWorkspaceId, createNote, updateNote]);
+
+  // Markdown import: multi-file input → one note per .md (the transformer
+  // needs at least one existing doc as its schema donor).
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const handleImportMarkdown = useCallback(() => {
+    if (notes.length === 0) {
+      useNotificationStore.getState().pushToast({
+        kind: "info",
+        title: MESSAGES.LIBRARY_IMPORT_NEEDS_NOTE,
+        description: MESSAGES.LIBRARY_IMPORT_NEEDS_NOTE_DESC,
+      });
+      return;
+    }
+    importInputRef.current?.click();
+  }, [notes.length]);
+
+  const handleImportFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0 || !activeWorkspaceId) return;
+      let imported = 0;
+      for (const file of Array.from(files)) {
+        try {
+          const docId = await blockSuiteEditorService.importMarkdownFile(file);
+          if (docId) imported += 1;
+        } catch {
+          // Per-file failures shouldn't abort the batch; the toast reports
+          // the count that succeeded.
+        }
+      }
+      if (imported > 0) {
+        await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+        useNotificationStore.getState().pushToast({
+          kind: "info",
+          title: MESSAGES.LIBRARY_IMPORTED,
+          description: MESSAGES.LIBRARY_IMPORTED_DESC.replace("{n}", String(imported)),
+        });
+      }
+    },
+    [activeWorkspaceId],
+  );
 
   // An applied tag filter must always be visible and one-click clearable —
   // the tag entry path (Tags tab / sidebar) never opens the rule editor.
@@ -210,6 +273,19 @@ export const LibraryPage: React.FC = () => {
         defs={eligibleDefs}
         onNewNote={handleNewNote}
         onNewEdgeless={handleNewEdgeless}
+        onImportMarkdown={handleImportMarkdown}
+      />
+
+      <input
+        ref={importInputRef}
+        type="file"
+        multiple
+        accept=".md,.markdown,text/markdown"
+        className="hidden"
+        onChange={(e) => {
+          void handleImportFiles(e.target.files);
+          e.target.value = "";
+        }}
       />
 
       {tab === "collections" ? (

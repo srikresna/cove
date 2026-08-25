@@ -24,6 +24,8 @@ interface NoteCardProps {
   onDelete: (id: string) => void;
   /** Stack chips shown in the card footer (already filtered by visibility). */
   stackRows: Array<{ def: PropertyDefinition; value: PropertyValue }>;
+  /** Tag chips after the stack chips (Library display option). */
+  tagChips?: Array<{ name: string; color: string }>;
   /** Masonry cards size to content; grid cards keep a uniform min-height. */
   variant: "grid" | "masonry";
 }
@@ -55,6 +57,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onDuplicate,
   onDelete,
   stackRows,
+  tagChips = [],
   variant,
 }) => {
   const chips = stackRows
@@ -156,6 +159,27 @@ export const NoteCard: React.FC<NoteCardProps> = ({
               <span className="truncate">{row.text}</span>
             </span>
           ))}
+        </div>
+      )}
+
+      {tagChips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tagChips.slice(0, 3).map((chip) => (
+            <span
+              key={chip.name}
+              className="inline-flex h-6 max-w-32 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground"
+            >
+              <span
+                aria-hidden="true"
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: chip.color }}
+              />
+              <span className="truncate">{chip.name}</span>
+            </span>
+          ))}
+          {tagChips.length > 3 && (
+            <span className="text-xs text-muted-foreground/60">+{tagChips.length - 3}</span>
+          )}
         </div>
       )}
     </div>

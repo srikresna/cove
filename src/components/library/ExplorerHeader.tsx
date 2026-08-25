@@ -1,4 +1,13 @@
-import { ChevronDown, FileText, LayoutGrid, List, Plus, Shapes, Waves } from "lucide-react";
+import {
+  ChevronDown,
+  FileDown,
+  FileText,
+  LayoutGrid,
+  List,
+  Plus,
+  Shapes,
+  Waves,
+} from "lucide-react";
 import type React from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { PropertyDefinition } from "../../domain/property/Property";
@@ -8,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { DisplayMenu, type LibraryDisplayPrefs } from "./DisplayMenu";
@@ -52,6 +62,7 @@ interface ExplorerHeaderProps {
   defs: PropertyDefinition[];
   onNewNote: () => void;
   onNewEdgeless: () => void;
+  onImportMarkdown: () => void;
 }
 
 /**
@@ -71,6 +82,7 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
   defs,
   onNewNote,
   onNewEdgeless,
+  onImportMarkdown,
 }) => (
   <div className="flex h-[52px] shrink-0 items-center justify-between border-b px-4">
     <nav className="flex items-center gap-3 pl-2" aria-label="Library sections">
@@ -164,6 +176,19 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
                 </span>
                 <span className="pl-7 text-xs text-muted-foreground">
                   {MESSAGES.LIBRARY_NEW_EDGELESS_DESC}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={onImportMarkdown}
+                className="flex-col items-start gap-0.5 py-2"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <FileDown className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                  {MESSAGES.LIBRARY_IMPORT_MD}
+                </span>
+                <span className="pl-7 text-xs text-muted-foreground">
+                  {MESSAGES.LIBRARY_IMPORT_MD_DESC}
                 </span>
               </DropdownMenuItem>
             </DropdownMenuContent>

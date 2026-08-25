@@ -143,9 +143,15 @@ export const JournalsPage: React.FC = () => {
             </p>
 
             {selectedJournals.length === 0 ? (
-              // AFFI NE placeholder: dashed card + create button.
-              <div className="flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-10 text-center">
-                <CalendarPlus className="h-8 w-8 text-muted-foreground/60" aria-hidden="true" />
+              // AFFI NE placeholder spec: 200px dashed card, round 36px icon
+              // chip, tertiary copy, primary Create button.
+              <div className="flex h-[200px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed text-center">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
+                  aria-hidden="true"
+                >
+                  <CalendarPlus className="h-4.5 w-4.5 text-muted-foreground" />
+                </span>
                 <p className="text-sm text-muted-foreground">{MESSAGES.JOURNAL_NONE_DESC}</p>
                 <Button onClick={() => openJournal(selectedDate)} className="gap-1.5">
                   <Plus className="h-4 w-4" aria-hidden="true" />

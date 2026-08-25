@@ -3,8 +3,8 @@ import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 
-const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const CELL_W = 30;
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const CELL_W = 39;
 const CELL_GAP = 4;
 
 const dayKey = (d: Date): string => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -92,7 +92,7 @@ export const WeekDatePicker: React.FC<{
       >
         <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
-      <div className="flex min-w-0 items-center gap-1">
+      <div className="flex min-w-0 grow items-stretch gap-1">
         {displayDays.map((day) => {
           const isSelected = selected != null && sameDay(day, selected);
           const isToday = sameDay(day, today);
@@ -121,18 +121,24 @@ export const WeekDatePicker: React.FC<{
                 }
               }}
               className={cn(
-                "flex h-[30px] w-[30px] shrink-0 flex-col items-center justify-center rounded text-[11px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "flex h-[39px] min-w-[39px] shrink-0 grow basis-0 flex-col items-center justify-center rounded px-1 pb-px pt-0.5 text-[12px] font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isSelected
                   ? "bg-primary text-primary-foreground"
                   : isToday
-                    ? "font-semibold text-primary hover:bg-accent"
+                    ? "text-primary hover:bg-accent"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
-              <span className="text-[9px] uppercase tracking-wide">
-                {dense ? WEEKDAY_SHORT[day.getDay()]?.[0] : WEEKDAY_SHORT[day.getDay()]}
+              {/* AFFI NE dayCell: weekday line (16px) above the date line (20px). */}
+              <span
+                className={cn(
+                  "text-[10px] leading-4 uppercase tracking-wide",
+                  isSelected ? "text-primary-foreground/80" : "text-muted-foreground/70",
+                )}
+              >
+                {dense ? WEEKDAY_SHORT[day.getDay()]?.slice(0, 2) : WEEKDAY_SHORT[day.getDay()]}
               </span>
-              <span className="mt-0.5 tabular-nums">{day.getDate()}</span>
+              <span className="mt-px text-[13px] leading-5 tabular-nums">{day.getDate()}</span>
             </button>
           );
         })}

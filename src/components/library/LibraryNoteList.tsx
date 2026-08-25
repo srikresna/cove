@@ -261,10 +261,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   );
   const rulesActive = draftRules.length > 0;
 
-  // Tag ids per note feed both the tags filter rule and group-by-tags. The
-  // rule path already bulk-loads them; grouping without rules needs its own
-  // load, so the effect runs for either trigger.
-  const needsTagIds = prefs.groupBy === "tags" || draftRules.some((rule) => rule.kind === "tags");
+  // Tag ids per note feed the tags filter rule, group-by-tags AND the tag
+  // chips on rows/cards — loaded unconditionally while the Library is
+  // mounted (the SWR cache makes repeats cheap).
+  const needsTagIds = true;
   const [tagIdsByNote, setTagIdsByNote] = useState<Map<string, string[]> | null>(
     cached?.tagIdsByNote ?? null,
   );
@@ -575,6 +575,20 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
   // ---- Shared row handlers + stack rows -----------------------------------
 
+  /** Tag chips per note (name+color), gated by the Tags display toggle. */
+  const tagChipsOf = useCallback(
+    (noteId: string): Array<{ name: string; color: string }> => {
+      if (prefs.hiddenProps.includes("tags")) return [];
+      const ids = tagIdsByNote?.get(noteId);
+      if (!ids || ids.length === 0) return [];
+      return ids
+        .map((id) => allTags.find((tag) => tag.id === id))
+        .filter((tag): tag is NonNullable<typeof tag> => tag != null)
+        .map((tag) => ({ name: tag.name, color: tag.color }));
+    },
+    [prefs.hiddenProps, tagIdsByNote, allTags],
+  );
+
   const stackRowsOf = useCallback(
     (noteId: string): Array<{ def: PropertyDefinition; value: PropertyValue }> => {
       if (!prefs.showBody) return [];
@@ -645,6 +659,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         onDuplicate={handleDuplicate}
         onDelete={handleDelete}
         stackRows={stackRowsOf(note.id)}
+        tagChips={tagChipsOf(note.id)}
         showIcon={prefs.showIcon}
       />
     ),
@@ -656,6 +671,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       handleDuplicate,
       handleDelete,
       stackRowsOf,
+      tagChipsOf,
       prefs.showIcon,
     ],
   );
@@ -755,6 +771,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             stackRows={stackRowsOf(note.id)}
+            tagChips={tagChipsOf(note.id)}
             variant="grid"
           />
         ))}
@@ -772,6 +789,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             stackRows={stackRowsOf(note.id)}
+            tagChips={tagChipsOf(note.id)}
             variant="masonry"
           />
         ))}

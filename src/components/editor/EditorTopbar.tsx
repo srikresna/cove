@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
 import type { DocMode } from "../../domain/note/Note";
+import { useElementWidth } from "../../hooks/useElementWidth";
 import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
@@ -90,6 +91,10 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   const propertyVersion = usePropertyStore((s) => s.version);
   const openJournal = useOpenJournal();
   const [journalDate, setJournalDate] = useState<number | null>(null);
+  // AFFI NE hides the journal affordances as the header narrows: Today under
+  // 300px, the TemplateMark under 400px (container queries there; a
+  // ResizeObserver here).
+  const [headerRef, headerWidth] = useElementWidth<HTMLDivElement>();
 
   // AFFI NE pattern: the topbar of a journal note swaps the meta strip for a
   // week calendar navigated by the note's journal date.
@@ -115,7 +120,10 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   }).format(note.updatedAt);
 
   return (
-    <div className="flex h-10 flex-shrink-0 items-center justify-between border-b bg-card px-3">
+    <div
+      ref={headerRef}
+      className="flex h-10 flex-shrink-0 items-center justify-between border-b bg-card px-3"
+    >
       {journalDate != null ? (
         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
           {/* AFFI NE JournalPageHeader order: mode switch first, the week
@@ -138,22 +146,25 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
             />
           </div>
           {/* TemplateMark parity: marks a journal note that IS itself flagged
-              as a template (AFFI NE doc-is-template semantics). */}
-          {note.isTemplate && (
+              as a template (AFFI NE doc-is-template semantics); hidden below
+              400px of header width, like AFFI NE's container query. */}
+          {note.isTemplate && headerWidth >= 400 && (
             <span className="flex h-6 shrink-0 items-center rounded bg-primary/10 px-2 text-xs font-medium text-primary">
               {MESSAGES.TEMPLATE_BADGE}
             </span>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label={MESSAGES.JOURNAL_TODAY}
-            onClick={() => openJournal(Date.now())}
-            className="h-8 shrink-0 px-2 text-xs font-medium"
-          >
-            <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
-            {MESSAGES.JOURNAL_TODAY}
-          </Button>
+          {(headerWidth === 0 || headerWidth >= 300) && (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label={MESSAGES.JOURNAL_TODAY}
+              onClick={() => openJournal(Date.now())}
+              className="h-8 shrink-0 px-2 text-xs font-medium"
+            >
+              <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.JOURNAL_TODAY}
+            </Button>
+          )}
           <SaveStatusBadge />
           <span aria-hidden="true" className="h-5 w-px shrink-0 bg-border" />
           <DropdownMenu>

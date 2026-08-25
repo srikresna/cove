@@ -31,6 +31,8 @@ interface NoteItemProps {
   onDelete: (id: string) => void;
   /** Stack rows under the title (AFFI NE docs-view stack properties). */
   stackRows?: Array<{ def: PropertyDefinition; value: PropertyValue }>;
+  /** Tag chips after the stacks (Library display option). */
+  tagChips?: Array<{ name: string; color: string }>;
   /** Show the note's icon/emoji (Library list display option). */
   showIcon?: boolean;
 }
@@ -111,6 +113,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
     onDuplicate,
     onDelete,
     stackRows = [],
+    tagChips = [],
     showIcon = true,
   }) => {
     const menuHandlers = { note, onTogglePin, onToggleFavorite, onDuplicate, onDelete };
@@ -176,6 +179,28 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                       <div className="text-[10px] text-muted-foreground/60">
                         +{stackRows.length - 3}
                       </div>
+                    )}
+                  </div>
+                )}
+                {tagChips.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {tagChips.slice(0, 3).map((chip) => (
+                      <span
+                        key={chip.name}
+                        className="inline-flex h-[18px] max-w-28 items-center gap-1 rounded-full border bg-card px-1.5 text-[10px] text-foreground"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: chip.color }}
+                        />
+                        <span className="truncate">{chip.name}</span>
+                      </span>
+                    ))}
+                    {tagChips.length > 3 && (
+                      <span className="text-[10px] text-muted-foreground/60">
+                        +{tagChips.length - 3}
+                      </span>
                     )}
                   </div>
                 )}
