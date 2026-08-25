@@ -148,21 +148,31 @@ export class NoteService implements INoteService {
     // reorderNote tail drop can advance the max off-chain in between).
     const mintPromise = this.nextTailKey(workspaceId);
     const orderIndex = await mintPromise;
-    const rec = await this.notes.createNote(
-      {
-        id,
-        workspaceId,
-        title: await this.crypto.encryptPayload(title, titleAad(id)),
-        titleKmsVersion: 1,
-        content: await this.crypto.encryptPayload(content, id),
-        icon,
-        coverColor: undefined,
-        isPinned: false,
-        isFavorite: false,
-        orderIndex,
-      },
-      opts,
-    );
+    let rec: NoteRecord;
+    try {
+      rec = await this.notes.createNote(
+        {
+          id,
+          workspaceId,
+          title: await this.crypto.encryptPayload(title, titleAad(id)),
+          titleKmsVersion: 1,
+          content: await this.crypto.encryptPayload(content, id),
+          icon,
+          coverColor: undefined,
+          isPinned: false,
+          isFavorite: false,
+          orderIndex,
+        },
+        opts,
+      );
+    } catch (err) {
+      // A failed create must also drop its carry: a leaked resolved key
+      // survives forget-on-insert and mint-catch alike, and a later
+      // restore/move can raise the true max past it without touching the
+      // chain — minting off the stale carry then duplicates a key.
+      this.forgetTailMint(workspaceId, mintPromise);
+      throw err;
+    }
     this.forgetTailMint(workspaceId, mintPromise);
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
@@ -246,16 +256,25 @@ export class NoteService implements INoteService {
     >,
   ): Promise<Note> {
     this.assertUnlocked();
-    const { title, ...rest } = updates;
+    const { title, workspaceId: moveTo, ...rest } = updates;
     const recUpdates: Partial<NoteRecord> = { ...rest };
+    const before = await (moveTo !== undefined
+      ? this.notes.getNoteById(id)
+      : Promise.resolve(null));
     if (title !== undefined) {
       recUpdates.title = await this.crypto.encryptPayload(title, titleAad(id));
       recUpdates.titleKmsVersion = 1;
     }
+    if (moveTo !== undefined) (recUpdates as { workspaceId?: string }).workspaceId = moveTo;
     const updated = await this.notes.updateNote(id, recUpdates);
     if (recUpdates.orderIndex !== undefined) {
       // An external orderIndex write invalidates any cached tail mint.
       this.tailKeyMinting.delete(updated.workspaceId);
+    }
+    if (before && moveTo !== undefined && before.workspaceId !== moveTo) {
+      // A moved note keeps its key in BOTH workspaces' key spaces.
+      this.tailKeyMinting.delete(before.workspaceId);
+      this.tailKeyMinting.delete(moveTo);
     }
     return this.toNote(updated);
   }
@@ -364,7 +383,11 @@ export class NoteService implements INoteService {
 
   async restoreNote(id: string): Promise<void> {
     this.assertUnlocked();
+    const restored = await this.notes.getNoteById(id);
     await this.notes.setDeleted(id, null);
+    // A restored note re-enters getMaxOrderIndex's live filter with its old
+    // key — possibly above any cached tail mint.
+    if (restored) this.tailKeyMinting.delete(restored.workspaceId);
   }
 
   async listTrash(): Promise<Note[]> {
