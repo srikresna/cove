@@ -79,13 +79,25 @@ function satisfiedByEmptyInputs(rule: FilterRule): boolean {
   }
 }
 
+/** Code-unit comparison — fractional-indexing keys are ordered by char
+ *  code (a0..a9,aA..aZ,aa..az), which localeCompare's case-insensitive
+ *  ICU collation scrambles from the 37th key onward. */
+const cmpFractional = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 const compareBy = (sort: LibrarySort) => {
   switch (sort) {
     case "custom":
-      // Fractional-index keys sort lexicographically; empty keys (pre-v23
-      // strays) sink to the end rather than blocking the comparison.
-      return (a: Note, b: Note) =>
-        (a.orderIndex ?? "").localeCompare(b.orderIndex ?? "") || a.createdAt - b.createdAt;
+      // Fractional keys in code-unit order; empty keys (pre-v23 strays,
+      // new notes) sink to the end via the leading boolean term.
+      return (a: Note, b: Note) => {
+        const ak = a.orderIndex ?? "";
+        const bk = b.orderIndex ?? "";
+        return (
+          (ak === "" ? 1 : 0) - (bk === "" ? 1 : 0) ||
+          cmpFractional(ak, bk) ||
+          a.createdAt - b.createdAt
+        );
+      };
     case "updated-asc":
       return (a: Note, b: Note) => a.updatedAt - b.updatedAt;
     case "created-desc":
@@ -705,8 +717,8 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   }, [selectedIds, trashNote]);
 
   const handleSelect = useCallback(
-    (id: string) => {
-      handleRowClick(id);
+    (id: string, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => {
+      handleRowClick(id, event);
     },
     [handleRowClick],
   );

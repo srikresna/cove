@@ -215,9 +215,13 @@ export class NoteService implements INoteService {
     const target = await this.getNote(targetId);
     if (!target) throw new NotFoundError("Note", targetId);
 
-    const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) =>
-      (a.orderIndex ?? "").localeCompare(b.orderIndex ?? ""),
-    );
+    // Fractional keys sort by char code, NOT locale collation (ICU sorts
+    // case-insensitively and scrambles a0..a9,aA..aZ from the 37th key).
+    const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) => {
+      const ak = a.orderIndex ?? "";
+      const bk = b.orderIndex ?? "";
+      return (ak === "" ? 1 : 0) - (bk === "" ? 1 : 0) || (ak < bk ? -1 : ak > bk ? 1 : 0);
+    });
     const others = siblings.filter((n) => n.id !== id);
     const targetIndex = others.findIndex((n) => n.id === targetId);
     if (targetIndex === -1) throw new NotFoundError("Note", targetId);

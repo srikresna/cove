@@ -39,7 +39,8 @@ interface NoteItemProps {
   /** Show the drag handle (Library list + custom sort only). */
   showDragHandle?: boolean;
   onReorder?: (id: string, targetId: string, position: "before" | "after") => void;
-  onSelect: (id: string) => void;
+  /** The optional event carries ctrl/meta/shift for Library multi-select. */
+  onSelect: (id: string, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void;
   onTogglePin: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -193,11 +194,11 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
             role="button"
             tabIndex={0}
             aria-label={`Note: ${note.title || MESSAGES.UNTITLED_NOTE}`}
-            onClick={() => onSelect(note.id)}
+            onClick={(e) => onSelect(note.id, e)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                onSelect(note.id);
+                onSelect(note.id, e);
               }
             }}
             className={cn(

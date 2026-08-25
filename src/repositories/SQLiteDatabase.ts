@@ -686,11 +686,13 @@ export class SQLiteDatabase {
       // index column, seeded from the current createdAt order (oldest first,
       // so updated-desc lists look unchanged until the user drags).
       const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      const hasColumn = noteCols.some((c) => c.name === "orderIndex");
       const statements: SqlStatement[] = [];
-      if (!noteCols.some((c) => c.name === "orderIndex")) {
-        statements.push({
-          sql: "ALTER TABLE notes ADD COLUMN orderIndex TEXT NOT NULL DEFAULT ''",
-        });
+      if (!hasColumn) {
+        // Apply the ALTER immediately (v8/v9/v17 pattern) — the seed check
+        // below SELECTs the column, which the v14-style queued ALTER would
+        // brick on ("no such column") since runTransaction has not run yet.
+        await db.execute("ALTER TABLE notes ADD COLUMN orderIndex TEXT NOT NULL DEFAULT ''");
       }
       const noteRows = await db.select<Array<{ id: string; orderIndex: string }>>(
         "SELECT id, orderIndex FROM notes ORDER BY createdAt, id",

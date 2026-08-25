@@ -146,7 +146,9 @@ export class SQLiteNoteRepository implements INoteRepository {
           note.isTemplate ? 1 : 0,
           note.isPinned ? 1 : 0,
           note.isFavorite ? 1 : 0,
-          note.orderIndex || null,
+          // The column is NOT NULL — an unset key must bind the empty-string
+          // default, never SQL NULL (explicit NULLs bypass the DEFAULT).
+          note.orderIndex ?? "",
           KMS_VERSION_DEK,
           note.createdAt,
           note.updatedAt,
@@ -216,7 +218,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
     if (updates.orderIndex !== undefined) {
       setClauses.push("orderIndex = ?");
-      params.push(updates.orderIndex || null);
+      params.push(updates.orderIndex ?? "");
     }
 
     setClauses.push("updatedAt = ?");

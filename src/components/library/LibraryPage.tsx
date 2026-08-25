@@ -5,6 +5,7 @@ import { MESSAGES } from "../../constants/messages";
 import { blockSuiteEditorService, propertyService, savedViewService } from "../../di/container";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
+import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
@@ -187,21 +188,32 @@ export const LibraryPage: React.FC = () => {
     async (files: FileList | null) => {
       if (!files || files.length === 0 || !activeWorkspaceId) return;
       let imported = 0;
+      let failed = 0;
       for (const file of Array.from(files)) {
         try {
           const docId = await blockSuiteEditorService.importMarkdownFile(file);
           if (docId) imported += 1;
+          else failed += 1;
         } catch {
           // Per-file failures shouldn't abort the batch; the toast reports
-          // the count that succeeded.
+          // the counts.
+          failed += 1;
         }
       }
       if (imported > 0) {
         await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+      }
+      if (imported > 0 || failed > 0) {
+        const description = [
+          MESSAGES.LIBRARY_IMPORTED_DESC.replace("{n}", String(imported)),
+          failed > 0 ? `${failed} file(s) failed.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
         useNotificationStore.getState().pushToast({
-          kind: "info",
-          title: MESSAGES.LIBRARY_IMPORTED,
-          description: MESSAGES.LIBRARY_IMPORTED_DESC.replace("{n}", String(imported)),
+          kind: imported > 0 ? "info" : "error",
+          title: imported > 0 ? MESSAGES.LIBRARY_IMPORTED : MESSAGES.SOMETHING_WENT_WRONG,
+          description,
         });
       }
     },
@@ -474,10 +486,16 @@ export const LibraryPage: React.FC = () => {
           if (!activeWorkspaceId) return;
           if (editingId) {
             void (async () => {
-              await savedViewService.renameView(editingId, name);
-              await savedViewService.updateViewRules(editingId, rules);
-              await savedViewService.updateViewAllowIds(editingId, allowNoteIds);
-              useViewStore.setState((s) => ({ version: s.version + 1 }));
+              try {
+                await savedViewService.renameView(editingId, name);
+                await savedViewService.updateViewRules(editingId, rules);
+                await savedViewService.updateViewAllowIds(editingId, allowNoteIds);
+                // Bump AFTER the writes commit — CollectionsSection refetches
+                // on version, so the store sees the fully-edited view.
+                useViewStore.setState((s) => ({ version: s.version + 1 }));
+              } catch (err) {
+                notifyError(err);
+              }
             })();
           } else {
             // Create: route the editor rules through the store's draft path
@@ -489,9 +507,14 @@ export const LibraryPage: React.FC = () => {
               .then(async (created) => {
                 if (created) {
                   await savedViewService.updateViewAllowIds(created.id, allowNoteIds);
+                  // The store's last fetch ran inside saveDraftAsView BEFORE
+                  // this UPDATE — bump so CollectionsSection refetches the
+                  // view WITH its allow-list.
+                  useViewStore.setState((s) => ({ version: s.version + 1 }));
                 }
                 return null;
-              });
+              })
+              .catch(notifyError);
           }
         }}
       />
