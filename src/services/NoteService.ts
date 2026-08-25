@@ -142,8 +142,12 @@ export class NoteService implements INoteService {
     const id = makeNoteId();
     // New notes get a TAIL fractional key immediately — empty keys would
     // sink them at the sort's end anyway, and empty anchors break drag
-    // gap math (reorderNote).
-    const orderIndex = await this.nextTailKey(workspaceId);
+    // gap math (reorderNote). The mint promise is captured so the cache
+    // can be invalidated once THIS insert lands — the cached key must
+    // only serve genuinely concurrent mints, never a later create (a
+    // reorderNote tail drop can advance the max off-chain in between).
+    const mintPromise = this.nextTailKey(workspaceId);
+    const orderIndex = await mintPromise;
     const rec = await this.notes.createNote(
       {
         id,
@@ -159,6 +163,7 @@ export class NoteService implements INoteService {
       },
       opts,
     );
+    this.forgetTailMint(workspaceId, mintPromise);
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
   }
@@ -192,11 +197,18 @@ export class NoteService implements INoteService {
     this.tailKeyMinting.set(workspaceId, minted);
     minted.catch(() => {
       // A failed mint must not poison the chain for later creates.
-      if (this.tailKeyMinting.get(workspaceId) === minted) {
-        this.tailKeyMinting.delete(workspaceId);
-      }
+      this.forgetTailMint(workspaceId, minted);
     });
     return minted;
+  }
+
+  /** Drop a settled mint from the cache — the entry only exists to bridge
+   *  CONCURRENT creates; a cached key surviving past its insert goes stale
+   *  the moment reorderNote advances the tail off-chain. */
+  private forgetTailMint(workspaceId: string, mint: Promise<string>): void {
+    if (this.tailKeyMinting.get(workspaceId) === mint) {
+      this.tailKeyMinting.delete(workspaceId);
+    }
   }
 
   async createNoteWithId(
@@ -247,7 +259,12 @@ export class NoteService implements INoteService {
       recUpdates.title = await this.crypto.encryptPayload(title, titleAad(id));
       recUpdates.titleKmsVersion = 1;
     }
-    return this.toNote(await this.notes.updateNote(id, recUpdates));
+    const updated = await this.notes.updateNote(id, recUpdates);
+    if (recUpdates.orderIndex !== undefined) {
+      // An external orderIndex write invalidates any cached tail mint.
+      this.tailKeyMinting.delete(updated.workspaceId);
+    }
+    return this.toNote(updated);
   }
 
   /**
@@ -290,6 +307,9 @@ export class NoteService implements INoteService {
         : prev.orderIndex || (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
     const after = others[insertAt]?.orderIndex ?? null;
     await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
+    // This write advances the key space OFF the mint chain — drop any
+    // cached tail key so the next create rescans the true max.
+    this.tailKeyMinting.delete(target.workspaceId);
   }
 
   async updateContent(id: string, content: string): Promise<Note> {
