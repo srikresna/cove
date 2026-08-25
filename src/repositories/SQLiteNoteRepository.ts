@@ -49,6 +49,20 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
+  async getMaxOrderIndex(workspaceId: string): Promise<string | null> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ orderIndex: string }>>(
+        "SELECT orderIndex FROM notes WHERE workspaceId = ? AND deletedAt IS NULL AND orderIndex != '' ORDER BY orderIndex DESC LIMIT 1",
+        [workspaceId],
+      );
+      const row = rows[0];
+      return row?.orderIndex ? String(row.orderIndex) : null;
+    } catch (err) {
+      throw toPersistenceError("getMaxOrderIndex", err);
+    }
+  }
+
   async getMetaByIds(ids: string[]): Promise<NoteRecord[]> {
     if (ids.length === 0) return [];
     try {

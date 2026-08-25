@@ -17,6 +17,17 @@ export class InMemoryNoteRepository implements INoteRepository {
       .map((n) => ({ ...n, content: "" as EncryptedPayload }));
   }
 
+  async getMaxOrderIndex(workspaceId: string): Promise<string | null> {
+    let max: string | null = null;
+    for (const note of this.notes) {
+      if (note.workspaceId !== workspaceId || note.deletedAt != null) continue;
+      const key = note.orderIndex ?? "";
+      if (!key) continue;
+      if (max === null || key > max) max = key;
+    }
+    return max;
+  }
+
   async getMetaByIds(ids: string[]): Promise<NoteRecord[]> {
     this.callLog.push(`getMetaByIds:${ids.join(",")}`);
     if (this.shouldFail) throw new Error("Fake repo error: getMetaByIds");

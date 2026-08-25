@@ -10,6 +10,9 @@ export interface NoteRecord extends Omit<Note, "content" | "title"> {
 
 export interface INoteRepository {
   getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]>;
+  /** Largest non-empty manual-order key in the workspace (BINARY order —
+   *  fractional-index keys are ASCII code-unit ordered), or null. */
+  getMaxOrderIndex(workspaceId: string): Promise<string | null>;
   getMetaByIds(ids: string[]): Promise<NoteRecord[]>;
   getNoteById(id: string): Promise<NoteRecord | null>;
   findRecentForSearch(limit: number): Promise<NoteRecord[]>;

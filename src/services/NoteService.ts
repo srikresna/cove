@@ -170,30 +170,19 @@ export class NoteService implements INoteService {
 
   /**
    * A fractional key strictly after every existing note key (custom sort
-   * tail). Serialized per workspace: the mint reads the workspace's
-   * metadata (orderIndex is plaintext, but listMetadataByWorkspace also
-   * decrypts titles — the only list surface available) and CHAINS onto any
-   * in-flight mint, so overlapping creates derive from each other's keys
-   * instead of racing on the same DB snapshot.
+   * tail). Serialized per workspace: the mint asks the DB for the true max
+   * key (a single-row plaintext query — no decryption, no O(N) metadata
+   * scan) and CHAINS onto any in-flight mint, so overlapping creates derive
+   * from each other's keys instead of racing on the same snapshot. Because
+   * the DB source is always fresh, a stale cache can never mint a
+   * duplicate; the chain exists purely to serialize concurrent mints.
    */
   private nextTailKey(workspaceId: string): Promise<string> {
     const inFlight =
       this.tailKeyMinting.get(workspaceId) ?? Promise.resolve(null as unknown as string);
-    const minted = inFlight.then(async (previous: string | null) => {
-      // A chained mint derives from the previous mint's key directly — the
-      // DB list can't have grown since (the previous INSERT follows its own
-      // mint), and skipping the decrypting scan keeps double-click creates
-      // O(1) instead of O(N) each.
-      if (previous != null) return generateKeyBetween(previous, null);
-      const siblings = await this.listMetadataByWorkspace(workspaceId);
-      let maxKey: string | null = null;
-      for (const note of siblings) {
-        const key = note.orderIndex;
-        if (!key) continue;
-        if (maxKey === null || key > maxKey) maxKey = key;
-      }
-      return generateKeyBetween(maxKey, null);
-    });
+    const minted = inFlight.then(async () =>
+      generateKeyBetween(await this.notes.getMaxOrderIndex(workspaceId), null),
+    );
     this.tailKeyMinting.set(workspaceId, minted);
     minted.catch(() => {
       // A failed mint must not poison the chain for later creates.
