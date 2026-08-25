@@ -1,4 +1,13 @@
-import { FileText, LayoutTemplate, MoreHorizontal, Plus, Star, Trash2 } from "lucide-react";
+import {
+  Copy,
+  FileText,
+  LayoutTemplate,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
@@ -7,6 +16,7 @@ import { cn } from "../../lib/utils";
 import { getJournalTemplateId, setJournalTemplateId } from "../../services/journalTemplateSetting";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { PromptDialog } from "../ui/prompt-dialog";
 import { CollapsibleSection } from "./CollapsibleSection";
 
 const TemplateRow: React.FC<{
@@ -23,7 +34,10 @@ const TemplateRow: React.FC<{
   onSelect: () => void;
   onUse: () => void;
   onSetJournalTemplate: () => void;
+  onRename: () => void;
+  onDuplicate: () => void;
   onRemoveFlag: () => void;
+  onTrash: () => void;
 }> = ({
   note,
   isActive,
@@ -31,7 +45,10 @@ const TemplateRow: React.FC<{
   onSelect,
   onUse,
   onSetJournalTemplate,
+  onRename,
+  onDuplicate,
   onRemoveFlag,
+  onTrash,
 }) => (
   <div className="group/tpl flex items-center">
     <button
@@ -75,9 +92,25 @@ const TemplateRow: React.FC<{
           {MESSAGES.TPL_SET_JOURNAL}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onRename}>
+          <Pencil aria-hidden="true" />
+          {MESSAGES.PROP_RENAME}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onDuplicate}>
+          <Copy aria-hidden="true" />
+          {MESSAGES.DUPLICATE_NOTE}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onRemoveFlag}>
           <Trash2 aria-hidden="true" />
           {MESSAGES.TPL_REMOVE_FLAG}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+          onSelect={onTrash}
+        >
+          <Trash2 aria-hidden="true" />
+          {MESSAGES.MOVE_TO_TRASH}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -90,9 +123,12 @@ export const TemplatesSection: React.FC = () => {
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
   const createNote = useNoteStore((s) => s.createNote);
   const duplicateNote = useNoteStore((s) => s.duplicateNote);
+  const trashNote = useNoteStore((s) => s.trashNote);
   const updateNote = useNoteStore((s) => s.updateNote);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [journalTemplateId, setJournalTemplateIdState] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [trashingId, setTrashingId] = useState<string | null>(null);
 
   // The setting is per workspace and the workspace id arrives async at launch
   // (and changes on switch without remount), so resync instead of capturing
@@ -111,6 +147,9 @@ export const TemplatesSection: React.FC = () => {
       if (note) void updateNote(note.id, { isTemplate: true });
     });
   };
+
+  const renameTarget = templates.find((n) => n.id === renamingId) ?? null;
+  const trashTarget = templates.find((n) => n.id === trashingId) ?? null;
 
   return (
     <CollapsibleSection
@@ -148,6 +187,8 @@ export const TemplatesSection: React.FC = () => {
               setJournalTemplateId(activeWorkspaceId, note.id);
               setJournalTemplateIdState(note.id);
             }}
+            onRename={() => setRenamingId(note.id)}
+            onDuplicate={() => void duplicateNote(note.id)}
             onRemoveFlag={() => {
               if (activeWorkspaceId && note.id === journalTemplateId) {
                 setJournalTemplateId(activeWorkspaceId, null);
@@ -155,9 +196,43 @@ export const TemplatesSection: React.FC = () => {
               }
               void updateNote(note.id, { isTemplate: false });
             }}
+            onTrash={() => setTrashingId(note.id)}
           />
         ))
       )}
+
+      <PromptDialog
+        open={renamingId !== null}
+        title={MESSAGES.PROP_RENAME}
+        label="Template name"
+        placeholder={MESSAGES.TPL_DEFAULT_TITLE}
+        confirmLabel={MESSAGES.PROP_RENAME}
+        initialValue={renameTarget?.title}
+        onConfirm={(name) => {
+          if (renamingId) void updateNote(renamingId, { title: name });
+          setRenamingId(null);
+        }}
+        onCancel={() => setRenamingId(null)}
+      />
+
+      <ConfirmDialog
+        open={trashingId !== null}
+        title={MESSAGES.MOVE_TO_TRASH}
+        description={`"${trashTarget?.title ?? ""}" — ${MESSAGES.TRASH_MOVED_DESC}`}
+        confirmLabel={MESSAGES.MOVE_TO_TRASH}
+        danger
+        onConfirm={() => {
+          if (trashingId) {
+            if (activeWorkspaceId && trashingId === journalTemplateId) {
+              setJournalTemplateId(activeWorkspaceId, null);
+              setJournalTemplateIdState(null);
+            }
+            void trashNote(trashingId);
+          }
+          setTrashingId(null);
+        }}
+        onCancel={() => setTrashingId(null)}
+      />
     </CollapsibleSection>
   );
 };

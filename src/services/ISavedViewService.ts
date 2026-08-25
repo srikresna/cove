@@ -6,6 +6,8 @@ export interface ISavedViewService {
   listViews(workspaceId: string): Promise<SavedView[]>;
   createView(workspaceId: string, name: string, rules: FilterRules): Promise<SavedView>;
   renameView(id: string, name: string): Promise<void>;
+  /** Persist edited rules back into an existing view. */
+  updateViewRules(id: string, rules: FilterRules): Promise<void>;
   deleteView(id: string): Promise<void>;
   /** Drop a deleted option from all saved-view rules; returns deleted view ids. */
   pruneOption(definitionId: string, optionId: string): Promise<string[]>;

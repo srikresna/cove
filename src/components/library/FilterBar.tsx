@@ -1,4 +1,4 @@
-import { Plus, Save, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -11,7 +11,6 @@ import { cn } from "../../lib/utils";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
-import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -241,16 +240,17 @@ const RuleChip: React.FC<{
   );
 };
 
+/**
+ * The rule-chip editor inside the Library filter area (AFFI NE Filters
+ * row). Save/Cancel live in the surrounding area (LibraryPage) — this bar
+ * only composes and edits rules.
+ */
 export const FilterBar: React.FC = () => {
   const draftRules = useViewStore((s) => s.draftRules);
   const addDraftRule = useViewStore((s) => s.addDraftRule);
   const updateDraftRule = useViewStore((s) => s.updateDraftRule);
   const removeDraftRule = useViewStore((s) => s.removeDraftRule);
-  const clearDraft = useViewStore((s) => s.clearDraft);
-  const saveDraftAsView = useViewStore((s) => s.saveDraftAsView);
-  const activeViewId = useViewStore((s) => s.activeViewId);
   const propertyVersion = usePropertyStore((s) => s.version);
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [defs, setDefs] = useState<PropertyDefinition[]>([]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
@@ -299,84 +299,52 @@ export const FilterBar: React.FC = () => {
   };
 
   return (
-    <div className="space-y-1">
-      {draftRules.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1">
-          {draftRules.map((rule) => (
-            <RuleChip
-              key={rule.id}
-              rule={rule}
-              propertyDefs={filterableDefs}
-              onUpdate={(patch) => updateDraftRule(rule.id, patch)}
-              onRemove={() => removeDraftRule(rule.id)}
-            />
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-1">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground",
-              )}
-            >
-              <Plus className="h-3 w-3" aria-hidden="true" />
-              {MESSAGES.VIEW_ADD_RULE}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44">
-            {filterableDefs.map((def) => {
-              const kind = filterKindForType(def.type);
-              if (!kind) return null;
-              return (
-                <DropdownMenuItem key={def.id} onSelect={() => handleAdd(kind, def.id)}>
-                  <span className="truncate">{def.name}</span>
-                  <span className="ml-auto text-[10px] uppercase text-muted-foreground">
-                    {def.type}
-                  </span>
-                </DropdownMenuItem>
-              );
-            })}
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>{MESSAGES.VIEW_SPECIAL}</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => handleAdd("tags")}>
-              {MESSAGES.TAGS_HEADER}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => handleAdd("journal")}>Journal</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => handleAdd("template")}>Template</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {draftRules.length > 0 && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt(MESSAGES.VIEW_SAVE_PROMPT);
-                if (name && activeWorkspaceId) void saveDraftAsView(activeWorkspaceId, name);
-              }}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-            >
-              <Save className="h-3 w-3" aria-hidden="true" />
-              {MESSAGES.VIEW_SAVE}
-            </button>
-            <button
-              type="button"
-              onClick={clearDraft}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-            >
-              <X className="h-3 w-3" aria-hidden="true" />
-              {MESSAGES.VIEW_CLEAR}
-            </button>
-          </>
-        )}
-        {activeViewId && (
-          <span className="ml-auto text-[10px] uppercase tracking-wide text-primary">
-            {MESSAGES.VIEW_ACTIVE}
-          </span>
-        )}
-      </div>
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      {draftRules.map((rule) => (
+        <RuleChip
+          key={rule.id}
+          rule={rule}
+          propertyDefs={filterableDefs}
+          onUpdate={(patch) => updateDraftRule(rule.id, patch)}
+          onRemove={() => removeDraftRule(rule.id)}
+        />
+      ))}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={MESSAGES.VIEW_ADD_RULE}
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              draftRules.length === 0 && "border-dashed",
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            {MESSAGES.VIEW_ADD_RULE}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          {filterableDefs.map((def) => {
+            const kind = filterKindForType(def.type);
+            if (!kind) return null;
+            return (
+              <DropdownMenuItem key={def.id} onSelect={() => handleAdd(kind, def.id)}>
+                <span className="truncate">{def.name}</span>
+                <span className="ml-auto text-[10px] uppercase text-muted-foreground">
+                  {def.type}
+                </span>
+              </DropdownMenuItem>
+            );
+          })}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{MESSAGES.VIEW_SPECIAL}</DropdownMenuLabel>
+          <DropdownMenuItem onSelect={() => handleAdd("tags")}>
+            {MESSAGES.TAGS_HEADER}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => handleAdd("journal")}>Journal</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => handleAdd("template")}>Template</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };

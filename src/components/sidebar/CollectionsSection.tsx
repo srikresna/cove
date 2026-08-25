@@ -6,6 +6,7 @@ import { cn } from "../../lib/utils";
 import { useUIStore } from "../../store/useUIStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ export const CollectionsSection: React.FC = () => {
   const deleteView = useViewStore((s) => s.deleteView);
   const viewVersion = useViewStore((s) => s.version);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion is an intentional refresh signal, not a body input
   useEffect(() => {
@@ -30,6 +32,8 @@ export const CollectionsSection: React.FC = () => {
   }, [fetchViews, activeWorkspaceId, viewVersion]);
 
   if (views.length === 0) return null;
+
+  const deleteTarget = views.find((v) => v.id === deleting) ?? null;
 
   return (
     <CollapsibleSection
@@ -53,10 +57,23 @@ export const CollectionsSection: React.FC = () => {
               }
             }}
             onRename={(next) => void renameView(view.id, next)}
-            onDelete={() => void deleteView(view.id)}
+            onDelete={() => setDeleting(view.id)}
           />
         ))}
       </div>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={MESSAGES.COLLECTION_DELETE_CONFIRM_TITLE}
+        description={`"${deleteTarget?.name ?? ""}" — ${MESSAGES.COLLECTION_DELETE_CONFIRM_DESC}`}
+        confirmLabel={MESSAGES.VIEW_DELETE}
+        danger
+        onConfirm={() => {
+          if (deleting) void deleteView(deleting);
+          setDeleting(null);
+        }}
+        onCancel={() => setDeleting(null)}
+      />
     </CollapsibleSection>
   );
 };

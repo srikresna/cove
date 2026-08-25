@@ -32,6 +32,8 @@ interface ViewState {
   removeDraftRule: (id: string) => void;
   clearDraft: () => void;
   saveDraftAsView: (workspaceId: string, name: string) => Promise<SavedView | null>;
+  /** Persist the edited draft rules back into the active view. */
+  updateActiveViewRules: () => Promise<void>;
   renameView: (id: string, name: string) => Promise<void>;
   deleteView: (id: string) => Promise<void>;
   /** Sync saved views + drafts after a select option was deleted. */
@@ -143,6 +145,23 @@ export const useViewStore = create<ViewState>((set, get) => ({
     } catch (err) {
       notifyError(err);
       return null;
+    }
+  },
+
+  updateActiveViewRules: async () => {
+    const activeViewId = get().activeViewId;
+    if (!activeViewId) return;
+    try {
+      await savedViewService.updateViewRules(activeViewId, get().draftRules);
+      // Bump AFTER the commit (CollectionsSection refetches on version) and
+      // re-stamp the snapshot so the straggler guard doesn't treat the
+      // just-saved rules as a stale copy on the next fetch.
+      set((s) => ({
+        appliedRulesSnapshot: JSON.stringify(s.draftRules),
+        version: s.version + 1,
+      }));
+    } catch (err) {
+      notifyError(err);
     }
   },
 

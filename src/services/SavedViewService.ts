@@ -103,6 +103,19 @@ export class SavedViewService implements ISavedViewService {
     await this.views.rename(id, normalized);
   }
 
+  /**
+   * Persists edited rules back into an existing view (the "save changes"
+   * half of collection editing). Same completeness contract as createView.
+   */
+  async updateViewRules(id: string, rules: FilterRules): Promise<void> {
+    const view = await this.views.findById(id);
+    if (!view) throw new NotFoundError("SavedView", id);
+    if (rules.filter(isRuleComplete).length === 0) {
+      throw new ValidationError("Pick a value for at least one rule before saving.");
+    }
+    await this.views.updateRules(id, rules);
+  }
+
   deleteView(id: string): Promise<void> {
     return this.views.delete(id);
   }

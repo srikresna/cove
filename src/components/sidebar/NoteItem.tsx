@@ -31,6 +31,8 @@ interface NoteItemProps {
   onDelete: (id: string) => void;
   /** Stack rows under the title (AFFI NE docs-view stack properties). */
   stackRows?: Array<{ def: PropertyDefinition; value: PropertyValue }>;
+  /** Show the note's icon/emoji (Library list display option). */
+  showIcon?: boolean;
 }
 
 const updatedTimeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -38,7 +40,7 @@ const updatedTimeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-const MenuEntries: React.FC<{
+export const NoteMenuEntries: React.FC<{
   note: Note;
   onTogglePin: (id: string) => void;
   onToggleFavorite: (id: string) => void;
@@ -68,8 +70,8 @@ const MenuEntries: React.FC<{
   </>
 );
 
-/** Stack value formatter for note rows (compact, no editors). */
-function stackValueText(def: PropertyDefinition, value: PropertyValue): string | null {
+/** Stack value formatter for note rows and cards (compact, no editors). */
+export function stackValueText(def: PropertyDefinition, value: PropertyValue): string | null {
   switch (value.type) {
     case "text":
       return value.text || null;
@@ -109,6 +111,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
     onDuplicate,
     onDelete,
     stackRows = [],
+    showIcon = true,
   }) => {
     const menuHandlers = { note, onTogglePin, onToggleFavorite, onDuplicate, onDelete };
     const visibleStacks = stackRows
@@ -140,12 +143,14 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
             )}
           >
             <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
-              <span
-                className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-lg"
-                aria-hidden="true"
-              >
-                {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
-              </span>
+              {showIcon && (
+                <span
+                  className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-lg"
+                  aria-hidden="true"
+                >
+                  {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+                </span>
+              )}
               <div className="min-w-0 truncate">
                 <div className="truncate text-[13px] font-medium text-foreground">
                   {note.title || MESSAGES.UNTITLED_NOTE}
@@ -189,7 +194,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-                <MenuEntries
+                <NoteMenuEntries
                   {...menuHandlers}
                   Item={DropdownMenuItem}
                   Separator={DropdownMenuSeparator}
@@ -199,7 +204,11 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
           </motion.div>
         </ContextMenuTrigger>
         <ContextMenuContent onClick={(e) => e.stopPropagation()}>
-          <MenuEntries {...menuHandlers} Item={ContextMenuItem} Separator={ContextMenuSeparator} />
+          <NoteMenuEntries
+            {...menuHandlers}
+            Item={ContextMenuItem}
+            Separator={ContextMenuSeparator}
+          />
         </ContextMenuContent>
       </ContextMenu>
     );
