@@ -42,7 +42,19 @@ export function readCachedTagIds(workspaceId: string): Map<string, string[]> | n
 }
 
 export function writeCachedTagIds(workspaceId: string, tagIdsByNote: Map<string, string[]>): void {
+  // Create the entry when absent (the tag load can beat the stack-effect's
+  // entry-creating write on a first visit, which would drop the map and
+  // re-flash "Untagged" on every remount for the rest of the session).
   const prev = listCache.get(workspaceId);
-  if (!prev) return;
+  if (!prev) {
+    listCache.set(workspaceId, {
+      stackDefs: [],
+      stackValues: null,
+      filterable: null,
+      tagIdsByNote,
+      knownEmptyIds: new Set<string>(),
+    });
+    return;
+  }
   listCache.set(workspaceId, { ...prev, tagIdsByNote });
 }

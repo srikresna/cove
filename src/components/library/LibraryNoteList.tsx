@@ -517,9 +517,14 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     }
 
     // Stable display order: date groups newest-first, others by label, the
-    // special "__empty__"/"__untagged__" bucket always last.
+    // "absent/meta" buckets (Untagged, Empty, ✗, none-selected...) last.
     const entries = [...buckets.entries()].sort((a, b) => {
-      const special = (key: string) => key === "__empty__" || key === "__untagged__";
+      const special = (key: string) =>
+        key === "__untagged__" ||
+        key === "__empty__" ||
+        key.endsWith("__empty__") ||
+        key === "p:__unchecked__" ||
+        key === "p:__novalue__";
       if (special(a[0]) !== special(b[0])) return special(a[0]) ? 1 : -1;
       if (a[0].startsWith("d:") && b[0].startsWith("d:")) {
         return Number(b[0].slice(2)) - Number(a[0].slice(2));
