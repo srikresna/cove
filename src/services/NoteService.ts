@@ -125,6 +125,12 @@ export class NoteService implements INoteService {
     return hits;
   }
 
+  // Per-workspace in-flight tail-key minting: concurrent createNote calls
+  // (double-click) must not both read the same DB max and mint the SAME
+  // tail key — orderIndex has no UNIQUE constraint and duplicate keys
+  // permanently break drag gap math. The promise chain serializes mints.
+  private tailKeyMinting = new Map<string, Promise<string>>();
+
   async createNote(
     workspaceId: string,
     title = DEFAULT_NOTE_TITLE,
@@ -157,16 +163,40 @@ export class NoteService implements INoteService {
     return { ...rec, content, title };
   }
 
-  /** A fractional key strictly after every existing note key (custom sort tail). */
-  private async nextTailKey(workspaceId: string): Promise<string> {
-    const siblings = await this.listMetadataByWorkspace(workspaceId);
-    let maxKey: string | null = null;
-    for (const note of siblings) {
-      const key = note.orderIndex;
-      if (!key) continue;
-      if (maxKey === null || key > maxKey) maxKey = key;
-    }
-    return generateKeyBetween(maxKey, null);
+  /**
+   * A fractional key strictly after every existing note key (custom sort
+   * tail). Serialized per workspace: the mint reads the workspace's
+   * metadata (orderIndex is plaintext, but listMetadataByWorkspace also
+   * decrypts titles — the only list surface available) and CHAINS onto any
+   * in-flight mint, so overlapping creates derive from each other's keys
+   * instead of racing on the same DB snapshot.
+   */
+  private nextTailKey(workspaceId: string): Promise<string> {
+    const inFlight =
+      this.tailKeyMinting.get(workspaceId) ?? Promise.resolve(null as unknown as string);
+    const minted = inFlight.then(async (previous: string | null) => {
+      // A chained mint derives from the previous mint's key directly — the
+      // DB list can't have grown since (the previous INSERT follows its own
+      // mint), and skipping the decrypting scan keeps double-click creates
+      // O(1) instead of O(N) each.
+      if (previous != null) return generateKeyBetween(previous, null);
+      const siblings = await this.listMetadataByWorkspace(workspaceId);
+      let maxKey: string | null = null;
+      for (const note of siblings) {
+        const key = note.orderIndex;
+        if (!key) continue;
+        if (maxKey === null || key > maxKey) maxKey = key;
+      }
+      return generateKeyBetween(maxKey, null);
+    });
+    this.tailKeyMinting.set(workspaceId, minted);
+    minted.catch(() => {
+      // A failed mint must not poison the chain for later creates.
+      if (this.tailKeyMinting.get(workspaceId) === minted) {
+        this.tailKeyMinting.delete(workspaceId);
+      }
+    });
+    return minted;
   }
 
   async createNoteWithId(
@@ -244,13 +274,20 @@ export class NoteService implements INoteService {
     if (targetIndex === -1) throw new NotFoundError("Note", targetId);
 
     const insertAt = position === "before" ? targetIndex : targetIndex + 1;
-    // An EMPTY orderIndex means "after every real key" (new notes sit at
-    // the tail) — never collapse it to a start-of-list null anchor, or
-    // generateKeyBetween(null, ...) mints the SMALLEST key ("a0") and the
-    // dragged note teleports to the top, duplicating the oldest seed key.
+    // Anchor math distinguishes THREE lower-neighbor states:
+    //  - no neighbor (insertAt === 0, a true head drop) → null anchor, so
+    //    generateKeyBetween(null, firstKey) mints a correct head key;
+    //  - neighbor with an EMPTY key (legacy stray; empty means "after every
+    //    real key") → substitute the largest real key, or the null-anchor
+    //    collapse would mint the SMALLEST key ("a0") and teleport the note
+    //    to the top, duplicating the oldest seed;
+    //  - neighbor with a real key → use it.
     const realKeys = others.map((n) => n.orderIndex).filter((k): k is string => Boolean(k));
-    const lower = others[insertAt - 1]?.orderIndex;
-    const before = lower ?? (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
+    const prev = others[insertAt - 1];
+    const before =
+      prev === undefined
+        ? null
+        : prev.orderIndex || (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
     const after = others[insertAt]?.orderIndex ?? null;
     await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
   }
