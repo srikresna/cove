@@ -57,8 +57,10 @@ export const WeekDatePicker: React.FC<{
 
   // The measured width includes the two chevrons + gutters (56px) that the
   // day strip never sees — subtract them or the last cells slide under the
-  // right chevron at narrow widths.
-  const viewport = Math.max(1, Math.min(7, Math.floor((width - 56) / (CELL_W + CELL_GAP)) || 7));
+  // right chevron at narrow widths. Below 56+43px only one cell fits; the
+  // 7-cell default applies ONLY to the unmeasured (width 0) state.
+  const fitCount = Math.floor((width - 56) / (CELL_W + CELL_GAP));
+  const viewport = width > 0 ? Math.max(1, Math.min(7, fitCount)) : 7;
   const dense = width > 0 && width < 300;
 
   const weekStart = useMemo(() => startOfWeekLocal(cursor), [cursor]);

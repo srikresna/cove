@@ -134,6 +134,10 @@ export class NoteService implements INoteService {
   ): Promise<Note> {
     this.assertUnlocked();
     const id = makeNoteId();
+    // New notes get a TAIL fractional key immediately — empty keys would
+    // sink them at the sort's end anyway, and empty anchors break drag
+    // gap math (reorderNote).
+    const orderIndex = await this.nextTailKey(workspaceId);
     const rec = await this.notes.createNote(
       {
         id,
@@ -145,11 +149,24 @@ export class NoteService implements INoteService {
         coverColor: undefined,
         isPinned: false,
         isFavorite: false,
+        orderIndex,
       },
       opts,
     );
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
+  }
+
+  /** A fractional key strictly after every existing note key (custom sort tail). */
+  private async nextTailKey(workspaceId: string): Promise<string> {
+    const siblings = await this.listMetadataByWorkspace(workspaceId);
+    let maxKey: string | null = null;
+    for (const note of siblings) {
+      const key = note.orderIndex;
+      if (!key) continue;
+      if (maxKey === null || key > maxKey) maxKey = key;
+    }
+    return generateKeyBetween(maxKey, null);
   }
 
   async createNoteWithId(
@@ -227,7 +244,13 @@ export class NoteService implements INoteService {
     if (targetIndex === -1) throw new NotFoundError("Note", targetId);
 
     const insertAt = position === "before" ? targetIndex : targetIndex + 1;
-    const before = others[insertAt - 1]?.orderIndex ?? null;
+    // An EMPTY orderIndex means "after every real key" (new notes sit at
+    // the tail) — never collapse it to a start-of-list null anchor, or
+    // generateKeyBetween(null, ...) mints the SMALLEST key ("a0") and the
+    // dragged note teleports to the top, duplicating the oldest seed key.
+    const realKeys = others.map((n) => n.orderIndex).filter((k): k is string => Boolean(k));
+    const lower = others[insertAt - 1]?.orderIndex;
+    const before = lower ?? (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
     const after = others[insertAt]?.orderIndex ?? null;
     await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
   }
