@@ -170,19 +170,23 @@ export class NoteService implements INoteService {
 
   /**
    * A fractional key strictly after every existing note key (custom sort
-   * tail). Serialized per workspace: the mint asks the DB for the true max
-   * key (a single-row plaintext query — no decryption, no O(N) metadata
-   * scan) and CHAINS onto any in-flight mint, so overlapping creates derive
-   * from each other's keys instead of racing on the same snapshot. Because
-   * the DB source is always fresh, a stale cache can never mint a
-   * duplicate; the chain exists purely to serialize concurrent mints.
+   * tail). Serialized per workspace. A CHAINED mint derives from its
+   * predecessor's resolved key IN MEMORY — the predecessor's INSERT runs
+   * in createNote's body after its mint settles, so the DB max is still
+   * stale during exactly the window the chain bridges, and re-querying
+   * would mint the SAME key (the deterministic increment of an identical
+   * max). Only a mint with no in-flight predecessor consults the DB (a
+   * single-row plaintext query — no decryption, no O(N) metadata scan).
+   * Off-chain key writes (reorderNote, updateMetadata) invalidate the
+   * entry, so a cached predecessor can never be stale.
    */
   private nextTailKey(workspaceId: string): Promise<string> {
     const inFlight =
       this.tailKeyMinting.get(workspaceId) ?? Promise.resolve(null as unknown as string);
-    const minted = inFlight.then(async () =>
-      generateKeyBetween(await this.notes.getMaxOrderIndex(workspaceId), null),
-    );
+    const minted = inFlight.then(async (previous: string | null) => {
+      const base = previous ?? (await this.notes.getMaxOrderIndex(workspaceId));
+      return generateKeyBetween(base, null);
+    });
     this.tailKeyMinting.set(workspaceId, minted);
     minted.catch(() => {
       // A failed mint must not poison the chain for later creates.

@@ -117,6 +117,27 @@ describe("NoteService", () => {
     expect(fakeRepo.callLog).toContain("getNotesMetadataByWorkspace");
   });
 
+  it("concurrent creates mint DISTINCT tail keys (double-click race)", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+
+    // Two overlapping creates — the exact interleaving a fast double-click
+    // produces: both mints run before either INSERT lands, so a DB-only
+    // max would return the same value twice and mint duplicate keys.
+    const [a, b] = await Promise.all([
+      service.createNote("ws-race", "First"),
+      service.createNote("ws-race", "Second"),
+    ]);
+
+    expect(a?.orderIndex).toBeDefined();
+    expect(b?.orderIndex).toBeDefined();
+    expect(a?.orderIndex).not.toBe(b?.orderIndex);
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-race")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it("getNote, createNote, updateMetadata, updateContent, and deleteNote work as expected", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
