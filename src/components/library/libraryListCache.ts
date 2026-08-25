@@ -11,6 +11,8 @@ export interface LibraryListCache {
   stackDefs: PropertyDefinition[];
   stackValues: Map<string, Map<string, PropertyValue>> | null;
   filterable: Map<string, FilterableNote> | null;
+  /** Per-note tag ids (group-by-tags input, SWR like the other maps). */
+  tagIdsByNote: Map<string, string[]> | null;
   /**
    * Note ids the app itself just created — provably empty filter inputs,
    * so emptiness-rule views may show them immediately instead of deferring
@@ -32,4 +34,15 @@ export function seedKnownEmptyNote(workspaceId: string, noteId: string): void {
   // so there is nothing to seed around.
   if (!entry) return;
   entry.knownEmptyIds.add(noteId);
+}
+
+/** Read the cached tag map, creating the cache entry shape if absent. */
+export function readCachedTagIds(workspaceId: string): Map<string, string[]> | null {
+  return listCache.get(workspaceId)?.tagIdsByNote ?? null;
+}
+
+export function writeCachedTagIds(workspaceId: string, tagIdsByNote: Map<string, string[]>): void {
+  const prev = listCache.get(workspaceId);
+  if (!prev) return;
+  listCache.set(workspaceId, { ...prev, tagIdsByNote });
 }

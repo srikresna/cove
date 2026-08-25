@@ -142,7 +142,9 @@ export const LibraryPage: React.FC = () => {
     });
   }, [activeWorkspaceId, createNote, updateNote]);
 
-  const filterAreaVisible = draftRules.length > 0 || filterEditing;
+  // An applied tag filter must always be visible and one-click clearable —
+  // the tag entry path (Tags tab / sidebar) never opens the rule editor.
+  const filterAreaVisible = draftRules.length > 0 || filterEditing || activeTagId !== null;
   const activeTag = tags.find((t) => t.id === activeTagId);
 
   const handleSaveFilter = useCallback(() => {
@@ -156,7 +158,8 @@ export const LibraryPage: React.FC = () => {
   const handleCancelFilter = useCallback(() => {
     clearDraft();
     setFilterEditing(false);
-  }, [clearDraft]);
+    void setTagFilter(null);
+  }, [clearDraft, setTagFilter]);
 
   const openTagInDocs = useCallback(
     (tagId: string) => {

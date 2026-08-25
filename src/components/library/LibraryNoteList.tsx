@@ -20,7 +20,7 @@ import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { NoteItem, stackValueText } from "../sidebar/NoteItem";
 import { isGroupByDef, type LibraryDisplayPrefs } from "./DisplayMenu";
-import { listCache } from "./libraryListCache";
+import { listCache, writeCachedTagIds } from "./libraryListCache";
 import { NoteCard } from "./NoteCard";
 
 export type LibrarySort =
@@ -93,23 +93,30 @@ const compareBy = (sort: LibrarySort) => {
   }
 };
 
+const startOfDay = (ts: number): number => {
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+};
+
 const relativeDayLabel = (ts: number): string => {
   const now = new Date();
-  const then = new Date(ts);
   const days = Math.floor(
-    (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() -
-      new Date(then.getFullYear(), then.getMonth(), then.getDate()).getTime()) /
+    (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - startOfDay(ts)) /
       86400000,
   );
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
-  return then.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 };
 
 type GroupItem =
   | { kind: "header"; key: string; label: string; count: number; dotColor?: string }
-  | { kind: "note"; note: Note };
+  | { kind: "note"; note: Note; group: string | null };
 
 interface LibraryNoteListProps {
   sort: LibrarySort;
@@ -195,6 +202,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
               stackValues: null,
               filterable: prev?.filterable ?? null,
               knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
+              tagIdsByNote: prev?.tagIdsByNote ?? null,
             });
           }
           return;
@@ -225,6 +233,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             stackValues: byNote,
             filterable: prev?.filterable ?? null,
             knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
+            tagIdsByNote: prev?.tagIdsByNote ?? null,
           });
         }
       })
@@ -256,7 +265,9 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   // rule path already bulk-loads them; grouping without rules needs its own
   // load, so the effect runs for either trigger.
   const needsTagIds = prefs.groupBy === "tags" || draftRules.some((rule) => rule.kind === "tags");
-  const [tagIdsByNote, setTagIdsByNote] = useState<Map<string, string[]> | null>(null);
+  const [tagIdsByNote, setTagIdsByNote] = useState<Map<string, string[]> | null>(
+    cached?.tagIdsByNote ?? null,
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion/propertyVersion/tagVersion are intentional refresh signals, not body inputs
   useEffect(() => {
@@ -300,6 +311,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
           }
         }
         setTagIdsByNote(idsByNote);
+        if (activeWorkspaceId) writeCachedTagIds(activeWorkspaceId, idsByNote);
         const map = new Map<string, FilterableNote>();
         for (const note of notes) {
           if (note.workspaceId !== activeWorkspaceId) continue;
@@ -327,6 +339,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             // The fresh map has real entries for every live note, so the
             // just-created markers have served their purpose.
             knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
+            tagIdsByNote: prev?.tagIdsByNote ?? null,
           });
         }
       })
@@ -364,6 +377,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
           }
         }
         setTagIdsByNote(idsByNote);
+        if (activeWorkspaceId) writeCachedTagIds(activeWorkspaceId, idsByNote);
       })
       .catch(() => {
         if (alive) setTagIdsByNote(null);
@@ -469,7 +483,9 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     } else if (prefs.groupBy === "created" || prefs.groupBy === "updated") {
       for (const note of workspaceNotes) {
         const ts = prefs.groupBy === "created" ? note.createdAt : note.updatedAt;
-        push(`d:${ts}`, relativeDayLabel(ts), note);
+        // Bucket by CALENDAR DAY, not the raw timestamp — notes touched the
+        // same day at different times must share one group.
+        push(`d:${startOfDay(ts)}`, relativeDayLabel(ts), note);
       }
     } else if (groupByDef) {
       const def =
@@ -477,8 +493,23 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       if (def) {
         for (const note of workspaceNotes) {
           const value = stackValues?.get(note.id)?.get(groupByDef);
-          const text = value ? stackValueText(def, value) : null;
-          push(`p:${text ?? "__empty__"}`, text ?? "Empty", note);
+          if (!value) {
+            push("p:__empty__", "Empty", note);
+            continue;
+          }
+          const text = stackValueText(def, value);
+          if (text) {
+            push(`p:${text}`, text, note);
+          } else if (value.type === "checkbox") {
+            // An explicitly-set unchecked value is NOT empty.
+            push("p:__unchecked__", "✗", note);
+          } else {
+            push(
+              "p:__novalue__",
+              def.type === "multiSelect" ? "(none selected)" : "(deleted option)",
+              note,
+            );
+          }
         }
       } else {
         for (const note of workspaceNotes) push("__all__", "All notes", note);
@@ -513,7 +544,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   ]);
 
   const visibleItems = useMemo<GroupItem[]>(() => {
-    if (!groups) return workspaceNotes.map((note) => ({ kind: "note", note }) as GroupItem);
+    if (!groups) {
+      // Ungrouped: bare ids are unique.
+      return workspaceNotes.map((note) => ({ kind: "note", note, group: null }) as GroupItem);
+    }
     const items: GroupItem[] = [];
     for (const group of groups) {
       items.push({
@@ -524,7 +558,11 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         dotColor: group.dotColor,
       });
       if (!collapsedGroups.has(group.key)) {
-        for (const note of group.notes) items.push({ kind: "note", note });
+        // The group qualifier keeps virtualizer keys unique when a note
+        // appears under several groups (tag grouping puts it under EACH
+        // of its tags) — duplicate sibling keys would corrupt React
+        // reconciliation and the shared measurement cache.
+        for (const note of group.notes) items.push({ kind: "note", note, group: group.key });
       }
     }
     return items;
@@ -568,12 +606,14 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
   // Keyed by note id (headers by their key), not index: notes re-sort under
   // unchanged indexes, and an index-keyed measurement cache would stamp each
-  // row with the previous occupant's height for a frame.
+  // row with the previous occupant's height for a frame. Grouped notes carry
+  // their group key so multi-group entries stay unique siblings.
   const getItemKey = useCallback(
     (index: number) => {
       const item = visibleItems[index];
       if (!item) return index;
-      return item.kind === "header" ? `header:${item.key}` : item.note.id;
+      if (item.kind === "header") return `header:${item.key}`;
+      return item.group !== null ? `${item.group}:${item.note.id}` : item.note.id;
     },
     [visibleItems],
   );

@@ -25,7 +25,7 @@ export const isGroupByDef = (value: GroupBy): value is { defId: string } =>
 
 export interface LibraryDisplayPrefs {
   groupBy: GroupBy;
-  /** Def ids (+ "tags") whose chips are HIDDEN on rows/cards (default: none hidden). */
+  /** Def ids whose chips are HIDDEN on rows/cards (default: none hidden). */
   hiddenProps: string[];
   showIcon: boolean;
   showBody: boolean;
@@ -189,21 +189,8 @@ export const DisplayMenu: React.FC<DisplayMenuProps> = ({
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{MESSAGES.LIBRARY_DISPLAY_PROPERTIES}</DropdownMenuLabel>
         <div className="flex flex-wrap gap-1 px-1 pb-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleVisible("tags");
-            }}
-            className={cn(
-              "rounded-lg px-2 py-1 text-xs transition-colors",
-              !prefs.hiddenProps.includes("tags")
-                ? "bg-primary/10 text-foreground"
-                : "bg-muted text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {MESSAGES.TAGS_HEADER}
-          </button>
+          {/* Only custom property defs toggle here — tags are not rendered as
+              row/card chips yet, so a Tags toggle would be a dead control. */}
           {chipDefs.map((def) => (
             <button
               key={def.id}
