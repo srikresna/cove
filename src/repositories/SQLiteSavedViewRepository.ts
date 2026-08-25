@@ -41,12 +41,22 @@ function decodeRules(json: string): FilterRules {
   }
 }
 
+function decodeAllowIds(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function rowToView(row: Record<string, unknown>): SavedView {
   return {
     id: String(row.id),
     workspaceId: String(row.workspaceId),
     name: String(row.name),
     rules: decodeRules(String(row.rulesJson ?? "[]")),
+    allowNoteIds: decodeAllowIds(String(row.allowNoteIdsJson ?? "[]")),
     createdAt: Number(row.createdAt),
   };
 }
@@ -60,7 +70,7 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, rulesJson, createdAt FROM saved_views WHERE workspaceId = ? ORDER BY createdAt, id",
+        "SELECT id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt FROM saved_views WHERE workspaceId = ? ORDER BY createdAt, id",
         [workspaceId],
       );
       return rows.map(rowToView);
@@ -73,7 +83,7 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, rulesJson, createdAt FROM saved_views ORDER BY createdAt, id",
+        "SELECT id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt FROM saved_views ORDER BY createdAt, id",
       );
       return rows.map(rowToView);
     } catch (err) {
@@ -85,7 +95,7 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, rulesJson, createdAt FROM saved_views WHERE id = ?",
+        "SELECT id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt FROM saved_views WHERE id = ?",
         [id],
       );
       const row = rows[0];
@@ -100,8 +110,15 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
     try {
       const db = await this.getDb();
       await db.execute(
-        "INSERT INTO saved_views (id, workspaceId, name, rulesJson, createdAt) VALUES (?, ?, ?, ?, ?)",
-        [view.id, view.workspaceId, view.name, JSON.stringify(view.rules), view.createdAt],
+        "INSERT INTO saved_views (id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          view.id,
+          view.workspaceId,
+          view.name,
+          JSON.stringify(view.rules),
+          JSON.stringify(view.allowNoteIds ?? []),
+          view.createdAt,
+        ],
       );
     } catch (err) {
       throw toPersistenceError("savedViews.create", err);
@@ -126,6 +143,18 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
       ]);
     } catch (err) {
       throw toPersistenceError("savedViews.updateRules", err);
+    }
+  }
+
+  async updateAllowNoteIds(id: string, allowNoteIds: string[]): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("UPDATE saved_views SET allowNoteIdsJson = ? WHERE id = ?", [
+        JSON.stringify(allowNoteIds),
+        id,
+      ]);
+    } catch (err) {
+      throw toPersistenceError("savedViews.updateAllowNoteIds", err);
     }
   }
 

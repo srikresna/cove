@@ -84,6 +84,7 @@ export class SavedViewService implements ISavedViewService {
       workspaceId,
       name: normalized,
       rules,
+      allowNoteIds: [],
       createdAt: Date.now(),
     };
     await this.views.create(view);
@@ -114,6 +115,13 @@ export class SavedViewService implements ISavedViewService {
       throw new ValidationError("Pick a value for at least one rule before saving.");
     }
     await this.views.updateRules(id, rules);
+  }
+
+  /** Persists the manually-included note ids of an existing view. */
+  async updateViewAllowIds(id: string, allowNoteIds: string[]): Promise<void> {
+    const view = await this.views.findById(id);
+    if (!view) throw new NotFoundError("SavedView", id);
+    await this.views.updateAllowNoteIds(id, allowNoteIds);
   }
 
   deleteView(id: string): Promise<void> {

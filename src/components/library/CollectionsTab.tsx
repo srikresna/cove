@@ -16,9 +16,12 @@ import { PromptDialog } from "../ui/prompt-dialog";
 
 /**
  * The Collections directory (AFFI NE /collection equivalent): every saved
- * view with rename/delete management and one-click apply.
+ * view with rename/edit/delete management and one-click apply.
  */
-export const CollectionsTab: React.FC<{ onOpenInDocs: () => void }> = ({ onOpenInDocs }) => {
+export const CollectionsTab: React.FC<{
+  onOpenInDocs: () => void;
+  onEditView: (viewId: string) => void;
+}> = ({ onOpenInDocs, onEditView }) => {
   const views = useViewStore((s) => s.views);
   const activeViewId = useViewStore((s) => s.activeViewId);
   const setActiveView = useViewStore((s) => s.setActiveView);
@@ -40,7 +43,7 @@ export const CollectionsTab: React.FC<{ onOpenInDocs: () => void }> = ({ onOpenI
           variant="secondary"
           size="sm"
           className="h-7 gap-1 px-3 text-xs"
-          onClick={onOpenInDocs}
+          onClick={() => onEditView("create")}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {MESSAGES.LIBRARY_COLLECTIONS_NEW}
@@ -86,6 +89,10 @@ export const CollectionsTab: React.FC<{ onOpenInDocs: () => void }> = ({ onOpenI
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onSelect={() => onEditView(view.id)}>
+                    <Pencil aria-hidden="true" />
+                    Edit rules
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setRenaming(view.id)}>
                     <Pencil aria-hidden="true" />
                     {MESSAGES.PROP_RENAME}

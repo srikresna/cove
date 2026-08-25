@@ -2,7 +2,7 @@ import { Check, Plus, Save, Tag as TagIcon, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { blockSuiteEditorService, propertyService } from "../../di/container";
+import { blockSuiteEditorService, propertyService, savedViewService } from "../../di/container";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { PromptDialog } from "../ui/prompt-dialog";
+import { CollectionEditorDialog } from "./CollectionEditorDialog";
 import { CollectionsTab } from "./CollectionsTab";
 import type { LibraryDisplayPrefs } from "./DisplayMenu";
 import { ExplorerHeader, type LibraryTab, type LibraryViewMode } from "./ExplorerHeader";
@@ -112,6 +113,7 @@ export const LibraryPage: React.FC = () => {
   });
   const [filterEditing, setFilterEditing] = useState(false);
   const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState<"create" | string | null>(null);
 
   // Stack-eligible defs feed the Display menu (grouping + chip toggles).
   const [defs, setDefs] = useState<PropertyDefinition[]>([]);
@@ -292,6 +294,7 @@ export const LibraryPage: React.FC = () => {
       {tab === "collections" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <CollectionsTab
+            onEditView={(viewId) => setEditorOpen(viewId)}
             onOpenInDocs={() => {
               setTab("docs");
               setFilterEditing(true);
@@ -455,6 +458,42 @@ export const LibraryPage: React.FC = () => {
           if (activeWorkspaceId) void saveDraftAsView(activeWorkspaceId, name);
         }}
         onCancel={() => setSavePromptOpen(false)}
+      />
+
+      <CollectionEditorDialog
+        open={editorOpen !== null}
+        view={
+          editorOpen !== null && editorOpen !== "create"
+            ? (views.find((v) => v.id === editorOpen) ?? null)
+            : null
+        }
+        onCancel={() => setEditorOpen(null)}
+        onSave={({ name, rules, allowNoteIds }) => {
+          const editingId = editorOpen !== null && editorOpen !== "create" ? editorOpen : null;
+          setEditorOpen(null);
+          if (!activeWorkspaceId) return;
+          if (editingId) {
+            void (async () => {
+              await savedViewService.renameView(editingId, name);
+              await savedViewService.updateViewRules(editingId, rules);
+              await savedViewService.updateViewAllowIds(editingId, allowNoteIds);
+              useViewStore.setState((s) => ({ version: s.version + 1 }));
+            })();
+          } else {
+            // Create: route the editor rules through the store's draft path
+            // (validation + fetches), then attach the allow-list.
+            useViewStore.getState().setDraftRules(rules);
+            void useViewStore
+              .getState()
+              .saveDraftAsView(activeWorkspaceId, name)
+              .then(async (created) => {
+                if (created) {
+                  await savedViewService.updateViewAllowIds(created.id, allowNoteIds);
+                }
+                return null;
+              });
+          }
+        }}
       />
     </div>
   );

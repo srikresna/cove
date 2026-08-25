@@ -5,6 +5,8 @@ export interface SavedView {
   readonly workspaceId: string;
   readonly name: string;
   readonly rules: FilterRules;
+  /** Manually-included note ids (shown regardless of the rules). */
+  readonly allowNoteIds: string[];
   readonly createdAt: number;
 }
 

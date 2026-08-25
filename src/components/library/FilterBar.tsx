@@ -245,13 +245,21 @@ const RuleChip: React.FC<{
  * row). Save/Cancel live in the surrounding area (LibraryPage) — this bar
  * only composes and edits rules.
  */
-export const FilterBar: React.FC = () => {
-  const draftRules = useViewStore((s) => s.draftRules);
+export const FilterBar: React.FC<{
+  /** Controlled mode (collection editor): edit an explicit rules array. */
+  rules?: FilterRule[];
+  onChange?: (next: FilterRule[]) => void;
+}> = ({ rules, onChange }) => {
+  // Uncontrolled mode edits the view-store drafts (Library filter area).
+  const storeRules = useViewStore((s) => s.draftRules);
   const addDraftRule = useViewStore((s) => s.addDraftRule);
   const updateDraftRule = useViewStore((s) => s.updateDraftRule);
   const removeDraftRule = useViewStore((s) => s.removeDraftRule);
   const propertyVersion = usePropertyStore((s) => s.version);
   const [defs, setDefs] = useState<PropertyDefinition[]>([]);
+
+  const controlled = rules !== undefined && onChange !== undefined;
+  const draftRules = controlled ? rules : storeRules;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   useEffect(() => {
@@ -265,35 +273,49 @@ export const FilterBar: React.FC = () => {
     (d) => d.show !== "always-hide" && d.id !== "system:tags" && filterKindForType(d.type) !== null,
   );
 
+  const addRule = (rule: FilterRule) => {
+    if (controlled) onChange([...rules, rule]);
+    else addDraftRule(rule);
+  };
+  const patchRule = (id: string, patch: Partial<FilterRule>) => {
+    if (controlled) {
+      onChange(rules.map((r) => (r.id === id ? ({ ...r, ...patch } as FilterRule) : r)));
+    } else updateDraftRule(id, patch);
+  };
+  const dropRule = (id: string) => {
+    if (controlled) onChange(rules.filter((r) => r.id !== id));
+    else removeDraftRule(id);
+  };
+
   const handleAdd = (kind: FilterRule["kind"], propertyId?: string) => {
     const base = { id: makeRuleId(), propertyId: propertyId ?? "" };
     switch (kind) {
       case "text":
-        addDraftRule({ ...base, kind: "text", op: "contains", value: "" });
+        addRule({ ...base, kind: "text", op: "contains", value: "" });
         break;
       case "number":
-        addDraftRule({ ...base, kind: "number", op: "=", value: undefined });
+        addRule({ ...base, kind: "number", op: "=", value: undefined });
         break;
       case "date":
-        addDraftRule({ ...base, kind: "date", op: "is", value: undefined });
+        addRule({ ...base, kind: "date", op: "is", value: undefined });
         break;
       case "select":
-        addDraftRule({ ...base, kind: "select", op: "is", optionIds: [] });
+        addRule({ ...base, kind: "select", op: "is", optionIds: [] });
         break;
       case "multiSelect":
-        addDraftRule({ ...base, kind: "multiSelect", op: "is", optionIds: [] });
+        addRule({ ...base, kind: "multiSelect", op: "is", optionIds: [] });
         break;
       case "checkbox":
-        addDraftRule({ ...base, kind: "checkbox", op: "is", value: true });
+        addRule({ ...base, kind: "checkbox", op: "is", value: true });
         break;
       case "tags":
-        addDraftRule({ id: makeRuleId(), kind: "tags", op: "has-any-of", tagIds: [] });
+        addRule({ id: makeRuleId(), kind: "tags", op: "has-any-of", tagIds: [] });
         break;
       case "journal":
-        addDraftRule({ id: makeRuleId(), kind: "journal", op: "is", value: true });
+        addRule({ id: makeRuleId(), kind: "journal", op: "is", value: true });
         break;
       case "template":
-        addDraftRule({ id: makeRuleId(), kind: "template", op: "is", value: false });
+        addRule({ id: makeRuleId(), kind: "template", op: "is", value: false });
         break;
     }
   };
@@ -305,8 +327,8 @@ export const FilterBar: React.FC = () => {
           key={rule.id}
           rule={rule}
           propertyDefs={filterableDefs}
-          onUpdate={(patch) => updateDraftRule(rule.id, patch)}
-          onRemove={() => removeDraftRule(rule.id)}
+          onUpdate={(patch) => patchRule(rule.id, patch)}
+          onRemove={() => dropRule(rule.id)}
         />
       ))}
       <DropdownMenu>

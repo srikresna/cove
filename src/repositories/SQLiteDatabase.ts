@@ -709,6 +709,18 @@ export class SQLiteDatabase {
       statements.push({ sql: "PRAGMA user_version = 23" });
       await SQLiteDatabase.runTransaction(statements);
     }
+
+    if (version < 24) {
+      // Collections gain a manual allow-list alongside their rules
+      // (AFFI NE "manually add docs OR match through rules").
+      const viewCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(saved_views)");
+      if (!viewCols.some((c) => c.name === "allowNoteIdsJson")) {
+        await db.execute(
+          "ALTER TABLE saved_views ADD COLUMN allowNoteIdsJson TEXT NOT NULL DEFAULT '[]'",
+        );
+      }
+      await db.execute("PRAGMA user_version = 24");
+    }
   }
 
   /**

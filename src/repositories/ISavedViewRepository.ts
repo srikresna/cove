@@ -8,6 +8,8 @@ export interface ISavedViewRepository {
   create(view: SavedView): Promise<void>;
   rename(id: string, name: string): Promise<void>;
   updateRules(id: string, rules: FilterRules): Promise<void>;
+  /** Persist the manually-included note ids of a view. */
+  updateAllowNoteIds(id: string, allowNoteIds: string[]): Promise<void>;
   /**
    * Applies a set of rule rewrites and view deletions in ONE transaction,
    * so a prune either lands on every view or none (a per-view autocommit

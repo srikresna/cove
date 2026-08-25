@@ -262,6 +262,8 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
   const draftRules = useViewStore((s) => s.draftRules);
   const viewVersion = useViewStore((s) => s.version);
+  const activeViewId = useViewStore((s) => s.activeViewId);
+  const allViews = useViewStore((s) => s.views);
 
   // Filter inputs (property values + journal dates) reload when rules exist.
   const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(
@@ -435,8 +437,28 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
               })),
             draftRules,
           ).map((i) => i.note);
-    return [...filtered].sort(compareBy(sort));
-  }, [notes, activeWorkspaceId, taggedNoteIds, rulesActive, filterable, draftRules, sort]);
+    // Manually-included notes (the collection editor's Docs tab) join the
+    // rule-matched set — AFFI NE's "manually add docs OR match through rules".
+    const allowIds = new Set(allViews.find((v) => v.id === activeViewId)?.allowNoteIds ?? []);
+    const withAllow =
+      allowIds.size === 0
+        ? filtered
+        : [
+            ...filtered,
+            ...base.filter((n) => allowIds.has(n.id) && !filtered.some((f) => f.id === n.id)),
+          ];
+    return [...withAllow].sort(compareBy(sort));
+  }, [
+    notes,
+    activeWorkspaceId,
+    taggedNoteIds,
+    rulesActive,
+    filterable,
+    draftRules,
+    sort,
+    allViews,
+    activeViewId,
+  ]);
 
   // ---- Grouping -----------------------------------------------------------
 
