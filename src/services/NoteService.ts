@@ -1,3 +1,4 @@
+import { generateKeyBetween } from "fractional-indexing";
 import * as Y from "yjs";
 import { NotFoundError } from "../domain/errors";
 import type { Note } from "../domain/note/Note";
@@ -188,6 +189,7 @@ export class NoteService implements INoteService {
         | "isPinned"
         | "isFavorite"
         | "workspaceId"
+        | "orderIndex"
       >
     >,
   ): Promise<Note> {
@@ -199,6 +201,31 @@ export class NoteService implements INoteService {
       recUpdates.titleKmsVersion = 1;
     }
     return this.toNote(await this.notes.updateNote(id, recUpdates));
+  }
+
+  /**
+   * Manual reorder for the Library's custom sort: computes the fractional
+   * key between the drop target's neighbors (with the dragged note removed
+   * from the sequence first, so it can never become its own neighbor and
+   * collapse the gap onto a duplicate key).
+   */
+  async reorderNote(id: string, targetId: string, position: "before" | "after"): Promise<void> {
+    this.assertUnlocked();
+    if (id === targetId) return;
+    const target = await this.getNote(targetId);
+    if (!target) throw new NotFoundError("Note", targetId);
+
+    const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) =>
+      (a.orderIndex ?? "").localeCompare(b.orderIndex ?? ""),
+    );
+    const others = siblings.filter((n) => n.id !== id);
+    const targetIndex = others.findIndex((n) => n.id === targetId);
+    if (targetIndex === -1) throw new NotFoundError("Note", targetId);
+
+    const insertAt = position === "before" ? targetIndex : targetIndex + 1;
+    const before = others[insertAt - 1]?.orderIndex ?? null;
+    const after = others[insertAt]?.orderIndex ?? null;
+    await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
   }
 
   async updateContent(id: string, content: string): Promise<Note> {

@@ -37,6 +37,7 @@ const isViewMode = (value: string): value is LibraryViewMode =>
   ["list", "grid", "masonry"].includes(value);
 const isLibrarySort = (value: string): value is LibrarySort =>
   [
+    "custom",
     "updated-desc",
     "updated-asc",
     "created-desc",

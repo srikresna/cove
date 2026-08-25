@@ -680,6 +680,35 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA user_version = 22");
       }
     }
+
+    if (version < 23) {
+      // Manual note ordering for the Library's "custom" sort: a fractional
+      // index column, seeded from the current createdAt order (oldest first,
+      // so updated-desc lists look unchanged until the user drags).
+      const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
+      const statements: SqlStatement[] = [];
+      if (!noteCols.some((c) => c.name === "orderIndex")) {
+        statements.push({
+          sql: "ALTER TABLE notes ADD COLUMN orderIndex TEXT NOT NULL DEFAULT ''",
+        });
+      }
+      const noteRows = await db.select<Array<{ id: string; orderIndex: string }>>(
+        "SELECT id, orderIndex FROM notes ORDER BY createdAt, id",
+      );
+      if (noteRows.some((row) => !row.orderIndex)) {
+        let prev: string | null = null;
+        for (const row of noteRows) {
+          const key = generateKeyBetween(prev, null);
+          statements.push({
+            sql: "UPDATE notes SET orderIndex = ? WHERE id = ?",
+            params: [key, row.id],
+          });
+          prev = key;
+        }
+      }
+      statements.push({ sql: "PRAGMA user_version = 23" });
+      await SQLiteDatabase.runTransaction(statements);
+    }
   }
 
   /**

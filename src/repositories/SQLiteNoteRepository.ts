@@ -29,6 +29,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       isTemplate: Boolean(row.isTemplate),
       isPinned: Boolean(row.isPinned),
       isFavorite: Boolean(row.isFavorite),
+      orderIndex: row.orderIndex ? String(row.orderIndex) : undefined,
       createdAt: Number(row.createdAt),
       updatedAt: Number(row.updatedAt),
       deletedAt: row.deletedAt != null ? Number(row.deletedAt) : undefined,
@@ -39,7 +40,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
+        "SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, isPinned, isFavorite, orderIndex, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -127,8 +128,8 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       await db.execute(
         `INSERT INTO notes
-        (id, workspaceId, title, titleKmsVersion, content, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, kmsVersion, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workspaceId, title, titleKmsVersion, content, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, kmsVersion, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.id,
           note.workspaceId,
@@ -145,6 +146,7 @@ export class SQLiteNoteRepository implements INoteRepository {
           note.isTemplate ? 1 : 0,
           note.isPinned ? 1 : 0,
           note.isFavorite ? 1 : 0,
+          note.orderIndex || null,
           KMS_VERSION_DEK,
           note.createdAt,
           note.updatedAt,
@@ -211,6 +213,10 @@ export class SQLiteNoteRepository implements INoteRepository {
     if (updates.isFavorite !== undefined) {
       setClauses.push("isFavorite = ?");
       params.push(updates.isFavorite ? 1 : 0);
+    }
+    if (updates.orderIndex !== undefined) {
+      setClauses.push("orderIndex = ?");
+      params.push(updates.orderIndex || null);
     }
 
     setClauses.push("updatedAt = ?");

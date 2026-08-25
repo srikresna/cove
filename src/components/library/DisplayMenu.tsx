@@ -1,4 +1,13 @@
-import { ArrowDownAZ, ArrowUpAZ, Check, Clock, EyeOff, Layers, Settings2 } from "lucide-react";
+import {
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Check,
+  Clock,
+  EyeOff,
+  GripVertical,
+  Layers,
+  Settings2,
+} from "lucide-react";
 import type React from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { PropertyDefinition } from "../../domain/property/Property";
@@ -42,6 +51,11 @@ interface DisplayMenuProps {
 }
 
 const ORDER_ITEMS: Array<{ value: LibrarySort; label: string; icon: React.ReactNode }> = [
+  {
+    value: "custom",
+    label: "Custom",
+    icon: <GripVertical className="h-4 w-4" aria-hidden="true" />,
+  },
   {
     value: "updated-desc",
     label: MESSAGES.LIBRARY_SORT_UPDATED,
@@ -96,6 +110,7 @@ export const DisplayMenu: React.FC<DisplayMenuProps> = ({
   };
   const orderLabel = (sort: LibrarySort): string => {
     const item = ORDER_ITEMS.find((o) => o.value === sort);
+    if (sort === "custom") return item?.label ?? "Custom";
     const asc = sort.endsWith("asc");
     return `${item?.label ?? ""} · ${asc ? MESSAGES.LIBRARY_SORT_ASC : MESSAGES.LIBRARY_SORT_DESC}`;
   };
@@ -173,10 +188,13 @@ export const DisplayMenu: React.FC<DisplayMenuProps> = ({
               <DropdownMenuItem key={option.value} onSelect={() => onOrderByChange(option.value)}>
                 {option.icon}
                 <span className="flex-1 truncate">
-                  {option.label} ·{" "}
-                  {option.value.endsWith("asc")
-                    ? MESSAGES.LIBRARY_SORT_ASC
-                    : MESSAGES.LIBRARY_SORT_DESC}
+                  {option.value === "custom"
+                    ? option.label
+                    : `${option.label} · ${
+                        option.value.endsWith("asc")
+                          ? MESSAGES.LIBRARY_SORT_ASC
+                          : MESSAGES.LIBRARY_SORT_DESC
+                      }`}
                 </span>
                 {orderBy === option.value && (
                   <Check className="h-4 w-4 text-primary" aria-hidden="true" />

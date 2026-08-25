@@ -4,7 +4,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
-import { propertyService, tagService } from "../../di/container";
+import { noteService, propertyService, tagService } from "../../di/container";
 import type { FilterRule } from "../../domain/filters/FilterRule";
 import { isRuleComplete } from "../../domain/filters/FilterRule";
 import type { Note } from "../../domain/note/Note";
@@ -14,6 +14,7 @@ import { cn } from "../../lib/utils";
 import type { FilterableNote } from "../../services/filters/evaluateFilters";
 import { evaluateFilters } from "../../services/filters/evaluateFilters";
 import { useNoteStore } from "../../store/useNoteStore";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
@@ -22,8 +23,10 @@ import { NoteItem, stackValueText } from "../sidebar/NoteItem";
 import { isGroupByDef, type LibraryDisplayPrefs } from "./DisplayMenu";
 import { listCache, writeCachedTagIds } from "./libraryListCache";
 import { NoteCard } from "./NoteCard";
+import { SelectionToolbar } from "./SelectionToolbar";
 
 export type LibrarySort =
+  | "custom"
   | "updated-desc"
   | "updated-asc"
   | "created-desc"
@@ -78,6 +81,11 @@ function satisfiedByEmptyInputs(rule: FilterRule): boolean {
 
 const compareBy = (sort: LibrarySort) => {
   switch (sort) {
+    case "custom":
+      // Fractional-index keys sort lexicographically; empty keys (pre-v23
+      // strays) sink to the end rather than blocking the comparison.
+      return (a: Note, b: Note) =>
+        (a.orderIndex ?? "").localeCompare(b.orderIndex ?? "") || a.createdAt - b.createdAt;
     case "updated-asc":
       return (a: Note, b: Note) => a.updatedAt - b.updatedAt;
     case "created-desc":
@@ -605,13 +613,103 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     [stackDefs, stackValues, prefs.showBody, prefs.hiddenProps],
   );
 
-  const handleSelect = useCallback(
-    (id: string) => {
+  // ---- Multi-select (AFFI NE selection mode) -------------------------------
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const anchorIdRef = useRef<string | null>(null);
+  const selectMode = selectedIds.size > 0;
+
+  // Escape exits selection mode.
+  useEffect(() => {
+    if (!selectMode) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedIds(new Set());
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectMode]);
+
+  /** Flat visible order for shift-range selection. */
+  const orderedNoteIds = useMemo(
+    () => visibleItems.flatMap((item): string[] => (item.kind === "note" ? [item.note.id] : [])),
+    [visibleItems],
+  );
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleRowClick = useCallback(
+    (id: string, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => {
+      const rangeClick = event?.shiftKey ?? false;
+      const toggleClick = event?.ctrlKey || event?.metaKey || false;
+      if (toggleClick) {
+        anchorIdRef.current = id;
+        toggleSelected(id);
+        return;
+      }
+      if (rangeClick && anchorIdRef.current !== null) {
+        const from = orderedNoteIds.indexOf(anchorIdRef.current);
+        const to = orderedNoteIds.indexOf(id);
+        if (from !== -1 && to !== -1) {
+          const [lo, hi] = from < to ? [from, to] : [to, from];
+          setSelectedIds(new Set(orderedNoteIds.slice(lo, hi + 1)));
+          return;
+        }
+      }
+      anchorIdRef.current = id;
+      if (selectedIds.size > 0) {
+        toggleSelected(id);
+        return;
+      }
       setActiveNoteId(id);
     },
-    [setActiveNoteId],
+    [orderedNoteIds, selectedIds.size, setActiveNoteId, toggleSelected],
+  );
+
+  const handleBulkTrash = useCallback(() => {
+    const ids = [...selectedIds];
+    setSelectedIds(new Set());
+    for (const id of ids) void trashNote(id);
+    useNotificationStore.getState().pushToast({
+      kind: "info",
+      title: MESSAGES.LIBRARY_MOVED_N.replace("{n}", String(ids.length)),
+    });
+  }, [selectedIds, trashNote]);
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      handleRowClick(id);
+    },
+    [handleRowClick],
   );
   const handleTogglePin = useCallback((id: string) => togglePinNote(id), [togglePinNote]);
+
+  // Manual reorder (custom sort): the service computes the fractional gap;
+  // a refresh pulls the new keys into the store.
+  const handleReorder = useCallback(
+    (id: string, targetId: string, position: "before" | "after") => {
+      noteService
+        .reorderNote(id, targetId, position)
+        .then(() => {
+          if (activeWorkspaceId) {
+            return useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+          }
+        })
+        .catch(() => {
+          useNotificationStore.getState().pushToast({
+            kind: "error",
+            title: MESSAGES.SOMETHING_WENT_WRONG,
+          });
+        });
+    },
+    [activeWorkspaceId],
+  );
   const handleToggleFavorite = useCallback(
     (id: string) => toggleFavoriteNote(id),
     [toggleFavoriteNote],
@@ -648,11 +746,16 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     overscan: 5,
   });
 
+  const dragHandlesVisible = viewMode === "list" && sort === "custom";
   const renderNote = useCallback(
     (note: Note) => (
       <NoteItem
         note={note}
         isActive={note.id === activeNoteId}
+        isSelected={selectedIds.has(note.id)}
+        selectionMode={selectMode}
+        showDragHandle={dragHandlesVisible}
+        onReorder={dragHandlesVisible ? handleReorder : undefined}
         onSelect={handleSelect}
         onTogglePin={handleTogglePin}
         onToggleFavorite={handleToggleFavorite}
@@ -672,6 +775,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       handleDelete,
       stackRowsOf,
       tagChipsOf,
+      selectedIds,
+      selectMode,
+      dragHandlesVisible,
+      handleReorder,
       prefs.showIcon,
     ],
   );
@@ -707,7 +814,14 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
   if (viewMode === "list") {
     return (
-      <div ref={parentRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={parentRef} className="relative min-h-0 flex-1 overflow-y-auto">
+        {selectMode && (
+          <SelectionToolbar
+            count={selectedIds.size}
+            onBulkTrash={handleBulkTrash}
+            onClear={() => setSelectedIds(new Set())}
+          />
+        )}
         <div className="mx-auto w-full max-w-4xl px-6 pb-16 pt-2">
           {workspaceNotes.length === 0 && (rulesActive || taggedNoteIds !== null) ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
@@ -797,7 +911,14 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="relative min-h-0 flex-1 overflow-y-auto">
+      {selectMode && (
+        <SelectionToolbar
+          count={selectedIds.size}
+          onBulkTrash={handleBulkTrash}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
       <div className="mx-auto w-full max-w-5xl px-6 pb-16 pt-4">
         {workspaceNotes.length === 0 && (rulesActive || taggedNoteIds !== null) ? (
           <p className="py-10 text-center text-sm text-muted-foreground">

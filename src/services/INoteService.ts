@@ -36,10 +36,13 @@ export interface INoteService {
         | "isPinned"
         | "isFavorite"
         | "workspaceId"
+        | "orderIndex"
       >
     >,
   ): Promise<Note>;
   updateContent(id: string, content: string): Promise<Note>;
+  /** Move a note before/after another in the manual (custom) order. */
+  reorderNote(id: string, targetId: string, position: "before" | "after"): Promise<void>;
 
   getCoverImage(id: string): Promise<string | null>;
   setCoverImage(id: string, dataUrl: string): Promise<void>;

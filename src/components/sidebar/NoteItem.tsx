@@ -1,6 +1,15 @@
+import {
+  draggable,
+  dropTargetForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import {
+  attachClosestEdge,
+  type Edge,
+  extractClosestEdge,
+} from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { motion } from "framer-motion";
-import { Copy, FileText, MoreHorizontal, Pin, Star, Trash2 } from "lucide-react";
-import React from "react";
+import { Copy, FileText, GripVertical, MoreHorizontal, Pin, Star, Trash2 } from "lucide-react";
+import React, { useRef } from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
@@ -24,6 +33,12 @@ import {
 interface NoteItemProps {
   note: Note;
   isActive: boolean;
+  /** Library selection mode: the row toggles selection instead of opening. */
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  /** Show the drag handle (Library list + custom sort only). */
+  showDragHandle?: boolean;
+  onReorder?: (id: string, targetId: string, position: "before" | "after") => void;
   onSelect: (id: string) => void;
   onTogglePin: (id: string) => void;
   onToggleFavorite: (id: string) => void;
@@ -107,6 +122,10 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
   ({
     note,
     isActive,
+    selectionMode = false,
+    isSelected = false,
+    showDragHandle = false,
+    onReorder,
     onSelect,
     onTogglePin,
     onToggleFavorite,
@@ -116,6 +135,48 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
     tagChips = [],
     showIcon = true,
   }) => {
+    // Drag-reorder (Library list + custom sort): the row is both the drag
+    // source (via the hover grip) and a top/bottom-edge drop target, the
+    // NotePropertiesRows pattern.
+    const rowRef = useRef<HTMLDivElement | null>(null);
+    const gripRef = useRef<HTMLButtonElement | null>(null);
+    const [closestEdge, setClosestEdge] = React.useState<"top" | "bottom" | null>(null);
+    const edgeOf = (edge: Edge | null): "top" | "bottom" | null =>
+      edge === "top" || edge === "bottom" ? edge : null;
+
+    React.useEffect(() => {
+      const grip = gripRef.current;
+      if (!grip || !showDragHandle) return;
+      return draggable({
+        element: grip,
+        dragHandle: grip,
+        getInitialData: () => ({ noteId: note.id, from: "library-list" }),
+      });
+    }, [showDragHandle, note.id]);
+
+    React.useEffect(() => {
+      const row = rowRef.current;
+      if (!row || !showDragHandle) return;
+      return dropTargetForElements({
+        element: row,
+        canDrop: ({ source }) => source.data.from === "library-list",
+        getIsSticky: () => true,
+        getData: ({ input, element }) =>
+          attachClosestEdge({}, { input, element, allowedEdges: ["top", "bottom"] }),
+        onDragEnter: ({ self }) => setClosestEdge(edgeOf(extractClosestEdge(self.data))),
+        onDrag: ({ self }) => setClosestEdge(edgeOf(extractClosestEdge(self.data))),
+        onDragLeave: () => setClosestEdge(null),
+        onDrop: ({ source, self }) => {
+          setClosestEdge(null);
+          const draggedId = String(source.data.noteId ?? "");
+          const edge = edgeOf(extractClosestEdge(self.data));
+          if (draggedId && draggedId !== note.id && edge) {
+            onReorder?.(draggedId, note.id, edge === "bottom" ? "after" : "before");
+          }
+        },
+      });
+    }, [showDragHandle, note.id, onReorder]);
+
     const menuHandlers = { note, onTogglePin, onToggleFavorite, onDuplicate, onDelete };
     const visibleStacks = stackRows
       .map((row) => ({ ...row, text: stackValueText(row.def, row.value) }))
@@ -127,6 +188,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <motion.div
+            ref={rowRef}
             layout
             role="button"
             tabIndex={0}
@@ -143,8 +205,42 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
               isActive
                 ? "border-border bg-card shadow-sm"
                 : "border-transparent hover:bg-accent/50",
+              isSelected && "border-primary/60 bg-primary/5",
             )}
           >
+            {showDragHandle && (
+              <button
+                ref={gripRef}
+                type="button"
+                aria-label={MESSAGES.PROP_DRAG_LABEL}
+                tabIndex={-1}
+                className="absolute -left-3.5 top-1/2 hidden -translate-y-1/2 cursor-grab rounded p-0.5 text-muted-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 md:block"
+              >
+                <GripVertical className="h-3 w-3" aria-hidden="true" />
+              </button>
+            )}
+            {closestEdge && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute left-0 right-0 z-10 h-0.5 bg-primary",
+                  closestEdge === "top" ? "-top-0.5" : "-bottom-0.5",
+                )}
+              />
+            )}
+            {selectionMode && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full border text-[9px] font-bold",
+                  isSelected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/40 bg-card text-transparent",
+                )}
+              >
+                ✓
+              </span>
+            )}
             <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
               {showIcon && (
                 <span
