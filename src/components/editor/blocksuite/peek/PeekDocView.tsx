@@ -1,12 +1,12 @@
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { blockSuiteEditorService, noteService } from "../../../../di/container";
+import type { Note } from "../../../../domain/note/Note";
 import type { DocPeekRequest } from "../../../../services/blocksuite/peekViewService";
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
 import { Logger } from "../../../../services/Logger";
 import { useNoteStore } from "../../../../store/useNoteStore";
-import type { Note } from "../../../../types";
 import { TooltipProvider } from "../../../ui/tooltip";
 import { NoteHeaderBody } from "../../EditorHeader";
 import { buildCommonExtensions } from "../BlockSuiteSurface";

@@ -19,7 +19,7 @@ import { effect, signal } from "@preact/signals-core";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { blockSuiteEditorService } from "../../../di/container";
-import type { DocMode as CoveDocMode } from "../../../domain/note/Note";
+import type { DocMode as CoveDocMode, Note } from "../../../domain/note/Note";
 import {
   coveNotificationExtension,
   coveQuickSearchExtension,
@@ -32,7 +32,6 @@ import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
 import { useUIStore } from "../../../store/useUIStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
-import type { Note } from "../../../types";
 import type { TestAffineEditorContainer } from "./editorContainer";
 
 const SAVE_DEBOUNCE_MS = 800;

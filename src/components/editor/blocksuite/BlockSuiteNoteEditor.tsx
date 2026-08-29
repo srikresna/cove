@@ -1,10 +1,10 @@
 import type { EditorHost } from "@blocksuite/std";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { Note } from "../../../domain/note/Note";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import { useNoteStore } from "../../../store/useNoteStore";
-import type { Note } from "../../../types";
 import { countWordsAndChars } from "../../../utils/plainText";
 import { TooltipProvider } from "../../ui/tooltip";
 import { EditorHeader } from "../EditorHeader";

@@ -12,6 +12,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { journalService, propertyService, tagService } from "../../di/container";
+import type { Note } from "../../domain/note/Note";
 import type {
   PropertyDefinition,
   PropertyType,
@@ -33,7 +34,6 @@ import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
-import type { Note } from "../../types";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {

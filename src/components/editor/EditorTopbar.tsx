@@ -16,13 +16,12 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
-import type { DocMode } from "../../domain/note/Note";
+import type { DocMode, Note } from "../../domain/note/Note";
 import { useElementWidth } from "../../hooks/useElementWidth";
 import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { cn } from "../../lib/utils";
 import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
-import type { Note } from "../../types";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,

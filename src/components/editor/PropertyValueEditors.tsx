@@ -37,6 +37,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService } from "../../di/container";
+import type { Note } from "../../domain/note/Note";
 import type {
   PropertyDefinition,
   PropertyOption,
@@ -49,7 +50,6 @@ import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useViewStore } from "../../store/useViewStore";
-import type { Note } from "../../types";
 import {
   DropdownMenu,
   DropdownMenuContent,

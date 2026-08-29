@@ -1,4 +1,4 @@
-import type { Workspace } from "../types";
+import type { Workspace } from "../domain/workspace/Workspace";
 
 export interface IWorkspaceRepository {
   getAllWorkspaces(): Promise<Workspace[]>;
