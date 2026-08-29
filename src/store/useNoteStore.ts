@@ -56,11 +56,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
     useSaveStatusStore.getState().setSaving();
 
     try {
-      if (key === "isPinned") {
-        await noteService.togglePin(id);
-      } else {
-        await noteService.toggleFavorite(id);
-      }
+      await runNoteWrite(() =>
+        key === "isPinned" ? noteService.togglePin(id) : noteService.toggleFavorite(id),
+      );
       useSaveStatusStore.getState().setSaved();
     } catch (err) {
       if (previousNote && optimisticNote && vaultService.isUnlocked()) {
@@ -81,14 +79,35 @@ export const useNoteStore = create<NoteState>((set, get) => {
     }
   };
 
-  // Bumped by every local note-list mutation and by vault lock: an in-flight
-  // fetch whose DB snapshot predates the mutation must never land over it.
+  // Fetch/mutation coordination. A fetch is dropped at land time when it is
+  // superseded, when ANY note write is still in flight (its snapshot may
+  // predate the write), or when its workspace is no longer active. Every
+  // write bumps fetchSeq after committing (killing fetches whose read
+  // predates it) and re-loads the active workspace's list if the store was
+  // still holding another workspace's (the killed fetch may have been the
+  // only fresh source).
   let fetchSeq = 0;
-  const invalidateFetches = (): void => {
-    fetchSeq += 1;
-  };
+  let pendingWrites = 0;
+  let loadedWorkspaceId: string | null = null;
+
   const isStaleFetch = (seq: number, workspaceId: string): boolean =>
-    seq !== fetchSeq || useWorkspaceStore.getState().activeWorkspaceId !== workspaceId;
+    seq !== fetchSeq ||
+    pendingWrites > 0 ||
+    useWorkspaceStore.getState().activeWorkspaceId !== workspaceId;
+
+  const runNoteWrite = async <T>(op: () => Promise<T>): Promise<T> => {
+    pendingWrites += 1;
+    try {
+      return await op();
+    } finally {
+      pendingWrites -= 1;
+      fetchSeq += 1;
+      const active = useWorkspaceStore.getState().activeWorkspaceId;
+      if (active && loadedWorkspaceId !== active) {
+        void get().fetchNotes(active);
+      }
+    }
+  };
 
   return {
     notes: [],
@@ -115,6 +134,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       blockSuiteEditorService.registerExistingNotes(
         notes.map((n) => ({ id: n.id, title: n.title })),
       );
+      loadedWorkspaceId = workspaceId;
       set((state) => ({
         notes,
         activeNoteId:
@@ -130,7 +150,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
     },
 
     invalidateInFlightFetches: () => {
-      invalidateFetches();
+      fetchSeq += 1;
+      loadedWorkspaceId = null;
     },
 
     fetchTrash: async () => {
@@ -161,7 +182,9 @@ export const useNoteStore = create<NoteState>((set, get) => {
     createNote: async (workspaceId, title, content, icon) => {
       useSaveStatusStore.getState().setSaving();
       try {
-        const created = await noteService.createNote(workspaceId, title, content, icon);
+        const created = await runNoteWrite(() =>
+          noteService.createNote(workspaceId, title, content, icon),
+        );
 
         blockSuiteEditorService.registerExistingNotes([{ id: created.id, title: created.title }]);
         // Creating a note opens it: return the main area to the editor even
@@ -171,7 +194,6 @@ export const useNoteStore = create<NoteState>((set, get) => {
         // emptiness-rule views in the Library can show it immediately
         // instead of deferring it to revalidation.
         seedKnownEmptyNote(workspaceId, created.id);
-        invalidateFetches();
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
@@ -200,13 +222,15 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
       try {
         const { content, ...metadata } = updates;
-        if (content !== undefined) {
-          await noteService.updateContent(id, content);
-          invalidateNoteBacklinkScan(id);
-        }
-        if (Object.keys(metadata).length > 0) {
-          await noteService.updateMetadata(id, metadata);
-        }
+        await runNoteWrite(async () => {
+          if (content !== undefined) {
+            await noteService.updateContent(id, content);
+            invalidateNoteBacklinkScan(id);
+          }
+          if (Object.keys(metadata).length > 0) {
+            await noteService.updateMetadata(id, metadata);
+          }
+        });
 
         if (updates.title !== undefined) {
           blockSuiteEditorService.setDocTitle(id, updates.title);
@@ -256,7 +280,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
     moveNoteToWorkspace: async (id, workspaceId) => {
       useSaveStatusStore.getState().setSaving();
       try {
-        await noteService.updateMetadata(id, { workspaceId });
+        await runNoteWrite(() => noteService.updateMetadata(id, { workspaceId }));
         useWorkspaceStore.getState().setActiveWorkspace(workspaceId);
         await get().fetchNotes(workspaceId);
         set({ activeNoteId: id });
@@ -273,7 +297,6 @@ export const useNoteStore = create<NoteState>((set, get) => {
       const filtered = previousNotes.filter((n) => n.id !== id);
       const wasActive = previousActive === id;
 
-      invalidateFetches();
       set({
         notes: filtered,
         activeNoteId: wasActive ? (filtered[0]?.id ?? null) : previousActive,
@@ -282,7 +305,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       useSaveStatusStore.getState().setSaving();
 
       try {
-        await noteService.trashNote(id);
+        await runNoteWrite(() => noteService.trashNote(id));
         invalidateNoteBacklinkScan(id);
         useSaveStatusStore.getState().setSaved();
         useNotificationStore.getState().pushToast({
@@ -303,7 +326,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       set((state) => ({ trashedNotes: state.trashedNotes.filter((n) => n.id !== id) }));
 
       try {
-        await noteService.restoreNote(id);
+        await runNoteWrite(() => noteService.restoreNote(id));
       } catch (err) {
         if (trashed) {
           set((state) => ({ trashedNotes: [trashed, ...state.trashedNotes] }));
@@ -313,30 +336,35 @@ export const useNoteStore = create<NoteState>((set, get) => {
       }
       // The DB restore committed — a failed refresh must never roll a live
       // note back into the Trash list, nor leave it absent from every list.
-      invalidateFetches();
       const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
       if (!trashed || trashed.workspaceId !== activeWorkspaceId) return;
+      const seq = fetchSeq;
       try {
         const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
+        // Same land-time guard as fetchNotes: a newer fetch or a workspace
+        // switch during the await must win.
+        if (isStaleFetch(seq, activeWorkspaceId)) return;
         blockSuiteEditorService.registerExistingNotes(
           notes.map((n) => ({ id: n.id, title: n.title })),
         );
+        loadedWorkspaceId = activeWorkspaceId;
         set({ notes });
       } catch (err) {
         notifyError(err, { saveStatus: false });
-        set((state) => ({
-          notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
-        }));
+        if (!isStaleFetch(seq, activeWorkspaceId)) {
+          set((state) => ({
+            notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
+          }));
+        }
       }
     },
 
     deleteNotePermanently: async (id) => {
       const previousTrash = get().trashedNotes;
-      invalidateFetches();
       set((state) => ({ trashedNotes: state.trashedNotes.filter((n) => n.id !== id) }));
 
       try {
-        await noteService.deleteNote(id);
+        await runNoteWrite(() => noteService.deleteNote(id));
         invalidateNoteBacklinkScan(id);
       } catch (err) {
         set({ trashedNotes: previousTrash });
@@ -355,11 +383,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
     duplicateNote: async (id) => {
       useSaveStatusStore.getState().setSaving();
       try {
-        const duplicated = await noteService.duplicateNote(id);
+        const duplicated = await runNoteWrite(() => noteService.duplicateNote(id));
         blockSuiteEditorService.registerExistingNotes([
           { id: duplicated.id, title: duplicated.title },
         ]);
-        invalidateFetches();
         set((state) => ({
           notes: [duplicated, ...state.notes],
           activeNoteId: duplicated.id,
@@ -395,8 +422,12 @@ blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   try {
     await noteService.createNoteWithId(activeWs, docId, title);
   } catch (err) {
-    // Editor-created docs have no awaiter — surface the failure here.
+    // Editor-created docs have no awaiter — surface the failure here. The
+    // tag lets awaiting callers (markdown import) skip their own toast.
     notifyError(err, { saveStatus: false });
+    if (err instanceof Error) {
+      (err as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified = true;
+    }
     throw err;
   }
 

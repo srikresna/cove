@@ -356,11 +356,13 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
 
   it("a local createNote invalidates an in-flight fetch so it cannot erase the new note", async () => {
     let resolveFetch: (notes: Note[]) => void = () => {};
-    listMetadataByWorkspace.mockReturnValue(
-      new Promise<Note[]>((r) => {
-        resolveFetch = r;
-      }),
+    listMetadataByWorkspace.mockImplementationOnce(
+      () =>
+        new Promise<Note[]>((r) => {
+          resolveFetch = r;
+        }),
     );
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "fresh-note", workspaceId: "ws1" })]);
     const { noteService } = await import("@/di/container");
     const originalCreate = noteService.createNote;
     noteService.createNote = vi
@@ -368,13 +370,91 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
       .mockResolvedValue(makeNote({ id: "fresh-note", workspaceId: "ws1" }));
 
     const inFlight = useNoteStore.getState().fetchNotes("ws1");
-    await useNoteStore.getState().createNote("ws1", "Fresh");
+    const created = useNoteStore.getState().createNote("ws1", "Fresh");
+    await vi.waitFor(() => {
+      expect(useNoteStore.getState().notes.map((n) => n.id)).toContain("fresh-note");
+    });
     resolveFetch([makeNote({ id: "old-note", workspaceId: "ws1" })]);
     await inFlight;
+    await created;
 
     noteService.createNote = originalCreate;
-    expect(useNoteStore.getState().notes.map((n) => n.id)).toContain("fresh-note");
     expect(useNoteStore.getState().notes.map((n) => n.id)).not.toContain("old-note");
+  });
+
+  it("a createNote during a workspace switch re-loads the active workspace's list", async () => {
+    listMetadataByWorkspace.mockImplementation((wsId: string) =>
+      Promise.resolve(
+        wsId === "ws1"
+          ? [makeNote({ id: "ws1-note", workspaceId: "ws1" })]
+          : [
+              makeNote({ id: "ws2-a", workspaceId: "ws2" }),
+              makeNote({ id: "ws2-b", workspaceId: "ws2" }),
+            ],
+      ),
+    );
+    const { noteService } = await import("@/di/container");
+    const originalCreate = noteService.createNote;
+    noteService.createNote = vi
+      .fn()
+      .mockResolvedValue(makeNote({ id: "fresh-ws2", workspaceId: "ws2" }));
+
+    await useNoteStore.getState().fetchNotes("ws1");
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws1-note"]);
+
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws2" });
+    await useNoteStore.getState().createNote("ws2", "New");
+    await vi.waitFor(() => {
+      expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws2-a", "ws2-b"]);
+    });
+
+    noteService.createNote = originalCreate;
+  });
+
+  it("a fetch landing inside a trash write window is dropped (no resurrection)", async () => {
+    let resolveTrash: () => void = () => {};
+    const { noteService } = await import("@/di/container");
+    const originalTrash = noteService.trashNote;
+    noteService.trashNote = vi.fn().mockReturnValue(
+      new Promise<void>((r) => {
+        resolveTrash = r;
+      }),
+    );
+    // The in-window fetch still sees the pre-write list; anything after the
+    // write commits must not contain the trashed note.
+    listMetadataByWorkspace.mockImplementationOnce(() =>
+      Promise.resolve([
+        makeNote({ id: "doomed", workspaceId: "ws1" }),
+        makeNote({ id: "kept", workspaceId: "ws1" }),
+      ]),
+    );
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "kept", workspaceId: "ws1" })]);
+    useNoteStore.setState({
+      notes: [makeNote({ id: "doomed" }), makeNote({ id: "kept" })],
+    });
+
+    const trash = useNoteStore.getState().trashNote("doomed");
+    const fetchInWindow = useNoteStore.getState().fetchNotes("ws1");
+    await fetchInWindow;
+    resolveTrash();
+    await trash;
+
+    noteService.trashNote = originalTrash;
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["kept"]);
+  });
+
+  it("a cross-workspace restore does not strand the active workspace's list", async () => {
+    listMetadataByWorkspace.mockImplementation((wsId: string) =>
+      Promise.resolve([makeNote({ id: `${wsId}-note`, workspaceId: wsId })]),
+    );
+    await useNoteStore.getState().fetchNotes("ws1");
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws2" });
+
+    await useNoteStore.getState().restoreNote("t-other-ws");
+
+    await vi.waitFor(() => {
+      expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws2-note"]);
+    });
   });
 });
 

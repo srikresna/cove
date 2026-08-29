@@ -41,7 +41,15 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ noteId }) => {
       const id = await blockSuiteEditorService.importMarkdownFile(file);
       toast(id ? "Markdown imported" : "Import returned no doc");
     } catch (err) {
-      notifyError(err);
+      // The doc-created handler already toasted persistence failures.
+      if (
+        !(
+          err instanceof Error &&
+          (err as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified
+        )
+      ) {
+        notifyError(err);
+      }
     }
   };
 

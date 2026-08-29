@@ -199,7 +199,13 @@ export class NoteService implements INoteService {
       isPinned: false,
       isFavorite: false,
     });
-    await this.persistLinksGuarded(id, extractNoteLinkIds(content));
+    try {
+      await this.links.replaceForSource(id, extractNoteLinkIds(content));
+    } catch {
+      // Empty content means "no link rows" is already the end state, and the
+      // caller's artifact is a mounted editor doc — deleting the row would
+      // strand it unsavable.
+    }
     return { ...rec, content, title };
   }
 
