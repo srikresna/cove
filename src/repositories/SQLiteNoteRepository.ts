@@ -118,6 +118,21 @@ export class SQLiteNoteRepository implements INoteRepository {
     }
   }
 
+  async getOrderIndexesByWorkspace(
+    workspaceId: string,
+  ): Promise<Array<{ id: string; orderIndex: string }>> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ id: string; orderIndex: string }>>(
+        "SELECT id, orderIndex FROM notes WHERE workspaceId = ? AND orderIndex != ''",
+        [workspaceId],
+      );
+      return rows;
+    } catch (err) {
+      throw toPersistenceError("getOrderIndexesByWorkspace", err);
+    }
+  }
+
   async getMetaByIds(ids: string[]): Promise<NoteRecord[]> {
     if (ids.length === 0) return [];
     try {

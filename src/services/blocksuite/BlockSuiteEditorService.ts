@@ -93,12 +93,16 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
           try {
             await this.docCreatedHandler(docId, title);
           } catch (err) {
-            // Without a notes row the in-memory doc could never save — drop it.
-            try {
-              workspace.removeDoc(docId);
-            } catch {}
-            this.coveOwnedDocIds.delete(docId);
-            this.knownTitles.delete(docId);
+            // Without a notes row the in-memory doc could never save — drop
+            // it, unless the user already has it open (same guard as
+            // registerExistingNotes: never removeDoc a mounted doc).
+            if (!this.initializedDocs.has(docId)) {
+              try {
+                workspace.removeDoc(docId);
+              } catch {}
+              this.coveOwnedDocIds.delete(docId);
+              this.knownTitles.delete(docId);
+            }
             throw err;
           }
         })();

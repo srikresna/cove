@@ -177,7 +177,7 @@ export class NoteService implements INoteService {
         opts,
       ),
     );
-    await this.links.replaceForSource(id, extractNoteLinkIds(content));
+    await this.persistLinksGuarded(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
   }
 
@@ -199,8 +199,19 @@ export class NoteService implements INoteService {
       isPinned: false,
       isFavorite: false,
     });
-    await this.links.replaceForSource(id, extractNoteLinkIds(content));
+    await this.persistLinksGuarded(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
+  }
+
+  // A create whose link row write fails must not leave a half-created note
+  // (row committed, call rejected) — compensate by removing the row.
+  private async persistLinksGuarded(id: string, linkIds: string[]): Promise<void> {
+    try {
+      await this.links.replaceForSource(id, linkIds);
+    } catch (err) {
+      await this.notes.deleteNote(id).catch(() => {});
+      throw err;
+    }
   }
 
   async updateMetadata(
@@ -273,6 +284,7 @@ export class NoteService implements INoteService {
       const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) =>
         cmpOrderIndex(a.orderIndex, b.orderIndex),
       );
+      const draggedKey = siblings.find((n) => n.id === id)?.orderIndex;
       const others = siblings.filter((n) => n.id !== id);
       const targetIndex = others.findIndex((n) => n.id === targetId);
       if (targetIndex === -1) throw new NotFoundError("Note", targetId);
@@ -286,7 +298,25 @@ export class NoteService implements INoteService {
           ? null
           : prev.orderIndex || (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
       const after = others[insertAt]?.orderIndex ?? null;
-      await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
+
+      // Midpoints are deterministic: the (before, after) interval can already
+      // hold keys invisible to the live sibling list (soft-trashed or
+      // undecryptable notes). Mint past every occupant — never re-mint one.
+      const taken = new Set(
+        (await this.notes.getOrderIndexesByWorkspace(target.workspaceId)).map((r) => r.orderIndex),
+      );
+      if (draggedKey) taken.delete(draggedKey);
+      let key: string;
+      try {
+        key = generateKeyBetween(before, after);
+        while (taken.has(key)) key = generateKeyBetween(key, after);
+      } catch {
+        // Equal anchors mean pre-existing duplicate damage — heal by
+        // appending after `before` instead of failing the drag.
+        key = generateKeyBetween(before, null);
+        while (taken.has(key)) key = generateKeyBetween(key, null);
+      }
+      await this.notes.updateNote(id, { orderIndex: key });
     });
   }
 
@@ -357,11 +387,23 @@ export class NoteService implements INoteService {
   // back into use — on restore the two notes would collide.
   private async setDeletedOrdered(id: string, deletedAt: number | null): Promise<void> {
     const rec = await this.notes.getNoteById(id);
-    if (rec) {
-      await this.enqueueOrderWrite(rec.workspaceId, () => this.notes.setDeleted(id, deletedAt));
-    } else {
+    if (!rec) {
       await this.notes.setDeleted(id, deletedAt);
+      return;
     }
+    await this.enqueueOrderWrite(rec.workspaceId, async () => {
+      await this.notes.setDeleted(id, deletedAt);
+      if (deletedAt !== null || !rec.orderIndex) return;
+      // Self-heal legacy duplicate keys: if the restored key is still held by
+      // another row, re-key at the tail instead of rejoining with a twin.
+      const held = (await this.notes.getOrderIndexesByWorkspace(rec.workspaceId)).filter(
+        (r) => r.id !== id && r.orderIndex === rec.orderIndex,
+      );
+      if (held.length > 0) {
+        const max = await this.notes.getMaxOrderIndex(rec.workspaceId);
+        await this.notes.updateNote(id, { orderIndex: generateKeyBetween(max, null) });
+      }
+    });
   }
 
   async listTrash(): Promise<Note[]> {

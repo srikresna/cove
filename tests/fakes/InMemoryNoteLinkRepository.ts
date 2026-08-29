@@ -2,8 +2,10 @@ import type { INoteLinkRepository } from "@/repositories/INoteLinkRepository";
 
 export class InMemoryNoteLinkRepository implements INoteLinkRepository {
   public links = new Map<string, Set<string>>();
+  public shouldFail = false;
 
   async replaceForSource(sourceId: string, targetIds: string[]): Promise<void> {
+    if (this.shouldFail) throw new Error("Fake link repo error: replaceForSource");
     this.links.set(sourceId, new Set(targetIds.filter((id) => id && id !== sourceId)));
   }
 

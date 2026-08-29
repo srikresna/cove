@@ -18,6 +18,8 @@ interface NoteState {
   activeCoverImage: string | null;
   setActiveNoteId: (id: string | null) => void;
   fetchNotes: (workspaceId: string) => Promise<void>;
+  /** Drops any in-flight notes fetch (vault lock wipes the list). */
+  invalidateInFlightFetches: () => void;
 
   refreshNotesInPlace: (workspaceId: string) => Promise<void>;
   fetchTrash: () => Promise<void>;
@@ -72,18 +74,21 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
   const listAndRegister = async (workspaceId: string): Promise<Note[] | null> => {
     try {
-      const notes = await noteService.listMetadataByWorkspace(workspaceId);
-      blockSuiteEditorService.registerExistingNotes(
-        notes.map((n) => ({ id: n.id, title: n.title })),
-      );
-      return notes;
+      return await noteService.listMetadataByWorkspace(workspaceId);
     } catch (err) {
       notifyError(err, { saveStatus: false });
       return null;
     }
   };
 
+  // Bumped by every local note-list mutation and by vault lock: an in-flight
+  // fetch whose DB snapshot predates the mutation must never land over it.
   let fetchSeq = 0;
+  const invalidateFetches = (): void => {
+    fetchSeq += 1;
+  };
+  const isStaleFetch = (seq: number, workspaceId: string): boolean =>
+    seq !== fetchSeq || useWorkspaceStore.getState().activeWorkspaceId !== workspaceId;
 
   return {
     notes: [],
@@ -102,9 +107,14 @@ export const useNoteStore = create<NoteState>((set, get) => {
       const seq = ++fetchSeq;
       const notes = await listAndRegister(workspaceId);
       if (!notes) return;
-      // A fetch superseded by a newer one (workspace switch) would swap in
-      // the old workspace's list.
-      if (seq !== fetchSeq) return;
+      // Stale = superseded by a newer fetch, invalidated by a local mutation,
+      // or captured for a workspace the user has since left. Dropping it here
+      // (before registerExistingNotes) also keeps its doc-registry side
+      // effects from evicting the active workspace's docs.
+      if (isStaleFetch(seq, workspaceId)) return;
+      blockSuiteEditorService.registerExistingNotes(
+        notes.map((n) => ({ id: n.id, title: n.title })),
+      );
       set((state) => ({
         notes,
         activeNoteId:
@@ -117,6 +127,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
     refreshNotesInPlace: async (workspaceId) => {
       await get().fetchNotes(workspaceId);
+    },
+
+    invalidateInFlightFetches: () => {
+      invalidateFetches();
     },
 
     fetchTrash: async () => {
@@ -157,6 +171,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
         // emptiness-rule views in the Library can show it immediately
         // instead of deferring it to revalidation.
         seedKnownEmptyNote(workspaceId, created.id);
+        invalidateFetches();
         set((state) => ({
           notes: [created, ...state.notes],
           activeNoteId: created.id,
@@ -258,6 +273,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       const filtered = previousNotes.filter((n) => n.id !== id);
       const wasActive = previousActive === id;
 
+      invalidateFetches();
       set({
         notes: filtered,
         activeNoteId: wasActive ? (filtered[0]?.id ?? null) : previousActive,
@@ -296,7 +312,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
         return;
       }
       // The DB restore committed — a failed refresh must never roll a live
-      // note back into the Trash list.
+      // note back into the Trash list, nor leave it absent from every list.
+      invalidateFetches();
       const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
       if (!trashed || trashed.workspaceId !== activeWorkspaceId) return;
       try {
@@ -307,11 +324,15 @@ export const useNoteStore = create<NoteState>((set, get) => {
         set({ notes });
       } catch (err) {
         notifyError(err, { saveStatus: false });
+        set((state) => ({
+          notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
+        }));
       }
     },
 
     deleteNotePermanently: async (id) => {
       const previousTrash = get().trashedNotes;
+      invalidateFetches();
       set((state) => ({ trashedNotes: state.trashedNotes.filter((n) => n.id !== id) }));
 
       try {
@@ -338,6 +359,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
         blockSuiteEditorService.registerExistingNotes([
           { id: duplicated.id, title: duplicated.title },
         ]);
+        invalidateFetches();
         set((state) => ({
           notes: [duplicated, ...state.notes],
           activeNoteId: duplicated.id,
@@ -356,6 +378,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
 vaultService.onLock(() => {
   clearBacklinkScans();
+  useNoteStore.getState().invalidateInFlightFetches();
   useNoteStore.setState({
     notes: [],
     trashedNotes: [],
@@ -369,7 +392,13 @@ blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   // Rejecting (not returning) lets the editor drop the unpersistable doc and
   // the markdown import count the file as failed.
   if (!activeWs) throw new Error("No active workspace to persist a new doc into.");
-  await noteService.createNoteWithId(activeWs, docId, title);
+  try {
+    await noteService.createNoteWithId(activeWs, docId, title);
+  } catch (err) {
+    // Editor-created docs have no awaiter — surface the failure here.
+    notifyError(err, { saveStatus: false });
+    throw err;
+  }
 
   await useNoteStore.getState().refreshNotesInPlace(activeWs);
 });

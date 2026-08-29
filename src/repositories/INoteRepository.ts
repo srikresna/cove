@@ -11,8 +11,14 @@ export interface NoteRecord extends Omit<Note, "content" | "title"> {
 export interface INoteRepository {
   getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]>;
   /** Largest non-empty manual-order key in the workspace (BINARY order —
-   *  fractional-index keys are ASCII code-unit ordered), or null. */
+   *  fractional-index keys are ASCII code-unit ordered), or null. Includes
+   *  soft-trashed rows so a tail mint can never re-mint a trashed key. */
   getMaxOrderIndex(workspaceId: string): Promise<string | null>;
+  /** Every non-empty manual-order key in the workspace (trashed included,
+   *  plaintext — no decrypt). Midpoint mints must skip all of them. */
+  getOrderIndexesByWorkspace(
+    workspaceId: string,
+  ): Promise<Array<{ id: string; orderIndex: string }>>;
   getMetaByIds(ids: string[]): Promise<NoteRecord[]>;
   getNoteById(id: string): Promise<NoteRecord | null>;
   findRecentForSearch(limit: number): Promise<NoteRecord[]>;

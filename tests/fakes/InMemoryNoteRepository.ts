@@ -28,6 +28,14 @@ export class InMemoryNoteRepository implements INoteRepository {
     return max;
   }
 
+  async getOrderIndexesByWorkspace(
+    workspaceId: string,
+  ): Promise<Array<{ id: string; orderIndex: string }>> {
+    return this.notes
+      .filter((n) => n.workspaceId === workspaceId && n.orderIndex)
+      .map((n) => ({ id: n.id, orderIndex: n.orderIndex as string }));
+  }
+
   async getMetaByIds(ids: string[]): Promise<NoteRecord[]> {
     this.callLog.push(`getMetaByIds:${ids.join(",")}`);
     if (this.shouldFail) throw new Error("Fake repo error: getMetaByIds");

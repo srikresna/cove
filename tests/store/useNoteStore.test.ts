@@ -251,6 +251,7 @@ describe("useNoteStore — refreshNotesInPlace (peek-created docs)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vault.unlocked = true;
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws1" });
     useNoteStore.setState({
       notes: [makeNote({ id: "cal-note", title: "Calendar" })],
       trashedNotes: [],
@@ -286,6 +287,7 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vault.unlocked = true;
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws1" });
     useNoteStore.setState({
       notes: [],
       trashedNotes: [],
@@ -305,6 +307,7 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
     );
 
     const slow = useNoteStore.getState().fetchNotes("ws1");
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws2" });
     const fast = useNoteStore.getState().fetchNotes("ws2");
     await fast;
 
@@ -314,6 +317,64 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
     await slow;
 
     expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws2-note"]);
+  });
+
+  it("drops a fetch for a workspace the user has since left even when it is the newest", async () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws2" });
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "stale-ws1", workspaceId: "ws1" })]);
+
+    await useNoteStore.getState().fetchNotes("ws1");
+
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual([]);
+  });
+
+  it("does not touch the editor doc registry for a superseded fetch", async () => {
+    let resolveWs1: (notes: Note[]) => void = () => {};
+    listMetadataByWorkspace.mockImplementation((wsId: string) =>
+      wsId === "ws1"
+        ? new Promise<Note[]>((r) => {
+            resolveWs1 = r;
+          })
+        : Promise.resolve([makeNote({ id: "ws2-note", workspaceId: "ws2" })]),
+    );
+    const register = vi.fn();
+    const { blockSuiteEditorService } = await import("@/di/container");
+    const original = blockSuiteEditorService.registerExistingNotes;
+    blockSuiteEditorService.registerExistingNotes = register;
+
+    const slow = useNoteStore.getState().fetchNotes("ws1");
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws2" });
+    const fast = useNoteStore.getState().fetchNotes("ws2");
+    await fast;
+    resolveWs1([makeNote({ id: "ws1-note", workspaceId: "ws1" })]);
+    await slow;
+
+    blockSuiteEditorService.registerExistingNotes = original;
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(register).toHaveBeenCalledWith([{ id: "ws2-note", title: "Test" }]);
+  });
+
+  it("a local createNote invalidates an in-flight fetch so it cannot erase the new note", async () => {
+    let resolveFetch: (notes: Note[]) => void = () => {};
+    listMetadataByWorkspace.mockReturnValue(
+      new Promise<Note[]>((r) => {
+        resolveFetch = r;
+      }),
+    );
+    const { noteService } = await import("@/di/container");
+    const originalCreate = noteService.createNote;
+    noteService.createNote = vi
+      .fn()
+      .mockResolvedValue(makeNote({ id: "fresh-note", workspaceId: "ws1" }));
+
+    const inFlight = useNoteStore.getState().fetchNotes("ws1");
+    await useNoteStore.getState().createNote("ws1", "Fresh");
+    resolveFetch([makeNote({ id: "old-note", workspaceId: "ws1" })]);
+    await inFlight;
+
+    noteService.createNote = originalCreate;
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toContain("fresh-note");
+    expect(useNoteStore.getState().notes.map((n) => n.id)).not.toContain("old-note");
   });
 });
 

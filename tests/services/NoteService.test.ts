@@ -186,6 +186,96 @@ describe("NoteService", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it("a drag into a gap whose midpoint key belongs to a trashed note never re-mints it", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    // Consecutive tail mints produce keys one midpoint apart, so the trashed
+    // note's key is exactly generateKeyBetween(its neighbors).
+    const a = await service.createNote("ws-1", "A");
+    const t = await service.createNote("ws-1", "T");
+    const c = await service.createNote("ws-1", "C");
+    const b = await service.createNote("ws-1", "B");
+
+    await service.trashNote(t.id);
+    await service.reorderNote(b.id, c.id, "before");
+    await service.restoreNote(t.id);
+
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-1")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(b.orderIndex).toBeDefined();
+    expect(a.orderIndex).toBeDefined();
+  });
+
+  it("a drag never mints the key of a hidden (undecryptable) live note", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+    const a = await service.createNote("ws-1", "A");
+    const c = await service.createNote("ws-1", "C");
+    const d = await service.createNote("ws-1", "D");
+    expect(a.orderIndex).toBe("a0");
+    expect(c.orderIndex).toBe("a1");
+    // A corrupt-title note hidden from every list, sitting exactly at the
+    // a0..a1 midpoint.
+    fakeRepo.notes.push({
+      id: "hidden",
+      workspaceId: "ws-1",
+      title: enc("corrupt"),
+      titleKmsVersion: 1,
+      content: enc(""),
+      isPinned: false,
+      isFavorite: false,
+      createdAt: 1,
+      updatedAt: 1,
+      orderIndex: "a0V",
+    });
+
+    await service.reorderNote(d.id, c.id, "before");
+
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-1")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("restoring onto a legacy duplicate key re-keys the restored note at the tail", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    const x = await service.createNote("ws-1", "X");
+    await service.trashNote(x.id);
+    // Pre-existing damage: another live row already holds X's key.
+    fakeRepo.notes.push({
+      id: "squat",
+      workspaceId: "ws-1",
+      title: enc("Squat"),
+      titleKmsVersion: 0,
+      content: enc(""),
+      isPinned: false,
+      isFavorite: false,
+      createdAt: 1,
+      updatedAt: 1,
+      orderIndex: x.orderIndex,
+    });
+
+    await service.restoreNote(x.id);
+
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-1")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("a failed link write after a successful insert removes the note row (no half-created note)", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const links = new InMemoryNoteLinkRepository();
+    links.shouldFail = true;
+    const service = new NoteService(fakeRepo, unlockedCrypto, links);
+
+    await expect(service.createNote("ws-1", "Title", "body")).rejects.toThrow();
+    expect(fakeRepo.notes).toHaveLength(0);
+  });
+
   it("a corrupt title degrades per note instead of failing the whole list", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
