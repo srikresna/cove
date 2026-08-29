@@ -24,7 +24,7 @@ const {
   invalidateNoteBacklinkScan: vi.fn<(noteId: string) => void>(),
   clearBacklinkScans: vi.fn<() => void>(),
   setDocTitle: vi.fn<(docId: string, title: string) => void>(),
-  vault: { unlocked: true },
+  vault: { unlocked: true, locking: false },
   handlers: {
     lock: null as (() => void) | null,
     docCreated: null as ((docId: string, title?: string) => Promise<void>) | null,
@@ -48,7 +48,7 @@ vi.mock("@/di/container", () => ({
     restoreNote,
   },
   vaultService: {
-    isUnlocked: () => vault.unlocked,
+    isUnlocked: () => vault.unlocked && !vault.locking,
     onLock: (fn: () => void) => {
       handlers.lock = fn;
     },
@@ -441,6 +441,21 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
 
     noteService.trashNote = originalTrash;
     expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["kept"]);
+  });
+
+  it("a fetch landing during the vault-lock gap never repopulates the wiped store", async () => {
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "secret", workspaceId: "ws1" })]);
+    useNoteStore.setState({ notes: [] });
+    handlers.lock?.();
+
+    // The gap: the wipe listener has run and the service reports locked,
+    // but the raw crypto service (what NoteService consults) is still live.
+    vault.unlocked = true;
+    vault.locking = true;
+    await useNoteStore.getState().fetchNotes("ws1");
+    vault.locking = false;
+
+    expect(useNoteStore.getState().notes).toEqual([]);
   });
 
   it("a cross-workspace restore does not strand the active workspace's list", async () => {

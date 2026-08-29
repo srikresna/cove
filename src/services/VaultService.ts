@@ -110,7 +110,7 @@ export class VaultService implements IVaultService {
   async computeStatus(): Promise<VaultStatus> {
     const rec = await this.kms.get();
     if (!rec) return "uninitialized";
-    return this.crypto.isUnlocked() ? "unlocked" : "locked";
+    return this.isUnlocked() ? "unlocked" : "locked";
   }
 
   private async deriveKeys(

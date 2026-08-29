@@ -99,6 +99,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
     workspaceId: string,
     apply: () => void,
   ): Promise<void> | null => {
+    // A locked (or locking) vault must stay wiped — the raw crypto service is
+    // still live during lock()'s async teardown gap, so reads started inside
+    // it can still decrypt.
+    if (!vaultService.isUnlocked()) return null;
     if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return null;
     if (seq === fetchSeq && epoch === writeEpoch && pendingWrites === 0) {
       apply();
