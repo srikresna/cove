@@ -114,15 +114,15 @@ describe("VaultService setup / unlock / lock", () => {
     expect(fired).toBe(2);
   });
 
-  it("runs lock listeners before the session keys are zeroized (flush window)", async () => {
-    const { service } = makeVault();
+  it("lock listeners keep the crypto flush window, but the service reports locked immediately", async () => {
+    const { service, crypto } = makeVault();
     await service.setupPassphrase(PW);
-    const unlockedDuringListener: boolean[] = [];
+    const cryptoDuringListener: boolean[] = [];
     service.onLock(() => {
-      unlockedDuringListener.push(service.isUnlocked());
+      cryptoDuringListener.push(crypto.isUnlocked());
     });
     await service.lock();
-    expect(unlockedDuringListener).toEqual([true]);
+    expect(cryptoDuringListener).toEqual([true]);
     expect(service.isUnlocked()).toBe(false);
   });
 

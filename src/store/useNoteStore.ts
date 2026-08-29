@@ -93,19 +93,36 @@ export const useNoteStore = create<NoteState>((set, get) => {
   let healAfterWrites = false;
   let loadedWorkspaceId: string | null = null;
 
-  const landFetch = (seq: number, epoch: number, workspaceId: string, apply: () => void): void => {
-    if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return;
+  const landFetch = (
+    seq: number,
+    epoch: number,
+    workspaceId: string,
+    apply: () => void,
+  ): Promise<void> | null => {
+    if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return null;
     if (seq === fetchSeq && epoch === writeEpoch && pendingWrites === 0) {
       apply();
-      return;
+      return null;
     }
     // Superseded by a newer fetch — that fetch delivers fresher data.
-    if (seq !== fetchSeq) return;
+    if (seq !== fetchSeq) return null;
     if (pendingWrites === 0) {
-      if (vaultService.isUnlocked()) void get().fetchNotes(workspaceId);
-    } else {
-      healAfterWrites = true;
+      return scheduleHeal(workspaceId);
     }
+    healAfterWrites = true;
+    return null;
+  };
+
+  // The heal fetch is returned so awaited refreshes (journal open, restore,
+  // import) resolve only once the data has actually landed.
+  const scheduleHeal = (workspaceId: string): Promise<void> | null => {
+    if (!vaultService.isUnlocked()) return null;
+    return get()
+      .fetchNotes(workspaceId)
+      .then(
+        () => {},
+        () => {},
+      );
   };
 
   const runNoteWrite = async <T>(op: () => Promise<T>): Promise<T> => {
@@ -117,11 +134,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
       writeEpoch += 1;
       const active = useWorkspaceStore.getState().activeWorkspaceId;
       if (active && vaultService.isUnlocked()) {
-        if (loadedWorkspaceId !== active) {
-          void get().fetchNotes(active);
-        } else if (healAfterWrites && pendingWrites === 0) {
+        const needsReload = loadedWorkspaceId !== active;
+        if (needsReload || (healAfterWrites && pendingWrites === 0)) {
           healAfterWrites = false;
-          void get().fetchNotes(active);
+          void scheduleHeal(active);
         }
       }
     }
@@ -145,7 +161,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
       const epoch = writeEpoch;
       const notes = await listAndRegister(workspaceId);
       if (!notes) return;
-      landFetch(seq, epoch, workspaceId, () => {
+      const heal = landFetch(seq, epoch, workspaceId, () => {
         blockSuiteEditorService.registerExistingNotes(
           notes.map((n) => ({ id: n.id, title: n.title })),
         );
@@ -159,6 +175,7 @@ export const useNoteStore = create<NoteState>((set, get) => {
           activeCoverImage: state.activeCoverImage,
         }));
       });
+      if (heal) await heal;
     },
 
     refreshNotesInPlace: async (workspaceId) => {
@@ -360,18 +377,28 @@ export const useNoteStore = create<NoteState>((set, get) => {
       const epoch = writeEpoch;
       try {
         const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
-        landFetch(seq, epoch, activeWorkspaceId, () => {
+        const heal = landFetch(seq, epoch, activeWorkspaceId, () => {
           blockSuiteEditorService.registerExistingNotes(
             notes.map((n) => ({ id: n.id, title: n.title })),
           );
           loadedWorkspaceId = activeWorkspaceId;
           set({ notes });
         });
+        if (heal) await heal;
       } catch (err) {
         notifyError(err, { saveStatus: false });
-        set((state) => ({
-          notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
-        }));
+        // Append only onto a list that genuinely reflects the active
+        // workspace, and never while the vault is (or is becoming) locked —
+        // a locked store must stay wiped.
+        const stillActive =
+          useWorkspaceStore.getState().activeWorkspaceId === activeWorkspaceId &&
+          vaultService.isUnlocked() &&
+          (loadedWorkspaceId === activeWorkspaceId || get().notes.length === 0);
+        if (stillActive) {
+          set((state) => ({
+            notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
+          }));
+        }
       }
     },
 
@@ -445,10 +472,12 @@ blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
     // Editor-created docs have no awaiter — surface the failure here. The
     // tag lets awaiting callers (markdown import) skip their own toast.
     notifyError(err, { saveStatus: false });
-    if (err instanceof Error) {
-      (err as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified = true;
-    }
-    throw err;
+    const tagged =
+      err instanceof Error
+        ? err
+        : new Error(err instanceof Object ? String(err) : "doc persist failed");
+    (tagged as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified = true;
+    throw tagged;
   }
 
   await useNoteStore.getState().refreshNotesInPlace(activeWs);

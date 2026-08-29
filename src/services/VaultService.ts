@@ -94,8 +94,13 @@ export class VaultService implements IVaultService {
     private readonly legacyKeys: ILegacyKeyStore,
   ) {}
 
+  private locking = false;
+
   isUnlocked(): boolean {
-    return this.crypto.isUnlocked();
+    // lock() fires its listeners, then persists the IV high-water mark
+    // (async) before the keys clear — during that gap the session keys are
+    // still live, but the app must already behave as locked.
+    return !this.locking && this.crypto.isUnlocked();
   }
 
   onLock(listener: () => void): void {
@@ -542,22 +547,27 @@ export class VaultService implements IVaultService {
         () => {},
       );
     }
+    this.locking = true;
     const attempt = (async () => {
-      for (const listener of this.lockListeners) {
-        try {
-          listener();
-        } catch (err) {
-          Logger.warn("vault: lock listener failed", err);
+      try {
+        for (const listener of this.lockListeners) {
+          try {
+            listener();
+          } catch (err) {
+            Logger.warn("vault: lock listener failed", err);
+          }
         }
+        if (this.crypto.isUnlocked()) {
+          await this.writeIvHighWaterMark(this.crypto.getIvCounter()).catch((err) =>
+            Logger.warn("vault: iv high-water-mark persist on lock failed", err),
+          );
+        }
+        if (this.rawDek) zeroize(this.rawDek);
+        this.rawDek = null;
+        this.crypto.clearSessionKeys();
+      } finally {
+        this.locking = false;
       }
-      if (this.crypto.isUnlocked()) {
-        await this.writeIvHighWaterMark(this.crypto.getIvCounter()).catch((err) =>
-          Logger.warn("vault: iv high-water-mark persist on lock failed", err),
-        );
-      }
-      if (this.rawDek) zeroize(this.rawDek);
-      this.rawDek = null;
-      this.crypto.clearSessionKeys();
     })();
     this.unlockInFlight = attempt;
     try {

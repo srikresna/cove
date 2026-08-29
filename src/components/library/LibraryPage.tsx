@@ -210,10 +210,11 @@ export const LibraryPage: React.FC = () => {
       if (imported > 0 || notifiedFailed > 0) {
         await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
       }
-      if (imported > 0 || failed > 0) {
+      const totalFailed = failed + notifiedFailed;
+      if (imported > 0 || totalFailed > 0) {
         const description = [
           MESSAGES.LIBRARY_IMPORTED_DESC.replace("{n}", String(imported)),
-          failed > 0 ? `${failed} file(s) failed.` : "",
+          totalFailed > 0 ? `${totalFailed} file(s) failed.` : "",
         ]
           .filter(Boolean)
           .join(" ");
