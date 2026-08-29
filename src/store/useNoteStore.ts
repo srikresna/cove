@@ -41,6 +41,7 @@ interface NoteState {
   duplicateNote: (id: string) => Promise<void>;
   togglePinNote: (id: string) => Promise<void>;
   toggleFavoriteNote: (id: string) => Promise<void>;
+  persistDocCreatedNote: (workspaceId: string, docId: string, title?: string) => Promise<Note>;
 }
 
 export const useNoteStore = create<NoteState>((set, get) => {
@@ -79,21 +80,33 @@ export const useNoteStore = create<NoteState>((set, get) => {
     }
   };
 
-  // Fetch/mutation coordination. A fetch is dropped at land time when it is
-  // superseded, when ANY note write is still in flight (its snapshot may
-  // predate the write), or when its workspace is no longer active. Every
-  // write bumps fetchSeq after committing (killing fetches whose read
-  // predates it) and re-loads the active workspace's list if the store was
-  // still holding another workspace's (the killed fetch may have been the
-  // only fresh source).
+  // Fetch/mutation coordination. A fetch lands only when it is still the
+  // newest fetch, no note write is in flight or has committed since its read
+  // (writeEpoch), and its workspace is still active. A landing dropped
+  // because of a WRITE is never a plain discard — the change it carried must
+  // still surface (a restored/imported note has no optimistic counterpart),
+  // so it re-issues immediately once writes drain, or defers to the last
+  // write's completion.
   let fetchSeq = 0;
+  let writeEpoch = 0;
   let pendingWrites = 0;
+  let healAfterWrites = false;
   let loadedWorkspaceId: string | null = null;
 
-  const isStaleFetch = (seq: number, workspaceId: string): boolean =>
-    seq !== fetchSeq ||
-    pendingWrites > 0 ||
-    useWorkspaceStore.getState().activeWorkspaceId !== workspaceId;
+  const landFetch = (seq: number, epoch: number, workspaceId: string, apply: () => void): void => {
+    if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return;
+    if (seq === fetchSeq && epoch === writeEpoch && pendingWrites === 0) {
+      apply();
+      return;
+    }
+    // Superseded by a newer fetch — that fetch delivers fresher data.
+    if (seq !== fetchSeq) return;
+    if (pendingWrites === 0) {
+      if (vaultService.isUnlocked()) void get().fetchNotes(workspaceId);
+    } else {
+      healAfterWrites = true;
+    }
+  };
 
   const runNoteWrite = async <T>(op: () => Promise<T>): Promise<T> => {
     pendingWrites += 1;
@@ -101,10 +114,15 @@ export const useNoteStore = create<NoteState>((set, get) => {
       return await op();
     } finally {
       pendingWrites -= 1;
-      fetchSeq += 1;
+      writeEpoch += 1;
       const active = useWorkspaceStore.getState().activeWorkspaceId;
-      if (active && loadedWorkspaceId !== active) {
-        void get().fetchNotes(active);
+      if (active && vaultService.isUnlocked()) {
+        if (loadedWorkspaceId !== active) {
+          void get().fetchNotes(active);
+        } else if (healAfterWrites && pendingWrites === 0) {
+          healAfterWrites = false;
+          void get().fetchNotes(active);
+        }
       }
     }
   };
@@ -124,25 +142,23 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
     fetchNotes: async (workspaceId) => {
       const seq = ++fetchSeq;
+      const epoch = writeEpoch;
       const notes = await listAndRegister(workspaceId);
       if (!notes) return;
-      // Stale = superseded by a newer fetch, invalidated by a local mutation,
-      // or captured for a workspace the user has since left. Dropping it here
-      // (before registerExistingNotes) also keeps its doc-registry side
-      // effects from evicting the active workspace's docs.
-      if (isStaleFetch(seq, workspaceId)) return;
-      blockSuiteEditorService.registerExistingNotes(
-        notes.map((n) => ({ id: n.id, title: n.title })),
-      );
-      loadedWorkspaceId = workspaceId;
-      set((state) => ({
-        notes,
-        activeNoteId:
-          state.activeNoteId && notes.some((n) => n.id === state.activeNoteId)
-            ? state.activeNoteId
-            : (notes[0]?.id ?? null),
-        activeCoverImage: state.activeCoverImage,
-      }));
+      landFetch(seq, epoch, workspaceId, () => {
+        blockSuiteEditorService.registerExistingNotes(
+          notes.map((n) => ({ id: n.id, title: n.title })),
+        );
+        loadedWorkspaceId = workspaceId;
+        set((state) => ({
+          notes,
+          activeNoteId:
+            state.activeNoteId && notes.some((n) => n.id === state.activeNoteId)
+              ? state.activeNoteId
+              : (notes[0]?.id ?? null),
+          activeCoverImage: state.activeCoverImage,
+        }));
+      });
     },
 
     refreshNotesInPlace: async (workspaceId) => {
@@ -151,6 +167,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
     invalidateInFlightFetches: () => {
       fetchSeq += 1;
+      writeEpoch += 1;
+      healAfterWrites = false;
       loadedWorkspaceId = null;
     },
 
@@ -338,24 +356,22 @@ export const useNoteStore = create<NoteState>((set, get) => {
       // note back into the Trash list, nor leave it absent from every list.
       const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
       if (!trashed || trashed.workspaceId !== activeWorkspaceId) return;
-      const seq = fetchSeq;
+      const seq = ++fetchSeq;
+      const epoch = writeEpoch;
       try {
         const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
-        // Same land-time guard as fetchNotes: a newer fetch or a workspace
-        // switch during the await must win.
-        if (isStaleFetch(seq, activeWorkspaceId)) return;
-        blockSuiteEditorService.registerExistingNotes(
-          notes.map((n) => ({ id: n.id, title: n.title })),
-        );
-        loadedWorkspaceId = activeWorkspaceId;
-        set({ notes });
+        landFetch(seq, epoch, activeWorkspaceId, () => {
+          blockSuiteEditorService.registerExistingNotes(
+            notes.map((n) => ({ id: n.id, title: n.title })),
+          );
+          loadedWorkspaceId = activeWorkspaceId;
+          set({ notes });
+        });
       } catch (err) {
         notifyError(err, { saveStatus: false });
-        if (!isStaleFetch(seq, activeWorkspaceId)) {
-          set((state) => ({
-            notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
-          }));
-        }
+        set((state) => ({
+          notes: state.notes.some((n) => n.id === id) ? state.notes : [trashed, ...state.notes],
+        }));
       }
     },
 
@@ -400,6 +416,10 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
     togglePinNote: (id) => toggleFlag(id, "isPinned"),
     toggleFavoriteNote: (id) => toggleFlag(id, "isFavorite"),
+
+    /** Persists an editor/import-created doc as a note row. */
+    persistDocCreatedNote: (workspaceId, docId, title) =>
+      runNoteWrite(() => noteService.createNoteWithId(workspaceId, docId, title)),
   };
 });
 
@@ -420,7 +440,7 @@ blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   // the markdown import count the file as failed.
   if (!activeWs) throw new Error("No active workspace to persist a new doc into.");
   try {
-    await noteService.createNoteWithId(activeWs, docId, title);
+    await useNoteStore.getState().persistDocCreatedNote(activeWs, docId, title);
   } catch (err) {
     // Editor-created docs have no awaiter — surface the failure here. The
     // tag lets awaiting callers (markdown import) skip their own toast.

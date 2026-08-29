@@ -456,6 +456,42 @@ describe("useNoteStore — fetchNotes staleness guard", () => {
       expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws2-note"]);
     });
   });
+
+  it("a refresh dropped by a concurrent write is re-issued after the write drains", async () => {
+    listMetadataByWorkspace.mockResolvedValueOnce([makeNote({ id: "n1", workspaceId: "ws1" })]);
+    await useNoteStore.getState().fetchNotes("ws1");
+    useNoteStore.setState({
+      trashedNotes: [makeNote({ id: "t1", workspaceId: "ws1" })],
+    });
+
+    let resolveRestoreList: (notes: Note[]) => void = () => {};
+    listMetadataByWorkspace.mockImplementationOnce(
+      () =>
+        new Promise<Note[]>((r) => {
+          resolveRestoreList = r;
+        }),
+    );
+    listMetadataByWorkspace.mockResolvedValue([
+      makeNote({ id: "n1", workspaceId: "ws1" }),
+      makeNote({ id: "t1", workspaceId: "ws1" }),
+    ]);
+    const restore = useNoteStore.getState().restoreNote("t1");
+    await vi.waitFor(() => {
+      expect(listMetadataByWorkspace.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    // A concurrent write commits while the restore's refresh is mid-flight.
+    updateMetadata.mockResolvedValue(makeNote({ title: "Edited" }));
+    await useNoteStore.getState().updateNote("n1", { title: "Edited" });
+
+    // The restore's landing is dropped (writeEpoch moved) — and re-issued.
+    resolveRestoreList([makeNote({ id: "t1", workspaceId: "ws1" })]);
+    await restore;
+
+    await vi.waitFor(() => {
+      expect(useNoteStore.getState().notes.map((n) => n.id)).toContain("t1");
+    });
+  });
 });
 
 describe("useNoteStore — restoreNote", () => {

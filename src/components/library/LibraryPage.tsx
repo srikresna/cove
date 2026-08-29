@@ -187,18 +187,27 @@ export const LibraryPage: React.FC = () => {
       if (!files || files.length === 0 || !activeWorkspaceId) return;
       let imported = 0;
       let failed = 0;
+      let notifiedFailed = 0;
       for (const file of Array.from(files)) {
         try {
           const docId = await blockSuiteEditorService.importMarkdownFile(file);
           if (docId) imported += 1;
           else failed += 1;
-        } catch {
+        } catch (err) {
           // Per-file failures shouldn't abort the batch; the toast reports
-          // the counts.
-          failed += 1;
+          // the counts. Persistence failures were already toasted by the
+          // doc-created handler — count them separately.
+          if (
+            err instanceof Error &&
+            (err as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified
+          ) {
+            notifiedFailed += 1;
+          } else {
+            failed += 1;
+          }
         }
       }
-      if (imported > 0) {
+      if (imported > 0 || notifiedFailed > 0) {
         await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
       }
       if (imported > 0 || failed > 0) {
