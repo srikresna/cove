@@ -65,10 +65,17 @@ export class NoteService implements INoteService {
     };
   }
 
+  // One corrupt ciphertext must not blank the whole list (search already
+  // degrades per note).
+  private async degradeAll<T>(promises: Array<Promise<T>>): Promise<T[]> {
+    const settled = await Promise.allSettled(promises);
+    return settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+  }
+
   async listMetadataByWorkspace(workspaceId: string): Promise<Note[]> {
     this.assertUnlocked();
     const records = await this.notes.getNotesMetadataByWorkspace(workspaceId);
-    return Promise.all(records.map((rec) => this.toNote(rec)));
+    return this.degradeAll(records.map((rec) => this.toNote(rec)));
   }
 
   async getNote(id: string): Promise<Note | null> {
@@ -126,9 +133,20 @@ export class NoteService implements INoteService {
     return hits;
   }
 
-  // Concurrent createNote calls must not both read the same DB max and mint the
-  // same tail key (no UNIQUE constraint; duplicates break drag math). Serialized.
-  private tailKeyMinting = new Map<string, Promise<string>>();
+  // Every orderIndex-writing operation runs end-to-end serialized per
+  // workspace: unordered writes read a stale DB max or neighbor set and mint
+  // duplicate keys (there is no UNIQUE constraint).
+  private orderWrites = new Map<string, Promise<unknown>>();
+
+  private enqueueOrderWrite<T>(workspaceId: string, op: () => Promise<T>): Promise<T> {
+    const inFlight = this.orderWrites.get(workspaceId) ?? Promise.resolve();
+    const result = inFlight.then(op);
+    this.orderWrites.set(
+      workspaceId,
+      result.catch(() => {}),
+    );
+    return result;
+  }
 
   async createNote(
     workspaceId: string,
@@ -139,63 +157,28 @@ export class NoteService implements INoteService {
   ): Promise<Note> {
     this.assertUnlocked();
     const id = makeNoteId();
-    // New notes get a tail key immediately (empty anchors break drag math); the
-    // mint promise is captured so the cache is dropped once this insert lands.
-    const mintPromise = this.nextTailKey(workspaceId);
-    const orderIndex = await mintPromise;
-    let rec: NoteRecord;
-    try {
-      rec = await this.notes.createNote(
+    const encTitle = await this.crypto.encryptPayload(title, titleAad(id));
+    const encContent = await this.crypto.encryptPayload(content, id);
+    const rec = await this.enqueueOrderWrite(workspaceId, async () =>
+      this.notes.createNote(
         {
           id,
           workspaceId,
-          title: await this.crypto.encryptPayload(title, titleAad(id)),
+          title: encTitle,
           titleKmsVersion: 1,
-          content: await this.crypto.encryptPayload(content, id),
+          content: encContent,
           icon,
           coverColor: undefined,
           isPinned: false,
           isFavorite: false,
-          orderIndex,
+          // New notes get a tail key immediately (empty anchors break drag math).
+          orderIndex: generateKeyBetween(await this.notes.getMaxOrderIndex(workspaceId), null),
         },
         opts,
-      );
-    } catch (err) {
-      // A failed create must also drop its carry — a leaked key goes stale and duplicates.
-      this.forgetTailMint(workspaceId, mintPromise);
-      throw err;
-    }
-    this.forgetTailMint(workspaceId, mintPromise);
+      ),
+    );
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
     return { ...rec, content, title };
-  }
-
-  /**
-   * Fractional key strictly after every existing note key, serialized per
-   * workspace. Chained mints derive from their predecessor in memory (the DB
-   * max is stale until the predecessor's INSERT lands).
-   */
-  private nextTailKey(workspaceId: string): Promise<string> {
-    const inFlight =
-      this.tailKeyMinting.get(workspaceId) ?? Promise.resolve(null as unknown as string);
-    const minted = inFlight.then(async (previous: string | null) => {
-      const base = previous ?? (await this.notes.getMaxOrderIndex(workspaceId));
-      return generateKeyBetween(base, null);
-    });
-    this.tailKeyMinting.set(workspaceId, minted);
-    minted.catch(() => {
-      // A failed mint must not poison later creates.
-      this.forgetTailMint(workspaceId, minted);
-    });
-    return minted;
-  }
-
-  /** The entry only bridges CONCURRENT creates; a cached key goes stale the
-   *  moment reorderNote advances the tail off-chain. */
-  private forgetTailMint(workspaceId: string, mint: Promise<string>): void {
-    if (this.tailKeyMinting.get(workspaceId) === mint) {
-      this.tailKeyMinting.delete(workspaceId);
-    }
   }
 
   async createNoteWithId(
@@ -242,25 +225,38 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const { title, workspaceId: moveTo, ...rest } = updates;
     const recUpdates: Partial<NoteRecord> = { ...rest };
-    const before = await (moveTo !== undefined
-      ? this.notes.getNoteById(id)
-      : Promise.resolve(null));
     if (title !== undefined) {
       recUpdates.title = await this.crypto.encryptPayload(title, titleAad(id));
       recUpdates.titleKmsVersion = 1;
     }
     if (moveTo !== undefined) (recUpdates as { workspaceId?: string }).workspaceId = moveTo;
-    const updated = await this.notes.updateNote(id, recUpdates);
-    if (recUpdates.orderIndex !== undefined) {
-      // An external orderIndex write invalidates any cached tail mint.
-      this.tailKeyMinting.delete(updated.workspaceId);
-    }
-    if (before && moveTo !== undefined && before.workspaceId !== moveTo) {
-      // A moved note keeps its key in BOTH workspaces' key spaces.
-      this.tailKeyMinting.delete(before.workspaceId);
-      this.tailKeyMinting.delete(moveTo);
-    }
+    const updated = await this.updateNoteOrdered(id, recUpdates, moveTo);
     return this.toNote(updated);
+  }
+
+  // A workspace move or an explicit key write changes a workspace's live key
+  // set and must be ordered against concurrent mints.
+  private async updateNoteOrdered(
+    id: string,
+    recUpdates: Partial<NoteRecord>,
+    moveTo: string | undefined,
+  ): Promise<NoteRecord> {
+    if (moveTo === undefined && recUpdates.orderIndex === undefined) {
+      return this.notes.updateNote(id, recUpdates);
+    }
+    const before = await this.notes.getNoteById(id);
+    if (!before) throw new NotFoundError("Note", id);
+    if (moveTo !== undefined && before.workspaceId !== moveTo) {
+      // The source key could collide with a destination key — re-key at the
+      // destination tail (a moved note lands at the end of its new list).
+      return this.enqueueOrderWrite(moveTo, async () =>
+        this.notes.updateNote(id, {
+          ...recUpdates,
+          orderIndex: generateKeyBetween(await this.notes.getMaxOrderIndex(moveTo), null),
+        }),
+      );
+    }
+    return this.enqueueOrderWrite(before.workspaceId, () => this.notes.updateNote(id, recUpdates));
   }
 
   /**
@@ -273,26 +269,25 @@ export class NoteService implements INoteService {
     const target = await this.getNote(targetId);
     if (!target) throw new NotFoundError("Note", targetId);
 
-    const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) =>
-      cmpOrderIndex(a.orderIndex, b.orderIndex),
-    );
-    const others = siblings.filter((n) => n.id !== id);
-    const targetIndex = others.findIndex((n) => n.id === targetId);
-    if (targetIndex === -1) throw new NotFoundError("Note", targetId);
+    await this.enqueueOrderWrite(target.workspaceId, async () => {
+      const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) =>
+        cmpOrderIndex(a.orderIndex, b.orderIndex),
+      );
+      const others = siblings.filter((n) => n.id !== id);
+      const targetIndex = others.findIndex((n) => n.id === targetId);
+      if (targetIndex === -1) throw new NotFoundError("Note", targetId);
 
-    const insertAt = position === "before" ? targetIndex : targetIndex + 1;
-    // No neighbor = head (null anchor); empty key = after every real key; real key = itself.
-    const realKeys = others.map((n) => n.orderIndex).filter((k): k is string => Boolean(k));
-    const prev = others[insertAt - 1];
-    const before =
-      prev === undefined
-        ? null
-        : prev.orderIndex || (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
-    const after = others[insertAt]?.orderIndex ?? null;
-    await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
-    // This write advances the key space OFF the mint chain — drop any
-    // cached tail key so the next create rescans the true max.
-    this.tailKeyMinting.delete(target.workspaceId);
+      const insertAt = position === "before" ? targetIndex : targetIndex + 1;
+      // No neighbor = head (null anchor); empty key = after every real key; real key = itself.
+      const realKeys = others.map((n) => n.orderIndex).filter((k): k is string => Boolean(k));
+      const prev = others[insertAt - 1];
+      const before =
+        prev === undefined
+          ? null
+          : prev.orderIndex || (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
+      const after = others[insertAt]?.orderIndex ?? null;
+      await this.notes.updateNote(id, { orderIndex: generateKeyBetween(before, after) });
+    });
   }
 
   async updateContent(id: string, content: string): Promise<Note> {
@@ -308,20 +303,20 @@ export class NoteService implements INoteService {
     this.assertUnlocked();
     const sources = await this.links.backlinksOf(id);
     const records = await this.notes.getMetaByIds(sources);
-    return Promise.all(records.map((rec) => this.toMeta(rec)));
+    return this.degradeAll(records.map((rec) => this.toMeta(rec)));
   }
 
   async outgoingLinksOf(id: string): Promise<NoteMeta[]> {
     this.assertUnlocked();
     const targets = await this.links.outgoingLinksOf(id);
     const records = await this.notes.getMetaByIds(targets);
-    return Promise.all(records.map((rec) => this.toMeta(rec)));
+    return this.degradeAll(records.map((rec) => this.toMeta(rec)));
   }
 
   async getLinkTargets(ids: string[]): Promise<NoteMeta[]> {
     this.assertUnlocked();
     const records = await this.notes.getMetaByIds(ids);
-    return Promise.all(records.map((rec) => this.toMeta(rec)));
+    return this.degradeAll(records.map((rec) => this.toMeta(rec)));
   }
 
   async deleteNote(id: string): Promise<void> {
@@ -349,22 +344,30 @@ export class NoteService implements INoteService {
 
   async trashNote(id: string): Promise<void> {
     this.assertUnlocked();
-    await this.notes.setDeleted(id, Date.now());
+    await this.setDeletedOrdered(id, Date.now());
   }
 
   async restoreNote(id: string): Promise<void> {
     this.assertUnlocked();
-    const restored = await this.notes.getNoteById(id);
-    await this.notes.setDeleted(id, null);
-    // A restored note re-enters getMaxOrderIndex's live filter with its old
-    // key — possibly above any cached tail mint.
-    if (restored) this.tailKeyMinting.delete(restored.workspaceId);
+    await this.setDeletedOrdered(id, null);
+  }
+
+  // A trashed note leaves the live key set (and a restored one rejoins with
+  // its old key): unordered, a concurrent create could mint that same key
+  // back into use — on restore the two notes would collide.
+  private async setDeletedOrdered(id: string, deletedAt: number | null): Promise<void> {
+    const rec = await this.notes.getNoteById(id);
+    if (rec) {
+      await this.enqueueOrderWrite(rec.workspaceId, () => this.notes.setDeleted(id, deletedAt));
+    } else {
+      await this.notes.setDeleted(id, deletedAt);
+    }
   }
 
   async listTrash(): Promise<Note[]> {
     this.assertUnlocked();
     const records = await this.notes.listTrashed();
-    return Promise.all(
+    return this.degradeAll(
       records.map(async (rec) => ({
         ...rec,
         title: await this.decryptTitle(rec),

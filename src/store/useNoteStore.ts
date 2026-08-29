@@ -83,6 +83,8 @@ export const useNoteStore = create<NoteState>((set, get) => {
     }
   };
 
+  let fetchSeq = 0;
+
   return {
     notes: [],
     trashedNotes: [],
@@ -97,8 +99,12 @@ export const useNoteStore = create<NoteState>((set, get) => {
     },
 
     fetchNotes: async (workspaceId) => {
+      const seq = ++fetchSeq;
       const notes = await listAndRegister(workspaceId);
       if (!notes) return;
+      // A fetch superseded by a newer one (workspace switch) would swap in
+      // the old workspace's list.
+      if (seq !== fetchSeq) return;
       set((state) => ({
         notes,
         activeNoteId:
@@ -282,18 +288,24 @@ export const useNoteStore = create<NoteState>((set, get) => {
 
       try {
         await noteService.restoreNote(id);
-        const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
-        if (trashed && trashed.workspaceId === activeWorkspaceId) {
-          const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
-          blockSuiteEditorService.registerExistingNotes(
-            notes.map((n) => ({ id: n.id, title: n.title })),
-          );
-          set({ notes });
-        }
       } catch (err) {
         if (trashed) {
           set((state) => ({ trashedNotes: [trashed, ...state.trashedNotes] }));
         }
+        notifyError(err, { saveStatus: false });
+        return;
+      }
+      // The DB restore committed — a failed refresh must never roll a live
+      // note back into the Trash list.
+      const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (!trashed || trashed.workspaceId !== activeWorkspaceId) return;
+      try {
+        const notes = await noteService.listMetadataByWorkspace(activeWorkspaceId);
+        blockSuiteEditorService.registerExistingNotes(
+          notes.map((n) => ({ id: n.id, title: n.title })),
+        );
+        set({ notes });
+      } catch (err) {
         notifyError(err, { saveStatus: false });
       }
     },
@@ -354,7 +366,9 @@ vaultService.onLock(() => {
 
 blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
-  if (!activeWs) return;
+  // Rejecting (not returning) lets the editor drop the unpersistable doc and
+  // the markdown import count the file as failed.
+  if (!activeWs) throw new Error("No active workspace to persist a new doc into.");
   await noteService.createNoteWithId(activeWs, docId, title);
 
   await useNoteStore.getState().refreshNotesInPlace(activeWs);

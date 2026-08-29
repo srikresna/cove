@@ -52,8 +52,10 @@ export class SQLiteNoteRepository implements INoteRepository {
   async getMaxOrderIndex(workspaceId: string): Promise<string | null> {
     try {
       const db = await this.getDb();
+      // Deliberately includes soft-trashed rows: minting above only the live
+      // max would re-mint a trashed note's key, colliding on restore.
       const rows = await db.select<Array<{ orderIndex: string }>>(
-        "SELECT orderIndex FROM notes WHERE workspaceId = ? AND deletedAt IS NULL AND orderIndex != '' ORDER BY orderIndex DESC LIMIT 1",
+        "SELECT orderIndex FROM notes WHERE workspaceId = ? AND orderIndex != '' ORDER BY orderIndex DESC LIMIT 1",
         [workspaceId],
       );
       const row = rows[0];

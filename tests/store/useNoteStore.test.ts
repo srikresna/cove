@@ -7,6 +7,7 @@ const {
   updateMetadata,
   createNoteWithId,
   listMetadataByWorkspace,
+  restoreNote,
   invalidateNoteBacklinkScan,
   clearBacklinkScans,
   setDocTitle,
@@ -19,6 +20,7 @@ const {
   updateMetadata: vi.fn<(id: string, updates: Record<string, unknown>) => Promise<Note>>(),
   createNoteWithId: vi.fn<(wsId: string, id: string, title?: string) => Promise<Note>>(),
   listMetadataByWorkspace: vi.fn<(wsId: string) => Promise<Note[]>>(),
+  restoreNote: vi.fn<(id: string) => Promise<void>>(),
   invalidateNoteBacklinkScan: vi.fn<(noteId: string) => void>(),
   clearBacklinkScans: vi.fn<() => void>(),
   setDocTitle: vi.fn<(docId: string, title: string) => void>(),
@@ -43,6 +45,7 @@ vi.mock("@/di/container", () => ({
     updateMetadata,
     createNoteWithId,
     listMetadataByWorkspace,
+    restoreNote,
   },
   vaultService: {
     isUnlocked: () => vault.unlocked,
@@ -276,5 +279,100 @@ describe("useNoteStore — refreshNotesInPlace (peek-created docs)", () => {
     await useNoteStore.getState().refreshNotesInPlace("ws1");
 
     expect(useNoteStore.getState().activeNoteId).toBe("other");
+  });
+});
+
+describe("useNoteStore — fetchNotes staleness guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vault.unlocked = true;
+    useNoteStore.setState({
+      notes: [],
+      trashedNotes: [],
+      activeNoteId: null,
+      activeCoverImage: null,
+    });
+  });
+
+  it("drops a stale in-flight fetch superseded by a newer one", async () => {
+    let resolveWs1: (notes: Note[]) => void = () => {};
+    listMetadataByWorkspace.mockImplementation((wsId: string) =>
+      wsId === "ws1"
+        ? new Promise<Note[]>((r) => {
+            resolveWs1 = r;
+          })
+        : Promise.resolve([makeNote({ id: "ws2-note", workspaceId: "ws2" })]),
+    );
+
+    const slow = useNoteStore.getState().fetchNotes("ws1");
+    const fast = useNoteStore.getState().fetchNotes("ws2");
+    await fast;
+
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws2-note"]);
+
+    resolveWs1([makeNote({ id: "ws1-note", workspaceId: "ws1" })]);
+    await slow;
+
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toEqual(["ws2-note"]);
+  });
+});
+
+describe("useNoteStore — restoreNote", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vault.unlocked = true;
+    useNoteStore.setState({
+      notes: [makeNote({ id: "n1" })],
+      trashedNotes: [makeNote({ id: "t1", workspaceId: "ws1" })],
+      activeNoteId: "n1",
+      activeCoverImage: null,
+    });
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws1" });
+  });
+
+  it("returns the note to the trash list when the DB restore itself fails", async () => {
+    restoreNote.mockRejectedValue(new Error("db down"));
+
+    await useNoteStore.getState().restoreNote("t1");
+
+    expect(useNoteStore.getState().trashedNotes.map((n) => n.id)).toContain("t1");
+  });
+
+  it("never re-trashes a live note when only the follow-up refresh fails", async () => {
+    restoreNote.mockResolvedValue(undefined);
+    listMetadataByWorkspace.mockRejectedValue(new Error("refresh failed"));
+
+    await useNoteStore.getState().restoreNote("t1");
+
+    expect(useNoteStore.getState().trashedNotes.map((n) => n.id)).not.toContain("t1");
+  });
+
+  it("refreshes the notes list when the restored note is in the active workspace", async () => {
+    restoreNote.mockResolvedValue(undefined);
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "t1" }), makeNote({ id: "n1" })]);
+
+    await useNoteStore.getState().restoreNote("t1");
+
+    expect(useNoteStore.getState().notes.map((n) => n.id)).toContain("t1");
+  });
+});
+
+describe("useNoteStore — doc-created persistence failures", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vault.unlocked = true;
+  });
+
+  it("rejects when there is no active workspace (no silent ghost doc)", async () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: null });
+
+    await expect(handlers.docCreated?.("doc-x", "T")).rejects.toThrow();
+  });
+
+  it("rejects when the notes row cannot be created", async () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws1" });
+    createNoteWithId.mockRejectedValue(new Error("insert failed"));
+
+    await expect(handlers.docCreated?.("doc-x", "T")).rejects.toThrow("insert failed");
   });
 });

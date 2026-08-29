@@ -20,7 +20,7 @@ export class InMemoryNoteRepository implements INoteRepository {
   async getMaxOrderIndex(workspaceId: string): Promise<string | null> {
     let max: string | null = null;
     for (const note of this.notes) {
-      if (note.workspaceId !== workspaceId || note.deletedAt != null) continue;
+      if (note.workspaceId !== workspaceId) continue;
       const key = note.orderIndex ?? "";
       if (!key) continue;
       if (max === null || key > max) max = key;

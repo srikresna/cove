@@ -84,7 +84,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       workspace.meta.initialize();
       workspace.start();
 
-      workspace.meta.docMetaAdded.subscribe(async (docId: string) => {
+      workspace.meta.docMetaAdded.subscribe((docId: string) => {
         if (this.coveOwnedDocIds.has(docId)) return;
         this.coveOwnedDocIds.add(docId);
         const meta = workspace.meta.getDocMeta(docId);
@@ -92,10 +92,24 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
         const created = (async () => {
           try {
             await this.docCreatedHandler(docId, title);
-          } catch {}
+          } catch (err) {
+            // Without a notes row the in-memory doc could never save — drop it.
+            try {
+              workspace.removeDoc(docId);
+            } catch {}
+            this.coveOwnedDocIds.delete(docId);
+            this.knownTitles.delete(docId);
+            throw err;
+          }
         })();
         this.docCreatedPromises.set(docId, created);
-        void created.finally(() => this.docCreatedPromises.delete(docId));
+        // Successful entries are dropped; failed ones stay so late awaiters
+        // (markdown import) still see the rejection. The no-op rejection
+        // handler marks the fire-and-forget path as handled.
+        void created.then(
+          () => this.docCreatedPromises.delete(docId),
+          () => {},
+        );
       });
 
       this.workspace = workspace;

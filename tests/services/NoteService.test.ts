@@ -138,6 +138,90 @@ describe("NoteService", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it("concurrent reorder and create stay key-unique", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    const a = await service.createNote("ws-race", "A");
+    const b = await service.createNote("ws-race", "B");
+
+    await Promise.all([
+      service.reorderNote(a.id, b.id, "after"),
+      service.createNote("ws-race", "C"),
+    ]);
+
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-race")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("trashing then creating never re-mints the trashed note's key", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    const x = await service.createNote("ws-1", "X");
+
+    await service.trashNote(x.id);
+    const y = await service.createNote("ws-1", "Y");
+    await service.restoreNote(x.id);
+
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-1")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("moving a note to another workspace re-keys it at the destination tail", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
+    const src = await service.createNote("ws-1", "M");
+    const dst = await service.createNote("ws-2", "D");
+
+    const moved = await service.updateMetadata(src.id, { workspaceId: "ws-2" });
+
+    expect(moved.orderIndex).toBeDefined();
+    expect(moved.orderIndex).not.toBe(dst.orderIndex);
+    const keys = fakeRepo.notes
+      .filter((n) => n.workspaceId === "ws-2")
+      .map((n) => n.orderIndex ?? "");
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("a corrupt title degrades per note instead of failing the whole list", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+    fakeRepo.notes.push(
+      {
+        id: "good",
+        workspaceId: "ws-1",
+        title: `enc[${titleAad("good")}]:Good` as EncryptedPayload,
+        titleKmsVersion: 1,
+        content: enc(""),
+        isPinned: false,
+        isFavorite: false,
+        createdAt: 1000,
+        updatedAt: 2000,
+      },
+      {
+        id: "bad",
+        workspaceId: "ws-1",
+        title: enc("ciphertext-that-fails-its-aad-check"),
+        titleKmsVersion: 1,
+        content: enc(""),
+        isPinned: false,
+        isFavorite: false,
+        createdAt: 1000,
+        updatedAt: 2000,
+        deletedAt: 3000,
+      },
+    );
+
+    const notes = await service.listMetadataByWorkspace("ws-1");
+    expect(notes.map((n) => n.id)).toEqual(["good"]);
+
+    const trash = await service.listTrash();
+    expect(trash.map((n) => n.id)).toEqual([]);
+  });
+
   it("getNote, createNote, updateMetadata, updateContent, and deleteNote work as expected", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
