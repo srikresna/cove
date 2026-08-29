@@ -3,15 +3,25 @@ import { toPersistenceError } from "../errors/errorMappers";
 import type { ITagRepository, TagCount } from "./ITagRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
-function rowToTag(row: Record<string, unknown>): Tag {
+interface TagRow {
+  id: string;
+  workspaceId: string;
+  name: string;
+  color: string;
+  createdAt: number;
+}
+
+function rowToTag(row: TagRow): Tag {
   return {
-    id: String(row.id),
-    workspaceId: String(row.workspaceId),
-    name: String(row.name),
-    color: String(row.color),
-    createdAt: Number(row.createdAt),
+    id: row.id,
+    workspaceId: row.workspaceId,
+    name: row.name,
+    color: row.color,
+    createdAt: row.createdAt,
   };
 }
+
+const TAG_COLUMNS = "id, workspaceId, name, color, createdAt";
 
 export class SQLiteTagRepository implements ITagRepository {
   private getDb() {
@@ -21,8 +31,8 @@ export class SQLiteTagRepository implements ITagRepository {
   async listByWorkspace(workspaceId: string): Promise<Tag[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, color, createdAt FROM tags WHERE workspaceId = ? ORDER BY name COLLATE NOCASE",
+      const rows = await db.select<Array<TagRow>>(
+        `SELECT ${TAG_COLUMNS} FROM tags WHERE workspaceId = ? ORDER BY name COLLATE NOCASE`,
         [workspaceId],
       );
       return rows.map(rowToTag);
@@ -51,10 +61,9 @@ export class SQLiteTagRepository implements ITagRepository {
   async findById(tagId: string): Promise<Tag | null> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, color, createdAt FROM tags WHERE id = ?",
-        [tagId],
-      );
+      const rows = await db.select<Array<TagRow>>(`SELECT ${TAG_COLUMNS} FROM tags WHERE id = ?`, [
+        tagId,
+      ]);
       const row = rows[0];
       return row ? rowToTag(row) : null;
     } catch (err) {
@@ -65,8 +74,8 @@ export class SQLiteTagRepository implements ITagRepository {
   async findByName(workspaceId: string, name: string): Promise<Tag | null> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, color, createdAt FROM tags WHERE workspaceId = ? AND name = ? COLLATE NOCASE",
+      const rows = await db.select<Array<TagRow>>(
+        `SELECT ${TAG_COLUMNS} FROM tags WHERE workspaceId = ? AND name = ? COLLATE NOCASE`,
         [workspaceId, name],
       );
       const row = rows[0];
@@ -135,8 +144,8 @@ export class SQLiteTagRepository implements ITagRepository {
   async tagsForNote(noteId: string): Promise<Tag[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT t.id, t.workspaceId, t.name, t.color, t.createdAt FROM tags t JOIN note_tags nt ON nt.tagId = t.id WHERE nt.noteId = ? ORDER BY t.name COLLATE NOCASE",
+      const rows = await db.select<Array<TagRow>>(
+        `SELECT ${TAG_COLUMNS} FROM tags t JOIN note_tags nt ON nt.tagId = t.id WHERE nt.noteId = ? ORDER BY t.name COLLATE NOCASE`,
         [noteId],
       );
       return rows.map(rowToTag);

@@ -4,26 +4,35 @@ import { toPersistenceError } from "../errors/errorMappers";
 import type { IWorkspaceRepository } from "./IWorkspaceRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
+interface WorkspaceRow {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  description: string | null;
+  createdAt: number;
+}
+
 export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
   private getDb() {
     return SQLiteDatabase.getInstance();
   }
 
-  private mapRowToWorkspace(row: Record<string, unknown>): Workspace {
+  private mapRowToWorkspace(row: WorkspaceRow): Workspace {
     return {
-      id: String(row.id),
-      name: String(row.name),
-      emoji: String(row.emoji),
-      color: String(row.color),
-      description: row.description ? String(row.description) : undefined,
-      createdAt: Number(row.createdAt),
+      id: row.id,
+      name: row.name,
+      emoji: row.emoji,
+      color: row.color,
+      description: row.description ?? undefined,
+      createdAt: row.createdAt,
     };
   }
 
   async getAllWorkspaces(): Promise<Workspace[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
+      const rows = await db.select<Array<WorkspaceRow>>(
         "SELECT * FROM workspaces ORDER BY createdAt ASC",
       );
       return rows.map((row) => this.mapRowToWorkspace(row));
@@ -35,10 +44,9 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
   async getWorkspaceById(id: string): Promise<Workspace | null> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT * FROM workspaces WHERE id = ?",
-        [id],
-      );
+      const rows = await db.select<Array<WorkspaceRow>>("SELECT * FROM workspaces WHERE id = ?", [
+        id,
+      ]);
       if (!rows.length || !rows[0]) return null;
       return this.mapRowToWorkspace(rows[0]);
     } catch (err) {

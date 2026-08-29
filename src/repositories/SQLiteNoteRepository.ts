@@ -6,20 +6,73 @@ import { SQLiteDatabase } from "./SQLiteDatabase";
 
 const KMS_VERSION_DEK = 1;
 
+// The SELECT column list every list-shaped notes query must match. Kept next
+// to the row type it produces so a mapper field with no column fails loudly
+// instead of silently defaulting.
+const NOTE_META_COLUMNS =
+  "id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, createdAt, updatedAt";
+
+interface NoteRow {
+  id: string;
+  workspaceId: string;
+  title: string;
+  titleKmsVersion: number;
+  icon: string | null;
+  coverColor: string | null;
+  docMode: string | null;
+  edgelessTheme: string | null;
+  pageWidth: string | null;
+  isTemplate: number;
+  isPinned: number;
+  isFavorite: number;
+  orderIndex: string;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt?: number | null;
+  content?: string;
+  kmsVersion?: number;
+}
+
+const NOTE_ROW_KEYS = [
+  "id",
+  "workspaceId",
+  "title",
+  "titleKmsVersion",
+  "icon",
+  "coverColor",
+  "docMode",
+  "edgelessTheme",
+  "pageWidth",
+  "isTemplate",
+  "isPinned",
+  "isFavorite",
+  "orderIndex",
+  "createdAt",
+  "updatedAt",
+] as const satisfies ReadonlyArray<keyof NoteRow>;
+
 export class SQLiteNoteRepository implements INoteRepository {
   private getDb() {
     return SQLiteDatabase.getInstance();
   }
 
-  private mapRowToRecord(row: Record<string, unknown>): NoteRecord {
+  private mapRowToRecord(row: NoteRow): NoteRecord {
+    for (const key of NOTE_ROW_KEYS) {
+      if (!(key in row)) {
+        throw new PersistenceError(
+          "mapRowToRecord",
+          `notes SELECT is missing the mapped column: ${key}`,
+        );
+      }
+    }
     return {
-      id: String(row.id),
-      workspaceId: String(row.workspaceId),
-      title: String(row.title) as EncryptedPayload,
-      titleKmsVersion: Number(row.titleKmsVersion ?? 0),
-      content: (row.content != null ? String(row.content) : "") as EncryptedPayload,
-      icon: row.icon ? String(row.icon) : undefined,
-      coverColor: row.coverColor ? String(row.coverColor) : undefined,
+      id: row.id,
+      workspaceId: row.workspaceId,
+      title: row.title as EncryptedPayload,
+      titleKmsVersion: row.titleKmsVersion,
+      content: (row.content ?? "") as EncryptedPayload,
+      icon: row.icon ?? undefined,
+      coverColor: row.coverColor ?? undefined,
       docMode: row.docMode === "edgeless" ? "edgeless" : undefined,
       edgelessTheme:
         row.edgelessTheme === "light" || row.edgelessTheme === "dark"
@@ -29,18 +82,18 @@ export class SQLiteNoteRepository implements INoteRepository {
       isTemplate: Boolean(row.isTemplate),
       isPinned: Boolean(row.isPinned),
       isFavorite: Boolean(row.isFavorite),
-      orderIndex: row.orderIndex ? String(row.orderIndex) : undefined,
-      createdAt: Number(row.createdAt),
-      updatedAt: Number(row.updatedAt),
-      deletedAt: row.deletedAt != null ? Number(row.deletedAt) : undefined,
+      orderIndex: row.orderIndex ? row.orderIndex : undefined,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      deletedAt: row.deletedAt != null ? row.deletedAt : undefined,
     };
   }
 
   async getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
+      const rows = await db.select<Array<NoteRow>>(
+        `SELECT ${NOTE_META_COLUMNS} FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC`,
         [workspaceId],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -70,8 +123,8 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const placeholders = ids.map(() => "?").join(", ");
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        `SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
+      const rows = await db.select<Array<NoteRow>>(
+        `SELECT ${NOTE_META_COLUMNS} FROM notes WHERE id IN (${placeholders})`,
         ids,
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -83,10 +136,7 @@ export class SQLiteNoteRepository implements INoteRepository {
   async getNoteById(id: string): Promise<NoteRecord | null> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT * FROM notes WHERE id = ?",
-        [id],
-      );
+      const rows = await db.select<Array<NoteRow>>("SELECT * FROM notes WHERE id = ?", [id]);
       if (!rows.length || !rows[0]) return null;
       return this.mapRowToRecord(rows[0]);
     } catch (err) {
@@ -97,7 +147,7 @@ export class SQLiteNoteRepository implements INoteRepository {
   async findRecentForSearch(limit: number): Promise<NoteRecord[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
+      const rows = await db.select<Array<NoteRow>>(
         "SELECT * FROM notes WHERE deletedAt IS NULL ORDER BY updatedAt DESC LIMIT ?",
         [limit],
       );
@@ -114,11 +164,11 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = cursor
-        ? await db.select<Array<Record<string, unknown>>>(
+        ? await db.select<Array<NoteRow>>(
             "SELECT * FROM notes WHERE deletedAt IS NULL AND (updatedAt < ? OR (updatedAt = ? AND id < ?)) ORDER BY updatedAt DESC, id DESC LIMIT ?",
             [cursor.updatedAt, cursor.updatedAt, cursor.id, limit],
           )
-        : await db.select<Array<Record<string, unknown>>>(
+        : await db.select<Array<NoteRow>>(
             "SELECT * FROM notes WHERE deletedAt IS NULL ORDER BY updatedAt DESC, id DESC LIMIT ?",
             [limit],
           );
@@ -300,8 +350,8 @@ export class SQLiteNoteRepository implements INoteRepository {
   async listTrashed(): Promise<NoteRecord[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt, deletedAt, titleKmsVersion FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
+      const rows = await db.select<Array<NoteRow>>(
+        `SELECT ${NOTE_META_COLUMNS}, deletedAt FROM notes WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC`,
       );
       return rows.map((row) => this.mapRowToRecord(row));
     } catch (err) {

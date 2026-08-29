@@ -3,22 +3,36 @@ import { toPersistenceError } from "../errors/errorMappers";
 import type { IKmsRepository, KmsPatch, KmsRecord } from "./IKmsRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 
+interface KmsRow {
+  kdfVersion: number;
+  kdfAlg: string;
+  kdfParamsJson: string;
+  saltB64: string;
+  ivCounter: number;
+  wrappedDekLocalB64: string | null;
+  integrityMacB64: string;
+  migrationState: string;
+  migrationCursor: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 const SELECT_SQL =
   "SELECT kdfVersion, kdfAlg, kdfParamsJson, saltB64, ivCounter, wrappedDekLocalB64, integrityMacB64, migrationState, migrationCursor, createdAt, updatedAt FROM kms WHERE id = 1";
 
-function rowToRecord(row: Record<string, unknown>): KmsRecord {
+function rowToRecord(row: KmsRow): KmsRecord {
   return {
-    kdfVersion: Number(row.kdfVersion),
-    kdfAlg: String(row.kdfAlg),
-    kdfParamsJson: String(row.kdfParamsJson),
-    saltB64: String(row.saltB64),
-    ivCounter: Number(row.ivCounter),
-    wrappedDekLocalB64: row.wrappedDekLocalB64 != null ? String(row.wrappedDekLocalB64) : null,
-    integrityMacB64: String(row.integrityMacB64),
-    migrationState: String(row.migrationState) as KmsRecord["migrationState"],
-    migrationCursor: row.migrationCursor != null ? String(row.migrationCursor) : null,
-    createdAt: Number(row.createdAt),
-    updatedAt: Number(row.updatedAt),
+    kdfVersion: row.kdfVersion,
+    kdfAlg: row.kdfAlg,
+    kdfParamsJson: row.kdfParamsJson,
+    saltB64: row.saltB64,
+    ivCounter: row.ivCounter,
+    wrappedDekLocalB64: row.wrappedDekLocalB64,
+    integrityMacB64: row.integrityMacB64,
+    migrationState: row.migrationState as KmsRecord["migrationState"],
+    migrationCursor: row.migrationCursor,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -30,7 +44,7 @@ export class SQLiteKmsRepository implements IKmsRepository {
   async get(): Promise<KmsRecord | null> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(SELECT_SQL);
+      const rows = await db.select<Array<KmsRow>>(SELECT_SQL);
       if (!rows.length || !rows[0]) return null;
       return rowToRecord(rows[0]);
     } catch (err) {

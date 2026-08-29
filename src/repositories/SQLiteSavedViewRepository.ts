@@ -50,16 +50,27 @@ function decodeAllowIds(json: string): string[] {
   }
 }
 
-function rowToView(row: Record<string, unknown>): SavedView {
+interface SavedViewRow {
+  id: string;
+  workspaceId: string;
+  name: string;
+  rulesJson: string;
+  allowNoteIdsJson: string;
+  createdAt: number;
+}
+
+function rowToView(row: SavedViewRow): SavedView {
   return {
-    id: String(row.id),
-    workspaceId: String(row.workspaceId),
-    name: String(row.name),
-    rules: decodeRules(String(row.rulesJson ?? "[]")),
-    allowNoteIds: decodeAllowIds(String(row.allowNoteIdsJson ?? "[]")),
-    createdAt: Number(row.createdAt),
+    id: row.id,
+    workspaceId: row.workspaceId,
+    name: row.name,
+    rules: decodeRules(row.rulesJson ?? "[]"),
+    allowNoteIds: decodeAllowIds(row.allowNoteIdsJson ?? "[]"),
+    createdAt: row.createdAt,
   };
 }
+
+const VIEW_COLUMNS = "id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt";
 
 export class SQLiteSavedViewRepository implements ISavedViewRepository {
   private getDb() {
@@ -69,8 +80,8 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
   async listByWorkspace(workspaceId: string): Promise<SavedView[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt FROM saved_views WHERE workspaceId = ? ORDER BY createdAt, id",
+      const rows = await db.select<Array<SavedViewRow>>(
+        `SELECT ${VIEW_COLUMNS} FROM saved_views WHERE workspaceId = ? ORDER BY createdAt, id`,
         [workspaceId],
       );
       return rows.map(rowToView);
@@ -82,8 +93,8 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
   async listAll(): Promise<SavedView[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt FROM saved_views ORDER BY createdAt, id",
+      const rows = await db.select<Array<SavedViewRow>>(
+        `SELECT ${VIEW_COLUMNS} FROM saved_views ORDER BY createdAt, id`,
       );
       return rows.map(rowToView);
     } catch (err) {
@@ -94,8 +105,8 @@ export class SQLiteSavedViewRepository implements ISavedViewRepository {
   async findById(id: string): Promise<SavedView | null> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, name, rulesJson, allowNoteIdsJson, createdAt FROM saved_views WHERE id = ?",
+      const rows = await db.select<Array<SavedViewRow>>(
+        `SELECT ${VIEW_COLUMNS} FROM saved_views WHERE id = ?`,
         [id],
       );
       const row = rows[0];

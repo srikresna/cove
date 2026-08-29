@@ -22,19 +22,34 @@ function parseOptions(json: unknown): PropertyOption[] {
   }
 }
 
-function rowToDefinition(row: Record<string, unknown>): PropertyDefinition | null {
-  const type = String(row.type);
-  if (!isPropertyType(type)) return null;
-  const show = String(row.show ?? "");
+interface PropertyDefRow {
+  id: string;
+  name: string;
+  type: string;
+  optionsJson: string;
+  createdAt: number;
+  orderIndex: string;
+  show: string;
+  icon: string | null;
+}
+
+interface NotePropertyValueRow {
+  noteId: string;
+  propertyId: string;
+  valueJson: string;
+}
+
+function rowToDefinition(row: PropertyDefRow): PropertyDefinition | null {
+  if (!isPropertyType(row.type)) return null;
   return {
-    id: String(row.id),
-    name: String(row.name),
-    type,
+    id: row.id,
+    name: row.name,
+    type: row.type,
     options: parseOptions(row.optionsJson),
-    createdAt: Number(row.createdAt),
-    order: String(row.orderIndex ?? ""),
-    show: isPropertyVisibility(show) ? show : "always-show",
-    icon: row.icon != null ? String(row.icon) : null,
+    createdAt: row.createdAt,
+    order: row.orderIndex ?? "",
+    show: isPropertyVisibility(row.show) ? row.show : "always-show",
+    icon: row.icon,
   };
 }
 
@@ -46,7 +61,7 @@ export class SQLitePropertyRepository implements IPropertyRepository {
   async listDefinitions(): Promise<PropertyDefinition[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
+      const rows = await db.select<Array<PropertyDefRow>>(
         "SELECT id, name, type, optionsJson, createdAt, orderIndex, show, icon FROM property_defs ORDER BY orderIndex, createdAt, id",
       );
       return rows.map(rowToDefinition).filter((d): d is PropertyDefinition => d !== null);
@@ -174,15 +189,11 @@ export class SQLitePropertyRepository implements IPropertyRepository {
   async valuesForNote(noteId: string): Promise<NotePropertyRecord[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
+      const rows = await db.select<Array<NotePropertyValueRow>>(
         "SELECT noteId, propertyId, valueJson FROM note_properties WHERE noteId = ?",
         [noteId],
       );
-      return rows.map((row) => ({
-        noteId: String(row.noteId),
-        propertyId: String(row.propertyId),
-        valueJson: String(row.valueJson),
-      }));
+      return rows;
     } catch (err) {
       throw toPersistenceError("properties.valuesForNote", err);
     }
@@ -191,15 +202,11 @@ export class SQLitePropertyRepository implements IPropertyRepository {
   async valuesForPropertyAll(propertyId: string): Promise<NotePropertyRecord[]> {
     try {
       const db = await this.getDb();
-      const rows = await db.select<Array<Record<string, unknown>>>(
+      const rows = await db.select<Array<NotePropertyValueRow>>(
         "SELECT noteId, propertyId, valueJson FROM note_properties WHERE propertyId = ?",
         [propertyId],
       );
-      return rows.map((row) => ({
-        noteId: String(row.noteId),
-        propertyId: String(row.propertyId),
-        valueJson: String(row.valueJson),
-      }));
+      return rows;
     } catch (err) {
       throw toPersistenceError("properties.valuesForPropertyAll", err);
     }
