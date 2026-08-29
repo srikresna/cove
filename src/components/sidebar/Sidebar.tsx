@@ -108,8 +108,7 @@ export const Sidebar: React.FC = () => {
               </DropdownMenu>
             </div>
 
-            {/* AFFI NE pattern: search + new-page row, then flat nav links
-                (All docs -> Library, Journal -> Journals) above the
+            {/* Search + new-page row, then flat nav links above the
                 scrollable accordion area. */}
             <div className="flex items-center gap-1.5 px-3 pt-3">
               <button

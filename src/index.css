@@ -350,7 +350,6 @@ doc-title {
   overflow-x: hidden;
 }
 
-/* AFFI NE parity: number inputs never show native spinner arrows. */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;

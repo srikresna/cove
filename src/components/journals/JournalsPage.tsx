@@ -17,10 +17,8 @@ import { dayKey, MonthGrid } from "./MonthGrid";
 const keyOf = (timestamp: number): string => dayKey(new Date(timestamp));
 
 /**
- * The Journals page (AFFI NE /journals parity): a centered week strip with
- * a Today shortcut, the month grid with journal dots, and the selected
- * day's journals — existing entries open directly, several entries show the
- * conflict block, and an empty day offers the dashed create placeholder.
+ * The Journals page: week strip + Today shortcut, month grid with journal
+ * dots, and the selected day's journals (conflict block when several).
  */
 export const JournalsPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -104,8 +102,6 @@ export const JournalsPage: React.FC = () => {
             <h2 className="font-display text-2xl font-medium tracking-tight text-foreground">
               {MESSAGES.JOURNALS_PAGE_TITLE}
             </h2>
-            {/* AFFI NE hides the Today button when the selected day already
-                IS today. */}
             {!isToday && (
               <Button
                 variant="secondary"
@@ -143,8 +139,6 @@ export const JournalsPage: React.FC = () => {
             </p>
 
             {selectedJournals.length === 0 ? (
-              // AFFI NE placeholder spec: 200px dashed card, round 36px icon
-              // chip, tertiary copy, primary Create button.
               <div className="flex h-[200px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed text-center">
                 <span
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-muted"

@@ -203,11 +203,8 @@ export class PropertyService implements IPropertyService {
     const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
     if (!def) throw new NotFoundError("Property", definitionId);
     const hasOption = def.options.some((o) => o.id === optionId);
-    // Compute the whole sweep up front: select/status rows pointing at the
-    // option are removed, multiSelect rows drop the id (and are removed when
-    // nothing is left). Without the sweep, hide-when-empty rows keep
-    // rendering "Empty" with no way to clear them and is-empty filters
-    // disagree with the stored value.
+    // Sweep values referencing the option (select/status removed, multiSelect
+    // drops the id) — else hide-when-empty rows render "Empty" with no way to clear.
     const writes: OptionDeletionWrite[] = [];
     for (const record of await this.properties.valuesForPropertyAll(definitionId)) {
       const value = deserializePropertyValue(record.valueJson, def.type);

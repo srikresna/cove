@@ -1,9 +1,8 @@
 import type { PropertyDefinition, PropertyType } from "../property/Property";
 
 /**
- * Filter AST for note views (AFFI NE collection-rules equivalent, sized for
- * Cove's client-side evaluation). A view filter is a list of rules combined
- * with AND; tags participate as their own rule kind.
+ * Filter AST for note views: a list of rules combined with AND;
+ * tags participate as their own rule kind.
  */
 
 export type TextFilterOp = "contains" | "is" | "is-not" | "is-empty" | "is-not-empty";
@@ -180,11 +179,8 @@ export function isFilterKind(value: string): value is FilterRule["kind"] {
 }
 
 /**
- * A rule whose value has not been chosen yet (fresh from the "+ Filter"
- * menu: empty text/number/date, no options, no tags) is incomplete — it is
- * treated as inactive (matches everything) instead of blanking the list,
- * mirroring AFFI NE's rule rows that only start filtering once a value is
- * picked. Emptiness operators never need a value.
+ * A rule whose value has not been chosen yet is incomplete — treated as
+ * inactive (matches everything), not blanking the list. Emptiness ops need no value.
  */
 export function isRuleComplete(rule: FilterRule): boolean {
   const emptiness = rule.op === "is-empty" || rule.op === "is-not-empty";

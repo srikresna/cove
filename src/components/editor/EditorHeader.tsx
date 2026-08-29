@@ -93,7 +93,7 @@ export const NoteHeaderBody: React.FC<{
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Journal notes show a read-only localized date + Today/weekday pill instead
-  // of the editable raw YYYY-MM-DD title (AFFI NE journal-doc-title).
+  // of the editable raw YYYY-MM-DD title.
   const [journalDate, setJournalDate] = useState<number | null>(null);
   const propertyVersion = usePropertyStore((s) => s.version);
 

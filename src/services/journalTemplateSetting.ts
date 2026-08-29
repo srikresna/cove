@@ -1,7 +1,6 @@
 /**
- * Per-workspace journal template selection, stored in localStorage for now
- * (matches the phased plan; a workspace settings table can replace this
- * later without changing the callers).
+ * Per-workspace journal template selection, stored in localStorage for now;
+ * a workspace settings table can replace this later without changing callers.
  */
 const PREFIX = "cove-journal-template:";
 

@@ -126,10 +126,8 @@ export class NoteService implements INoteService {
     return hits;
   }
 
-  // Per-workspace in-flight tail-key minting: concurrent createNote calls
-  // (double-click) must not both read the same DB max and mint the SAME
-  // tail key — orderIndex has no UNIQUE constraint and duplicate keys
-  // permanently break drag gap math. The promise chain serializes mints.
+  // Concurrent createNote calls must not both read the same DB max and mint the
+  // same tail key (no UNIQUE constraint; duplicates break drag math). Serialized.
   private tailKeyMinting = new Map<string, Promise<string>>();
 
   async createNote(
@@ -141,12 +139,8 @@ export class NoteService implements INoteService {
   ): Promise<Note> {
     this.assertUnlocked();
     const id = makeNoteId();
-    // New notes get a TAIL fractional key immediately — empty keys would
-    // sink them at the sort's end anyway, and empty anchors break drag
-    // gap math (reorderNote). The mint promise is captured so the cache
-    // can be invalidated once THIS insert lands — the cached key must
-    // only serve genuinely concurrent mints, never a later create (a
-    // reorderNote tail drop can advance the max off-chain in between).
+    // New notes get a tail key immediately (empty anchors break drag math); the
+    // mint promise is captured so the cache is dropped once this insert lands.
     const mintPromise = this.nextTailKey(workspaceId);
     const orderIndex = await mintPromise;
     let rec: NoteRecord;
@@ -167,10 +161,7 @@ export class NoteService implements INoteService {
         opts,
       );
     } catch (err) {
-      // A failed create must also drop its carry: a leaked resolved key
-      // survives forget-on-insert and mint-catch alike, and a later
-      // restore/move can raise the true max past it without touching the
-      // chain — minting off the stale carry then duplicates a key.
+      // A failed create must also drop its carry — a leaked key goes stale and duplicates.
       this.forgetTailMint(workspaceId, mintPromise);
       throw err;
     }
@@ -180,16 +171,9 @@ export class NoteService implements INoteService {
   }
 
   /**
-   * A fractional key strictly after every existing note key (custom sort
-   * tail). Serialized per workspace. A CHAINED mint derives from its
-   * predecessor's resolved key IN MEMORY — the predecessor's INSERT runs
-   * in createNote's body after its mint settles, so the DB max is still
-   * stale during exactly the window the chain bridges, and re-querying
-   * would mint the SAME key (the deterministic increment of an identical
-   * max). Only a mint with no in-flight predecessor consults the DB (a
-   * single-row plaintext query — no decryption, no O(N) metadata scan).
-   * Off-chain key writes (reorderNote, updateMetadata) invalidate the
-   * entry, so a cached predecessor can never be stale.
+   * Fractional key strictly after every existing note key, serialized per
+   * workspace. Chained mints derive from their predecessor in memory (the DB
+   * max is stale until the predecessor's INSERT lands).
    */
   private nextTailKey(workspaceId: string): Promise<string> {
     const inFlight =
@@ -200,15 +184,14 @@ export class NoteService implements INoteService {
     });
     this.tailKeyMinting.set(workspaceId, minted);
     minted.catch(() => {
-      // A failed mint must not poison the chain for later creates.
+      // A failed mint must not poison later creates.
       this.forgetTailMint(workspaceId, minted);
     });
     return minted;
   }
 
-  /** Drop a settled mint from the cache — the entry only exists to bridge
-   *  CONCURRENT creates; a cached key surviving past its insert goes stale
-   *  the moment reorderNote advances the tail off-chain. */
+  /** The entry only bridges CONCURRENT creates; a cached key goes stale the
+   *  moment reorderNote advances the tail off-chain. */
   private forgetTailMint(workspaceId: string, mint: Promise<string>): void {
     if (this.tailKeyMinting.get(workspaceId) === mint) {
       this.tailKeyMinting.delete(workspaceId);
@@ -281,10 +264,8 @@ export class NoteService implements INoteService {
   }
 
   /**
-   * Manual reorder for the Library's custom sort: computes the fractional
-   * key between the drop target's neighbors (with the dragged note removed
-   * from the sequence first, so it can never become its own neighbor and
-   * collapse the gap onto a duplicate key).
+   * Manual reorder: computes the fractional key between the drop target's
+   * neighbors, with the dragged note removed first (never its own neighbor).
    */
   async reorderNote(id: string, targetId: string, position: "before" | "after"): Promise<void> {
     this.assertUnlocked();
@@ -300,14 +281,7 @@ export class NoteService implements INoteService {
     if (targetIndex === -1) throw new NotFoundError("Note", targetId);
 
     const insertAt = position === "before" ? targetIndex : targetIndex + 1;
-    // Anchor math distinguishes THREE lower-neighbor states:
-    //  - no neighbor (insertAt === 0, a true head drop) → null anchor, so
-    //    generateKeyBetween(null, firstKey) mints a correct head key;
-    //  - neighbor with an EMPTY key (legacy stray; empty means "after every
-    //    real key") → substitute the largest real key, or the null-anchor
-    //    collapse would mint the SMALLEST key ("a0") and teleport the note
-    //    to the top, duplicating the oldest seed;
-    //  - neighbor with a real key → use it.
+    // No neighbor = head (null anchor); empty key = after every real key; real key = itself.
     const realKeys = others.map((n) => n.orderIndex).filter((k): k is string => Boolean(k));
     const prev = others[insertAt - 1];
     const before =

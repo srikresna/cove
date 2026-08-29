@@ -7,12 +7,9 @@ import { useUIStore } from "../store/useUIStore";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 
 /**
- * The single journal navigation helper (AFFI NE repeats this ternary in four
- * places): ensure-or-create the journal note for a date, refresh both stores,
- * then open it. A same-id re-select (clicking Today on today's journal, or
- * the already-highlighted day chip) skips setActiveNoteId — it would null
- * activeCoverImage with no effect to reload it — but still returns the main
- * area to the editor page.
+ * Ensure-or-create the journal note for a date, refresh stores, open it.
+ * A same-id re-select skips setActiveNoteId (it would null activeCoverImage)
+ * but still returns the main area to the editor page.
  */
 export function useOpenJournal(): (timestamp: number) => void {
   const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);

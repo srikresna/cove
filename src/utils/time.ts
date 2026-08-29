@@ -10,7 +10,6 @@ function localStartOfDay(t: number): number {
 }
 
 export function formatRelativeDay(timestamp: number, now = Date.now()): string {
-  // AFFI NE caps relativity at one day: today/yesterday, then absolute date.
   const days = Math.round((localStartOfDay(now) - localStartOfDay(timestamp)) / DAY_MS);
   if (days <= 0) return MESSAGES.TIME_TODAY;
   if (days === 1) return MESSAGES.TIME_YESTERDAY;
@@ -22,7 +21,6 @@ export function formatRelativeDay(timestamp: number, now = Date.now()): string {
 }
 
 export function formatFullTimestamp(timestamp: number): string {
-  // AFFI NE's full tooltip is minute-accurate (no seconds).
   return new Intl.DateTimeFormat(APP_LOCALE, {
     month: "short",
     day: "numeric",

@@ -2,9 +2,8 @@ import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Tracks an element's content-box width via ResizeObserver — used by the
- * journal topbar to hide affordances at AFFI NE's container thresholds
- * (Today < 300px, TemplateMark < 400px).
+ * Tracks an element's content-box width via ResizeObserver. The journal
+ * topbar uses it to hide affordances (Today < 300px, TemplateMark < 400px).
  */
 export function useElementWidth<T extends HTMLElement>(): [RefObject<T>, number] {
   const ref = useRef<T>(null);

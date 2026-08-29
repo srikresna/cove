@@ -241,9 +241,8 @@ const RuleChip: React.FC<{
 };
 
 /**
- * The rule-chip editor inside the Library filter area (AFFI NE Filters
- * row). Save/Cancel live in the surrounding area (LibraryPage) — this bar
- * only composes and edits rules.
+ * The rule-chip editor inside the Library filter area. Save/Cancel live in
+ * the surrounding area (LibraryPage) — this bar only composes and edits rules.
  */
 export const FilterBar: React.FC<{
   /** Controlled mode (collection editor): edit an explicit rules array. */

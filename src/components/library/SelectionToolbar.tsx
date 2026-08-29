@@ -4,8 +4,8 @@ import { MESSAGES } from "../../constants/messages";
 import { Button } from "../ui/button";
 
 /**
- * AFFI NE ListFloatingToolbar equivalent: a floating pill at the bottom of
- * the Library while notes are selected, with the count and bulk actions.
+ * A floating pill at the bottom of the Library while notes are selected,
+ * with the count and bulk actions.
  */
 export const SelectionToolbar: React.FC<{
   count: number;

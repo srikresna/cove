@@ -301,9 +301,7 @@ export class SQLiteDatabase {
             sql: "ALTER TABLE property_defs ADD COLUMN show TEXT NOT NULL DEFAULT 'always-show'",
           });
         }
-        // Recompute every key from creation order (not only unbackfilled rows):
-        // the whole step is data-idempotent, so a database left half-migrated
-        // by an interrupted earlier attempt heals on the next run.
+        // Recompute every key (idempotent): a half-migrated database heals on the next run.
         const rows = await db.select<Array<{ id: string }>>(
           "SELECT id FROM property_defs ORDER BY createdAt, id",
         );
@@ -326,9 +324,8 @@ export class SQLiteDatabase {
     if (version < 15) {
       const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
       if (propCols.length > 0) {
-        // Built-in Info rows become system property definitions: orderable and
-        // hideable like any other row, but rename/delete are guarded in the
-        // service layer and their values stay derived (tags service, note fields).
+        // Built-in Info rows become system property defs: orderable/hideable,
+        // but rename/delete are guarded in the service layer and values stay derived.
         const seed = [
           ["system:tags", "Tags", "tags"],
           ["system:workspace", "Workspace", "workspace"],
@@ -336,8 +333,7 @@ export class SQLiteDatabase {
           ["system:updated", "Updated", "updated"],
         ] as const;
         const statements: SqlStatement[] = [
-          // A v14 user could legally have created a custom property named
-          // "Tags" etc.; keep the name-uniqueness invariant intact.
+          // A v14 user could already own a custom "Tags"; keep names unique.
           {
             sql: "UPDATE property_defs SET name = name || ' (custom)' WHERE id NOT LIKE 'system:%' AND lower(name) IN ('tags','workspace','created','updated')",
           },
@@ -346,10 +342,8 @@ export class SQLiteDatabase {
             params: [id, name, type],
           })),
         ];
-        // Build the full ordering in code: the seed rows above are only queued
-        // for the transaction, so a SELECT could never see them yet. Custom rows
-        // are ordered by their existing orderIndex to preserve any drag
-        // arrangement made on v14 (createdAt is only a tiebreaker).
+        // Ordering is built in code (queued seed rows aren't visible to SELECT yet);
+        // custom rows keep their v14 drag order (createdAt only tiebreaks).
         const customRows = await db.select<Array<{ id: string }>>(
           "SELECT id FROM property_defs WHERE id NOT LIKE 'system:%' ORDER BY orderIndex, createdAt, id",
         );
@@ -373,17 +367,9 @@ export class SQLiteDatabase {
     if (version < 16) {
       const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
       if (propCols.length > 0) {
-        // Seed the journal row after the derived system rows: it is a date
-        // property whose value lives in note_properties (local-midnight
-        // timestamp), seeded hidden-until-set so only journal notes show it.
-        //
-        // Rows are fully re-keyed in code (v15 pattern): an interim build of
-        // v15 seeded system rows with orderIndex '' and never backfilled them,
-        // and fractional-indexing throws on empty keys - generateKeyBetween
-        // (null, '') wedged every later launch inside migrate(). Recomputing
-        // all keys here heals such databases and is a no-op rearrangement for
-        // healthy ones, preserving each row's current relative order ('' rows
-        // sort first under BINARY collation, so they heal at the head).
+        // Seeds the journal row (a date property, hidden-until-set) after
+        // system:updated, then re-keys every row: generateKeyBetween throws on
+        // '' keys, so half-migrated databases heal ('' rows sort first).
         const existing = await db.select<Array<{ id: string }>>(
           "SELECT id FROM property_defs ORDER BY (CASE WHEN orderIndex = '' THEN 0 ELSE 1 END), orderIndex, createdAt, id",
         );
@@ -431,8 +417,7 @@ export class SQLiteDatabase {
     }
 
     if (version < 18) {
-      // Per-doc behaviors live on the notes row (like AFFI NE's dedicated
-      // docProperties columns): edgeless theme, page width, template flag.
+      // Per-doc behaviors live on the notes row: edgeless theme, page width, template flag.
       const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
       const statements: SqlStatement[] = [];
       if (noteCols.length > 0) {
@@ -455,9 +440,7 @@ export class SQLiteDatabase {
     if (version < 19) {
       const propCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(property_defs)");
       if (propCols.length > 0) {
-        // Seed the four behavior rows after system:journal (v16 re-key
-        // pattern: name-collision guard, full recompute with the seeds
-        // placed right after the journal row).
+        // Seed the four behavior rows after system:journal; full re-key with a name-collision guard.
         const seed = [
           ["system:doc-mode", "Doc mode", "always-show"],
           ["system:page-width", "Page width", "always-show"],
@@ -502,11 +485,9 @@ export class SQLiteDatabase {
     }
 
     if (version < 20) {
-      // Tags become workspace-scoped: the tags table is rebuilt with a
-      // workspaceId column and a per-workspace name unique constraint
-      // (replacing the global one). Tags used in several workspaces are
-      // duplicated per workspace and their note_tags rows remapped; orphan
-      // tags land in the first workspace.
+      // Tags become workspace-scoped: rebuilt with workspaceId + per-workspace
+      // name uniqueness; multi-workspace tags duplicated and remapped; orphans
+      // land in the first workspace.
       const tagCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(tags)");
       if (tagCols.length > 0 && !tagCols.some((c) => c.name === "workspaceId")) {
         const workspaces = await db.select<Array<{ id: string }>>(
@@ -516,13 +497,9 @@ export class SQLiteDatabase {
         const oldTags = await db.select<
           Array<{ id: string; name: string; color: string; createdAt: number }>
         >("SELECT id, name, color, createdAt FROM tags");
-        // The junction is staged WITHOUT any FK: a tagId FK to the old tags
-        // table both fails the cross-workspace remap UPDATE below (new ids
-        // don't exist in the old table yet) and cascade-wipes every staged
-        // row when DROP TABLE tags runs its implicit DELETE; a noteId FK
-        // would abort the unguarded staging copy on orphan rows from
-        // FK-off-era edits. The full FK set is added to the final table only
-        // after the new tags table is in place and populated.
+        // The junction is staged WITHOUT FKs: a tagId FK to the old tags table
+        // would fail the remap UPDATE and cascade-wipe on DROP TABLE; the full
+        // FK set is added only after the rebuilt tables are in place.
         const statements: SqlStatement[] = [
           {
             sql: "CREATE TABLE tags_v20 (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL, createdAt INTEGER NOT NULL, UNIQUE(workspaceId, name))",
@@ -565,10 +542,7 @@ export class SQLiteDatabase {
           { sql: "DROP TABLE note_tags" },
           { sql: "DROP TABLE tags" },
           { sql: "ALTER TABLE tags_v20 RENAME TO tags" },
-          // Final junction with the complete FK set, now resolved against
-          // the rebuilt tags table. The IN guards drop junction rows whose
-          // noteId or tagId no longer exists (possible only if FK
-          // enforcement was off earlier in this database's life).
+          // Final junction with full FKs against the rebuilt tables; the IN guards drop orphaned rows.
           {
             sql: "CREATE TABLE note_tags_v20 (noteId TEXT NOT NULL, tagId TEXT NOT NULL, PRIMARY KEY (noteId, tagId), FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE, FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE)",
           },
@@ -586,7 +560,7 @@ export class SQLiteDatabase {
     }
 
     if (version < 21) {
-      // Saved views (AFFI NE collections): named filter-rule sets per workspace.
+      // Saved views: named filter-rule sets per workspace.
       await db.execute(
         "CREATE TABLE IF NOT EXISTS saved_views (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, name TEXT NOT NULL, rulesJson TEXT NOT NULL, createdAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
       );
@@ -594,15 +568,9 @@ export class SQLiteDatabase {
     }
 
     if (version < 22) {
-      // Saved views created before the completeness gate could persist rules
-      // without values. POSITIVE value-less rules (select is [], tags
-      // has-any-of [], number/date without a value) matched NOTHING under
-      // the old strict evaluation but would match EVERYTHING now that
-      // value-less rules are inactive — drop them, and delete views left
-      // with no complete rule. NEGATIVE value-less rules (is-not [],
-      // has-none-of [], has-all-of [], text is-not "") matched EVERYTHING
-      // back then and the new gate preserves exactly that — their views must
-      // survive as match-all (empty rule list), not be deleted.
+      // Value-less rules persisted by old views: positive ops matched nothing
+      // before but would now match everything (inactive) — drop them; negative
+      // ops matched everything — keep their views as match-all.
       const viewRows = await db.select<Array<{ id: string; rulesJson: string }>>(
         "SELECT id, rulesJson FROM saved_views",
       );
@@ -681,16 +649,13 @@ export class SQLiteDatabase {
     }
 
     if (version < 23) {
-      // Manual note ordering for the Library's "custom" sort: a fractional
-      // index column, seeded from the current createdAt order (oldest first,
-      // so updated-desc lists look unchanged until the user drags).
+      // v23: manual library ordering — notes.orderIndex fractional keys
+      // seeded from createdAt order (oldest first, so lists look unchanged).
       const noteCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
       const hasColumn = noteCols.some((c) => c.name === "orderIndex");
       const statements: SqlStatement[] = [];
       if (!hasColumn) {
-        // Apply the ALTER immediately (v8/v9/v17 pattern) — the seed check
-        // below SELECTs the column, which the v14-style queued ALTER would
-        // brick on ("no such column") since runTransaction has not run yet.
+        // ALTER runs immediately: the SELECT below needs the column before the transaction runs.
         await db.execute("ALTER TABLE notes ADD COLUMN orderIndex TEXT NOT NULL DEFAULT ''");
       }
       const noteRows = await db.select<Array<{ id: string; orderIndex: string }>>(
@@ -712,8 +677,7 @@ export class SQLiteDatabase {
     }
 
     if (version < 24) {
-      // Collections gain a manual allow-list alongside their rules
-      // (AFFI NE "manually add docs OR match through rules").
+      // Collections gain a manual allow-list alongside their rules.
       const viewCols = await db.select<Array<{ name: string }>>("PRAGMA table_info(saved_views)");
       if (!viewCols.some((c) => c.name === "allowNoteIdsJson")) {
         await db.execute(
@@ -725,9 +689,8 @@ export class SQLiteDatabase {
   }
 
   /**
-   * Old-evaluator semantics for a value-less rule: negative operators were
-   * vacuously TRUE for every note (is-not [] / has-none-of [] / has-all-of
-   * [] / text is-not ""), positive operators matched nothing.
+   * Old-evaluator semantics for a value-less rule: negative ops were vacuously
+   * TRUE for every note, positive ops matched nothing.
    */
   private static vacuousRuleWasMatchAll(rule: Record<string, unknown>, op: string): boolean {
     switch (rule.kind) {

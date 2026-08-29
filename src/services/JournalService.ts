@@ -22,7 +22,7 @@ const localMidnight = (timestamp: number): number => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
 
-/** Daily-note title, matching AFFiNE's journal naming. */
+/** Daily-note title: YYYY-MM-DD. */
 export const journalTitleFor = (timestamp: number): string => {
   const d = new Date(timestamp);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

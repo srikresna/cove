@@ -17,8 +17,8 @@ import {
 } from "../ui/dropdown-menu";
 
 /**
- * The Tags directory (AFFI NE /tag equivalent): every workspace tag with
- * rename/recolor/delete management; clicking a tag filters the Docs list.
+ * The Tags directory: every workspace tag with rename/recolor/delete
+ * management; clicking a tag filters the Docs list.
  */
 export const TagsTab: React.FC<{ onOpenTag: (tagId: string) => void }> = ({ onOpenTag }) => {
   const tags = useTagStore((s) => s.tags);

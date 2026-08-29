@@ -13,11 +13,8 @@ function normalizeViewName(name: string): string {
 }
 
 /**
- * Semantics of a rule in the POST-deletion universe (its property/option
- * gone, so no note can carry the referenced value): `is-not X` and
- * `is-empty` are vacuously true for every note (a nonexistent property is
- * empty on every note), `checkbox is false` is true (a missing value reads
- * as unchecked); positive operators and is-not-empty match nothing.
+ * Post-deletion semantics (property/option gone, no note can carry the value):
+ * is-not/is-empty and checkbox-is-false are vacuously true; positive ops match nothing.
  */
 function droppedRuleMatchesAllPostDelete(rule: FilterRule): boolean {
   switch (rule.kind) {
@@ -129,21 +126,9 @@ export class SavedViewService implements ISavedViewService {
   }
 
   /**
-   * Shared prune engine: rewriteRule maps each rule to its replacement or a
-   * drop (classified by its post-deletion match semantics). Computes every
-   * view's outcome FIRST, then applies all rewrites + deletions in ONE
-   * transaction, so an interrupted prune can never land on some views but
-   * not others. Returns the deleted view ids.
-   *
-   * Keep-vs-delete when no complete rule survives: the view's fate follows
-   * the rules that were ACTIVE before the prune. If every active rule is
-   * vacuously match-all in the post-deletion universe (negative operators),
-   * the view has been showing everything all along and is kept with `[]`
-   * rules (identical match-all under the completeness gate). Otherwise the
-   * view filtered something real that no note can carry anymore and is
-   * deleted. Inactive (incomplete) rules were already no-ops and never
-   * influence the decision. Surviving views are persisted with only their
-   * complete rules — the shape createView accepts.
+   * Shared prune engine: computes every view's outcome first, then applies
+   * all rewrites + deletions in one transaction. A view left with no complete
+   * rule is kept with [] iff it was match-all before the prune, else deleted.
    */
   private async applyViewPrune(rewriteRule: (rule: FilterRule) => RuleRewrite): Promise<string[]> {
     const updates: Array<{ id: string; rulesJson: string }> = [];
@@ -180,11 +165,8 @@ export class SavedViewService implements ISavedViewService {
   }
 
   /**
-   * Removes a deleted select/multiSelect option from every saved view's
-   * rules (property defs are global, so views in all workspaces can
-   * reference them). Rules left with no option under a value-requiring op
-   * are dropped; views left with no complete rule are handled per the
-   * applyViewPrune policy. Returns the deleted view ids.
+   * Removes a deleted select/multiSelect option from every view's rules
+   * (defs are global across workspaces). Returns the deleted view ids.
    */
   pruneOption(definitionId: string, optionId: string): Promise<string[]> {
     return this.applyViewPrune((rule) => {
@@ -203,11 +185,7 @@ export class SavedViewService implements ISavedViewService {
     });
   }
 
-  /**
-   * Removes every rule referencing a deleted property definition (any
-   * kind), with the same view lifecycle policy as pruneOption. Returns the
-   * deleted view ids.
-   */
+  /** Removes every rule referencing a deleted property definition. */
   pruneProperty(definitionId: string): Promise<string[]> {
     return this.applyViewPrune((rule) => {
       if (ruleHasPropertyId(rule) && rule.propertyId === definitionId) {
@@ -218,16 +196,10 @@ export class SavedViewService implements ISavedViewService {
   }
 
   /**
-   * Startup self-heal: drops saved-view rules referencing property defs or
-   * option ids that no longer exist (stranded by an interrupted prune or by
-   * deletions from older builds). Idempotent; rewrites land in one
-   * transaction. Returns the deleted view ids so callers can reconcile
-   * active-view state.
-   *
-   * Kinds are narrowed explicitly: the SQLite loader stamps EVERY decoded
-   * rule with a propertyId key (defaulting to ""), so `in`-checks are
-   * meaningless on loaded rules — tags/journal/template rules carry no
-   * property and must pass through untouched.
+   * Startup self-heal: drops rules referencing dead defs/options (idempotent,
+   * one transaction). Kinds are narrowed explicitly because the SQLite loader
+   * stamps every decoded rule with a propertyId ("") — `in`-checks are
+   * meaningless on loaded rules.
    */
   async healRules(liveDefs: PropertyDefinition[]): Promise<string[]> {
     const liveDefIds = new Set(liveDefs.map((d) => d.id));

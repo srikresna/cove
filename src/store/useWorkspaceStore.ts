@@ -7,10 +7,8 @@ import { useUIStore } from "./useUIStore";
 import { useViewStore } from "./useViewStore";
 
 /**
- * Tag filters and saved-view rules are workspace-scoped (tag ids and property
- * ids belong to one workspace). Whenever the active workspace actually
- * changes, drop them so the previous workspace's filters never leak into the
- * new one's note list.
+ * Tag filters and saved-view rules are workspace-scoped; drop them whenever
+ * the active workspace changes so the old workspace's filters never leak.
  */
 function resetWorkspaceScopedFilters(): void {
   useTagStore.setState({ activeTagId: null, taggedNoteIds: null });

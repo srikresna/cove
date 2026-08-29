@@ -1,11 +1,7 @@
 import { create } from "zustand";
 
 interface PropertyState {
-  /**
-   * Bumped after every property mutation so all mounted surfaces refetch.
-   * The Info panel can be mounted twice at once (editor header + right bar),
-   * so instances cannot rely on their own local reload alone.
-   */
+  /** Bumped after every property mutation so all mounted surfaces refetch. */
   version: number;
   refresh: () => void;
 }

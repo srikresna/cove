@@ -1,7 +1,6 @@
 /**
- * AFFiNE suggest-journal-date: natural-language date suggestions for quick
- * search ("today", "tomorrow", "yesterday", "next tuesday", "dec 10").
- * Returns a local-midnight timestamp plus the matched alias, or null.
+ * Natural-language date suggestions for quick search ("today", "tomorrow",
+ * "next tuesday", "dec 10"). Returns local midnight + matched alias, or null.
  */
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, index) =>

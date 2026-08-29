@@ -16,10 +16,10 @@ import { FilterBar } from "./FilterBar";
 import { readListCache } from "./libraryListCache";
 
 /**
- * AFFI NE collection-editor equivalent: a large dialog with Docs/Rules tabs,
- * a live preview of the matching notes, and a footer with match counts +
- * Save/Create. The "Docs" tab is the manual allow-list (a note is in the
- * collection if it matches the rules OR is checked there).
+ * A large dialog with Docs/Rules tabs, a live preview of the matching notes,
+ * and a footer with match counts + Save/Create. The "Docs" tab is the manual
+ * allow-list (a note is in the collection if it matches the rules OR is
+ * checked there).
  */
 export const CollectionEditorDialog: React.FC<{
   open: boolean;
@@ -50,11 +50,9 @@ export const CollectionEditorDialog: React.FC<{
     [notes, activeWorkspaceId],
   );
 
-  // Live preview: evaluate the editor rules against the SAME filterable map
-  // the Library list maintains (listCache holds it after the page loads —
-  // the editor only opens from the Library, so it is warm), plus the manual
-  // allow-list. Notes absent from the map fall back to their live fields
-  // (template flag) the same way the list's synthesized entries do.
+  // Live preview: evaluate the editor rules against the same filterable map
+  // the Library list maintains, plus the manual allow-list. Notes absent from
+  // the map fall back to their live fields.
   const matchedIds = useMemo(() => {
     const complete = rules.filter(isRuleComplete);
     const cache = activeWorkspaceId ? readListCache(activeWorkspaceId) : undefined;

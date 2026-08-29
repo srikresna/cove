@@ -15,8 +15,8 @@ import {
 import { PromptDialog } from "../ui/prompt-dialog";
 
 /**
- * The Collections directory (AFFI NE /collection equivalent): every saved
- * view with rename/edit/delete management and one-click apply.
+ * The Collections directory: every saved view with rename/edit/delete
+ * management and one-click apply.
  */
 export const CollectionsTab: React.FC<{
   onOpenInDocs: () => void;

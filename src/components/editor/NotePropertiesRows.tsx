@@ -97,9 +97,9 @@ const DateValue: React.FC<{ timestamp: number }> = ({ timestamp }) => (
 );
 
 /**
- * Journal row editor (AFFiNE pattern): a 24px checkbox marks the note as a
- * journal note; when checked, the localized date opens the calendar popover,
- * and a red conflict pill appears when another note shares the date.
+ * Journal row editor: a 24px checkbox marks the note as a journal note; when
+ * checked, the localized date opens the calendar popover, and a red conflict
+ * pill appears when another note shares the date.
  */
 const JournalValue: React.FC<{
   noteId: string;
@@ -153,9 +153,9 @@ const JournalValue: React.FC<{
   }, [noteId, value, propertyVersion]);
 
   return (
-    // AFFI NE pattern: the hidden input inside PropertyCheckbox covers the
-    // whole cell, so clicking anywhere toggles; the date trigger and the
-    // conflict pill are buttons that naturally stop the label activation.
+    // The hidden input inside PropertyCheckbox covers the whole cell, so
+    // clicking anywhere toggles; the date trigger and the conflict pill are
+    // buttons that naturally stop the label activation.
     <PropertyCheckbox
       checked={value !== undefined}
       onChange={() => onSetOrClear()}
@@ -361,7 +361,7 @@ const WorkspaceValue: React.FC<{ note: Note }> = ({ note }) => {
   );
 };
 
-/** AFFI NE PropertyRadioGroup: a small fixed-width segmented control. */
+/** A small fixed-width segmented control. */
 const SegmentedValue: React.FC<{
   options: Array<{ value: string; label: string }>;
   value: string;
@@ -645,8 +645,8 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
           className="absolute -bottom-1 left-0 right-0 z-10 h-0.5 rounded-full bg-primary"
         />
       )}
-      {/* AFFI NE drag affordance: a hover-revealed grip on the row's outer
-          left edge that consumes no layout space. */}
+      {/* A hover-revealed grip on the row's outer left edge, consuming no
+          layout space. */}
       <button
         type="button"
         ref={handleRef}
@@ -678,7 +678,7 @@ const PropertyRow: React.FC<PropertyRowProps> = ({
         {children}
       </InfoRow>
       {/* The menu lives on an invisible layer above the name cell (clicking
-          the name opens it, like AFFI NE) without stealing value width. */}
+          the name opens it) without stealing value width. */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

@@ -22,9 +22,8 @@ interface MonthGridProps {
 }
 
 /**
- * AFFI NE calendar grid: a full 6-week (42-cell) month with faded adjacent
- * days and typed journal dots. Ported from the right-bar CalendarPanel for
- * the Journals page.
+ * A full 6-week (42-cell) month grid with faded adjacent days and typed
+ * journal dots.
  */
 export const MonthGrid: React.FC<MonthGridProps> = ({
   month,
@@ -34,8 +33,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   onShiftMonth,
 }) => {
   const cells = useMemo(() => {
-    // AFFI NE calendar: full 6-week grid; adjacent-month days render faded
-    // (and clickable) instead of leaving leading blanks.
+    // Full 6-week grid; adjacent-month days render faded (and clickable), no leading blanks.
     const year = month.getFullYear();
     const monthIndex = month.getMonth();
     const firstOfMonth = new Date(year, monthIndex, 1);

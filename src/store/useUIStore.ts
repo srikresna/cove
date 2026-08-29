@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-/** Main-area pages, AFFI NE-style: one visible at a time. */
+/** Main-area pages: exactly one is visible at a time. */
 export type ActivePage = "editor" | "library" | "journals" | "trash";
 
 interface UIState {

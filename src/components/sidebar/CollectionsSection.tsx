@@ -49,8 +49,6 @@ export const CollectionsSection: React.FC = () => {
             ruleCount={view.rules.length}
             isActive={view.id === activeViewId}
             onSelect={() => {
-              // AFFI NE parity: applying a collection from the sidebar
-              // navigates to the all-docs page with the view active.
               setActiveView(view.id === activeViewId ? null : view.id);
               if (view.id !== activeViewId) {
                 useUIStore.getState().setActivePage("library");

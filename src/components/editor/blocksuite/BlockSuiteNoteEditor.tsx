@@ -29,7 +29,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
   const scrollRef = useRef<HTMLDivElement>(null);
   const [editorHost, setEditorHost] = useState<EditorHost | null>(null);
   const mode = note.docMode ?? "page";
-  // Page width is a persisted per-doc property (AFFI NE pageWidth row).
+  // Page width is a persisted per-doc property.
   const isFullWidth = (note.pageWidth ?? "standard") === "fullWidth";
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),

@@ -45,9 +45,9 @@ const relativeDay = (ts: number): string => {
 };
 
 /**
- * AFFI NE CardViewDoc: rounded-12 padded card with icon + title header,
- * hover-revealed quick actions, meta line and property stack chips. Grid
- * keeps cards uniform; masonry lets content set the height.
+ * A rounded-12 padded card with icon + title header, hover-revealed quick
+ * actions, meta line and property stack chips. Grid keeps cards uniform;
+ * masonry lets content set the height.
  */
 export const NoteCard: React.FC<NoteCardProps> = ({
   note,

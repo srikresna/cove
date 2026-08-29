@@ -89,8 +89,8 @@ const ORDER_ITEMS: Array<{ value: LibrarySort; label: string; icon: React.ReactN
 ];
 
 /**
- * AFFI NE Explorer display menu: Grouping + Ordering submenus, display
- * property chip toggles, and list-only icon/body switches.
+ * Explorer display menu: Grouping + Ordering submenus, display property
+ * chip toggles, and list-only icon/body switches.
  */
 export const DisplayMenu: React.FC<DisplayMenuProps> = ({
   prefs,

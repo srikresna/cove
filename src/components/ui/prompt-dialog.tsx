@@ -6,9 +6,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./dialog"
 import { Input } from "./input";
 
 /**
- * AFFI NE PromptModal pattern: the canonical window.prompt replacement for
- * naming flows (save-as-collection, rename). Confirm is disabled while the
- * required input is empty; Enter commits, Escape/outside cancels.
+ * The canonical window.prompt replacement for naming flows (save-as-
+ * collection, rename). Confirm is disabled while the required input is
+ * empty; Enter commits, Escape/outside cancels.
  */
 export const PromptDialog: React.FC<{
   open: boolean;

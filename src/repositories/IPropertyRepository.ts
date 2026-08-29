@@ -27,10 +27,8 @@ export interface IPropertyRepository {
   appendOption(id: string, optionJson: string): Promise<void>;
   deleteDefinition(id: string): Promise<void>;
   /**
-   * Atomically removes one option: replaces the definition's optionsJson
-   * (skipped when null) and applies the per-note value sweep in the same
-   * transaction, so a crash can never leave the option deleted but values
-   * dangling (the sweep would then be unretryable).
+   * Atomically removes one option: replaces optionsJson (skipped when null)
+   * and applies the value sweep in the same transaction.
    */
   applyOptionDeletion(
     definitionId: string,

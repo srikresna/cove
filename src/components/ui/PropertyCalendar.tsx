@@ -21,10 +21,9 @@ const CELL = 28;
 const GAP = 8;
 
 /**
- * AFFiNE-metrics month calendar used by property date pickers: 28px day
- * cells with 8px gaps (244px min width), Sunday-start week header, today in
- * bold brand color, selected day in brand background, adjacent-month days
- * faded, month switcher with a TODAY shortcut that commits today directly.
+ * A month calendar for property date pickers: 28px day cells with 8px gaps,
+ * Sunday-start week header, adjacent-month days faded, month switcher with a
+ * TODAY shortcut that commits today directly.
  */
 export const PropertyCalendar: React.FC<{
   value: number | null;

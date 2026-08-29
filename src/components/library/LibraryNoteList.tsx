@@ -38,16 +38,9 @@ export type LibrarySort =
 export type LibraryViewMode = "list" | "grid" | "masonry";
 
 /**
- * Rules whose predicate EMPTY inputs would satisfy (is-empty everywhere,
- * tags has-none-of, journal-is-false, checkbox-is-false). For a note with
- * UNKNOWN inputs (absent from the SWR cache — could be brand-new and truly
- * empty, or could have acquired values while the page was unmounted, e.g.
- * today's journal is created WITH its journal date), fabricated emptiness
- * must not decide these predicates: such views defer unknown notes to
- * revalidation (brief omission reads as loading; admission-then-vanish
- * reads as a glitch). Views without these rules keep unknown notes visible
- * immediately — live-note-field rules (template) and positive rules decide
- * on data we actually have.
+ * Rules whose predicate EMPTY inputs would satisfy. Unknown notes (absent
+ * from the cache) must not be decided by fabricated emptiness — views with
+ * these rules defer them to revalidation; other views keep them visible.
  */
 function satisfiedByEmptyInputs(rule: FilterRule): boolean {
   switch (rule.kind) {
@@ -121,10 +114,9 @@ interface LibraryNoteListProps {
 }
 
 /**
- * The all-docs list (AFFI NE Explorer equivalent): tag pre-filter +
- * saved-view rules + sort, then AFFI NE's three view modes — virtualized
- * list (group headers as virtual rows) or CSS grid/masonry card layouts —
- * with optional grouping by tags/journal/created/updated/custom property.
+ * The all-docs list: tag pre-filter + saved-view rules + sort, then three
+ * view modes — virtualized list (group headers as virtual rows) or CSS
+ * grid/masonry cards — with optional grouping.
  */
 export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   sort,
@@ -153,7 +145,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     })),
   );
 
-  // Property stacks under each note title (AFFI NE docs-view stack rows).
+  // Property stacks under each note title.
   const cached = activeWorkspaceId ? listCache.get(activeWorkspaceId) : undefined;
   const [stackDefs, setStackDefs] = useState<PropertyDefinition[]>(cached?.stackDefs ?? []);
   const [stackValues, setStackValues] = useState<Map<string, Map<string, PropertyValue>> | null>(
@@ -392,9 +384,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         n.workspaceId === activeWorkspaceId && (taggedNoteIds === null || taggedNoteIds.has(n.id)),
     );
     // Defer cache-unknown notes only when some rule's predicate empty inputs
-    // would satisfy (see satisfiedByEmptyInputs) — counting only rules the
-    // evaluator actually applies. Notes the app itself just created are
-    // provably empty and bypass the deferral.
+    // would satisfy; notes the app just created are provably empty and bypass it.
     const knownEmptyIds = activeWorkspaceId
       ? listCache.get(activeWorkspaceId)?.knownEmptyIds
       : undefined;
@@ -403,12 +393,9 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       !rulesActive || !filterable
         ? base
         : evaluateFilters(
-            // The cached filterable map may hold stale note objects and may
-            // not know notes created since the last visit — always evaluate
-            // with the LIVE note. Notes absent from the cache are
-            // synthesized with empty inputs ONLY in views where fabricated
-            // emptiness cannot decide the outcome; views with
-            // emptiness-satisfiable rules defer them to revalidation.
+            // Always evaluate with the LIVE note (the cached map may be stale);
+            // notes absent from the cache are synthesized empty ONLY where
+            // fabricated emptiness cannot decide the outcome.
             base
               .filter(
                 (n) => !deferUnknown || filterable.has(n.id) || (knownEmptyIds?.has(n.id) ?? false),
@@ -425,7 +412,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             draftRules,
           ).map((i) => i.note);
     // Manually-included notes (the collection editor's Docs tab) join the
-    // rule-matched set — AFFI NE's "manually add docs OR match through rules".
+    // rule-matched set.
     const allowIds = new Set(allViews.find((v) => v.id === activeViewId)?.allowNoteIds ?? []);
     const withAllow =
       allowIds.size === 0
@@ -472,8 +459,8 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
     const groupByDef = isGroupByDef(prefs.groupBy) ? prefs.groupBy.defId : null;
     if (prefs.groupBy === "tags") {
-      // A tagged note appears under EACH of its tags (AFFI NE semantics);
-      // notes with no tags land in one Untagged bucket.
+      // A tagged note appears under EACH of its tags; notes with no tags
+      // land in one Untagged bucket.
       const idsByNote = tagIdsByNote ?? new Map<string, string[]>();
       const tagged = new Set<string>();
       for (const tag of allTags) {
@@ -580,10 +567,9 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         dotColor: group.dotColor,
       });
       if (!collapsedGroups.has(group.key)) {
-        // The group qualifier keeps virtualizer keys unique when a note
-        // appears under several groups (tag grouping puts it under EACH
-        // of its tags) — duplicate sibling keys would corrupt React
-        // reconciliation and the shared measurement cache.
+        // The group qualifier keeps virtualizer keys unique when a note appears
+        // under several groups (tag grouping) — duplicate sibling keys would
+        // corrupt React reconciliation and the shared measurement cache.
         for (const note of group.notes) items.push({ kind: "note", note, group: group.key });
       }
     }
@@ -622,7 +608,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     [stackDefs, stackValues, prefs.showBody, prefs.hiddenProps],
   );
 
-  // ---- Multi-select (AFFI NE selection mode) -------------------------------
+  // ---- Multi-select --------------------------------------------------------
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const anchorIdRef = useRef<string | null>(null);
@@ -730,10 +716,8 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Keyed by note id (headers by their key), not index: notes re-sort under
-  // unchanged indexes, and an index-keyed measurement cache would stamp each
-  // row with the previous occupant's height for a frame. Grouped notes carry
-  // their group key so multi-group entries stay unique siblings.
+  // Keyed by note id, not index — notes re-sort under unchanged indexes;
+  // grouped notes carry their group key so multi-group entries stay unique.
   const getItemKey = useCallback(
     (index: number) => {
       const item = visibleItems[index];
@@ -858,10 +842,9 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
                       top: 0,
                       left: 0,
                       width: "100%",
-                      // No inline height: the row must be content-sized so
-                      // measureElement can observe real heights; pinning it
-                      // to virtualRow.size would freeze measurement at the
-                      // estimate forever.
+                      // No inline height: the row must stay content-sized so
+                      // measureElement observes real heights; pinning
+                      // virtualRow.size would freeze measurement at the estimate.
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >

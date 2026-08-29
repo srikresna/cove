@@ -35,8 +35,8 @@ const Group: React.FC<{
 };
 
 /**
- * The sidebar's Favorites accordion (AFFI NE parity): Cove's Pinned notes
- * live here as a labelled sub-group since both are per-note flags.
+ * The sidebar's Favorites accordion; Pinned notes live here as a labelled
+ * sub-group since both are per-note flags.
  */
 export const FavoritesSection: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);

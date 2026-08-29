@@ -67,10 +67,9 @@ const isDisplayPrefs = (value: unknown): value is LibraryDisplayPrefs => {
 };
 
 /**
- * The all-docs page (AFFI NE Explorer equivalent): a 52px header bar with
- * Docs/Collections/Tags navigation, view modes, the Display menu and the
- * New dropdown; below it the collection chip strip and the inline filter
- * area, then the virtualized/groupable note list.
+ * The all-docs page: a 52px header bar with Docs/Collections/Tags navigation,
+ * view modes, the Display menu and the New dropdown; below it the collection
+ * chip strip and the inline filter area, then the virtualized note list.
  */
 export const LibraryPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -98,8 +97,7 @@ export const LibraryPage: React.FC = () => {
     const stored = localStorage.getItem(SORT_KEY) ?? "";
     return isLibrarySort(stored) ? stored : "updated-desc";
   });
-  // Display prefs persist PER VIEW MODE (list/grid/masonry), like AFFI NE's
-  // allDocsDisplayPreference:<mode> keys.
+  // Display prefs persist PER VIEW MODE (list/grid/masonry).
   const [prefs, setPrefs] = useState<LibraryDisplayPrefs>(() => {
     const readPrefs = (mode: LibraryViewMode): LibraryDisplayPrefs => {
       try {
@@ -319,7 +317,7 @@ export const LibraryPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Collection chip strip (AFFI NE pinned-collections row). */}
+          {/* Collection chip strip. */}
           <div className="flex items-center gap-1 px-6 pt-3">
             <button
               type="button"
@@ -410,7 +408,7 @@ export const LibraryPage: React.FC = () => {
             )}
           </div>
 
-          {/* Inline filter area (AFFI NE filterInnerArea): chips + Save/Cancel. */}
+          {/* Inline filter area: chips + Save/Cancel. */}
           {filterAreaVisible && (
             <div className="px-6 pt-2">
               <div className="flex items-center gap-2 rounded-xl bg-muted/60 p-2">

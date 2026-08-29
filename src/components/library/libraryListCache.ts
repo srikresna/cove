@@ -2,10 +2,8 @@ import type { PropertyDefinition, PropertyValue } from "../../domain/property/Pr
 import type { FilterableNote } from "../../services/filters/evaluateFilters";
 
 /**
- * Module-level stale-while-revalidate cache for the Library list's
- * bulk-loaded inputs (kept out of the component so note-creating store
- * actions can seed it without an import cycle). See LibraryNoteList for
- * the rationale.
+ * Module-level stale-while-revalidate cache for the Library list's bulk-loaded
+ * inputs (kept out of the component so note-creating actions can seed it).
  */
 export interface LibraryListCache {
   stackDefs: PropertyDefinition[];
@@ -13,11 +11,7 @@ export interface LibraryListCache {
   filterable: Map<string, FilterableNote> | null;
   /** Per-note tag ids (group-by-tags input, SWR like the other maps). */
   tagIdsByNote: Map<string, string[]> | null;
-  /**
-   * Note ids the app itself just created — provably empty filter inputs,
-   * so emptiness-rule views may show them immediately instead of deferring
-   * them to revalidation like genuinely-unknown notes.
-   */
+  /** Note ids the app itself just created — provably empty filter inputs. */
   knownEmptyIds: Set<string>;
 }
 

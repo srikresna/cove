@@ -157,7 +157,7 @@ function matchRule(rule: FilterRule, item: FilterableNote): boolean {
   }
 }
 
-/** All rules AND-combined, as in AFFI NE collection filters (no OR yet). */
+/** All rules AND-combined; incomplete rules are skipped (no OR yet). */
 export function evaluateFilters(items: FilterableNote[], rules: FilterRules): FilterableNote[] {
   if (rules.length === 0) return items;
   const active = rules.filter(isRuleComplete);

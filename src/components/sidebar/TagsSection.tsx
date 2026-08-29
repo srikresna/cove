@@ -174,7 +174,6 @@ export const TagsSection: React.FC = () => {
             noteCount={countOf(tag.id)}
             isActive={tag.id === activeTagId}
             onSelect={() => {
-              // AFFI NE parity: a tag click filters the all-docs page.
               const next = tag.id === activeTagId ? null : tag.id;
               void setTagFilter(next);
               if (next !== null) {

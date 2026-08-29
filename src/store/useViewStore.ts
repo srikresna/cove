@@ -10,11 +10,8 @@ interface ViewState {
   views: SavedView[];
   activeViewId: string | null;
   /**
-   * JSON snapshot of the rules setActiveView copied into the drafts. Used
-   * by fetchViews to detect that the applied copy came from a STALE row
-   * (straggler click between a heal/prune commit and the refresh) and
-   * re-copy the healed rules — without ever touching user-tweaked drafts,
-   * which no longer match the snapshot.
+   * Snapshot of the rules setActiveView copied into the drafts; lets fetchViews
+   * detect a stale copy and re-copy healed rules, never touching tweaked drafts.
    */
   appliedRulesSnapshot: string | null;
   /** Ad-hoc rules the user is composing in the filter bar (unsaved). */
@@ -53,10 +50,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set({ fetchSeq: seq });
     try {
       const fresh = await savedViewService.listViews(workspaceId);
-      // A fetch for a superseded generation (rapid workspace switches race
-      // their fetches) must be dropped entirely — applying it would swap in
-      // another workspace's list and, via the reconcile below, clear a
-      // legitimate active selection.
+      // A fetch for a superseded generation (racing workspace switches) must be
+      // dropped entirely — applying it would swap in another workspace's list.
       if (get().fetchSeq !== seq) return;
       set((s) => {
         const active = s.activeViewId ? fresh.find((v) => v.id === s.activeViewId) : undefined;
@@ -65,11 +60,9 @@ export const useViewStore = create<ViewState>((set, get) => ({
           // fetch (startup heal, prune) — clear the stranded selection.
           return { views: fresh, activeViewId: null, draftRules: [], appliedRulesSnapshot: null };
         }
-        // Straggler guard: the drafts still match what setActiveView
-        // snapshotted (the user hasn't tweaked them) yet the fresh rules
-        // differ — the copy came from a stale pre-heal row; re-copy the
-        // healed rules. Tweaked drafts (no longer equal to the snapshot)
-        // are never touched.
+        // Straggler guard: drafts still match the snapshot yet the fresh rules
+        // differ — the copy came from a stale pre-heal row, so re-copy. Tweaked
+        // drafts are never touched.
         if (
           active &&
           s.appliedRulesSnapshot != null &&
@@ -190,10 +183,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
 
   syncAfterOptionDelete: async (propertyId, optionId) => {
-    // Prune drafts FIRST and unconditionally: the rule dropdown only renders
-    // live options, so a dead id could never be cleared from a draft — even
-    // if the service-side prune itself fails, the in-memory state must not
-    // keep it (the startup heal repairs the persisted side later).
+    // Prune drafts FIRST and unconditionally — the dropdown only renders live
+    // options, so a dead id could never be cleared from a draft.
     set((s) => ({
       draftRules: s.draftRules.flatMap((r) => {
         if ((r.kind === "select" || r.kind === "multiSelect") && r.propertyId === propertyId) {
@@ -220,10 +211,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
     }
     const activeDeleted =
       get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
-    // Bump AFTER the prune commits: CollectionsSection refetches on version
-    // changes, so an earlier bump would race the prune transaction and cache
-    // pre-commit rows (draft subscribers re-render off draftRules directly
-    // and do not need the pre-set bump).
+    // Bump AFTER the prune commits — CollectionsSection refetches on version
+    // changes, so an earlier bump would cache pre-commit rows.
     set((s) => ({
       ...(activeDeleted ? { activeViewId: null, draftRules: [], appliedRulesSnapshot: null } : {}),
       version: s.version + 1,
@@ -252,11 +241,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
   healDrafts: (defs) => {
     const defsById = new Map(defs.map((d) => [d.id, d]));
     set((s) => ({
-      // Same contract as the runtime sync paths: drafts referencing dead
-      // defs/options are pruned unconditionally — the FilterBar can never
-      // render or clear a dead reference. Kinds are narrowed explicitly
-      // because drafts copied from loaded views carry the loader's stamped
-      // propertyId key on tags/journal/template rules too.
+      // Drafts referencing dead defs/options are pruned unconditionally (the
+      // FilterBar can never clear a dead reference). Kinds are narrowed
+      // explicitly because drafts copied from loaded views carry the loader's
+      // stamped propertyId on tags/journal/template rules too.
       draftRules: s.draftRules.flatMap((r): FilterRule[] => {
         switch (r.kind) {
           case "text":
@@ -271,10 +259,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
             if (!def) return [];
             const live = new Set(def.options.map((o) => o.id));
             const optionIds = r.optionIds.filter((id) => live.has(id));
-            // Drop only rules that HAD options and lost them all to dead
-            // ids — an already-empty rule is the FilterBar's normal
-            // mid-composition state ("is" with nothing picked yet) and
-            // stays as an inactive chip until the user picks one.
+            // Drop only rules that HAD options and lost them all — an
+            // already-empty rule is a normal mid-composition state.
             if (
               r.optionIds.length > 0 &&
               optionIds.length === 0 &&

@@ -297,9 +297,9 @@ const ManagerRow: React.FC<ManagerRowProps> = ({
 };
 
 /**
- * AFFiNE-style workspace property manager for the right bar: reorder and
- * configure every property definition, and add new ones from the type list.
- * Definitions are workspace-wide, so changes apply to every note.
+ * Workspace property manager for the right bar: reorder and configure every
+ * property definition, and add new ones from the type list. Definitions are
+ * workspace-wide, so changes apply to every note.
  */
 export const PropertyManagerPanel: React.FC<{
   typeMeta: Record<string, { label: string; icon: React.ReactNode }>;

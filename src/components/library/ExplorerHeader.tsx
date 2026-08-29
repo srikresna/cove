@@ -66,9 +66,9 @@ interface ExplorerHeaderProps {
 }
 
 /**
- * AFFI NE all-docs header: one 52px bar — Docs/Collections/Tags navigation
- * on the left (18px semibold text links), view-mode toggle + Display menu +
- * split New dropdown on the right. Tab-scoped controls only render on Docs.
+ * The all-docs header: one 52px bar — Docs/Collections/Tags navigation on
+ * the left, view-mode toggle + Display menu + split New dropdown on the
+ * right. Tab-scoped controls only render on Docs.
  */
 export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
   tab,
@@ -104,8 +104,7 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
 
     {tab === "docs" && (
       <div className="flex items-center gap-4">
-        {/* View toggle (AFFI NE naked RadioGroup: three 24px icon buttons,
-            active gets the hover overlay). */}
+        {/* View toggle: three icon buttons, active gets the hover overlay. */}
         <div className="flex items-center gap-1" role="group" aria-label="View mode">
           {VIEW_MODES.map((mode) => (
             <button
@@ -135,8 +134,7 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
           viewMode={viewMode}
         />
 
-        {/* Split New dropdown: main click creates a note, chevron opens the
-            menu (AFFI NE PageListNewPageButton shape). */}
+        {/* Split New dropdown: main click creates a note, chevron opens the menu. */}
         <div className="flex items-stretch">
           <Button
             size="sm"

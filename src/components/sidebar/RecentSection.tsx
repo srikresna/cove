@@ -8,8 +8,7 @@ import { NoteRow } from "./NoteRow";
 
 const RECENT_LIMIT = 5;
 
-/** A short, compact list of the most recently touched notes (AFFI NE keeps
- *  its full doc list OUT of the sidebar; Recent is the quick way back in). */
+/** A short, compact list of the most recently touched notes. */
 export const RecentSection: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const notes = useNoteStore((s) => s.notes);

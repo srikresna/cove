@@ -160,11 +160,9 @@ const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = 
 );
 
 /**
- * AFFI NE tags-editor parity: keyboard Up/Down/Enter navigation with a
- * focused row, Backspace on empty input removes the last selected chip,
- * hover-revealed "..." per-option menu (rename / 9-swatch recolor / delete
- * writing through PropertyService), rotating random create colors, a Done
- * row, and 400px-hug width.
+ * Option-picker popover: keyboard Up/Down/Enter navigation with a focused
+ * row, Backspace on empty input removes the last selected chip, and a
+ * hover-revealed "..." per-option menu (rename / recolor / delete).
  */
 const OptionPicker: React.FC<{
   def: PropertyDefinition;
@@ -187,7 +185,7 @@ const OptionPicker: React.FC<{
   const rowCount = visible.length + (showCreate ? 1 : 0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Random-start rotating palette index, like AFFI NE's useReducer approach.
+  // Random-start rotating palette index.
   const colorOffset = useRef(Math.floor(Math.random() * TAG_COLORS.length));
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: trimmed is the intentional reset signal; listing query would re-run on every keystroke anyway
@@ -237,7 +235,7 @@ const OptionPicker: React.FC<{
             activateRow(focusedIndex);
           } else if (e.key === "Backspace" && query === "" && multi && selectedIds.length > 0) {
             e.preventDefault();
-            // Remove the last selected chip, like AFFI NE.
+            // Remove the last selected chip.
             onPick(selectedIds[selectedIds.length - 1] ?? "");
           }
         }}
@@ -536,9 +534,8 @@ export interface PropertyValueEditorProps {
 }
 
 /**
- * AFFiNE text editor: an auto-growing textarea over a hidden mirror div,
- * multiline (Enter = newline), committed once on blur with trim. The blue
- * focus treatment lives on the wrapper (focus-within), not the textarea.
+ * An auto-growing textarea over a hidden mirror div; multiline, committed on
+ * blur with trim. Focus styling lives on the wrapper (focus-within).
  */
 const TextLikeValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet, onClear }) => {
   const current =
@@ -612,7 +609,7 @@ const CheckboxValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet }
   const checked = value?.type === "checkbox" && value.checked;
   return (
     // The label stretches across the whole value cell, so the entire cell
-    // toggles through the hidden native input (AFFI NE pattern).
+    // toggles through the hidden native input.
     <PropertyCheckbox
       checked={checked}
       onChange={(next) => onSet({ type: "checkbox", checked: next })}
@@ -824,9 +821,8 @@ const RelationValue: React.FC<PropertyValueEditorProps> = ({ value, noteId, onCl
 };
 
 /**
- * Declarative per-type value editor registry (AFFI NE WorkspacePropertyTypes
- * pattern): the Info panel renderValue path and any future surface (doc-list
- * columns, filters) resolve editors from here instead of a switch statement.
+ * Declarative per-type value editor registry: every surface (Info panel,
+ * doc-list columns, filters) resolves editors from here, not a switch.
  */
 export const PROPERTY_VALUE_EDITORS: Record<PropertyType, React.FC<PropertyValueEditorProps>> = {
   text: TextLikeValue,

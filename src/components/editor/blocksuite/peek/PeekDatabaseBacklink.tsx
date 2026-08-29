@@ -125,7 +125,7 @@ function useBacklinkRev(): number {
 const cellInputClass =
   "h-7 w-full rounded-[4px] border border-transparent bg-transparent px-[5px] text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
 
-/** AFFI NE db-label chip: the whole chip is tinted with the option color. */
+/** The whole chip is tinted with the option color. */
 const OptionChip: React.FC<{
   option: BacklinkOption;
   onRemove?: () => void;
@@ -227,17 +227,12 @@ const OptionPickerPopover: React.FC<{
   );
 };
 
+// Per-type cell editors mirror the Info panel affordances; rich-text, title
+// and created-time cells stay read-only (Y.Text / engine-managed values).
 /**
- * Per-type cell editors mirroring the Info panel affordances. Values follow
- * the BlockSuite database raw-value contract per column type (boolean for
- * checkbox, number|null for number/date, option-id string / string[] for
- * select and multi-select, string for text/link); rich-text, title and
- * created-time cells stay read-only (Y.Text / engine-managed values).
- */
-/**
- * Rich-text cells hold a Y.Text; AFFiNE's backlink panel mounts the real
- * BlockSuite RichText inline editor against it (not a plain input), sharing
- * the page view's inline schema and renderer through a lightweight std scope.
+ * Rich-text cells hold a Y.Text; the real BlockSuite RichText inline editor is
+ * mounted against it (not a plain input), sharing the page view's inline
+ * schema through a lightweight std scope.
  */
 const RichTextCellEditor: React.FC<{
   yText: Y.Text;
@@ -288,7 +283,7 @@ const RichTextCellEditor: React.FC<{
   return <div ref={ref} className="min-h-7 w-full text-sm text-foreground" />;
 };
 
-/** AFFI NE date cell: formatted text opening a calendar popover; the picker stays open after a pick. */
+/** Formatted text opening a calendar popover; the picker stays open after a pick. */
 const DateCellEditor: React.FC<{
   timestamp: number | null;
   onChange: (next: number | null) => void;
@@ -326,8 +321,8 @@ const DateCellEditor: React.FC<{
 };
 
 /**
- * AFFI NE progress cell: a slider with a live percentage label, a
- * hover-revealed thumb, track-click jump, and a single commit on blur.
+ * A slider with a live percentage label, a hover-revealed thumb, and a
+ * single commit on blur.
  */
 const ProgressSlider: React.FC<{
   value: number;
@@ -374,7 +369,7 @@ const ProgressSlider: React.FC<{
   );
 };
 
-/** AFFI NE link cell: display mode is an anchor; editing commits on Enter/blur, Escape reverts. */
+/** Display mode is an anchor; editing commits on Enter/blur, Escape reverts. */
 const LinkCellEditor: React.FC<{
   value: string;
   onChange: (next: string) => void;
@@ -715,7 +710,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
         });
       }
 
-      // AFFiNE sorts the backlink cells alphabetically by property name.
+      // Cells are sorted alphabetically by property name.
       cells.sort((a, b) => a.name.localeCompare(b.name));
       return { cells, ds, databaseName, doc: ds.doc };
     } catch {
@@ -728,9 +723,8 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    // Only flush when an edit actually happened - sections remount on note
-    // switches and a no-op save would re-encrypt identical content, bump
-    // updatedAt, and drop the backlink scan cache for nothing.
+    // Only flush when an edit actually happened — a no-op save would
+    // re-encrypt identical content, bump updatedAt, and drop the scan cache.
     if (!dirtyRef.current) return;
     try {
       if (!blockSuiteEditorService.isNoteDocLoaded(databaseDocId)) return;
@@ -810,7 +804,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
     [data, databaseRowId, scheduleSave],
   );
 
-  // AFFiNE hides the whole section when the row has no visible cells.
+  // The whole section hides when the row has no visible cells.
   if (!data || data.cells.length === 0) return null;
 
   const sectionTitle = `${data.databaseName || MESSAGES.UNNAMED} ${MESSAGES.PROPERTIES}`;

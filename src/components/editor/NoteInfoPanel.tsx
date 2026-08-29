@@ -21,7 +21,7 @@ export const InfoRow: React.FC<{
   handle?: React.ReactNode;
   /** Editors that carry their own 5/6px padding (text/number) sit flush. */
   flush?: boolean;
-  /** Radio/segmented rows don't highlight on hover (AFFI NE hoverable={false}). */
+  /** Radio/segmented rows don't highlight on hover. */
   noHover?: boolean;
   children: React.ReactNode;
 }> = ({ icon, label, handle, flush = false, noHover = false, children }) => (

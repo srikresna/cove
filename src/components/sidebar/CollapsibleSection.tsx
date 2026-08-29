@@ -4,9 +4,9 @@ import { useState } from "react";
 import { cn } from "../../lib/utils";
 
 /**
- * AFFI NE-style collapsible sidebar section: a switch-role header row
- * (chevron + label + optional count) with an isolated action slot, and
- * unmount-when-collapsed content. Open/closed persists per storage key.
+ * A collapsible sidebar section: a switch-role header row (chevron + label +
+ * optional count) with an isolated action slot, and unmount-when-collapsed
+ * content. Open/closed persists per storage key.
  */
 export const CollapsibleSection: React.FC<{
   storageKey: string;

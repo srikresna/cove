@@ -97,10 +97,8 @@ export async function scanNoteForDatabaseRows(
 const inflightScans = new Map<string, Promise<void>>();
 
 /**
- * Several Info panels can be mounted at once (editor header, right bar, peek)
- * and each wants the whole library scanned. The cache is only written after an
- * await, so unguarded concurrent loops would fetch and decrypt every note one
- * time per instance - this gate makes them share a single in-flight pass.
+ * Multiple Info panels can request the same scan concurrently (the cache is
+ * only written after an await) — this gate makes them share one in-flight pass.
  */
 export function ensureNoteScanned(
   getNoteContent: (noteId: string) => Promise<string | undefined>,

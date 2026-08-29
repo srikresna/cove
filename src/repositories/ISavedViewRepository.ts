@@ -11,9 +11,8 @@ export interface ISavedViewRepository {
   /** Persist the manually-included note ids of a view. */
   updateAllowNoteIds(id: string, allowNoteIds: string[]): Promise<void>;
   /**
-   * Applies a set of rule rewrites and view deletions in ONE transaction,
-   * so a prune either lands on every view or none (a per-view autocommit
-   * loop crash-strands the rest with no retry path).
+   * Applies rule rewrites and view deletions in ONE transaction — a prune
+   * lands on every view or none.
    */
   applyPrune(updates: Array<{ id: string; rulesJson: string }>, deleteIds: string[]): Promise<void>;
   delete(id: string): Promise<void>;

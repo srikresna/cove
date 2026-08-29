@@ -91,13 +91,12 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   const propertyVersion = usePropertyStore((s) => s.version);
   const openJournal = useOpenJournal();
   const [journalDate, setJournalDate] = useState<number | null>(null);
-  // AFFI NE hides the journal affordances as the header narrows: Today under
-  // 300px, the TemplateMark under 400px (container queries there; a
-  // ResizeObserver here).
+  // Journal affordances hide as the header narrows: Today under 300px,
+  // TemplateMark under 400px.
   const [headerRef, headerWidth] = useElementWidth<HTMLDivElement>();
 
-  // AFFI NE pattern: the topbar of a journal note swaps the meta strip for a
-  // week calendar navigated by the note's journal date.
+  // A journal note's topbar swaps the meta strip for a week calendar
+  // navigated by the note's journal date.
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   useEffect(() => {
     let alive = true;
@@ -126,9 +125,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     >
       {journalDate != null ? (
         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-          {/* AFFI NE JournalPageHeader order: mode switch first, the week
-              picker centered in the growing middle, TemplateMark + Today
-              after it, and the overflow actions behind a "..." menu. */}
           {onToggleDocMode && (
             <IconAction
               label={docMode === "edgeless" ? MESSAGES.DOC_MODE_PAGE : MESSAGES.DOC_MODE_CANVAS}
@@ -217,8 +213,8 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
       )}
 
       <div className="flex items-center gap-0.5">
-        {/* Journal mode owns its actions in the left cluster (AFFI NE
-            JournalPageHeader) — only the right-bar toggle stays here. */}
+        {/* Journal mode owns its actions in the left cluster — only the
+            right-bar toggle stays here. */}
         {journalDate == null && (
           <>
             {onToggleDocMode && (

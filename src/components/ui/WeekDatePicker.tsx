@@ -24,10 +24,10 @@ const addDaysLocal = (d: Date, n: number): Date => {
 };
 
 /**
- * AFFI NE WeekDatePicker: a compact week strip navigator. The visible day
- * count adapts to the container width (1..7 via ResizeObserver); a dense
- * mode under 300px truncates weekday labels; arrow keys move the cursor day
- * by day. Purely presentational - journal callers decide what a day click does.
+ * A compact week strip navigator. Visible day count adapts to the container
+ * width (1..7 via ResizeObserver); dense mode under 300px truncates weekday
+ * labels; arrow keys move the cursor. Purely presentational — callers decide
+ * what a day click does.
  */
 export const WeekDatePicker: React.FC<{
   value: number | null;
@@ -55,10 +55,8 @@ export const WeekDatePicker: React.FC<{
     if (selected) setCursor(selected);
   }, [selected]);
 
-  // The measured width includes the two chevrons + gutters (56px) that the
-  // day strip never sees — subtract them or the last cells slide under the
-  // right chevron at narrow widths. Below 56+43px only one cell fits; the
-  // 7-cell default applies ONLY to the unmeasured (width 0) state.
+  // The measured width includes the two chevrons + gutters (56px) the day
+  // strip never sees — subtract them. 7 cells is only the unmeasured default.
   const fitCount = Math.floor((width - 56) / (CELL_W + CELL_GAP));
   const viewport = width > 0 ? Math.max(1, Math.min(7, fitCount)) : 7;
   const dense = width > 0 && width < 300;
@@ -134,7 +132,6 @@ export const WeekDatePicker: React.FC<{
                     : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
-              {/* AFFI NE dayCell: weekday line (16px) above the date line (20px). */}
               <span
                 className={cn(
                   "text-[10px] leading-4 uppercase tracking-wide",

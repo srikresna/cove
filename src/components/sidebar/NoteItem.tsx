@@ -45,7 +45,7 @@ interface NoteItemProps {
   onToggleFavorite: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
-  /** Stack rows under the title (AFFI NE docs-view stack properties). */
+  /** Stack rows under the title. */
   stackRows?: Array<{ def: PropertyDefinition; value: PropertyValue }>;
   /** Tag chips after the stacks (Library display option). */
   tagChips?: Array<{ name: string; color: string }>;

@@ -93,9 +93,9 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
   const noteId = note.id;
   const initialContent = useRef(note.content);
   initialContent.current = note.content;
-  // Per-doc edgeless theme (AFFI NE edgelessColorTheme): 'system' follows the
-  // app theme; explicit light/dark overrides it. Keying the effect on the
-  // resolved value remounts the editor only when the theme actually changes.
+  // Per-doc edgeless theme: 'system' follows the app theme; explicit
+  // light/dark overrides it. Keying the effect on the resolved value remounts
+  // the editor only when the theme actually changes.
   const isDarkMode = useUIStore((s) => s.isDarkMode);
   const edgelessDark =
     note.edgelessTheme === "dark" || (note.edgelessTheme !== "light" && isDarkMode);

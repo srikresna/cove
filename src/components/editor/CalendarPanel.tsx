@@ -86,8 +86,7 @@ export const CalendarPanel: React.FC = () => {
   }, [workspaceNotes, field, journalByNoteId]);
 
   const cells = useMemo(() => {
-    // AFFI NE calendar: full 6-week grid; adjacent-month days render faded
-    // (and clickable) instead of leaving leading blanks.
+    // Full 6-week grid; adjacent-month days render faded (and clickable), no leading blanks.
     const year = monthCursor.getFullYear();
     const month = monthCursor.getMonth();
     const firstOfMonth = new Date(year, month, 1);
@@ -159,8 +158,7 @@ export const CalendarPanel: React.FC = () => {
   );
 
   const handleDayClick = (key: string, hasNotes: boolean) => {
-    // Explicit create (AFFI NE placeholder pattern): day click only selects;
-    // the New-journal-note row/button is the single creation path.
+    // Day click only selects; the New-journal-note row/button is the single creation path.
     void hasNotes;
     setSelectedDay((prev) => (prev === key ? null : key));
   };
