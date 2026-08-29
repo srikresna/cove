@@ -145,9 +145,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
               className="min-w-0 max-w-[800px]"
             />
           </div>
-          {/* TemplateMark parity: marks a journal note that IS itself flagged
-              as a template (AFFI NE doc-is-template semantics); hidden below
-              400px of header width, like AFFI NE's container query. */}
           {note.isTemplate && headerWidth >= 400 && (
             <span className="flex h-6 shrink-0 items-center rounded bg-primary/10 px-2 text-xs font-medium text-primary">
               {MESSAGES.TEMPLATE_BADGE}

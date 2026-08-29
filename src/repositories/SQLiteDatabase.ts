@@ -317,7 +317,6 @@ export class SQLiteDatabase {
           prev = key;
         }
         statements.push({ sql: "PRAGMA user_version = 14" });
-        // Atomic: ALTERs + backfill + version bump land together or not at all.
         await SQLiteDatabase.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 14");

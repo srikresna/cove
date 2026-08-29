@@ -10,6 +10,7 @@ import {
   makeNoteId,
   trashPurgeCutoff,
 } from "../domain/note/notePolicy";
+import { cmpOrderIndex } from "../domain/note/ordering";
 import { VaultLockedError } from "../errors/AppError";
 import type { INoteLinkRepository } from "../repositories/INoteLinkRepository";
 import type { INoteRepository, NoteRecord } from "../repositories/INoteRepository";
@@ -291,13 +292,9 @@ export class NoteService implements INoteService {
     const target = await this.getNote(targetId);
     if (!target) throw new NotFoundError("Note", targetId);
 
-    // Fractional keys sort by char code, NOT locale collation (ICU sorts
-    // case-insensitively and scrambles a0..a9,aA..aZ from the 37th key).
-    const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) => {
-      const ak = a.orderIndex ?? "";
-      const bk = b.orderIndex ?? "";
-      return (ak === "" ? 1 : 0) - (bk === "" ? 1 : 0) || (ak < bk ? -1 : ak > bk ? 1 : 0);
-    });
+    const siblings = (await this.listMetadataByWorkspace(target.workspaceId)).sort((a, b) =>
+      cmpOrderIndex(a.orderIndex, b.orderIndex),
+    );
     const others = siblings.filter((n) => n.id !== id);
     const targetIndex = others.findIndex((n) => n.id === targetId);
     if (targetIndex === -1) throw new NotFoundError("Note", targetId);

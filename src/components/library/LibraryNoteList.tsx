@@ -8,6 +8,7 @@ import { noteService, propertyService, tagService } from "../../di/container";
 import type { FilterRule } from "../../domain/filters/FilterRule";
 import { isRuleComplete } from "../../domain/filters/FilterRule";
 import type { Note } from "../../domain/note/Note";
+import { cmpOrderIndex } from "../../domain/note/ordering";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
 import { cn } from "../../lib/utils";
@@ -35,18 +36,6 @@ export type LibrarySort =
   | "title-desc";
 
 export type LibraryViewMode = "list" | "grid" | "masonry";
-
-/**
- * Stale-while-revalidate cache for the bulk-loaded filter/stack inputs
- * (see ./libraryListCache — kept module-level so the note store can seed
- * just-created notes into it). The old sidebar NoteList stayed mounted
- * forever, so its maps persisted across note opens; as a page, this list
- * unmounts on every note open, and rebuilding the maps per mount would
- * flash the UNFILTERED list (rules not applied) before the async loads
- * land. The cache restores the old semantics: mount with the last-known
- * maps, revalidate in the background (the version signals still gate
- * freshness).
- */
 
 /**
  * Rules whose predicate EMPTY inputs would satisfy (is-empty everywhere,
@@ -79,25 +68,11 @@ function satisfiedByEmptyInputs(rule: FilterRule): boolean {
   }
 }
 
-/** Code-unit comparison — fractional-indexing keys are ordered by char
- *  code (a0..a9,aA..aZ,aa..az), which localeCompare's case-insensitive
- *  ICU collation scrambles from the 37th key onward. */
-const cmpFractional = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
 const compareBy = (sort: LibrarySort) => {
   switch (sort) {
     case "custom":
-      // Fractional keys in code-unit order; empty keys (pre-v23 strays,
-      // new notes) sink to the end via the leading boolean term.
-      return (a: Note, b: Note) => {
-        const ak = a.orderIndex ?? "";
-        const bk = b.orderIndex ?? "";
-        return (
-          (ak === "" ? 1 : 0) - (bk === "" ? 1 : 0) ||
-          cmpFractional(ak, bk) ||
-          a.createdAt - b.createdAt
-        );
-      };
+      return (a: Note, b: Note) =>
+        cmpOrderIndex(a.orderIndex, b.orderIndex) || a.createdAt - b.createdAt;
     case "updated-asc":
       return (a: Note, b: Note) => a.updatedAt - b.updatedAt;
     case "created-desc":

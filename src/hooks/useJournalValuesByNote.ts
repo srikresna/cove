@@ -4,8 +4,7 @@ import { usePropertyStore } from "../store/usePropertyStore";
 
 /**
  * Bulk journal-date map (noteId -> local-midnight timestamp), refetched on
- * property-store refreshes. Shared source for the Journals page (and a
- * future replacement for CalendarPanel's per-component copy).
+ * property-store refreshes.
  */
 export const useJournalValuesByNote = (): Map<string, number> => {
   const [map, setMap] = useState<Map<string, number>>(new Map());

@@ -8,7 +8,6 @@ import { notifyError } from "./notify";
 interface ViewState {
   /** Saved views of the active workspace. */
   views: SavedView[];
-  /** The applied saved view, when any. */
   activeViewId: string | null;
   /**
    * JSON snapshot of the rules setActiveView copied into the drafts. Used
@@ -32,13 +31,10 @@ interface ViewState {
   removeDraftRule: (id: string) => void;
   clearDraft: () => void;
   saveDraftAsView: (workspaceId: string, name: string) => Promise<SavedView | null>;
-  /** Persist the edited draft rules back into the active view. */
   updateActiveViewRules: () => Promise<void>;
   renameView: (id: string, name: string) => Promise<void>;
   deleteView: (id: string) => Promise<void>;
-  /** Sync saved views + drafts after a select option was deleted. */
   syncAfterOptionDelete: (propertyId: string, optionId: string) => Promise<void>;
-  /** Sync saved views + drafts after a property definition was deleted. */
   syncAfterPropertyDelete: (propertyId: string) => Promise<void>;
   /** Prune draft rules referencing dead defs/options (startup heal). */
   healDrafts: (defs: PropertyDefinition[]) => void;
@@ -202,8 +198,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       draftRules: s.draftRules.flatMap((r) => {
         if ((r.kind === "select" || r.kind === "multiSelect") && r.propertyId === propertyId) {
           const optionIds = r.optionIds.filter((id) => id !== optionId);
-          // Born-empty rules are the FilterBar's mid-composition state —
-          // keep them; only rules that just lost their last id are dropped.
           if (
             r.optionIds.length > 0 &&
             optionIds.length === 0 &&

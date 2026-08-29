@@ -131,7 +131,7 @@ export class PropertyService implements IPropertyService {
     if (targetIndex === -1) throw new NotFoundError("Property", targetId);
 
     const insertAt = position === "before" ? targetIndex : targetIndex + 1;
-    if (insertAt === currentIndex) return; // already in place — nothing to write
+    if (insertAt === currentIndex) return;
 
     const beforeDef = position === "before" ? others[targetIndex - 1] : others[targetIndex];
     const afterDef = position === "before" ? others[targetIndex] : others[targetIndex + 1];

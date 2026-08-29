@@ -49,7 +49,8 @@ export function suggestJournalDate(query: string): SuggestedJournalDate | null {
   if (fuzzyMatch(q, "yesterday"))
     return { timestamp: midnightOf(addDays(now, -1)), alias: "Yesterday" };
 
-  // Next week / last week + weekday aliases ("next tuesday").
+  // Weekday aliases ("next tuesday") — the letters must fuzzy-match a
+  // weekday name, so bare "next week" never matches.
   const weekMatch = q.match(/^(next|last)([a-z]+)$/);
   if (weekMatch) {
     const [, direction = "", letters = ""] = weekMatch;

@@ -40,7 +40,7 @@ export class SQLiteNoteRepository implements INoteRepository {
     try {
       const db = await this.getDb();
       const rows = await db.select<Array<Record<string, unknown>>>(
-        "SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, isPinned, isFavorite, orderIndex, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
+        "SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, createdAt, updatedAt FROM notes WHERE workspaceId = ? AND deletedAt IS NULL ORDER BY updatedAt DESC, id DESC",
         [workspaceId],
       );
       return rows.map((row) => this.mapRowToRecord(row));
@@ -69,7 +69,7 @@ export class SQLiteNoteRepository implements INoteRepository {
       const db = await this.getDb();
       const placeholders = ids.map(() => "?").join(", ");
       const rows = await db.select<Array<Record<string, unknown>>>(
-        `SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, isPinned, isFavorite, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
+        `SELECT id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, createdAt, updatedAt FROM notes WHERE id IN (${placeholders})`,
         ids,
       );
       return rows.map((row) => this.mapRowToRecord(row));

@@ -36,11 +36,6 @@ export function seedKnownEmptyNote(workspaceId: string, noteId: string): void {
   entry.knownEmptyIds.add(noteId);
 }
 
-/** Read the cached tag map, creating the cache entry shape if absent. */
-export function readCachedTagIds(workspaceId: string): Map<string, string[]> | null {
-  return listCache.get(workspaceId)?.tagIdsByNote ?? null;
-}
-
 export function writeCachedTagIds(workspaceId: string, tagIdsByNote: Map<string, string[]>): void {
   // Create the entry when absent (the tag load can beat the stack-effect's
   // entry-creating write on a first visit, which would drop the map and
