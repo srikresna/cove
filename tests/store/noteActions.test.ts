@@ -190,6 +190,51 @@ describe("noteActions", () => {
     expect(queryClient.getQueryData<Note[]>(notesKey("ws1"))?.map((n) => n.id)).toContain("t1");
   });
 
+  it("fetchNotes selects the first note when nothing valid is active (passive paths)", async () => {
+    queryClient.clear();
+    queryClient.setQueryDefaults(notesKey("ws1"), {
+      queryFn: () => listMetadataByWorkspace("ws1"),
+    });
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "a" }), makeNote({ id: "b" })]);
+    useNoteUiStore.setState({ activeNoteId: null });
+
+    await noteActions.fetchNotes("ws1");
+
+    expect(useNoteUiStore.getState().activeNoteId).toBe("a");
+  });
+
+  it("fetchNotes keeps an active note that exists in the landed list", async () => {
+    queryClient.clear();
+    queryClient.setQueryDefaults(notesKey("ws1"), {
+      queryFn: () => listMetadataByWorkspace("ws1"),
+    });
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "a" }), makeNote({ id: "b" })]);
+    useNoteUiStore.setState({ activeNoteId: "b" });
+
+    await noteActions.fetchNotes("ws1");
+
+    expect(useNoteUiStore.getState().activeNoteId).toBe("b");
+  });
+
+  it("loadActiveNoteContent fetches the owning workspace's cache for a cross-ws note", async () => {
+    const { getNote, getCoverImage } = (await import("@/di/container")).noteService as unknown as {
+      getNote: ReturnType<typeof vi.fn>;
+      getCoverImage: ReturnType<typeof vi.fn>;
+    };
+    getNote.mockResolvedValue(makeNote({ id: "x-ws2", workspaceId: "ws2", content: "full" }));
+    getCoverImage.mockResolvedValue(null);
+    queryClient.setQueryDefaults(notesKey("ws2"), {
+      queryFn: () => listMetadataByWorkspace("ws2"),
+    });
+    listMetadataByWorkspace.mockResolvedValue([makeNote({ id: "x-ws2", workspaceId: "ws2" })]);
+    useNoteUiStore.setState({ activeNoteId: "x-ws2" });
+
+    await noteActions.loadActiveNoteContent("x-ws2");
+
+    const ws2 = queryClient.getQueryData<Note[]>(notesKey("ws2"));
+    expect(ws2?.[0]?.content).toBe("full");
+  });
+
   it("doc-created handler rejects (tagged) when there is no active workspace", async () => {
     useWorkspaceStore.setState({ activeWorkspaceId: null });
 

@@ -45,12 +45,23 @@ async function invalidateNotes(): Promise<void> {
 }
 
 export const noteActions = {
-  /** Ensures the workspace's list is cached (fetches on first use). */
+  /** Ensures the workspace's list is cached (fetches on first use) and
+   *  keeps the passive-selection invariant: boot, unlock remount, and
+   *  workspace switches never click a row, so a landed list selects the
+   *  first note when nothing valid is active. */
   async fetchNotes(ws: string): Promise<void> {
     await queryClient.ensureQueryData({
       queryKey: notesKey(ws),
       queryFn: () => fetchNotesFn(ws),
     });
+    if (useWorkspaceStore.getState().activeWorkspaceId !== ws) return;
+    const notes = readNotes(ws);
+    const activeId = useNoteUiStore.getState().activeNoteId;
+    const valid = activeId != null && notes.some((n) => n.id === activeId);
+    if (!valid && notes.length > 0) {
+      // Direct state write: selecting passively must not flip the page.
+      useNoteUiStore.setState({ activeNoteId: notes[0]?.id ?? null, activeCoverImage: null });
+    }
   },
 
   /** Forces a refetch of the workspace's list, resolving after it lands. */
@@ -71,7 +82,16 @@ export const noteActions = {
       ]);
       if (useNoteUiStore.getState().activeNoteId !== id) return;
       if (note) {
-        const entry = cacheOf(id);
+        // The owning list may not be cached yet (a cross-workspace Quick
+        // Search hit) — fetch it so the full-note patch always lands.
+        let entry = cacheOf(id);
+        if (!entry) {
+          await queryClient.ensureQueryData({
+            queryKey: notesKey(note.workspaceId),
+            queryFn: () => fetchNotesFn(note.workspaceId),
+          });
+          entry = cacheOf(id);
+        }
         if (entry) {
           writeNotes(
             entry.ws,
