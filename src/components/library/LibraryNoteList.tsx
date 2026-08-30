@@ -2,7 +2,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
 import { noteService, propertyService, tagService } from "../../di/container";
 import type { FilterableNote } from "../../domain/filters/evaluateFilters";
@@ -15,9 +14,11 @@ import {
 import type { Note } from "../../domain/note/Note";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { listCache, writeCachedTagIds } from "../../services/library/libraryListCache";
-import { useNoteStore } from "../../store/useNoteStore";
+import { noteActions } from "../../store/noteActions";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
@@ -54,25 +55,13 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   defs,
 }) => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const {
-    notes,
-    activeNoteId,
-    setActiveNoteId,
-    trashNote,
-    duplicateNote,
-    togglePinNote,
-    toggleFavoriteNote,
-  } = useNoteStore(
-    useShallow((s) => ({
-      notes: s.notes,
-      activeNoteId: s.activeNoteId,
-      setActiveNoteId: s.setActiveNoteId,
-      trashNote: s.trashNote,
-      duplicateNote: s.duplicateNote,
-      togglePinNote: s.togglePinNote,
-      toggleFavoriteNote: s.toggleFavoriteNote,
-    })),
-  );
+  const notes = useNotes();
+  const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
+  const trashNote = noteActions.trashNote;
+  const duplicateNote = noteActions.duplicateNote;
+  const togglePinNote = noteActions.togglePinNote;
+  const toggleFavoriteNote = noteActions.toggleFavoriteNote;
 
   // Property stacks under each note title.
   const cached = activeWorkspaceId ? listCache.get(activeWorkspaceId) : undefined;
@@ -499,7 +488,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         .reorderNote(id, targetId, position)
         .then(() => {
           if (activeWorkspaceId) {
-            return useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+            return noteActions.refreshNotesInPlace(activeWorkspaceId);
           }
         })
         .catch(() => {

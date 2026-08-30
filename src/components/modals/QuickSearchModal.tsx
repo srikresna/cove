@@ -7,8 +7,9 @@ import { journalService, noteService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
 import { suggestJournalDate } from "../../services/suggestJournalDate";
+import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { extractParagraphs } from "../../utils/plainText";
@@ -81,7 +82,7 @@ export const QuickSearchModal: React.FC = () => {
   const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
   const pickerResolve = useUIStore((s) => s.pickerResolve);
   const resolvePicker = useUIStore((s) => s.resolvePicker);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<NoteSearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -187,7 +188,7 @@ export const QuickSearchModal: React.FC = () => {
     journalService
       .ensureJournalByDate(activeWorkspaceId, timestamp)
       .then(async (noteId) => {
-        await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+        await noteActions.refreshNotesInPlace(activeWorkspaceId);
         if (pickerResolve) {
           resolvePicker(noteId);
           return;

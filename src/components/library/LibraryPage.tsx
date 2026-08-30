@@ -5,9 +5,10 @@ import { MESSAGES } from "../../constants/messages";
 import { blockSuiteEditorService, propertyService, savedViewService } from "../../di/container";
 import { isStackEligibleDef } from "../../domain/library/query";
 import type { PropertyDefinition } from "../../domain/property/Property";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
+import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
@@ -74,9 +75,9 @@ const isDisplayPrefs = (value: unknown): value is LibraryDisplayPrefs => {
  */
 export const LibraryPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const notes = useNoteStore((s) => s.notes);
-  const createNote = useNoteStore((s) => s.createNote);
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const notes = useNotes();
+  const createNote = noteActions.createNote;
+  const updateNote = noteActions.updateNote;
   const tags = useTagStore((s) => s.tags);
   const activeTagId = useTagStore((s) => s.activeTagId);
   const setTagFilter = useTagStore((s) => s.setTagFilter);
@@ -209,7 +210,7 @@ export const LibraryPage: React.FC = () => {
         }
       }
       if (imported > 0 || notifiedFailed > 0) {
-        await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+        await noteActions.refreshNotesInPlace(activeWorkspaceId);
       }
       const totalFailed = failed + notifiedFailed;
       if (imported > 0 || totalFailed > 0) {

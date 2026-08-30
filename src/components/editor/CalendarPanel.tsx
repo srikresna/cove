@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
+import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
@@ -25,8 +27,8 @@ const isDateField = (value: string): value is DateField =>
   value === "journal" || value === "updatedAt" || value === "createdAt";
 
 export const CalendarPanel: React.FC = () => {
-  const notes = useNoteStore((s) => s.notes);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const notes = useNotes();
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const propertyVersion = usePropertyStore((s) => s.version);
 
@@ -145,7 +147,7 @@ export const CalendarPanel: React.FC = () => {
         .then(async (noteId) => {
           // The service bypasses the stores, so refresh both before pointing
           // the UI at the (possibly just-created) journal note.
-          await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
+          await noteActions.refreshNotesInPlace(activeWorkspaceId);
           setSelectedDay(dayKey(date));
           setActiveNoteId(noteId);
         })

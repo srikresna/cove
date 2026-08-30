@@ -1,7 +1,8 @@
 import type React from "react";
 import { useMemo } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNotes } from "../../hooks/useNotes";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { NoteRow } from "./NoteRow";
@@ -11,9 +12,9 @@ const RECENT_LIMIT = 5;
 /** A short, compact list of the most recently touched notes. */
 export const RecentSection: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const notes = useNoteStore((s) => s.notes);
-  const activeNoteId = useNoteStore((s) => s.activeNoteId);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const notes = useNotes();
+  const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
 
   const recent = useMemo(
     () =>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Note } from "../../../domain/note/Note";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
-import { useNoteStore } from "../../../store/useNoteStore";
+import { noteActions } from "../../../store/noteActions";
 import { countWordsAndChars } from "../../../utils/plainText";
 import { TooltipProvider } from "../../ui/tooltip";
 import { EditorHeader } from "../EditorHeader";
@@ -21,7 +21,7 @@ interface BlockSuiteNoteEditorProps {
 }
 
 export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const updateNote = noteActions.updateNote;
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
   const [isRightBarOpen, setRightBarOpen] = useState(
     () => localStorage.getItem(RIGHTBAR_KEY) === "true",

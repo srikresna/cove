@@ -1,8 +1,9 @@
 import { FileText, RotateCcw, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useTrash } from "../../hooks/useNotes";
+import { noteActions } from "../../store/noteActions";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { formatRelativeDay } from "../../utils/time";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
@@ -12,17 +13,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 export const TrashPage: React.FC = () => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const trashedNotes = useNoteStore((s) => s.trashedNotes);
-  const fetchTrash = useNoteStore((s) => s.fetchTrash);
-  const restoreNote = useNoteStore((s) => s.restoreNote);
-  const deleteNotePermanently = useNoteStore((s) => s.deleteNotePermanently);
+  const trashedNotes = useTrash();
+  const restoreNote = noteActions.restoreNote;
+  const deleteNotePermanently = noteActions.deleteNotePermanently;
 
   const [query, setQuery] = useState("");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    void fetchTrash();
-  }, [fetchTrash]);
 
   const trimmed = query.trim().toLowerCase();
   const filtered = useMemo(

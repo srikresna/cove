@@ -1,6 +1,7 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
+import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 
 /** The notes-list cache key — per workspace. */
 export const notesKey = (workspaceId: string) => ["notes", workspaceId] as const;
@@ -27,6 +28,10 @@ export const queryClient = new QueryClient({
       gcTime: 5 * 60_000,
     },
   },
+  queryCache: new QueryCache({
+    // One surface for fetch failures (the old per-call notifyError paths).
+    onError: (err) => notifyError(err, { saveStatus: false }),
+  }),
 });
 
 // Vault lock wipes the caches; the unlock remount refetches through the

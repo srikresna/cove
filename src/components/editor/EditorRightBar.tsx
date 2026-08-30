@@ -8,8 +8,9 @@ import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 import { requestPresentation } from "../../services/blocksuite/presentationIntent";
 import type { NoteMeta } from "../../services/INoteService";
+import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { formatFullTimestamp, formatRelativeDay } from "../../utils/time";
 import { Button } from "../ui/button";
@@ -60,8 +61,8 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
   });
   const [backlinks, setBacklinks] = useState<NoteMeta[]>([]);
   const [outgoing, setOutgoing] = useState<NoteMeta[]>([]);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
+  const updateNote = noteActions.updateNote;
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 

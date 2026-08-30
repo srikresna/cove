@@ -7,7 +7,8 @@ import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
-import { useNoteStore } from "../../store/useNoteStore";
+import { noteActions } from "../../store/noteActions";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import { Button } from "../ui/button";
@@ -49,9 +50,9 @@ export const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, on
 );
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth }) => {
-  const uploadCoverImage = useNoteStore((s) => s.uploadCoverImage);
-  const removeCoverImage = useNoteStore((s) => s.removeCoverImage);
-  const coverImage = useNoteStore((s) => s.activeCoverImage);
+  const uploadCoverImage = noteActions.uploadCoverImage;
+  const removeCoverImage = noteActions.removeCoverImage;
+  const coverImage = useNoteUiStore((s) => s.activeCoverImage);
   const saveStatus = useSaveStatusStore((s) => s.status);
 
   return (
@@ -84,7 +85,7 @@ export const NoteHeaderBody: React.FC<{
   removeCoverImage,
   backlinkDefaultOpenRef = null,
 }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const updateNote = noteActions.updateNote;
 
   const [title, setTitle] = useState(note.title);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

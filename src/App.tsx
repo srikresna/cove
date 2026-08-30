@@ -18,7 +18,9 @@ import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import { propertyService, savedViewService } from "./di/container";
 import type { Note } from "./domain/note/Note";
-import { useNoteStore } from "./store/useNoteStore";
+import { useNotes } from "./hooks/useNotes";
+import { noteActions } from "./store/noteActions";
+import { useNoteUiStore } from "./store/useNoteUiStore";
 import { useUIStore } from "./store/useUIStore";
 import { useViewStore } from "./store/useViewStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
@@ -34,12 +36,12 @@ export const AppContent: React.FC = () => {
   const isDarkMode = useUIStore((s) => s.isDarkMode);
   const activePage = useUIStore((s) => s.activePage);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
-  const notes = useNoteStore((s) => s.notes);
-  const activeNoteId = useNoteStore((s) => s.activeNoteId);
-  const createNote = useNoteStore((s) => s.createNote);
-  const fetchNotes = useNoteStore((s) => s.fetchNotes);
-  const loadActiveNoteContent = useNoteStore((s) => s.loadActiveNoteContent);
-  const purgeExpiredTrash = useNoteStore((s) => s.purgeExpiredTrash);
+  const notes = useNotes();
+  const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
+  const createNote = noteActions.createNote;
+  const fetchNotes = noteActions.fetchNotes;
+  const loadActiveNoteContent = noteActions.loadActiveNoteContent;
+  const purgeExpiredTrash = noteActions.purgeExpiredTrash;
 
   useEffect(() => {
     fetchWorkspaces();

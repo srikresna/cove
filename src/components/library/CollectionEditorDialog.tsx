@@ -6,9 +6,10 @@ import type { FilterRule } from "../../domain/filters/FilterRule";
 import { isRuleComplete } from "../../domain/filters/FilterRule";
 import type { SavedView } from "../../domain/filters/SavedView";
 import { selectNotesForView } from "../../domain/library/query";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { readListCache } from "../../services/library/libraryListCache";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
@@ -29,8 +30,8 @@ export const CollectionEditorDialog: React.FC<{
   onSave: (next: { name: string; rules: FilterRule[]; allowNoteIds: string[] }) => void;
 }> = ({ open, view, onCancel, onSave }) => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const notes = useNoteStore((s) => s.notes);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const notes = useNotes();
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
 
   const [tab, setTab] = useState<"rules" | "docs">("rules");
   const [name, setName] = useState("");

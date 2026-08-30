@@ -28,8 +28,8 @@ import {
 } from "../../domain/property/Property";
 import type { Tag } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
+import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
@@ -328,7 +328,7 @@ const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({ noteId, 
 /** System row: workspace picker, derived from the note's workspaceId. */
 const WorkspaceValue: React.FC<{ note: Note }> = ({ note }) => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const moveNoteToWorkspace = useNoteStore((s) => s.moveNoteToWorkspace);
+  const moveNoteToWorkspace = noteActions.moveNoteToWorkspace;
   const workspace = workspaces.find((w) => w.id === note.workspaceId);
 
   const moveToWorkspace = (workspaceId: string) => {
@@ -411,7 +411,7 @@ const EDGELESS_THEME_OPTIONS = [
 ] as const;
 
 const DocModeValue: React.FC<{ note: Note }> = ({ note }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const updateNote = noteActions.updateNote;
   return (
     <SegmentedValue
       options={DOC_MODE_OPTIONS.map((o) => ({ ...o }))}
@@ -425,7 +425,7 @@ const DocModeValue: React.FC<{ note: Note }> = ({ note }) => {
 };
 
 const PageWidthValue: React.FC<{ note: Note }> = ({ note }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const updateNote = noteActions.updateNote;
   return (
     <SegmentedValue
       options={PAGE_WIDTH_OPTIONS.map((o) => ({ ...o }))}
@@ -439,7 +439,7 @@ const PageWidthValue: React.FC<{ note: Note }> = ({ note }) => {
 };
 
 const EdgelessThemeValue: React.FC<{ note: Note }> = ({ note }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const updateNote = noteActions.updateNote;
   return (
     <SegmentedValue
       options={EDGELESS_THEME_OPTIONS.map((o) => ({ ...o }))}
@@ -455,7 +455,7 @@ const EdgelessThemeValue: React.FC<{ note: Note }> = ({ note }) => {
 };
 
 const TemplateValue: React.FC<{ note: Note }> = ({ note }) => {
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const updateNote = noteActions.updateNote;
   return (
     <PropertyCheckbox
       checked={note.isTemplate === true}

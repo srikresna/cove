@@ -29,7 +29,8 @@ import { consumePresentation } from "../../../services/blocksuite/presentationIn
 import { packBlockSuiteContent } from "../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../services/editor/yjsCodec";
 import { Logger } from "../../../services/Logger";
-import { useNoteStore } from "../../../store/useNoteStore";
+import { noteActions } from "../../../store/noteActions";
+import { useNoteUiStore } from "../../../store/useNoteUiStore";
 import { useUIStore } from "../../../store/useUIStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import type { TestAffineEditorContainer } from "./editorContainer";
@@ -195,15 +196,14 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     const refSlots = editor.std?.get?.(RefNodeSlotsProvider);
     const navSub = refSlots?.docLinkClicked?.subscribe?.(
       ({ pageId: targetId }: { pageId: string }) => {
-        const noteStore = useNoteStore.getState();
         const wsStore = useWorkspaceStore.getState();
 
-        const allNotes = noteStore.notes;
+        const allNotes = noteActions.currentNotes();
         const targetNote = allNotes.find((n) => n.id === targetId);
         if (targetNote && targetNote.workspaceId !== wsStore.activeWorkspaceId) {
           wsStore.setActiveWorkspace(targetNote.workspaceId);
         }
-        noteStore.setActiveNoteId(targetId);
+        useNoteUiStore.getState().setActiveNoteId(targetId);
       },
     );
 
@@ -216,15 +216,12 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
       const snapshot = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
       if (snapshot === lastSavedSnapshot) return;
 
-      void useNoteStore
-        .getState()
-        .updateNote(noteId, { content: snapshot })
-        .then(
-          () => {
-            lastSavedSnapshot = snapshot;
-          },
-          () => {},
-        );
+      void noteActions.updateNote(noteId, { content: snapshot }).then(
+        () => {
+          lastSavedSnapshot = snapshot;
+        },
+        () => {},
+      );
     };
     const flush = () => {
       const doEncode = () => {

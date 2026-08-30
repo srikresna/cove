@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import { journalService } from "../di/container";
+import { noteActions } from "../store/noteActions";
 import { notifyError } from "../store/notify";
-import { useNoteStore } from "../store/useNoteStore";
+import { useNoteUiStore } from "../store/useNoteUiStore";
 import { useUIStore } from "../store/useUIStore";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 
@@ -11,7 +12,7 @@ import { useWorkspaceStore } from "../store/useWorkspaceStore";
  * but still returns the main area to the editor page.
  */
 export function useOpenJournal(): (timestamp: number) => void {
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   return useCallback(
@@ -20,8 +21,8 @@ export function useOpenJournal(): (timestamp: number) => void {
       journalService
         .ensureJournalByDate(activeWorkspaceId, timestamp)
         .then(async (noteId) => {
-          await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
-          if (useNoteStore.getState().activeNoteId === noteId) {
+          await noteActions.refreshNotesInPlace(activeWorkspaceId);
+          if (useNoteUiStore.getState().activeNoteId === noteId) {
             useUIStore.getState().setActivePage("editor");
             return;
           }

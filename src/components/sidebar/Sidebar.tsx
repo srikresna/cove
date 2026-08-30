@@ -3,7 +3,8 @@ import { CalendarCheck, ChevronDown, Library, Plus, Search, Trash2 } from "lucid
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNotes } from "../../hooks/useNotes";
+import { noteActions } from "../../store/noteActions";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
@@ -34,8 +35,8 @@ export const Sidebar: React.FC = () => {
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const activePage = useUIStore((s) => s.activePage);
   const setActivePage = useUIStore((s) => s.setActivePage);
-  const createNote = useNoteStore((s) => s.createNote);
-  const notes = useNoteStore((s) => s.notes);
+  const createNote = noteActions.createNote;
+  const notes = useNotes();
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
   const noteCount = notes.filter((n) => n.workspaceId === activeWorkspace?.id).length;

@@ -20,7 +20,7 @@ import type { DocMode, Note } from "../../domain/note/Note";
 import { useElementWidth } from "../../hooks/useElementWidth";
 import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { cn } from "../../lib/utils";
-import { useNoteStore } from "../../store/useNoteStore";
+import { noteActions } from "../../store/noteActions";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { Button } from "../ui/button";
 import {
@@ -83,10 +83,10 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   onToggleFullscreen,
   onToggleRightBar,
 }) => {
-  const trashNote = useNoteStore((s) => s.trashNote);
-  const duplicateNote = useNoteStore((s) => s.duplicateNote);
-  const togglePinNote = useNoteStore((s) => s.togglePinNote);
-  const toggleFavoriteNote = useNoteStore((s) => s.toggleFavoriteNote);
+  const trashNote = noteActions.trashNote;
+  const duplicateNote = noteActions.duplicateNote;
+  const togglePinNote = noteActions.togglePinNote;
+  const toggleFavoriteNote = noteActions.toggleFavoriteNote;
   const propertyVersion = usePropertyStore((s) => s.version);
   const openJournal = useOpenJournal();
   const [journalDate, setJournalDate] = useState<number | null>(null);

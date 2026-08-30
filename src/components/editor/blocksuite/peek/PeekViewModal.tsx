@@ -4,11 +4,13 @@ import { Check, Copy, Expand, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { blockSuiteEditorService, noteService } from "../../../../di/container";
+import { useNotes } from "../../../../hooks/useNotes";
 import type { DocPeekRequest } from "../../../../services/blocksuite/peekViewService";
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
 import { Logger } from "../../../../services/Logger";
-import { useNoteStore } from "../../../../store/useNoteStore";
+import { noteActions } from "../../../../store/noteActions";
+import { useNoteUiStore } from "../../../../store/useNoteUiStore";
 import { useNotificationStore } from "../../../../store/useNotificationStore";
 import { usePeekViewStore } from "../../../../store/usePeekViewStore";
 import { useWorkspaceStore } from "../../../../store/useWorkspaceStore";
@@ -72,15 +74,12 @@ function mountEdgelessPeek(
       if (!blockSuiteEditorService.isWorkspaceAlive()) return;
       const snapshot = packBlockSuiteContent(encodeDocSnapshot(store.spaceDoc));
       if (snapshot === lastSavedSnapshot) return;
-      void useNoteStore
-        .getState()
-        .updateNote(docRequest.docId, { content: snapshot })
-        .then(
-          () => {
-            lastSavedSnapshot = snapshot;
-          },
-          () => {},
-        );
+      void noteActions.updateNote(docRequest.docId, { content: snapshot }).then(
+        () => {
+          lastSavedSnapshot = snapshot;
+        },
+        () => {},
+      );
     };
     const flush = () => {
       const doEncode = () => {
@@ -208,14 +207,14 @@ async function openPeekDoc(docId: string): Promise<boolean> {
 }
 
 async function waitForNoteRecord(docId: string): Promise<boolean | null> {
-  const hasRecord = () => useNoteStore.getState().notes.some((n) => n.id === docId);
+  const hasRecord = () => noteActions.currentNotes().some((n) => n.id === docId);
   if (hasRecord()) return true;
   const wsId = useWorkspaceStore.getState().activeWorkspaceId;
   if (!wsId) return null;
   for (let i = 0; i < 20 && !hasRecord(); i++) {
     await new Promise((r) => setTimeout(r, 100));
     if (i > 0 && i % 5 === 0) {
-      await useNoteStore.getState().refreshNotesInPlace(wsId);
+      await noteActions.refreshNotesInPlace(wsId);
     }
   }
   return hasRecord();
@@ -230,9 +229,8 @@ export const PeekViewModal: React.FC = () => {
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const note = useNoteStore((s) =>
-    request?.type === "doc" ? s.notes.find((n) => n.id === request.docId) : undefined,
-  );
+  const notes = useNotes();
+  const note = request?.type === "doc" ? notes.find((n) => n.id === request.docId) : undefined;
   const peekMode = request?.type === "doc" ? (request.mode ?? note?.docMode ?? "page") : null;
   const isEdgelessPeek = request?.type === "doc" && peekMode === "edgeless";
 
@@ -319,7 +317,7 @@ export const PeekViewModal: React.FC = () => {
       return;
     }
 
-    useNoteStore.getState().setActiveNoteId(docId);
+    useNoteUiStore.getState().setActiveNoteId(docId);
     close();
   };
 

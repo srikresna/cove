@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
 import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
+import { useNotes } from "../../hooks/useNotes";
 import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import { WeekDatePicker } from "../ui/WeekDatePicker";
@@ -21,8 +22,8 @@ const keyOf = (timestamp: number): string => dayKey(new Date(timestamp));
  */
 export const JournalsPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const notes = useNoteStore((s) => s.notes);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const notes = useNotes();
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const [selectedDate, setSelectedDate] = useState(() => Date.now());
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();

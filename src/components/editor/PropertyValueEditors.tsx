@@ -45,9 +45,10 @@ import type {
   PropertyValue,
 } from "../../domain/property/Property";
 import { TAG_COLORS } from "../../domain/tag/Tag";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useViewStore } from "../../store/useViewStore";
 import {
   DropdownMenu,
@@ -479,7 +480,7 @@ const RelationPicker: React.FC<{
   excluded: string[];
   onPick: (noteId: string) => void;
 }> = ({ excluded, onPick }) => {
-  const notes = useNoteStore((s) => s.notes);
+  const notes = useNotes();
   const [query, setQuery] = useState("");
   const trimmed = query.trim().toLowerCase();
   const candidates = notes
@@ -760,8 +761,8 @@ const FilesValue: React.FC<PropertyValueEditorProps> = ({ value, onClear, onSet 
 };
 
 const RelationValue: React.FC<PropertyValueEditorProps> = ({ value, noteId, onClear, onSet }) => {
-  const notes = useNoteStore((s) => s.notes);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const notes = useNotes();
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const ids = value?.type === "relation" ? value.noteIds : [];
   const noteTitle = (id: string): string => {
     const found: Note | undefined = notes.find((n) => n.id === id);

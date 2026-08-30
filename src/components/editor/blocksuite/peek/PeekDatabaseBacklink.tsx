@@ -32,7 +32,8 @@ import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlock
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
 import { Logger } from "../../../../services/Logger";
-import { useNoteStore } from "../../../../store/useNoteStore";
+import { noteActions } from "../../../../store/noteActions";
+import { useNoteUiStore } from "../../../../store/useNoteUiStore";
 import { PropertyCalendar } from "../../../ui/PropertyCalendar";
 import { PropertyCheckbox } from "../../../ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../ui/popover";
@@ -731,15 +732,12 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
       const store = blockSuiteEditorService.getDocStoreForPeek(databaseDocId);
       if (!store) return;
       const snapshot = packBlockSuiteContent(encodeDocSnapshot(store.spaceDoc));
-      void useNoteStore
-        .getState()
-        .updateNote(databaseDocId, { content: snapshot })
-        .then(
-          () => {
-            dirtyRef.current = false;
-          },
-          () => {},
-        );
+      void noteActions.updateNote(databaseDocId, { content: snapshot }).then(
+        () => {
+          dirtyRef.current = false;
+        },
+        () => {},
+      );
     } catch {
       void 0;
     }
@@ -808,7 +806,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
   if (!data || data.cells.length === 0) return null;
 
   const sectionTitle = `${data.databaseName || MESSAGES.UNNAMED} ${MESSAGES.PROPERTIES}`;
-  const canOpenSource = useNoteStore.getState().notes.some((n) => n.id === databaseDocId);
+  const canOpenSource = noteActions.currentNotes().some((n) => n.id === databaseDocId);
 
   return (
     <div className="mt-4">
@@ -834,7 +832,7 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
             type="button"
             aria-label={MESSAGES.BACKLINK_OPEN_SOURCE}
             title={MESSAGES.BACKLINK_OPEN_SOURCE}
-            onClick={() => useNoteStore.getState().setActiveNoteId(databaseDocId)}
+            onClick={() => useNoteUiStore.getState().setActiveNoteId(databaseDocId)}
             className="mr-1 flex items-center gap-1 rounded px-1 py-0.5 text-xs text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <FileText className="h-3.5 w-3.5" aria-hidden="true" />

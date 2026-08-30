@@ -6,7 +6,7 @@ import type { DocPeekRequest } from "../../../../services/blocksuite/peekViewSer
 import { packBlockSuiteContent } from "../../../../services/editor/contentFormat";
 import { encodeDocSnapshot } from "../../../../services/editor/yjsCodec";
 import { Logger } from "../../../../services/Logger";
-import { useNoteStore } from "../../../../store/useNoteStore";
+import { noteActions } from "../../../../store/noteActions";
 import { TooltipProvider } from "../../../ui/tooltip";
 import { NoteHeaderBody } from "../../EditorHeader";
 import { buildCommonExtensions } from "../BlockSuiteSurface";
@@ -28,8 +28,8 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
   onReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const uploadCoverImage = useNoteStore((s) => s.uploadCoverImage);
-  const removeCoverImage = useNoteStore((s) => s.removeCoverImage);
+  const uploadCoverImage = noteActions.uploadCoverImage;
+  const removeCoverImage = noteActions.removeCoverImage;
   const [coverImage, setCoverImage] = useState<string | null>(null);
 
   const handleUnavailable = useCallback(() => onUnavailable(), [onUnavailable]);
@@ -79,15 +79,12 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
           if (!blockSuiteEditorService.isWorkspaceAlive()) return;
           const snapshot = packBlockSuiteContent(encodeDocSnapshot(store.spaceDoc));
           if (snapshot === lastSavedSnapshot) return;
-          void useNoteStore
-            .getState()
-            .updateNote(request.docId, { content: snapshot })
-            .then(
-              () => {
-                lastSavedSnapshot = snapshot;
-              },
-              () => {},
-            );
+          void noteActions.updateNote(request.docId, { content: snapshot }).then(
+            () => {
+              lastSavedSnapshot = snapshot;
+            },
+            () => {},
+          );
         };
         const flush = () => {
           const doEncode = () => {

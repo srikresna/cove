@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { noteService } from "../../../../di/container";
+import { useNotes } from "../../../../hooks/useNotes";
 import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlockSuiteEditorService";
 import { ensureNoteScanned, scannedBacklinksOf } from "../../../../services/editor/backlinkScan";
-import { useNoteStore } from "../../../../store/useNoteStore";
 
 export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklinkRef[] {
-  const noteIds = useNoteStore((s) => s.notes.map((n) => n.id).join(","));
+  const noteIds = useNotes()
+    .map((n) => n.id)
+    .join(",");
   const [backlinks, setBacklinks] = useState<DatabaseBacklinkRef[]>([]);
 
   useEffect(() => {

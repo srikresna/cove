@@ -3,7 +3,8 @@ import type React from "react";
 import { useMemo } from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
-import { useNoteStore } from "../../store/useNoteStore";
+import { useNotes } from "../../hooks/useNotes";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { NoteRow } from "./NoteRow";
@@ -40,9 +41,9 @@ const Group: React.FC<{
  */
 export const FavoritesSection: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const notes = useNoteStore((s) => s.notes);
-  const activeNoteId = useNoteStore((s) => s.activeNoteId);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
+  const notes = useNotes();
+  const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
 
   const workspaceNotes = useMemo(
     () => notes.filter((n) => n.workspaceId === activeWorkspaceId),

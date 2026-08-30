@@ -12,9 +12,11 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { getJournalTemplateId, setJournalTemplateId } from "../../services/journalTemplateSetting";
-import { useNoteStore } from "../../store/useNoteStore";
+import { noteActions } from "../../store/noteActions";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import {
@@ -118,13 +120,13 @@ const TemplateRow: React.FC<{
 );
 
 export const TemplatesSection: React.FC = () => {
-  const notes = useNoteStore((s) => s.notes);
-  const activeNoteId = useNoteStore((s) => s.activeNoteId);
-  const setActiveNoteId = useNoteStore((s) => s.setActiveNoteId);
-  const createNote = useNoteStore((s) => s.createNote);
-  const duplicateNote = useNoteStore((s) => s.duplicateNote);
-  const trashNote = useNoteStore((s) => s.trashNote);
-  const updateNote = useNoteStore((s) => s.updateNote);
+  const notes = useNotes();
+  const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
+  const createNote = noteActions.createNote;
+  const duplicateNote = noteActions.duplicateNote;
+  const trashNote = noteActions.trashNote;
+  const updateNote = noteActions.updateNote;
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const [journalTemplateId, setJournalTemplateIdState] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
