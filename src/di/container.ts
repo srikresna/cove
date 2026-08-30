@@ -1,3 +1,4 @@
+import type { BlobSource } from "@blocksuite/sync";
 import { invoke } from "@tauri-apps/api/core";
 import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
@@ -44,7 +45,10 @@ const noteLinkRepository = new SQLiteNoteLinkRepository();
 const tagRepository = new SQLiteTagRepository();
 const blobRepository = new SQLiteBlobRepository();
 
-export const blobSource = new SqliteBlobSource(blobRepository, cryptoVault);
+export const blobSource: BlobSource & { clearCache(): void } = new SqliteBlobSource(
+  blobRepository,
+  cryptoVault,
+);
 
 export const noteService: INoteService = new NoteService(
   noteRepository,

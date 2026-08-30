@@ -4,6 +4,8 @@ import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
 import { FoundationViewExtension } from "@blocksuite/affine/foundation/view";
 import { FeatureFlagService } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
+// The vendored store package exports Workspace only as an interface — this
+// test entrypoint is its sole concrete implementation.
 import { TestWorkspace } from "@blocksuite/affine/store/test";
 import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
 import type { BlobSource } from "@blocksuite/sync";

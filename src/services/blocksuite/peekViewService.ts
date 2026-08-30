@@ -1,6 +1,5 @@
 import type { PeekOptions, PeekViewService } from "@blocksuite/affine/components/peek";
 import type { TemplateResult } from "lit";
-import { create } from "zustand";
 
 export interface DocPeekRequest {
   type: "doc";
@@ -24,25 +23,22 @@ export interface TemplatePeekRequest {
 
 export type PeekRequest = DocPeekRequest | TemplatePeekRequest;
 
-interface PeekViewState {
-  request: PeekRequest | null;
-  resolve: (() => void) | null;
-  open: (request: PeekRequest, resolve: () => void) => void;
-  close: () => void;
+/** UI-side peek surface: open/close the modal holding the request. */
+export interface PeekSink {
+  open(request: PeekRequest, resolve: () => void): void;
+  close(): void;
 }
 
-export const usePeekViewStore = create<PeekViewState>((set, get) => ({
-  request: null,
-  resolve: null,
-  open: (request, resolve) => {
-    get().resolve?.();
-    set({ request, resolve });
-  },
-  close: () => {
-    get().resolve?.();
-    set({ request: null, resolve: null });
-  },
-}));
+// Bound by the store layer at module load; the unbound default resolves
+// immediately so callers never hang before boot wiring.
+let peekSink: PeekSink = {
+  open: (_request, resolve) => resolve(),
+  close: () => {},
+};
+
+export function providePeekSink(sink: PeekSink): void {
+  peekSink = sink;
+}
 
 function resolvePeekTarget(args: {
   target?: HTMLElement;
@@ -96,7 +92,7 @@ let inflight: { key: string; promise: Promise<void> } | null = null;
 
 export function dismissAllPeeks(): void {
   inflight = null;
-  usePeekViewStore.getState().close();
+  peekSink.close();
 }
 
 export const covePeekViewService: PeekViewService = {
@@ -124,7 +120,7 @@ export const covePeekViewService: PeekViewService = {
       return inflight.promise;
     }
     const promise = new Promise<void>((resolve) => {
-      usePeekViewStore.getState().open(request as PeekRequest, resolve);
+      peekSink.open(request, resolve);
     });
     inflight = { key, promise };
     promise.finally(() => {

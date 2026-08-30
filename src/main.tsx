@@ -5,6 +5,7 @@ import "./di/container";
 import "./index.css";
 import "./lib/disposableGuard";
 import { setupFullscreenShim } from "./lib/fullscreenShim";
+import "./store/blockSuiteBridge";
 
 void setupFullscreenShim();
 

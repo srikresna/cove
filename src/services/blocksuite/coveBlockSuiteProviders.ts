@@ -5,47 +5,72 @@ import {
   type QuickSearchService,
 } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
-import { useBlockSuiteDialogStore } from "../../store/useBlockSuiteDialogStore";
-import { useNotificationStore } from "../../store/useNotificationStore";
-import { useUIStore } from "../../store/useUIStore";
 
-const asText = (v: unknown): string => (typeof v === "string" ? v : "");
+/**
+ * The UI surface BlockSuite services delegate to — bound by the store layer
+ * (see store/blockSuiteBridge.ts), keeping this module store-free.
+ */
+export interface CoveUiPort {
+  toast(message: string): void;
+  confirm(options: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+  }): Promise<boolean>;
+  prompt(options: {
+    title: string;
+    message: string;
+    autofill?: string;
+    placeholder?: string;
+    confirmText?: string;
+    cancelText?: string;
+  }): Promise<string | null>;
+  notify(options: {
+    accent: "error" | "warning" | "success" | "info";
+    title: string;
+    message?: string;
+  }): void;
+  pickNote(): Promise<string | null>;
+}
+
+let ui: CoveUiPort | null = null;
+
+export function provideCoveUi(port: CoveUiPort): void {
+  ui = port;
+}
 
 export const coveNotificationService: NotificationService = {
-  toast: (message, options) => {
-    void options;
-    useNotificationStore.getState().pushToast({ kind: "info", title: message });
-  },
+  toast: (message) => ui?.toast(message),
   confirm: (options) =>
-    useBlockSuiteDialogStore.getState().confirm({
-      title: asText(options.title),
-      message: asText(options.message),
-      confirmText: options.confirmText ? asText(options.confirmText) : undefined,
-      cancelText: options.cancelText ? asText(options.cancelText) : undefined,
-    }),
+    ui
+      ? ui.confirm({
+          title: String(options.title ?? ""),
+          message: String(options.message ?? ""),
+          confirmText: options.confirmText ? String(options.confirmText) : undefined,
+          cancelText: options.cancelText ? String(options.cancelText) : undefined,
+        })
+      : Promise.resolve(false),
   prompt: (options) =>
-    useBlockSuiteDialogStore.getState().prompt({
-      title: asText(options.title),
-      message: asText(options.message),
-      autofill: options.autofill,
-      placeholder: options.placeholder,
-      confirmText: options.confirmText ? asText(options.confirmText) : undefined,
-      cancelText: options.cancelText ? asText(options.cancelText) : undefined,
+    ui
+      ? ui.prompt({
+          title: String(options.title ?? ""),
+          message: String(options.message ?? ""),
+          autofill: options.autofill,
+          placeholder: options.placeholder,
+          confirmText: options.confirmText ? String(options.confirmText) : undefined,
+          cancelText: options.cancelText ? String(options.cancelText) : undefined,
+        })
+      : Promise.resolve(null),
+  notify: (options) =>
+    ui?.notify({
+      accent:
+        options.accent === "error" || options.accent === "warning" || options.accent === "success"
+          ? options.accent
+          : "info",
+      title: String(options.title ?? ""),
+      message: options.message ? String(options.message) : undefined,
     }),
-  notify: (options) => {
-    useNotificationStore.getState().pushToast({
-      kind:
-        options.accent === "error"
-          ? "error"
-          : options.accent === "warning"
-            ? "warning"
-            : options.accent === "success"
-              ? "success"
-              : "info",
-      title: asText(options.title),
-      description: options.message ? asText(options.message) : undefined,
-    });
-  },
 
   notifyWithUndoAction: (options) => coveNotificationService.notify(options),
 };
@@ -55,7 +80,7 @@ export const coveNotificationExtension: ExtensionType =
 
 export const coveQuickSearchService: QuickSearchService = {
   openQuickSearch: async () => {
-    const docId = await useUIStore.getState().pickNote();
+    const docId = (await ui?.pickNote()) ?? null;
     return docId ? { docId } : null;
   },
 };
