@@ -5,102 +5,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MESSAGES } from "../../constants/messages";
 import { noteService, propertyService, tagService } from "../../di/container";
-import type { FilterRule } from "../../domain/filters/FilterRule";
-import { isRuleComplete } from "../../domain/filters/FilterRule";
+import type { FilterableNote } from "../../domain/filters/evaluateFilters";
+import { type GroupBy, groupNotes, type NoteGroup } from "../../domain/library/grouping";
+import {
+  isStackEligibleDef,
+  type LibrarySort,
+  selectNotesForView,
+} from "../../domain/library/query";
 import type { Note } from "../../domain/note/Note";
-import { cmpOrderIndex } from "../../domain/note/ordering";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
 import { cn } from "../../lib/utils";
-import type { FilterableNote } from "../../services/filters/evaluateFilters";
-import { evaluateFilters } from "../../services/filters/evaluateFilters";
+import { listCache, writeCachedTagIds } from "../../services/library/libraryListCache";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
-import { NoteItem, stackValueText } from "../sidebar/NoteItem";
+import { NoteItem } from "../sidebar/NoteItem";
 import { isGroupByDef, type LibraryDisplayPrefs } from "./DisplayMenu";
-import { listCache, writeCachedTagIds } from "./libraryListCache";
 import { NoteCard } from "./NoteCard";
 import { SelectionToolbar } from "./SelectionToolbar";
 
-export type LibrarySort =
-  | "custom"
-  | "updated-desc"
-  | "updated-asc"
-  | "created-desc"
-  | "created-asc"
-  | "title-asc"
-  | "title-desc";
-
+export type { LibrarySort } from "../../domain/library/query";
 export type LibraryViewMode = "list" | "grid" | "masonry";
-
-/**
- * Rules whose predicate EMPTY inputs would satisfy. Unknown notes (absent
- * from the cache) must not be decided by fabricated emptiness — views with
- * these rules defer them to revalidation; other views keep them visible.
- */
-function satisfiedByEmptyInputs(rule: FilterRule): boolean {
-  switch (rule.kind) {
-    case "text":
-    case "number":
-    case "date":
-    case "select":
-    case "multiSelect":
-      return rule.op === "is-empty";
-    case "tags":
-      return rule.op === "is-empty" || rule.op === "has-none-of";
-    case "journal":
-      return rule.value === false;
-    case "checkbox":
-      return rule.value === false;
-    default:
-      return false;
-  }
-}
-
-const compareBy = (sort: LibrarySort) => {
-  switch (sort) {
-    case "custom":
-      return (a: Note, b: Note) =>
-        cmpOrderIndex(a.orderIndex, b.orderIndex) || a.createdAt - b.createdAt;
-    case "updated-asc":
-      return (a: Note, b: Note) => a.updatedAt - b.updatedAt;
-    case "created-desc":
-      return (a: Note, b: Note) => b.createdAt - a.createdAt;
-    case "created-asc":
-      return (a: Note, b: Note) => a.createdAt - b.createdAt;
-    case "title-asc":
-      return (a: Note, b: Note) => (a.title || "").localeCompare(b.title || "");
-    case "title-desc":
-      return (a: Note, b: Note) => (b.title || "").localeCompare(a.title || "");
-    default:
-      return (a: Note, b: Note) => b.updatedAt - a.updatedAt;
-  }
-};
-
-const startOfDay = (ts: number): number => {
-  const d = new Date(ts);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-};
-
-const relativeDayLabel = (ts: number): string => {
-  const now = new Date();
-  const days = Math.floor(
-    (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - startOfDay(ts)) /
-      86400000,
-  );
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days} days ago`;
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
 
 type GroupItem =
   | { kind: "header"; key: string; label: string; count: number; dotColor?: string }
@@ -160,22 +89,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       .listDefinitions()
       .then(async (allDefs) => {
         // Stack-eligible custom properties with values load one pass per def.
-        const eligible = allDefs.filter(
-          (d) =>
-            d.show !== "always-hide" &&
-            !d.id.startsWith("system:") &&
-            [
-              "text",
-              "number",
-              "date",
-              "select",
-              "status",
-              "multiSelect",
-              "checkbox",
-              "person",
-              "url",
-            ].includes(d.type),
-        );
+        const eligible = allDefs.filter(isStackEligibleDef);
         if (!alive) return;
         setStackDefs(eligible);
         if (eligible.length === 0) {
@@ -383,50 +297,22 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       (n) =>
         n.workspaceId === activeWorkspaceId && (taggedNoteIds === null || taggedNoteIds.has(n.id)),
     );
-    // Defer cache-unknown notes only when some rule's predicate empty inputs
-    // would satisfy; notes the app just created are provably empty and bypass it.
-    const knownEmptyIds = activeWorkspaceId
-      ? listCache.get(activeWorkspaceId)?.knownEmptyIds
-      : undefined;
-    const deferUnknown = draftRules.filter(isRuleComplete).some(satisfiedByEmptyInputs);
-    const filtered =
-      !rulesActive || !filterable
-        ? base
-        : evaluateFilters(
-            // Always evaluate with the LIVE note (the cached map may be stale);
-            // notes absent from the cache are synthesized empty ONLY where
-            // fabricated emptiness cannot decide the outcome.
-            base
-              .filter(
-                (n) => !deferUnknown || filterable.has(n.id) || (knownEmptyIds?.has(n.id) ?? false),
-              )
-              .map((n) => ({
-                ...(filterable.get(n.id) ?? {
-                  note: n,
-                  propertyValues: new Map<string, PropertyValue>(),
-                  tagIds: [],
-                  journalTimestamp: null,
-                }),
-                note: n,
-              })),
-            draftRules,
-          ).map((i) => i.note);
-    // Manually-included notes (the collection editor's Docs tab) join the
-    // rule-matched set.
-    const allowIds = new Set(allViews.find((v) => v.id === activeViewId)?.allowNoteIds ?? []);
-    const withAllow =
-      allowIds.size === 0
-        ? filtered
-        : [
-            ...filtered,
-            ...base.filter((n) => allowIds.has(n.id) && !filtered.some((f) => f.id === n.id)),
-          ];
-    return [...withAllow].sort(compareBy(sort));
+    return selectNotesForView(
+      {
+        notes: base,
+        rules: draftRules,
+        filterable,
+        knownEmptyIds: activeWorkspaceId
+          ? listCache.get(activeWorkspaceId)?.knownEmptyIds
+          : undefined,
+        allowNoteIds: allViews.find((v) => v.id === activeViewId)?.allowNoteIds ?? [],
+      },
+      sort,
+    );
   }, [
     notes,
     activeWorkspaceId,
     taggedNoteIds,
-    rulesActive,
     filterable,
     draftRules,
     sort,
@@ -446,101 +332,21 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     });
   }, []);
 
-  const groups = useMemo(() => {
+  const groups: NoteGroup[] | null = useMemo(() => {
     if (prefs.groupBy === "none") return null;
-    const buckets = new Map<string, { label: string; dotColor?: string; notes: Note[] }>();
-
-    const push = (key: string, label: string, note: Note, dotColor?: string) => {
-      const bucket = buckets.get(key) ?? { label, dotColor, notes: [] };
-      if (dotColor && !bucket.dotColor) bucket.dotColor = dotColor;
-      bucket.notes.push(note);
-      buckets.set(key, bucket);
-    };
-
-    const groupByDef = isGroupByDef(prefs.groupBy) ? prefs.groupBy.defId : null;
-    if (prefs.groupBy === "tags") {
-      // A tagged note appears under EACH of its tags; notes with no tags
-      // land in one Untagged bucket.
-      const idsByNote = tagIdsByNote ?? new Map<string, string[]>();
-      const tagged = new Set<string>();
-      for (const tag of allTags) {
-        for (const note of workspaceNotes) {
-          if ((idsByNote.get(note.id) ?? []).includes(tag.id)) {
-            tagged.add(note.id);
-            push(`tag:${tag.id}`, tag.name, note, tag.color);
-          }
-        }
-      }
-      for (const note of workspaceNotes) {
-        if (!tagged.has(note.id)) push("__untagged__", "Untagged", note);
-      }
-    } else if (prefs.groupBy === "journal") {
-      for (const note of workspaceNotes) {
-        const ts = journalByNoteId.get(note.id);
-        if (ts == null) {
-          push("__empty__", "Not journals", note);
-        } else {
-          const key = `d:${ts}`;
-          push(key, relativeDayLabel(ts), note);
-        }
-      }
-    } else if (prefs.groupBy === "created" || prefs.groupBy === "updated") {
-      for (const note of workspaceNotes) {
-        const ts = prefs.groupBy === "created" ? note.createdAt : note.updatedAt;
-        // Bucket by CALENDAR DAY, not the raw timestamp — notes touched the
-        // same day at different times must share one group.
-        push(`d:${startOfDay(ts)}`, relativeDayLabel(ts), note);
-      }
-    } else if (groupByDef) {
-      const def =
-        stackDefs.find((d) => d.id === groupByDef) ?? defs.find((d) => d.id === groupByDef);
-      if (def) {
-        for (const note of workspaceNotes) {
-          const value = stackValues?.get(note.id)?.get(groupByDef);
-          if (!value) {
-            push("p:__empty__", "Empty", note);
-            continue;
-          }
-          const text = stackValueText(def, value);
-          if (text) {
-            push(`p:${text}`, text, note);
-          } else if (value.type === "checkbox") {
-            // An explicitly-set unchecked value is NOT empty.
-            push("p:__unchecked__", "✗", note);
-          } else {
-            push(
-              "p:__novalue__",
-              def.type === "multiSelect" ? "(none selected)" : "(deleted option)",
-              note,
-            );
-          }
-        }
-      } else {
-        for (const note of workspaceNotes) push("__all__", "All notes", note);
-      }
-    }
-
-    // Stable display order: date groups newest-first, others by label, the
-    // "absent/meta" buckets (Untagged, Empty, ✗, none-selected...) last.
-    const entries = [...buckets.entries()].sort((a, b) => {
-      const special = (key: string) =>
-        key === "__untagged__" ||
-        key === "__empty__" ||
-        key.endsWith("__empty__") ||
-        key === "p:__unchecked__" ||
-        key === "p:__novalue__";
-      if (special(a[0]) !== special(b[0])) return special(a[0]) ? 1 : -1;
-      if (a[0].startsWith("d:") && b[0].startsWith("d:")) {
-        return Number(b[0].slice(2)) - Number(a[0].slice(2));
-      }
-      return a[1].label.localeCompare(b[1].label);
+    const groupBy: GroupBy = isGroupByDef(prefs.groupBy)
+      ? { defId: prefs.groupBy.defId }
+      : prefs.groupBy;
+    return groupNotes({
+      groupBy,
+      notes: workspaceNotes,
+      allTags,
+      tagIdsByNote,
+      journalByNoteId,
+      stackValues,
+      stackDefs,
+      defs,
     });
-    return entries.map(([key, bucket]) => ({
-      key,
-      label: bucket.label,
-      dotColor: bucket.dotColor,
-      notes: bucket.notes,
-    }));
   }, [
     prefs.groupBy,
     workspaceNotes,

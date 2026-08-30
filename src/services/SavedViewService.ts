@@ -1,6 +1,12 @@
 import { NotFoundError } from "../domain/errors";
 import type { FilterRule, FilterRules } from "../domain/filters/FilterRule";
 import { isRuleComplete } from "../domain/filters/FilterRule";
+import {
+  dropDeadDef,
+  healRule,
+  type RuleRewrite,
+  removeOption,
+} from "../domain/filters/ruleMaintenance";
 import type { SavedView } from "../domain/filters/SavedView";
 import { makeSavedViewId } from "../domain/filters/SavedView";
 import type { PropertyDefinition } from "../domain/property/Property";
@@ -12,46 +18,15 @@ function normalizeViewName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-/**
- * Post-deletion semantics (property/option gone, no note can carry the value):
- * is-not/is-empty and checkbox-is-false are vacuously true; positive ops match nothing.
- */
-function droppedRuleMatchesAllPostDelete(rule: FilterRule): boolean {
-  switch (rule.kind) {
-    case "text":
-    case "number":
-    case "date":
-    case "select":
-    case "multiSelect":
-      return rule.op === "is-not" || rule.op === "is-empty";
-    case "checkbox":
-      return rule.value === false;
-    case "tags":
-      // Latent: no prune path drops tags rules today. Dead tags can be on
-      // no note, so has-none-of matches everything and has-all-of nothing.
-      return rule.op === "has-none-of";
-    default:
-      return false;
-  }
-}
+/** The prune engine's classification shape (drop carries the keep-as-match-all verdict). */
+type PruneRewrite = { drop: false; rule: FilterRule } | { drop: true; postDeleteMatchAll: boolean };
 
-/** The rule kinds whose filter references a property definition. */
-function ruleHasPropertyId(rule: FilterRule): rule is Extract<FilterRule, { propertyId: string }> {
-  return (
-    rule.kind === "text" ||
-    rule.kind === "number" ||
-    rule.kind === "date" ||
-    rule.kind === "select" ||
-    rule.kind === "multiSelect" ||
-    rule.kind === "checkbox"
-  );
+/** Adapts the domain rewrite to the prune engine's classification shape. */
+function toPruneRewrite(r: RuleRewrite): PruneRewrite {
+  return r.drop
+    ? { drop: true, postDeleteMatchAll: r.vacuouslyAll }
+    : { drop: false, rule: r.rule };
 }
-
-/**
- * Rewrite outcome for one rule inside applyViewPrune: the replacement rule
- * (or the drop reason, used for the keep-vs-delete classification).
- */
-type RuleRewrite = { drop: false; rule: FilterRule } | { drop: true; postDeleteMatchAll: boolean };
 
 export class SavedViewService implements ISavedViewService {
   constructor(private readonly views: ISavedViewRepository) {}
@@ -130,7 +105,7 @@ export class SavedViewService implements ISavedViewService {
    * all rewrites + deletions in one transaction. A view left with no complete
    * rule is kept with [] iff it was match-all before the prune, else deleted.
    */
-  private async applyViewPrune(rewriteRule: (rule: FilterRule) => RuleRewrite): Promise<string[]> {
+  private async applyViewPrune(rewriteRule: (rule: FilterRule) => PruneRewrite): Promise<string[]> {
     const updates: Array<{ id: string; rulesJson: string }> = [];
     const deletes: string[] = [];
     for (const view of await this.views.listAll()) {
@@ -169,59 +144,21 @@ export class SavedViewService implements ISavedViewService {
    * (defs are global across workspaces). Returns the deleted view ids.
    */
   pruneOption(definitionId: string, optionId: string): Promise<string[]> {
-    return this.applyViewPrune((rule) => {
-      if (
-        (rule.kind === "select" || rule.kind === "multiSelect") &&
-        rule.propertyId === definitionId &&
-        rule.optionIds.includes(optionId)
-      ) {
-        const optionIds = rule.optionIds.filter((id) => id !== optionId);
-        if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) {
-          return { drop: true, postDeleteMatchAll: rule.op === "is-not" };
-        }
-        return { drop: false, rule: { ...rule, optionIds } };
-      }
-      return { drop: false, rule };
-    });
+    return this.applyViewPrune((rule) =>
+      toPruneRewrite(removeOption(rule, definitionId, optionId)),
+    );
   }
 
   /** Removes every rule referencing a deleted property definition. */
   pruneProperty(definitionId: string): Promise<string[]> {
-    return this.applyViewPrune((rule) => {
-      if (ruleHasPropertyId(rule) && rule.propertyId === definitionId) {
-        return { drop: true, postDeleteMatchAll: droppedRuleMatchesAllPostDelete(rule) };
-      }
-      return { drop: false, rule };
-    });
+    return this.applyViewPrune((rule) => toPruneRewrite(dropDeadDef(rule, definitionId)));
   }
 
   /**
    * Startup self-heal: drops rules referencing dead defs/options (idempotent,
-   * one transaction). Kinds are narrowed explicitly because the SQLite loader
-   * stamps every decoded rule with a propertyId ("") — `in`-checks are
-   * meaningless on loaded rules.
+   * one transaction).
    */
-  async healRules(liveDefs: PropertyDefinition[]): Promise<string[]> {
-    const liveDefIds = new Set(liveDefs.map((d) => d.id));
-    const liveOptions = new Map<string, Set<string>>(
-      liveDefs.map((d) => [d.id, new Set(d.options.map((o) => o.id))]),
-    );
-    return this.applyViewPrune((rule) => {
-      if (!ruleHasPropertyId(rule)) return { drop: false, rule };
-      if (!liveDefIds.has(rule.propertyId)) {
-        return { drop: true, postDeleteMatchAll: droppedRuleMatchesAllPostDelete(rule) };
-      }
-      if (rule.kind === "select" || rule.kind === "multiSelect") {
-        const live = liveOptions.get(rule.propertyId) ?? new Set<string>();
-        const optionIds = rule.optionIds.filter((id) => live.has(id));
-        if (optionIds.length === 0 && (rule.op === "is" || rule.op === "is-not")) {
-          return { drop: true, postDeleteMatchAll: rule.op === "is-not" };
-        }
-        if (optionIds.length !== rule.optionIds.length) {
-          return { drop: false, rule: { ...rule, optionIds } };
-        }
-      }
-      return { drop: false, rule };
-    });
+  healRules(liveDefs: PropertyDefinition[]): Promise<string[]> {
+    return this.applyViewPrune((rule) => toPruneRewrite(healRule(rule, liveDefs)));
   }
 }

@@ -1,6 +1,6 @@
+import type { EncryptedPayload } from "../domain/EncryptedPayload";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
-import type { EncryptedPayload } from "../services/vault/IEncryptionService";
 import type { INoteRepository, NoteRecord } from "./INoteRepository";
 import { SQLiteDatabase } from "./SQLiteDatabase";
 

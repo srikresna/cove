@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { seedKnownEmptyNote } from "../components/library/libraryListCache";
 import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
 import { clearBacklinkScans, invalidateNoteBacklinkScan } from "../services/editor/backlinkScan";
+import { seedKnownEmptyNote } from "../services/library/libraryListCache";
 import { processCoverImage } from "../utils/coverImage";
 import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 import { useNotificationStore } from "./useNotificationStore";

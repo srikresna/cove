@@ -3,6 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { blockSuiteEditorService, propertyService, savedViewService } from "../../di/container";
+import { isStackEligibleDef } from "../../domain/library/query";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
@@ -256,26 +257,7 @@ export const LibraryPage: React.FC = () => {
   );
 
   // Simple-typed custom defs are groupable and chip-toggleable.
-  const eligibleDefs = useMemo(
-    () =>
-      defs.filter(
-        (d) =>
-          d.show !== "always-hide" &&
-          !d.id.startsWith("system:") &&
-          [
-            "text",
-            "number",
-            "date",
-            "select",
-            "status",
-            "multiSelect",
-            "checkbox",
-            "person",
-            "url",
-          ].includes(d.type),
-      ),
-    [defs],
-  );
+  const eligibleDefs = useMemo(() => defs.filter(isStackEligibleDef), [defs]);
 
   const docsBody = useMemo(
     () => <LibraryNoteList sort={sort} viewMode={viewMode} prefs={prefs} defs={eligibleDefs} />,

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { savedViewService, vaultService } from "../di/container";
 import type { FilterRule, FilterRules } from "../domain/filters/FilterRule";
+import { healRule, removeOption } from "../domain/filters/ruleMaintenance";
 import type { SavedView } from "../domain/filters/SavedView";
 import type { PropertyDefinition } from "../domain/property/Property";
 import { notifyError } from "./notify";
@@ -187,19 +188,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
     // options, so a dead id could never be cleared from a draft.
     set((s) => ({
       draftRules: s.draftRules.flatMap((r) => {
-        if ((r.kind === "select" || r.kind === "multiSelect") && r.propertyId === propertyId) {
-          const optionIds = r.optionIds.filter((id) => id !== optionId);
-          if (
-            r.optionIds.length > 0 &&
-            optionIds.length === 0 &&
-            (r.op === "is" || r.op === "is-not")
-          ) {
-            return [];
-          }
-          if (optionIds.length !== r.optionIds.length) return [{ ...r, optionIds }];
-          return [r];
-        }
-        return [r];
+        const next = removeOption(r, propertyId, optionId);
+        return next.drop ? [] : [next.rule];
       }),
     }));
     let deletedViewIds: string[] = [];
@@ -239,41 +229,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
 
   healDrafts: (defs) => {
-    const defsById = new Map(defs.map((d) => [d.id, d]));
     set((s) => ({
       // Drafts referencing dead defs/options are pruned unconditionally (the
-      // FilterBar can never clear a dead reference). Kinds are narrowed
-      // explicitly because drafts copied from loaded views carry the loader's
-      // stamped propertyId on tags/journal/template rules too.
+      // FilterBar can never clear a dead reference).
       draftRules: s.draftRules.flatMap((r): FilterRule[] => {
-        switch (r.kind) {
-          case "text":
-          case "number":
-          case "date":
-          case "checkbox": {
-            return defsById.has(r.propertyId) ? [r] : [];
-          }
-          case "select":
-          case "multiSelect": {
-            const def = defsById.get(r.propertyId);
-            if (!def) return [];
-            const live = new Set(def.options.map((o) => o.id));
-            const optionIds = r.optionIds.filter((id) => live.has(id));
-            // Drop only rules that HAD options and lost them all — an
-            // already-empty rule is a normal mid-composition state.
-            if (
-              r.optionIds.length > 0 &&
-              optionIds.length === 0 &&
-              (r.op === "is" || r.op === "is-not")
-            ) {
-              return [];
-            }
-            if (optionIds.length !== r.optionIds.length) return [{ ...r, optionIds }];
-            return [r];
-          }
-          default:
-            return [r];
-        }
+        const next = healRule(r, defs, { emptySelectIsComposing: true });
+        return next.drop ? [] : [next.rule];
       }),
       version: s.version + 1,
     }));

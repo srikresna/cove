@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { evaluateFilters, type FilterableNote } from "@/domain/filters/evaluateFilters";
 import type { FilterRule } from "@/domain/filters/FilterRule";
 import type { Note } from "@/domain/note/Note";
-import { evaluateFilters, type FilterableNote } from "@/services/filters/evaluateFilters";
 
 function makeNote(id: string, overrides: Partial<Note> = {}): Note {
   return {

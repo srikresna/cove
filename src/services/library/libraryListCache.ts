@@ -1,5 +1,5 @@
+import type { FilterableNote } from "../../domain/filters/evaluateFilters";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
-import type { FilterableNote } from "../../services/filters/evaluateFilters";
 
 /**
  * Module-level stale-while-revalidate cache for the Library list's bulk-loaded

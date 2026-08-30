@@ -5,15 +5,15 @@ import { MESSAGES } from "../../constants/messages";
 import type { FilterRule } from "../../domain/filters/FilterRule";
 import { isRuleComplete } from "../../domain/filters/FilterRule";
 import type { SavedView } from "../../domain/filters/SavedView";
+import { selectNotesForView } from "../../domain/library/query";
 import { cn } from "../../lib/utils";
-import { evaluateFilters } from "../../services/filters/evaluateFilters";
+import { readListCache } from "../../services/library/libraryListCache";
 import { useNoteStore } from "../../store/useNoteStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { FilterBar } from "./FilterBar";
-import { readListCache } from "./libraryListCache";
 
 /**
  * A large dialog with Docs/Rules tabs, a live preview of the matching notes,
@@ -50,28 +50,25 @@ export const CollectionEditorDialog: React.FC<{
     [notes, activeWorkspaceId],
   );
 
-  // Live preview: evaluate the editor rules against the same filterable map
-  // the Library list maintains, plus the manual allow-list. Notes absent from
-  // the map fall back to their live fields.
+  // Live preview: the SAME selection the Library list applies (rules with
+  // cache-aware deferral, OR-unioned with the manual allow-list). With no
+  // complete rule yet the preview shows only manually added notes — matching
+  // the save gate, which refuses a rule-less view.
   const matchedIds = useMemo(() => {
     const complete = rules.filter(isRuleComplete);
+    if (complete.length === 0) return new Set<string>(allowIds);
     const cache = activeWorkspaceId ? readListCache(activeWorkspaceId) : undefined;
-    const filterable = cache?.filterable ?? null;
-    const set = new Set<string>(allowIds);
-    if (complete.length === 0) return set;
-    const items = workspaceNotes.map((note) => {
-      const cached = filterable?.get(note.id);
-      return cached
-        ? { ...cached, note }
-        : {
-            note,
-            propertyValues: new Map(),
-            tagIds: [],
-            journalTimestamp: null,
-          };
-    });
-    for (const item of evaluateFilters(items, complete)) set.add(item.note.id);
-    return set;
+    const selected = selectNotesForView(
+      {
+        notes: workspaceNotes,
+        rules: complete,
+        filterable: cache?.filterable ?? null,
+        knownEmptyIds: cache?.knownEmptyIds,
+        allowNoteIds: allowIds,
+      },
+      "updated-desc",
+    );
+    return new Set(selected.map((n) => n.id));
   }, [rules, allowIds, workspaceNotes, activeWorkspaceId]);
 
   const matchedCount = matchedIds.size;

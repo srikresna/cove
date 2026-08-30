@@ -1,6 +1,7 @@
-import { type FilterRule, type FilterRules, isRuleComplete } from "../../domain/filters/FilterRule";
-import type { Note } from "../../domain/note/Note";
-import type { PropertyValue } from "../../domain/property/Property";
+import type { Note } from "../note/Note";
+import type { PropertyValue } from "../property/Property";
+import type { FilterRule } from "./FilterRule";
+import { isRuleComplete } from "./FilterRule";
 
 /** Per-note filter inputs: property values (note_properties) + tag ids. */
 export interface FilterableNote {
@@ -158,9 +159,33 @@ function matchRule(rule: FilterRule, item: FilterableNote): boolean {
 }
 
 /** All rules AND-combined; incomplete rules are skipped (no OR yet). */
-export function evaluateFilters(items: FilterableNote[], rules: FilterRules): FilterableNote[] {
+export function evaluateFilters(items: FilterableNote[], rules: FilterRule[]): FilterableNote[] {
   if (rules.length === 0) return items;
   const active = rules.filter(isRuleComplete);
   if (active.length === 0) return items;
   return items.filter((item) => active.every((rule) => matchRule(rule, item)));
+}
+
+const emptyInputs = (): FilterableNote => ({
+  // Only the fabricated fields matter to value/tag/journal rules; note
+  // intrinsics read as their neutral values.
+  note: { isTemplate: false } as unknown as Note,
+  propertyValues: new Map(),
+  tagIds: [],
+  journalTimestamp: null,
+});
+
+/** Whether this rule's predicate holds for a note with NO inputs at all,
+ *  derived from the evaluator itself so the table can never drift. This is
+ *  also the post-deletion vacuity answer: once a def/option is gone every
+ *  note behaves as empty. */
+export function matchesEmptyInputs(rule: FilterRule): boolean {
+  return matchRule(rule, emptyInputs());
+}
+
+/** Whether a cache-unknown note could be decided WRONGLY by synthesizing
+ *  empty inputs for this rule. Note-intrinsic rules (template) always see
+ *  live data, so fabricating inputs for them decides nothing. */
+export function decidesByFabricatedEmptiness(rule: FilterRule): boolean {
+  return rule.kind !== "template" && matchesEmptyInputs(rule);
 }
