@@ -55,6 +55,8 @@ const NOTE_COLUMNS = [
   "isPinned",
   "isFavorite",
   "orderIndex",
+  "kmsVersion",
+  "deletedAt",
   "createdAt",
   "updatedAt",
 ];
@@ -127,6 +129,24 @@ describe("migration ladder", () => {
     ).rejects.toThrow();
     const rows = await db.select<Array<{ id: string }>>("SELECT id FROM workspaces");
     expect(rows).toHaveLength(0);
+  });
+
+  it("a mid-ladder failure leaves user_version at the prior version (crash recovery)", async () => {
+    // Fail the v23 stamp itself: the version must NOT advance and the seed
+    // writes from the same transaction must roll back.
+    const failing: MigrationDb = {
+      execute: db.execute,
+      select: db.select,
+      runTransaction: async (statements) => {
+        if (statements.some((s) => s.sql.includes("PRAGMA user_version = 23"))) {
+          throw new Error("simulated crash mid-v23");
+        }
+        await db.runTransaction(statements);
+      },
+    };
+    await expect(runMigrations(failing)).rejects.toThrow("simulated crash mid-v23");
+    // The stamp and the seed writes share one transaction — both rolled back.
+    expect(await userVersion(db)).toBe(22);
   });
 
   it("respects foreign-key cascades through the seam", async () => {

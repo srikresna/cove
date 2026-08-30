@@ -65,7 +65,6 @@ export const useTagStore = create<TagState>((set, get) => ({
   renameTag: async (tagId, name) => {
     try {
       await tagService.renameTag(tagId, name);
-      await get().refresh();
     } catch (err) {
       notifyError(err);
     }
@@ -74,7 +73,6 @@ export const useTagStore = create<TagState>((set, get) => ({
   setTagColor: async (tagId, color) => {
     try {
       await tagService.setTagColor(tagId, color);
-      await get().refresh();
     } catch (err) {
       notifyError(err);
     }
@@ -86,7 +84,6 @@ export const useTagStore = create<TagState>((set, get) => ({
       if (get().activeTagId === tagId) {
         set({ activeTagId: null, taggedNoteIds: null });
       }
-      await get().refresh();
     } catch (err) {
       notifyError(err);
     }

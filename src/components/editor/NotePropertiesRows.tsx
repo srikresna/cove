@@ -233,7 +233,6 @@ const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({ noteId, 
       setQuery("");
       refreshTags(tagVersion);
       loadAllTags();
-      void useTagStore.getState().refresh();
     } catch (err) {
       notifyError(err);
     }
@@ -243,7 +242,6 @@ const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({ noteId, 
     try {
       await tagService.removeTag(noteId, tagId);
       refreshTags(tagVersion);
-      void useTagStore.getState().refresh();
     } catch (err) {
       notifyError(err);
     }
