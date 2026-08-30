@@ -310,7 +310,6 @@ export const PropertyManagerPanel: React.FC<{
   const [listOpen, setListOpen] = useState(true);
   const [addOpen, setAddOpen] = useState(true);
   const propertyVersion = usePropertyStore((s) => s.version);
-  const bumpProperties = usePropertyStore((s) => s.refresh);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   const reload = useCallback(() => {
@@ -346,33 +345,24 @@ export const PropertyManagerPanel: React.FC<{
   const commitRename = (def: PropertyDefinition, name: string) => {
     setRenamingId(null);
     if (name === def.name) return;
-    propertyService
-      .renameDefinition(def.id, name)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.renameDefinition(def.id, name).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const handleVisibility = (def: PropertyDefinition, show: PropertyVisibility) => {
-    propertyService
-      .setDefinitionVisibility(def.id, show)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.setDefinitionVisibility(def.id, show).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const handleIcon = (def: PropertyDefinition, icon: string | null) => {
-    propertyService
-      .setDefinitionIcon(def.id, icon)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.setDefinitionIcon(def.id, icon).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const addProperty = (type: string) => {
@@ -385,7 +375,6 @@ export const PropertyManagerPanel: React.FC<{
     const name = nameExists ? generateSequencedName(meta.label, allNames) : meta.label;
     propertyService
       .createDefinition(name, type as Parameters<typeof propertyService.createDefinition>[1])
-      .then(() => bumpProperties())
       .catch(notifyError);
   };
 
@@ -484,7 +473,6 @@ export const PropertyManagerPanel: React.FC<{
                 // Saved views may filter on the deleted definition; prune
                 // their rules so no view silently goes empty or undead.
                 await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
-                bumpProperties();
               })
               .catch(notifyError);
           }

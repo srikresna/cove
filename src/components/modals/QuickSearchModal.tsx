@@ -9,7 +9,6 @@ import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
 import { suggestJournalDate } from "../../services/suggestJournalDate";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { usePropertyStore } from "../../store/usePropertyStore";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { extractParagraphs } from "../../utils/plainText";
@@ -188,7 +187,6 @@ export const QuickSearchModal: React.FC = () => {
     journalService
       .ensureJournalByDate(activeWorkspaceId, timestamp)
       .then(async (noteId) => {
-        usePropertyStore.getState().refresh();
         await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
         if (pickerResolve) {
           resolvePicker(noteId);

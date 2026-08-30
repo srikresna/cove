@@ -790,7 +790,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const propertyVersion = usePropertyStore((s) => s.version);
-  const bumpProperties = usePropertyStore((s) => s.refresh);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   const reload = useCallback(() => {
@@ -808,13 +807,10 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
 
   const save = (propertyId: string, value: PropertyValue) => {
     setValues((prev) => new Map(prev).set(propertyId, value));
-    return propertyService
-      .setValue(note.id, propertyId, value)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    return propertyService.setValue(note.id, propertyId, value).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const clear = (propertyId: string) => {
@@ -823,13 +819,10 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
       next.delete(propertyId);
       return next;
     });
-    propertyService
-      .removeValue(note.id, propertyId)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.removeValue(note.id, propertyId).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const createDefinition = (type: PropertyType) => {
@@ -839,7 +832,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
       .createDefinition(name, type)
       .then((def) => {
         setJustCreatedId(def.id);
-        bumpProperties();
       })
       .catch(notifyError);
   };
@@ -853,7 +845,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     propertyService
       .addOption(def.id, name, color)
       .then(async (option) => {
-        if (!thenPick) return bumpProperties();
+        if (!thenPick) return;
         const current = values.get(def.id);
         if (def.type === "multiSelect") {
           const ids = current?.type === "multiSelect" ? current.optionIds : [];
@@ -861,7 +853,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         } else {
           await save(def.id, { type: def.type as "select" | "status", optionId: option.id });
         }
-        bumpProperties();
       })
       .catch(notifyError);
   };
@@ -880,47 +871,35 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         next.splice(insertAt, 0, moved);
         return next;
       });
-      propertyService
-        .reorderDefinition(id, targetId, position)
-        .then(() => bumpProperties())
-        .catch((err) => {
-          notifyError(err);
-          reload();
-        });
+      propertyService.reorderDefinition(id, targetId, position).catch((err) => {
+        notifyError(err);
+        reload();
+      });
     },
-    [bumpProperties, reload],
+    [reload],
   );
 
   const commitRename = (def: PropertyDefinition, name: string) => {
     setRenamingId(null);
     if (name === def.name) return;
-    propertyService
-      .renameDefinition(def.id, name)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.renameDefinition(def.id, name).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const handleVisibility = (def: PropertyDefinition, show: PropertyVisibility) => {
-    propertyService
-      .setDefinitionVisibility(def.id, show)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.setDefinitionVisibility(def.id, show).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   const handleIcon = (def: PropertyDefinition, icon: string | null) => {
-    propertyService
-      .setDefinitionIcon(def.id, icon)
-      .then(() => bumpProperties())
-      .catch((err) => {
-        notifyError(err);
-        reload();
-      });
+    propertyService.setDefinitionIcon(def.id, icon).catch((err) => {
+      notifyError(err);
+      reload();
+    });
   };
 
   useEffect(() => {
@@ -1111,7 +1090,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
                 // Saved views may filter on the deleted definition; prune
                 // their rules so no view silently goes empty or undead.
                 await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
-                bumpProperties();
               })
               .catch(notifyError);
           }

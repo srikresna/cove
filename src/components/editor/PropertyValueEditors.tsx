@@ -48,7 +48,6 @@ import { TAG_COLORS } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { usePropertyStore } from "../../store/usePropertyStore";
 import { useViewStore } from "../../store/useViewStore";
 import {
   DropdownMenu,
@@ -313,15 +312,10 @@ const OptionRow: React.FC<{
   }, [renaming]);
 
   // Option mutations write through PropertyService, which has no reactive
-  // layer of its own — bumping the property store is what makes every
-  // mounted surface (this picker, the Info chips, filters, sidebar) refetch.
   const commitRename = (name: string) => {
     const next = name.trim();
     if (next && next !== option.name) {
-      void propertyService
-        .renameOption(defId, option.id, next)
-        .then(() => usePropertyStore.getState().refresh())
-        .catch(notifyError);
+      void propertyService.renameOption(defId, option.id, next).catch(notifyError);
     }
   };
 
@@ -400,10 +394,7 @@ const OptionRow: React.FC<{
                 title={color}
                 onClick={(e) => {
                   e.stopPropagation();
-                  void propertyService
-                    .setOptionColor(defId, option.id, color)
-                    .then(() => usePropertyStore.getState().refresh())
-                    .catch(notifyError);
+                  void propertyService.setOptionColor(defId, option.id, color).catch(notifyError);
                 }}
                 className={cn(
                   "flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -423,7 +414,6 @@ const OptionRow: React.FC<{
                   // Saved views + draft rules may filter on the deleted
                   // option; prune them so no view silently goes empty.
                   await useViewStore.getState().syncAfterOptionDelete(defId, option.id);
-                  usePropertyStore.getState().refresh();
                 })
                 .catch(notifyError)
             }

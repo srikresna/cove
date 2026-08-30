@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { tagService, vaultService } from "../di/container";
 import type { Tag, TagCount } from "../domain/tag/Tag";
+import { changeBus } from "../services/changeBus";
 import { notifyError } from "./notify";
 
 interface TagState {
@@ -111,4 +112,10 @@ export const useTagStore = create<TagState>((set, get) => ({
 
 vaultService.onLock(() => {
   useTagStore.setState({ tags: [], tagCounts: [], activeTagId: null, taggedNoteIds: null });
+});
+
+// Repo writes publish "tags" — refresh is centralized here instead of every
+// mutation call site.
+changeBus.on("tags", () => {
+  void useTagStore.getState().refresh();
 });

@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { journalService } from "../di/container";
 import { notifyError } from "../store/notify";
 import { useNoteStore } from "../store/useNoteStore";
-import { usePropertyStore } from "../store/usePropertyStore";
 import { useUIStore } from "../store/useUIStore";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 
@@ -21,7 +20,6 @@ export function useOpenJournal(): (timestamp: number) => void {
       journalService
         .ensureJournalByDate(activeWorkspaceId, timestamp)
         .then(async (noteId) => {
-          usePropertyStore.getState().refresh();
           await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
           if (useNoteStore.getState().activeNoteId === noteId) {
             useUIStore.getState().setActivePage("editor");

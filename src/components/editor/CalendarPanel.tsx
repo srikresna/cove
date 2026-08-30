@@ -117,9 +117,7 @@ export const CalendarPanel: React.FC = () => {
   const removeJournalMark = (noteId: string) => {
     journalService
       .removeJournalDate(noteId)
-      .then(() => {
-        usePropertyStore.getState().refresh();
-      })
+      .then(() => {})
       .catch(notifyError);
   };
 
@@ -147,7 +145,6 @@ export const CalendarPanel: React.FC = () => {
         .then(async (noteId) => {
           // The service bypasses the stores, so refresh both before pointing
           // the UI at the (possibly just-created) journal note.
-          usePropertyStore.getState().refresh();
           await useNoteStore.getState().refreshNotesInPlace(activeWorkspaceId);
           setSelectedDay(dayKey(date));
           setActiveNoteId(noteId);

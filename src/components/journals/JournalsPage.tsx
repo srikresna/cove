@@ -8,7 +8,6 @@ import { useOpenJournal } from "../../hooks/useOpenJournal";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useNoteStore } from "../../store/useNoteStore";
-import { usePropertyStore } from "../../store/usePropertyStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
 import { WeekDatePicker } from "../ui/WeekDatePicker";
@@ -81,9 +80,7 @@ export const JournalsPage: React.FC = () => {
   const removeJournalMark = (noteId: string) => {
     journalService
       .removeJournalDate(noteId)
-      .then(() => {
-        usePropertyStore.getState().refresh();
-      })
+      .then(() => {})
       .catch(notifyError);
   };
 

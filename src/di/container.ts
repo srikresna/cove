@@ -12,6 +12,7 @@ import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
 import { BlockSuiteEditorService } from "../services/blocksuite/BlockSuiteEditorService";
 import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuiteEditorService";
+import { publishingWrites } from "../services/changeBus";
 import type { IJournalService } from "../services/IJournalService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
@@ -42,7 +43,27 @@ const cryptoVault = new CryptoVault(kmsRepository);
 const noteRepository = new SQLiteNoteRepository();
 const workspaceRepository = new SQLiteWorkspaceRepository();
 const noteLinkRepository = new SQLiteNoteLinkRepository();
-const tagRepository = new SQLiteTagRepository();
+// Repo writes publish change topics — every store cache riding on them
+// invalidates by construction, not by each caller remembering to refresh.
+const tagRepository = publishingWrites(
+  new SQLiteTagRepository(),
+  ["create", "update", "delete", "addToNote", "removeFromNote"],
+  "tags",
+);
+const propertyRepository = publishingWrites(
+  new SQLitePropertyRepository(),
+  [
+    "createDefinition",
+    "updateDefinition",
+    "updateOptions",
+    "appendOption",
+    "deleteDefinition",
+    "applyOptionDeletion",
+    "setValue",
+    "removeValue",
+  ],
+  "properties",
+);
 const blobRepository = new SQLiteBlobRepository();
 
 export const blobSource: BlobSource & { clearCache(): void } = new SqliteBlobSource(
@@ -57,9 +78,7 @@ export const noteService: INoteService = new NoteService(
   blobSource,
 );
 export const tagService: ITagService = new TagService(tagRepository, noteService);
-export const propertyService: IPropertyService = new PropertyService(
-  new SQLitePropertyRepository(),
-);
+export const propertyService: IPropertyService = new PropertyService(propertyRepository);
 export const journalService: IJournalService = new JournalService(propertyService, noteService);
 export const savedViewService: ISavedViewService = new SavedViewService(
   new SQLiteSavedViewRepository(),
