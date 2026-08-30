@@ -16,6 +16,9 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["node_modules", "src-tauri", "dist"],
+    // node: builtin modules (the migration tests run real SQLite) must stay
+    // external to vite's transform.
+    server: { deps: { external: [/^node:/] } },
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

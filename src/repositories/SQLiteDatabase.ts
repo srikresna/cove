@@ -7,6 +7,13 @@ export interface SqlStatement {
   sql: string;
   params?: unknown[];
 }
+/** The database surface the migration ladder needs — the plugin connection in
+ *  production, an in-memory SQLite in tests. */
+export interface MigrationDb {
+  execute(sql: string, params?: unknown[]): Promise<unknown>;
+  select<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T>;
+  runTransaction(statements: SqlStatement[]): Promise<void>;
+}
 
 export class SQLiteDatabase {
   private static instance: Promise<Database> | null = null;
@@ -28,7 +35,11 @@ export class SQLiteDatabase {
         await db.execute("PRAGMA cache_size = -20000");
         await db.execute("PRAGMA mmap_size = 268435456");
         await db.execute("PRAGMA wal_autocheckpoint = 1000");
-        await SQLiteDatabase.migrate(db);
+        await SQLiteDatabase.migrateDb({
+          execute: (sql, params) => db.execute(sql, params),
+          select: (sql, params) => db.select(sql, params),
+          runTransaction: (statements) => SQLiteDatabase.runTransaction(statements),
+        });
         return db;
       })();
       SQLiteDatabase.instance = init;
@@ -64,7 +75,7 @@ export class SQLiteDatabase {
     await invoke("run_sql_transaction", { statements });
   }
 
-  private static async migrate(db: Database): Promise<void> {
+  static async migrateDb(db: MigrationDb): Promise<void> {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS workspaces (
         id TEXT PRIMARY KEY,
@@ -100,7 +111,7 @@ export class SQLiteDatabase {
     if (version < 2) {
       const cols = await db.select<Array<{ name: string }>>("PRAGMA table_info(notes)");
       if (cols.some((c) => c.name === "folderId")) {
-        await SQLiteDatabase.runTransaction([
+        await db.runTransaction([
           {
             sql: "CREATE TABLE notes_new (id TEXT PRIMARY KEY, workspaceId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, icon TEXT, coverColor TEXT, isPinned INTEGER NOT NULL DEFAULT 0, isFavorite INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
           },
@@ -315,7 +326,7 @@ export class SQLiteDatabase {
           prev = key;
         }
         statements.push({ sql: "PRAGMA user_version = 14" });
-        await SQLiteDatabase.runTransaction(statements);
+        await db.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 14");
       }
@@ -358,7 +369,7 @@ export class SQLiteDatabase {
           prev = key;
         }
         statements.push({ sql: "PRAGMA user_version = 15" });
-        await SQLiteDatabase.runTransaction(statements);
+        await db.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 15");
       }
@@ -402,7 +413,7 @@ export class SQLiteDatabase {
           prev = key;
         }
         statements.push({ sql: "PRAGMA user_version = 16" });
-        await SQLiteDatabase.runTransaction(statements);
+        await db.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 16");
       }
@@ -434,7 +445,7 @@ export class SQLiteDatabase {
         }
       }
       statements.push({ sql: "PRAGMA user_version = 18" });
-      await SQLiteDatabase.runTransaction(statements);
+      await db.runTransaction(statements);
     }
 
     if (version < 19) {
@@ -478,7 +489,7 @@ export class SQLiteDatabase {
           prev = key;
         }
         statements.push({ sql: "PRAGMA user_version = 19" });
-        await SQLiteDatabase.runTransaction(statements);
+        await db.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 19");
       }
@@ -553,7 +564,7 @@ export class SQLiteDatabase {
           { sql: "ALTER TABLE note_tags_v20 RENAME TO note_tags" },
           { sql: "PRAGMA user_version = 20" },
         );
-        await SQLiteDatabase.runTransaction(statements);
+        await db.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 20");
       }
@@ -642,7 +653,7 @@ export class SQLiteDatabase {
       }
       if (statements.length > 0) {
         statements.push({ sql: "PRAGMA user_version = 22" });
-        await SQLiteDatabase.runTransaction(statements);
+        await db.runTransaction(statements);
       } else {
         await db.execute("PRAGMA user_version = 22");
       }
@@ -673,7 +684,7 @@ export class SQLiteDatabase {
         }
       }
       statements.push({ sql: "PRAGMA user_version = 23" });
-      await SQLiteDatabase.runTransaction(statements);
+      await db.runTransaction(statements);
     }
 
     if (version < 24) {
@@ -713,4 +724,9 @@ export class SQLiteDatabase {
         return false;
     }
   }
+}
+/** Runs the migration ladder against any SQL surface (tests inject an
+ *  in-memory SQLite). */
+export async function runMigrations(db: MigrationDb): Promise<void> {
+  await SQLiteDatabase.migrateDb(db);
 }
