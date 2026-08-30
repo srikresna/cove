@@ -67,6 +67,7 @@ export const CollectionEditorDialog: React.FC<{
         allowNoteIds: allowIds,
       },
       "updated-desc",
+      { synthesizedPreview: true },
     );
     return new Set(selected.map((n) => n.id));
   }, [rules, allowIds, workspaceNotes, activeWorkspaceId]);

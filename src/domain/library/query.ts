@@ -75,30 +75,46 @@ export interface ViewSelectionInputs {
  *  with cache-aware deferral, OR-unioned with the manual allow-list, sorted.
  *  Notes absent from the cache are synthesized empty ONLY where fabricated
  *  emptiness cannot decide the outcome; otherwise they wait for
- *  revalidation. */
-export function selectNotesForView(inputs: ViewSelectionInputs, sort: LibrarySort): Note[] {
+ *  revalidation.
+ *
+ *  `synthesizedPreview` is for surfaces with no bulk loader of their own
+ *  (the collection editor's live preview): every note evaluates against its
+ *  cached inputs or synthesized empty ones — no deferral, so the preview can
+ *  never claim all-notes-match while a cache is missing or stale. */
+export function selectNotesForView(
+  inputs: ViewSelectionInputs,
+  sort: LibrarySort,
+  opts: { synthesizedPreview?: boolean } = {},
+): Note[] {
   const { notes, rules, filterable, knownEmptyIds, allowNoteIds } = inputs;
   const rulesActive = rules.length > 0;
-  const deferUnknown = rules.filter(isRuleComplete).some(decidesByFabricatedEmptiness);
-  const filtered =
-    !rulesActive || !filterable
-      ? notes
-      : evaluateFilters(
-          notes
-            .filter(
-              (n) => !deferUnknown || filterable.has(n.id) || (knownEmptyIds?.has(n.id) ?? false),
-            )
-            .map((n) => ({
-              ...(filterable.get(n.id) ?? {
-                note: n,
-                propertyValues: new Map<string, PropertyValue>(),
-                tagIds: [],
-                journalTimestamp: null,
-              }),
-              note: n,
-            })),
-          rules,
-        ).map((i) => i.note);
+  const synthesized = (n: Note): FilterableNote => ({
+    ...(filterable?.get(n.id) ?? {
+      note: n,
+      propertyValues: new Map<string, PropertyValue>(),
+      tagIds: [],
+      journalTimestamp: null,
+    }),
+    note: n,
+  });
+  let filtered: Note[];
+  if (!rulesActive) {
+    // No rules = match-all; the allow-list only adds.
+    filtered = notes;
+  } else if (opts.synthesizedPreview) {
+    filtered = evaluateFilters(notes.map(synthesized), rules).map((i) => i.note);
+  } else if (!filterable) {
+    // Bulk inputs still loading — the list's own loader re-runs this.
+    filtered = notes;
+  } else {
+    const deferUnknown = rules.filter(isRuleComplete).some(decidesByFabricatedEmptiness);
+    filtered = evaluateFilters(
+      notes
+        .filter((n) => !deferUnknown || filterable.has(n.id) || (knownEmptyIds?.has(n.id) ?? false))
+        .map(synthesized),
+      rules,
+    ).map((i) => i.note);
+  }
   const allow = new Set(allowNoteIds);
   const withAllow =
     allow.size === 0

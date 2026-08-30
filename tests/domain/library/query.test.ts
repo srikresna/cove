@@ -81,9 +81,64 @@ describe("selectNotesForView", () => {
       },
       "updated-desc",
     );
-    // b is unknown and not provably empty -> deferred; c is provably empty and
-    // is-not-empty excludes it.
+    // is-not-empty is NOT emptiness-admitting, so nothing defers: b evaluates
+    // with synthesized empty inputs and fails; c (provably empty) fails too.
     expect(out.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("an emptiness-admitting rule defers unknown notes until the cache loads", () => {
+    const isEmpty = rule({ kind: "text", propertyId: "p1", op: "is-empty" });
+    const filterable = new Map<string, FilterableNote>([["a", withValue(a, "v")]]);
+    const out = selectNotesForView(
+      { notes: [a, b], rules: [isEmpty], filterable, knownEmptyIds: undefined, allowNoteIds: [] },
+      "updated-desc",
+    );
+    // is-empty admits emptiness -> b (cache-absent) is deferred out.
+    expect(out.map((n) => n.id)).toEqual([]);
+  });
+
+  it("synthesizedPreview evaluates rules even without a cache (never all-notes)", () => {
+    const isEmpty = rule({ kind: "text", propertyId: "p1", op: "is-empty" });
+    const filterable = new Map<string, FilterableNote>([["a", withValue(a, "v")]]);
+    const out = selectNotesForView(
+      { notes: [a, b], rules: [isEmpty], filterable, knownEmptyIds: undefined, allowNoteIds: [] },
+      "updated-desc",
+      { synthesizedPreview: true },
+    );
+    // No deferral in preview mode: a fails is-empty, b evaluates synthesized
+    // empty and matches.
+    expect(out.map((n) => n.id)).toEqual(["b"]);
+  });
+
+  it("synthesizedPreview with a NULL cache still applies the rules", () => {
+    const contains = rule({ kind: "text", propertyId: "p1", op: "contains", value: "x" });
+    const out = selectNotesForView(
+      {
+        notes: [a, b],
+        rules: [contains],
+        filterable: new Map<string, FilterableNote>([["a", withValue(a, "xylophone")]]),
+        knownEmptyIds: undefined,
+        allowNoteIds: [],
+      },
+      "updated-desc",
+      { synthesizedPreview: true },
+    );
+    expect(out.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("without a cache and without the preview flag, notes pass until the loader runs", () => {
+    const contains = rule({ kind: "text", propertyId: "p1", op: "contains", value: "x" });
+    const out = selectNotesForView(
+      {
+        notes: [a, b],
+        rules: [contains],
+        filterable: null,
+        knownEmptyIds: undefined,
+        allowNoteIds: [],
+      },
+      "updated-desc",
+    );
+    expect(out.map((n) => n.id)).toEqual(["a", "b"]);
   });
 
   it("positive rules evaluate unknown notes with synthesized empty inputs (no deferral)", () => {
