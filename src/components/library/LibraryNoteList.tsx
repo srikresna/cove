@@ -1,26 +1,26 @@
+import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
-import { noteService, propertyService, tagService } from "../../di/container";
-import type { FilterableNote } from "../../domain/filters/evaluateFilters";
+import { noteService } from "../../di/container";
 import { type GroupBy, groupNotes, type NoteGroup } from "../../domain/library/grouping";
-import {
-  isStackEligibleDef,
-  type LibrarySort,
-  selectNotesForView,
-} from "../../domain/library/query";
+import { type LibrarySort, selectNotesForView } from "../../domain/library/query";
 import type { Note } from "../../domain/note/Note";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
 import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
-import { listCache, writeCachedTagIds } from "../../services/library/libraryListCache";
 import { noteActions } from "../../store/noteActions";
+import {
+  fetchLibraryInputs,
+  fetchLibraryStacks,
+  libraryInputsKey,
+  libraryStacksKey,
+} from "../../store/queryClient";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
-import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
@@ -63,221 +63,33 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   const togglePinNote = noteActions.togglePinNote;
   const toggleFavoriteNote = noteActions.toggleFavoriteNote;
 
-  // Property stacks under each note title.
-  const cached = activeWorkspaceId ? listCache.get(activeWorkspaceId) : undefined;
-  const [stackDefs, setStackDefs] = useState<PropertyDefinition[]>(cached?.stackDefs ?? []);
-  const [stackValues, setStackValues] = useState<Map<string, Map<string, PropertyValue>> | null>(
-    cached?.stackValues ?? null,
-  );
-  const propertyVersion = usePropertyStore((s) => s.version);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
-  useEffect(() => {
-    let alive = true;
-    propertyService
-      .listDefinitions()
-      .then(async (allDefs) => {
-        // Stack-eligible custom properties with values load one pass per def.
-        const eligible = allDefs.filter(isStackEligibleDef);
-        if (!alive) return;
-        setStackDefs(eligible);
-        if (eligible.length === 0) {
-          setStackValues(null);
-          // Write the empty state through to the cache too, or a deleted
-          // last definition replays ghost stack rows on every remount.
-          if (activeWorkspaceId) {
-            const prev = listCache.get(activeWorkspaceId);
-            listCache.set(activeWorkspaceId, {
-              stackDefs: [],
-              stackValues: null,
-              filterable: prev?.filterable ?? null,
-              knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
-              tagIdsByNote: prev?.tagIdsByNote ?? null,
-            });
-          }
-          return;
-        }
-        const perDef = await Promise.all(
-          eligible.map(async (def) => ({
-            propertyId: def.id,
-            values: await propertyService.valuesForDefinitionAllNotes(def.id),
-          })),
-        );
-        if (!alive) return;
-        const byNote = new Map<string, Map<string, PropertyValue>>();
-        for (const { propertyId, values } of perDef) {
-          for (const [noteId, value] of values) {
-            let row = byNote.get(noteId);
-            if (!row) {
-              row = new Map();
-              byNote.set(noteId, row);
-            }
-            row.set(propertyId, value);
-          }
-        }
-        setStackValues(byNote);
-        if (activeWorkspaceId) {
-          const prev = listCache.get(activeWorkspaceId);
-          listCache.set(activeWorkspaceId, {
-            stackDefs: eligible,
-            stackValues: byNote,
-            filterable: prev?.filterable ?? null,
-            knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
-            tagIdsByNote: prev?.tagIdsByNote ?? null,
-          });
-        }
-      })
-      .catch(() => {
-        if (alive) {
-          setStackDefs([]);
-          setStackValues(null);
-        }
-      });
-    return () => {
-      alive = false;
-    };
-  }, [propertyVersion]);
+  // Property stacks under each note title — cached globally (definitions are
+  // global), invalidated by property writes through the change bus.
+  const { data: stacksData } = useQuery({
+    queryKey: libraryStacksKey,
+    queryFn: fetchLibraryStacks,
+  });
+  const stackDefs = stacksData?.stackDefs ?? [];
+  const stackValues = stacksData?.stackValues ?? null;
 
   const taggedNoteIds = useTagStore((s) => s.taggedNoteIds);
-  const tagVersion = useTagStore((s) => s.version);
   const allTags = useTagStore((s) => s.tags);
 
   const draftRules = useViewStore((s) => s.draftRules);
-  const viewVersion = useViewStore((s) => s.version);
   const activeViewId = useViewStore((s) => s.activeViewId);
   const allViews = useViewStore((s) => s.views);
 
-  // Filter inputs (property values + journal dates) reload when rules exist.
-  const [filterable, setFilterable] = useState<Map<string, FilterableNote> | null>(
-    cached?.filterable ?? null,
-  );
+  // Filter inputs (property values + journal dates + tag ids) for the rules
+  // engine, group-by-tags, and row/card tag chips.
+  const { data: inputsData } = useQuery({
+    queryKey: libraryInputsKey(activeWorkspaceId ?? ""),
+    queryFn: () => fetchLibraryInputs(activeWorkspaceId ?? ""),
+    enabled: activeWorkspaceId != null,
+    placeholderData: (previous) => previous,
+  });
+  const filterable = inputsData?.filterable ?? null;
+  const tagIdsByNote = inputsData?.tagIdsByNote ?? null;
   const rulesActive = draftRules.length > 0;
-
-  // Tag ids per note feed the tags filter rule, group-by-tags AND the tag
-  // chips on rows/cards — loaded unconditionally while the Library is
-  // mounted (the SWR cache makes repeats cheap).
-  const needsTagIds = true;
-  const [tagIdsByNote, setTagIdsByNote] = useState<Map<string, string[]> | null>(
-    cached?.tagIdsByNote ?? null,
-  );
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: viewVersion/propertyVersion/tagVersion are intentional refresh signals, not body inputs
-  useEffect(() => {
-    if (!rulesActive) {
-      setFilterable(null);
-      return;
-    }
-    let alive = true;
-    Promise.all([
-      propertyService.valuesForDefinitionAllNotes("system:journal"),
-      propertyService.listDefinitions().then((allDefs) =>
-        Promise.all(
-          allDefs.map(async (def) => ({
-            propertyId: def.id,
-            values: await propertyService.valuesForDefinitionAllNotes(def.id),
-          })),
-        ),
-      ),
-      // Per-tag note ids feed the tags filter rule (tags live in note_tags,
-      // not note_properties, so they need their own bulk load).
-      tagService
-        .listTags(activeWorkspaceId ?? "")
-        .then((wsTags) =>
-          Promise.all(
-            wsTags.map(async (tag) => ({
-              tagId: tag.id,
-              noteIds: await tagService.notesForTag(tag.id),
-            })),
-          ),
-        )
-        .catch(() => [] as Array<{ tagId: string; noteIds: string[] }>),
-    ])
-      .then(([journalValues, perDef, tagLists]) => {
-        if (!alive) return;
-        const idsByNote = new Map<string, string[]>();
-        for (const { tagId, noteIds } of tagLists) {
-          for (const noteId of noteIds) {
-            const ids = idsByNote.get(noteId) ?? [];
-            ids.push(tagId);
-            idsByNote.set(noteId, ids);
-          }
-        }
-        setTagIdsByNote(idsByNote);
-        if (activeWorkspaceId) writeCachedTagIds(activeWorkspaceId, idsByNote);
-        const map = new Map<string, FilterableNote>();
-        for (const note of notes) {
-          if (note.workspaceId !== activeWorkspaceId) continue;
-          const journal = journalValues.get(note.id);
-          map.set(note.id, {
-            note,
-            propertyValues: new Map(),
-            tagIds: idsByNote.get(note.id) ?? [],
-            journalTimestamp:
-              journal?.type === "date" ? (journal as { timestamp: number }).timestamp : null,
-          });
-        }
-        for (const { propertyId, values } of perDef) {
-          for (const [noteId, value] of values) {
-            map.get(noteId)?.propertyValues.set(propertyId, value);
-          }
-        }
-        setFilterable(map);
-        if (activeWorkspaceId) {
-          const prev = listCache.get(activeWorkspaceId);
-          listCache.set(activeWorkspaceId, {
-            stackDefs: prev?.stackDefs ?? [],
-            stackValues: prev?.stackValues ?? null,
-            filterable: map,
-            // The fresh map has real entries for every live note, so the
-            // just-created markers have served their purpose.
-            knownEmptyIds: prev?.knownEmptyIds ?? new Set<string>(),
-            tagIdsByNote: prev?.tagIdsByNote ?? null,
-          });
-        }
-      })
-      .catch(() => {
-        if (alive) setFilterable(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [rulesActive, notes, activeWorkspaceId, viewVersion, propertyVersion, tagVersion]);
-
-  // Standalone tag-id load for group-by-tags without any rules active.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: tagVersion is an intentional refresh signal, not a body input
-  useEffect(() => {
-    if (!needsTagIds || rulesActive) return;
-    let alive = true;
-    tagService
-      .listTags(activeWorkspaceId ?? "")
-      .then((wsTags) =>
-        Promise.all(
-          wsTags.map(async (tag) => ({
-            tagId: tag.id,
-            noteIds: await tagService.notesForTag(tag.id),
-          })),
-        ),
-      )
-      .then((tagLists) => {
-        if (!alive) return;
-        const idsByNote = new Map<string, string[]>();
-        for (const { tagId, noteIds } of tagLists) {
-          for (const noteId of noteIds) {
-            const ids = idsByNote.get(noteId) ?? [];
-            ids.push(tagId);
-            idsByNote.set(noteId, ids);
-          }
-        }
-        setTagIdsByNote(idsByNote);
-        if (activeWorkspaceId) writeCachedTagIds(activeWorkspaceId, idsByNote);
-      })
-      .catch(() => {
-        if (alive) setTagIdsByNote(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [needsTagIds, rulesActive, activeWorkspaceId, tagVersion, notes]);
 
   const journalByNoteId = useJournalValuesByNote();
 
@@ -291,9 +103,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         notes: base,
         rules: draftRules,
         filterable,
-        knownEmptyIds: activeWorkspaceId
-          ? listCache.get(activeWorkspaceId)?.knownEmptyIds
-          : undefined,
         allowNoteIds: allViews.find((v) => v.id === activeViewId)?.allowNoteIds ?? [],
       },
       sort,

@@ -1,7 +1,6 @@
 import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
-import { seedKnownEmptyNote } from "../services/library/libraryListCache";
 import { processCoverImage } from "../utils/coverImage";
 import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 import {
@@ -9,6 +8,7 @@ import {
   fetchNotes as fetchNotesFn,
   notesKey,
   queryClient,
+  seedLibraryInputsNote,
   trashKey,
 } from "./queryClient";
 import { useNoteUiStore } from "./useNoteUiStore";
@@ -125,7 +125,7 @@ export const noteActions = {
       useUIStore.getState().setActivePage("editor");
       // A created note has provably empty filter inputs — record it so
       // emptiness-rule views in the Library can show it immediately.
-      seedKnownEmptyNote(ws, created.id);
+      seedLibraryInputsNote(ws, created);
       writeNotes(ws, [created, ...readNotes(ws)]);
       useNoteUiStore.getState().setActiveNoteId(created.id);
       useSaveStatusStore.getState().setSaved();

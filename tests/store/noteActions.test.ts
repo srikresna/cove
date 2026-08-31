@@ -72,7 +72,7 @@ vi.mock("@/di/container", () => ({
 
 import type { Note } from "@/domain/note/Note";
 import { noteActions } from "@/store/noteActions";
-import { notesKey, queryClient } from "@/store/queryClient";
+import { backlinkScanKey, notesKey, queryClient } from "@/store/queryClient";
 import { useNoteUiStore } from "@/store/useNoteUiStore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 
@@ -130,11 +130,18 @@ describe("noteActions", () => {
 
   it("updateNote splits content vs metadata and invalidates the backlink scan", async () => {
     updateContent.mockResolvedValue(makeNote({ content: "doc-v2" }));
+    queryClient.setQueryData(backlinkScanKey("n1"), []);
 
     await noteActions.updateNote("n1", { content: "doc-v2" });
 
     expect(updateContent).toHaveBeenCalledWith("n1", "doc-v2");
-    expect(invalidateNoteBacklinkScan).toHaveBeenCalledWith("n1");
+    // The scan query for the note was marked stale by the content write.
+    expect(
+      queryClient
+        .getQueryCache()
+        .find({ queryKey: backlinkScanKey("n1") })
+        ?.isStale(),
+    ).toBe(true);
     expect(updateMetadata).not.toHaveBeenCalled();
     expect(queryClient.getQueryData<Note[]>(notesKey("ws1"))?.[0]?.content).toBe("doc-v2");
   });

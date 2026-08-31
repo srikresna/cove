@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { FileText } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +9,7 @@ import type { SavedView } from "../../domain/filters/SavedView";
 import { selectNotesForView } from "../../domain/library/query";
 import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
-import { readListCache } from "../../services/library/libraryListCache";
+import { fetchLibraryInputs, libraryInputsKey } from "../../store/queryClient";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { Button } from "../ui/button";
@@ -55,23 +56,27 @@ export const CollectionEditorDialog: React.FC<{
   // cache-aware deferral, OR-unioned with the manual allow-list). With no
   // complete rule yet the preview shows only manually added notes — matching
   // the save gate, which refuses a rule-less view.
+  const { data: inputsData } = useQuery({
+    queryKey: libraryInputsKey(activeWorkspaceId ?? ""),
+    queryFn: () => fetchLibraryInputs(activeWorkspaceId ?? ""),
+    enabled: activeWorkspaceId != null,
+    placeholderData: (previous) => previous,
+  });
   const matchedIds = useMemo(() => {
     const complete = rules.filter(isRuleComplete);
     if (complete.length === 0) return new Set<string>(allowIds);
-    const cache = activeWorkspaceId ? readListCache(activeWorkspaceId) : undefined;
     const selected = selectNotesForView(
       {
         notes: workspaceNotes,
         rules: complete,
-        filterable: cache?.filterable ?? null,
-        knownEmptyIds: cache?.knownEmptyIds,
+        filterable: inputsData?.filterable ?? null,
         allowNoteIds: allowIds,
       },
       "updated-desc",
       { synthesizedPreview: true },
     );
     return new Set(selected.map((n) => n.id));
-  }, [rules, allowIds, workspaceNotes, activeWorkspaceId]);
+  }, [rules, allowIds, workspaceNotes, inputsData]);
 
   const matchedCount = matchedIds.size;
   const nameValid = name.trim().length > 0;

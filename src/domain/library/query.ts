@@ -63,10 +63,9 @@ export interface ViewSelectionInputs {
   /** Live notes of the workspace, already tag-prefiltered. */
   notes: Note[];
   rules: FilterRule[];
-  /** Bulk-loaded filter inputs by note id (null while loading). */
+  /** Bulk-loaded filter inputs by note id (null while loading). App-created
+   *  notes carry a seeded empty entry, so membership implies "known". */
   filterable: Map<string, FilterableNote> | null;
-  /** Note ids the app itself created — provably empty filter inputs. */
-  knownEmptyIds: Set<string> | undefined;
   /** Manually-included ids (a collection's Docs tab): rules OR membership. */
   allowNoteIds: string[];
 }
@@ -86,7 +85,7 @@ export function selectNotesForView(
   sort: LibrarySort,
   opts: { synthesizedPreview?: boolean } = {},
 ): Note[] {
-  const { notes, rules, filterable, knownEmptyIds, allowNoteIds } = inputs;
+  const { notes, rules, filterable, allowNoteIds } = inputs;
   const rulesActive = rules.length > 0;
   const synthesized = (n: Note): FilterableNote => ({
     ...(filterable?.get(n.id) ?? {
@@ -109,9 +108,7 @@ export function selectNotesForView(
   } else {
     const deferUnknown = rules.filter(isRuleComplete).some(decidesByFabricatedEmptiness);
     filtered = evaluateFilters(
-      notes
-        .filter((n) => !deferUnknown || filterable.has(n.id) || (knownEmptyIds?.has(n.id) ?? false))
-        .map(synthesized),
+      notes.filter((n) => !deferUnknown || filterable.has(n.id)).map(synthesized),
       rules,
     ).map((i) => i.note);
   }
