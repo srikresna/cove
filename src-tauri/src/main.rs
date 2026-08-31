@@ -10,6 +10,14 @@ mod transaction;
 use std::panic;
 use tauri::Manager;
 
+#[tauri::command]
+fn js_log(level: String, msg: String) {
+  match level.as_str() {
+    "warn" => tracing::warn!(target: "cove::js", "{}", msg),
+    _ => tracing::error!(target: "cove::js", "{}", msg),
+  }
+}
+
 fn main() {
   tracing_subscriber::fmt::init();
 
@@ -35,7 +43,8 @@ fn main() {
         backup::backup_database,
         backup::pre_restore_backup_path,
         restore::restore_database,
-        transaction::run_sql_transaction
+        transaction::run_sql_transaction,
+        js_log
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");
