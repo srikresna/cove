@@ -1,11 +1,16 @@
 import { MESSAGES } from "../constants/messages";
 import { blockSuiteEditorService, noteService, vaultService } from "../di/container";
 import type { Note } from "../domain/note/Note";
-import { invalidateNoteBacklinkScan } from "../services/editor/backlinkScan";
 import { seedKnownEmptyNote } from "../services/library/libraryListCache";
 import { processCoverImage } from "../utils/coverImage";
 import { notifyErrorWithSaveStatus as notifyError } from "./notify";
-import { fetchNotes as fetchNotesFn, notesKey, queryClient, trashKey } from "./queryClient";
+import {
+  backlinkScanKey,
+  fetchNotes as fetchNotesFn,
+  notesKey,
+  queryClient,
+  trashKey,
+} from "./queryClient";
 import { useNoteUiStore } from "./useNoteUiStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useSaveStatusStore } from "./useSaveStatusStore";
@@ -148,7 +153,7 @@ export const noteActions = {
       let saved: Note | null = null;
       if (content !== undefined) {
         saved = await noteService.updateContent(id, content);
-        invalidateNoteBacklinkScan(id);
+        await queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       }
       if (Object.keys(metadata).length > 0) {
         saved = await noteService.updateMetadata(id, metadata);
@@ -243,7 +248,7 @@ export const noteActions = {
 
     try {
       await noteService.trashNote(id);
-      invalidateNoteBacklinkScan(id);
+      await queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       useSaveStatusStore.getState().setSaved();
       useNotificationStore.getState().pushToast({
         kind: "info",
@@ -283,7 +288,7 @@ export const noteActions = {
     writeTrash(previousTrash.filter((n) => n.id !== id));
     try {
       await noteService.deleteNote(id);
-      invalidateNoteBacklinkScan(id);
+      await queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       await queryClient.invalidateQueries({ queryKey: trashKey });
     } catch (err) {
       writeTrash(previousTrash);

@@ -6,6 +6,8 @@ import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 /** The notes-list cache key — per workspace. */
 export const notesKey = (workspaceId: string) => ["notes", workspaceId] as const;
 export const trashKey = ["trash"] as const;
+/** One note's database-row backlink scan — per source note. */
+export const backlinkScanKey = (noteId: string) => ["backlink-scan", noteId] as const;
 
 /**
  * Fetches a workspace's note list and mirrors it into the editor's doc

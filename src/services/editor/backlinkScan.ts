@@ -1,5 +1,4 @@
 import * as Y from "yjs";
-import type { DatabaseBacklinkRef } from "../blocksuite/IBlockSuiteEditorService";
 import { unpackBlockSuiteContent } from "./contentFormat";
 import { tryDocFromSnapshot } from "./yjsCodec";
 
@@ -7,39 +6,10 @@ interface ReferenceDelta {
   attributes?: { reference?: { type?: string; pageId?: string } };
 }
 
-interface DatabaseRowRef {
+export interface DatabaseRowRef {
   refDocId: string;
   databaseId: string;
   databaseRowId: string;
-}
-
-const rowsBySourceNoteId = new Map<string, DatabaseRowRef[]>();
-
-export function invalidateNoteBacklinkScan(noteId: string): void {
-  rowsBySourceNoteId.delete(noteId);
-}
-
-export function clearBacklinkScans(): void {
-  rowsBySourceNoteId.clear();
-}
-
-export function hasBacklinkScan(noteId: string): boolean {
-  return rowsBySourceNoteId.has(noteId);
-}
-
-export function scannedBacklinksOf(targetDocId: string): DatabaseBacklinkRef[] {
-  const refs: DatabaseBacklinkRef[] = [];
-  for (const [sourceNoteId, rows] of rowsBySourceNoteId) {
-    for (const row of rows) {
-      if (row.refDocId !== targetDocId) continue;
-      refs.push({
-        databaseDocId: sourceNoteId,
-        databaseId: row.databaseId,
-        databaseRowId: row.databaseRowId,
-      });
-    }
-  }
-  return refs;
 }
 
 function scanDocForDatabaseRows(doc: Y.Doc): DatabaseRowRef[] {
@@ -76,40 +46,20 @@ function scanDocForDatabaseRows(doc: Y.Doc): DatabaseRowRef[] {
   return rows;
 }
 
-export async function scanNoteForDatabaseRows(
+/** Pure scan of one note's content for database rows referencing other docs.
+ *  Caching, dedupe, and invalidation live in the query layer
+ *  (["backlink-scan", noteId]). */
+export async function scanNoteRows(
   getNoteContent: (noteId: string) => Promise<string | undefined>,
   noteId: string,
-): Promise<void> {
+): Promise<DatabaseRowRef[]> {
   try {
     const content = await getNoteContent(noteId);
     const snapshot = content ? unpackBlockSuiteContent(content) : null;
-    if (!snapshot) {
-      rowsBySourceNoteId.set(noteId, []);
-      return;
-    }
+    if (!snapshot) return [];
     const doc = tryDocFromSnapshot(snapshot);
-    rowsBySourceNoteId.set(noteId, doc ? scanDocForDatabaseRows(doc) : []);
+    return doc ? scanDocForDatabaseRows(doc) : [];
   } catch {
-    rowsBySourceNoteId.set(noteId, []);
+    return [];
   }
-}
-
-const inflightScans = new Map<string, Promise<void>>();
-
-/**
- * Multiple Info panels can request the same scan concurrently (the cache is
- * only written after an await) — this gate makes them share one in-flight pass.
- */
-export function ensureNoteScanned(
-  getNoteContent: (noteId: string) => Promise<string | undefined>,
-  noteId: string,
-): Promise<void> {
-  if (rowsBySourceNoteId.has(noteId)) return Promise.resolve();
-  const inFlight = inflightScans.get(noteId);
-  if (inFlight) return inFlight;
-  const pending = scanNoteForDatabaseRows(getNoteContent, noteId).finally(() => {
-    inflightScans.delete(noteId);
-  });
-  inflightScans.set(noteId, pending);
-  return pending;
 }

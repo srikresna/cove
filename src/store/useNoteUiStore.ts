@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { vaultService } from "../di/container";
-import { clearBacklinkScans } from "../services/editor/backlinkScan";
 import { useUIStore } from "./useUIStore";
 
 /** Pure client state around the active note (the list itself lives in the
@@ -24,6 +23,5 @@ export const useNoteUiStore = create<NoteUiState>((set) => ({
 }));
 
 vaultService.onLock(() => {
-  clearBacklinkScans();
   useNoteUiStore.setState({ activeNoteId: null, activeCoverImage: null });
 });

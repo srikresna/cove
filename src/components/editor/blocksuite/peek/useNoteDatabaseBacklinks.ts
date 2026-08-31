@@ -1,41 +1,41 @@
-import { useEffect, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { noteService } from "../../../../di/container";
 import { useNotes } from "../../../../hooks/useNotes";
 import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlockSuiteEditorService";
-import { ensureNoteScanned, scannedBacklinksOf } from "../../../../services/editor/backlinkScan";
+import { scanNoteRows } from "../../../../services/editor/backlinkScan";
+import { backlinkScanKey } from "../../../../store/queryClient";
 
+/** Database rows across the workspace's notes that reference `noteId`. Each
+ *  source note scans once and lives in the query cache (invalidated when the
+ *  note's content changes). */
 export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklinkRef[] {
-  const noteIds = useNotes()
-    .map((n) => n.id)
-    .join(",");
-  const [backlinks, setBacklinks] = useState<DatabaseBacklinkRef[]>([]);
+  const notes = useNotes();
+  const scans = useQueries({
+    queries: notes.map((note) => ({
+      queryKey: backlinkScanKey(note.id),
+      queryFn: () =>
+        scanNoteRows((nid) => noteService.getNote(nid).then((n) => n?.content), note.id),
+      staleTime: Infinity,
+      retry: false,
+    })),
+  });
 
-  useEffect(() => {
-    if (!noteId) {
-      setBacklinks([]);
-      return;
+  const backlinks: DatabaseBacklinkRef[] = [];
+  if (!noteId) return backlinks;
+  for (let i = 0; i < notes.length; i += 1) {
+    const rows = scans[i]?.data;
+    if (!rows) continue;
+    const sourceId = notes[i]?.id;
+    if (!sourceId) continue;
+    for (const row of rows) {
+      if (row.refDocId !== noteId) continue;
+      backlinks.push({
+        databaseDocId: sourceId,
+        databaseId: row.databaseId,
+        databaseRowId: row.databaseRowId,
+      });
     }
-    let cancelled = false;
-
-    const scanAll = async () => {
-      const ids = noteIds ? noteIds.split(",") : [];
-      const getContent = (nid: string) => noteService.getNote(nid).then((n) => n?.content);
-      // ensureNoteScanned shares in-flight scans, so every mounted Info panel
-      // instance contributes at most one fetch+decrypt pass per note.
-      for (const id of ids) {
-        if (cancelled) return;
-        await ensureNoteScanned(getContent, id);
-      }
-      if (!cancelled) setBacklinks(scannedBacklinksOf(noteId));
-    };
-
-    setBacklinks(scannedBacklinksOf(noteId));
-    void scanAll();
-    return () => {
-      cancelled = true;
-    };
-  }, [noteId, noteIds]);
-
+  }
   return backlinks;
 }
 

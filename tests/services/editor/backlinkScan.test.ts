@@ -1,13 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
-import {
-  clearBacklinkScans,
-  ensureNoteScanned,
-  hasBacklinkScan,
-  invalidateNoteBacklinkScan,
-  scanNoteForDatabaseRows,
-  scannedBacklinksOf,
-} from "@/services/editor/backlinkScan";
+import { scanNoteRows } from "@/services/editor/backlinkScan";
 import { packBlockSuiteContent } from "@/services/editor/contentFormat";
 import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
 
@@ -45,88 +38,31 @@ function databaseContentWithLinkedRow(): string {
 function contentGetter(
   contents: Map<string, string>,
 ): (noteId: string) => Promise<string | undefined> {
-  return async (noteId: string) => contents.get(noteId);
+  return async (noteId) => contents.get(noteId);
 }
 
-describe("backlinkScan", () => {
-  beforeEach(() => {
-    clearBacklinkScans();
-  });
-
-  it("records database rows whose title references a linked page", async () => {
+describe("scanNoteRows", () => {
+  it("finds database rows whose title references a linked page", async () => {
     const contents = new Map([["note-db", databaseContentWithLinkedRow()]]);
-    expect(hasBacklinkScan("note-db")).toBe(false);
 
-    await scanNoteForDatabaseRows(contentGetter(contents), "note-db");
+    const rows = await scanNoteRows(contentGetter(contents), "note-db");
 
-    expect(hasBacklinkScan("note-db")).toBe(true);
-    expect(scannedBacklinksOf("target-1")).toEqual([
-      { databaseDocId: "note-db", databaseId: "db", databaseRowId: "row-1" },
-    ]);
-    expect(scannedBacklinksOf("unrelated-target")).toEqual([]);
+    expect(rows).toEqual([{ refDocId: "target-1", databaseId: "db", databaseRowId: "row-1" }]);
   });
 
-  it("records an empty scan for missing or non-BlockSuite content", async () => {
+  it("returns no rows for missing or non-BlockSuite content", async () => {
     const contents = new Map([["note-plain", "just markdown text"]]);
-    await scanNoteForDatabaseRows(contentGetter(contents), "note-plain");
-    expect(hasBacklinkScan("note-plain")).toBe(true);
-    expect(scannedBacklinksOf("target-1")).toEqual([]);
-
-    await scanNoteForDatabaseRows(contentGetter(contents), "note-missing");
-    expect(hasBacklinkScan("note-missing")).toBe(true);
-    expect(scannedBacklinksOf("target-1")).toEqual([]);
+    expect(await scanNoteRows(contentGetter(contents), "note-plain")).toEqual([]);
+    expect(await scanNoteRows(contentGetter(contents), "note-missing")).toEqual([]);
   });
 
-  it("a corrupt snapshot yields no refs without throwing", async () => {
+  it("a corrupt snapshot yields no rows without throwing", async () => {
     const contents = new Map([["note-corrupt", packBlockSuiteContent("%%%not-base64%%%")]]);
-
-    await expect(
-      scanNoteForDatabaseRows(contentGetter(contents), "note-corrupt"),
-    ).resolves.toBeUndefined();
-    expect(hasBacklinkScan("note-corrupt")).toBe(true);
-    expect(scannedBacklinksOf("target-1")).toEqual([]);
+    await expect(scanNoteRows(contentGetter(contents), "note-corrupt")).resolves.toEqual([]);
   });
 
-  it("invalidateNoteBacklinkScan drops one scan and clearBacklinkScans drops all", async () => {
-    const contents = new Map([["note-db", databaseContentWithLinkedRow()]]);
-    await scanNoteForDatabaseRows(contentGetter(contents), "note-db");
-    expect(scannedBacklinksOf("target-1")).toHaveLength(1);
-
-    invalidateNoteBacklinkScan("note-db");
-    expect(hasBacklinkScan("note-db")).toBe(false);
-    expect(scannedBacklinksOf("target-1")).toEqual([]);
-
-    await scanNoteForDatabaseRows(contentGetter(contents), "note-db");
-    expect(scannedBacklinksOf("target-1")).toHaveLength(1);
-
-    clearBacklinkScans();
-    expect(hasBacklinkScan("note-db")).toBe(false);
-    expect(scannedBacklinksOf("target-1")).toEqual([]);
-  });
-
-  it("ensureNoteScanned shares one in-flight pass across concurrent callers", async () => {
-    const contents = new Map([["note-db", databaseContentWithLinkedRow()]]);
-    let fetches = 0;
-    const slowGetter = async (noteId: string) => {
-      fetches += 1;
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      return contents.get(noteId);
-    };
-
-    // Several Info panels mounting at once race their scan loops; without the
-    // in-flight gate each would fetch and decrypt the same note.
-    await Promise.all([
-      ensureNoteScanned(slowGetter, "note-db"),
-      ensureNoteScanned(slowGetter, "note-db"),
-      ensureNoteScanned(slowGetter, "note-db"),
-    ]);
-
-    expect(fetches).toBe(1);
-    expect(hasBacklinkScan("note-db")).toBe(true);
-    expect(scannedBacklinksOf("target-1")).toHaveLength(1);
-
-    // Once cached, later callers resolve without another fetch.
-    await ensureNoteScanned(slowGetter, "note-db");
-    expect(fetches).toBe(1);
+  it("a throwing content getter yields no rows", async () => {
+    const getter = vi.fn().mockRejectedValue(new Error("decrypt failed"));
+    await expect(scanNoteRows(getter, "n")).resolves.toEqual([]);
   });
 });
