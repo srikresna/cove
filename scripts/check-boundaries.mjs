@@ -3,7 +3,7 @@
 //
 // Graph (arrows = allowed import direction):
 //   (app root: App.tsx, main.tsx, *.d.ts) -> everything
-//   domain  -> constants, errors only
+//   domain  -> utils (shared kernel of pure helpers), constants, errors
 //   repositories -> domain, constants, errors
 //   services -> domain, repositories, constants, errors, utils, lib
 //   store -> domain, services, constants, errors, utils, lib
@@ -19,7 +19,7 @@ import { dirname, join, normalize, resolve } from "node:path";
 const ROOT = resolve(process.cwd(), "src");
 
 const DENY = {
-  domain: ["repositories", "services", "store", "components", "features", "hooks", "utils", "lib"],
+  domain: ["repositories", "services", "store", "components", "features", "hooks", "lib"],
   repositories: ["services", "store", "components", "features", "hooks", "utils", "lib"],
   services: ["store", "components", "features", "hooks"],
   store: ["components", "features", "hooks"],
