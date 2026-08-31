@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService, tagService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
+import { summarizePropertyValue } from "../../domain/property/format";
 import type { Tag } from "../../domain/tag/Tag";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
@@ -11,7 +12,7 @@ import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { DatabaseBacklinkSection } from "./blocksuite/peek/PeekDatabaseBacklink";
 import { useNoteDatabaseBacklinks } from "./blocksuite/peek/useNoteDatabaseBacklinks";
-import { NotePropertiesRows, summarizePropertyValue, TagChip } from "./NotePropertiesRows";
+import { NotePropertiesRows, TagChip } from "./NotePropertiesRows";
 
 const OPEN_KEY = "cove-info-open";
 
