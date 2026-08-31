@@ -1,0 +1,13 @@
+export const WorkspaceMessages = {
+  CREATE_WORKSPACE_TITLE: "Create Workspace",
+  WORKSPACE_NAME_LABEL: "Workspace Name",
+  WORKSPACE_EMOJI_LABEL: "Emoji Icon",
+  WORKSPACE_COLOR_LABEL: "Accent Color",
+  WORKSPACE_DESC_LABEL: "Description",
+  CREATE_WORKSPACE_BUTTON: "Create Workspace",
+  DELETE_WORKSPACE: "Delete workspace",
+  DELETE_WORKSPACE_CONFIRM_TITLE: "Delete this workspace?",
+  DELETE_WORKSPACE_CONFIRM_DESC:
+    "The workspace and every note inside it will be permanently deleted. This cannot be undone.",
+  DELETE_WORKSPACE_CONFIRM_BUTTON: "Delete workspace",
+} as const;
