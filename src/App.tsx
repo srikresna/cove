@@ -2,22 +2,22 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { lazy, Suspense, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { BlockSuiteDialogs } from "./components/editor/BlockSuiteDialogs";
-import { PeekViewModal } from "./components/editor/blocksuite/peek/PeekViewModal";
-import { JournalsPage } from "./components/journals/JournalsPage";
-import { LibraryPage } from "./components/library/LibraryPage";
-import { CreateWorkspaceModal } from "./components/modals/CreateWorkspaceModal";
-import { QuickSearchModal } from "./components/modals/QuickSearchModal";
-import { SettingsModal } from "./components/settings/SettingsModal";
-import { Sidebar } from "./components/sidebar/Sidebar";
 import { ToastContainer } from "./components/ToastContainer";
-import { TrashPage } from "./components/trash/TrashPage";
 import { Button } from "./components/ui/button";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { VaultGate } from "./components/vault/VaultGate";
 import { MESSAGES } from "./constants/messages";
 import { propertyService, savedViewService } from "./di/container";
 import type { Note } from "./domain/note/Note";
+import { BlockSuiteDialogs } from "./features/editor/BlockSuiteDialogs";
+import { PeekViewModal } from "./features/editor/blocksuite/peek/PeekViewModal";
+import { JournalsPage } from "./features/journals/JournalsPage";
+import { LibraryPage } from "./features/library/LibraryPage";
+import { CreateWorkspaceModal } from "./features/modals/CreateWorkspaceModal";
+import { QuickSearchModal } from "./features/modals/QuickSearchModal";
+import { SettingsModal } from "./features/settings/SettingsModal";
+import { Sidebar } from "./features/sidebar/Sidebar";
+import { TrashPage } from "./features/trash/TrashPage";
+import { VaultGate } from "./features/vault/VaultGate";
 import { useNotes } from "./hooks/useNotes";
 import { noteActions } from "./store/noteActions";
 import { useNoteUiStore } from "./store/useNoteUiStore";
@@ -26,7 +26,7 @@ import { useViewStore } from "./store/useViewStore";
 import { useWorkspaceStore } from "./store/useWorkspaceStore";
 
 const BlockSuiteNoteEditor = lazy(
-  () => import("./components/editor/blocksuite/BlockSuiteNoteEditor"),
+  () => import("./features/editor/blocksuite/BlockSuiteNoteEditor"),
 );
 
 export const AppContent: React.FC = () => {

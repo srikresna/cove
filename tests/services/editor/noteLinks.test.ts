@@ -5,8 +5,8 @@ import { extractNoteLinkIds } from "@/services/editor/noteLinks";
 import { encodeDocSnapshot } from "@/services/editor/yjsCodec";
 import { NoteService } from "@/services/NoteService";
 import type { EncryptedPayload, IEncryptionService } from "@/services/vault/IEncryptionService";
-import { InMemoryNoteLinkRepository } from "../fakes/InMemoryNoteLinkRepository";
-import { InMemoryNoteRepository } from "../fakes/InMemoryNoteRepository";
+import { InMemoryNoteLinkRepository } from "../../fakes/InMemoryNoteLinkRepository";
+import { InMemoryNoteRepository } from "../../fakes/InMemoryNoteRepository";
 
 const unlockedCrypto: IEncryptionService = {
   isUnlocked: () => true,
