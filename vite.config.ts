@@ -30,6 +30,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^@\/(.*)$/,
+        replacement: resolve(rootDir, "src/$1"),
+      },
+      {
         find: /^@preact\/signals-core(?=\/|$)/,
         replacement: resolve(rootDir, "node_modules/@preact/signals-core"),
       },
@@ -48,7 +52,7 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
-    entries: ["index.html", "src/components/editor/blocksuite/**/*.{ts,tsx}"],
+    entries: ["index.html", "src/features/editor/blocksuite/**/*.{ts,tsx}"],
     exclude: ["@vanilla-extract/css", "@vanilla-extract/private"],
   },
   server: {
