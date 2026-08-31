@@ -42,29 +42,29 @@ npm run tauri dev    # full app (Rust + Vite dev server, port 1420)
 
 ## Architecture
 
-Clean architecture with strict layering:
+Clean architecture with strict layering, enforced by `scripts/check-boundaries.mjs` (run via `bun run boundaries`; wired into `check` and `verify`):
 
 ```
 src/
-  domain/        pure logic + error types (no deps)
+  domain/        pure logic + formatters + error types (may use utils as shared kernel)
   repositories/  persistence interfaces + SQLite impls (I*Repository)
-  services/      orchestration with I*Service contracts (no zustand import*)
-  store/         zustand stores (may import services via DI)
-  components/    React view layer (may import stores + services)
-  di/            dependency injection wiring (container.ts)
-  lib/           shared utilities
+  services/      orchestration with I*Service contracts
+  store/         zustand client state + TanStack Query cache/actions (noteActions, queryClient)
+  hooks/         React data hooks (useNotes, useTrash, …)
+  features/      feature UIs (editor, library, journals, modals, settings, sidebar, trash, vault)
+  components/    shared UI kit only (ui/, ErrorBoundary, ToastContainer)
+  di/            dependency injection wiring (container.ts) — may import everything
+  constants/ errors/ utils/ lib/   shared vocabulary + pure helpers
 ```
 
-\* Two documented exceptions: `services/blocksuite/peekViewService.ts` and `coveBlockSuiteProviders.ts` import zustand to bridge BlockSuite's service contracts to React UI. These carry explanatory header comments.
-
-**Dependency direction:** `store → service → repository → domain`. Services never import zustand directly (except the two bridging exceptions above).
+**Dependency direction:** `features → hooks/store → services → repositories → domain`. Server state lives in the TanStack Query cache (`src/store/queryClient.ts`); zustand holds only client state. Repo writes publish change topics (`services/changeBus.ts`) that invalidate queries. An unknown top-level folder is a boundary violation — new layers must be registered in the gate script.
 
 ## BlockSuite integration
 
 - `src/services/blocksuite/BlockSuiteEditorService.ts` — workspace lifecycle, doc open/normalize, export/import
 - `src/services/editor/BlockTreeNormalizer.ts` — `normalizeBlockTree()`: repairs corrupted snapshots (multi-surface merge + element dedup). Safety-critical — has tests.
-- `src/components/editor/blocksuite/BlockSuiteSurface.tsx` — mounts the editor, debounced save, presentation, pointer/autocomplete guards
-- `src/components/editor/blocksuite/peek/PeekViewModal.tsx` — peek view for embedded frames/mindmaps
+- `src/features/editor/blocksuite/BlockSuiteSurface.tsx` — mounts the editor, debounced save, presentation, pointer/autocomplete guards
+- `src/features/editor/blocksuite/peek/PeekViewModal.tsx` — peek view for embedded frames/mindmaps
 
 ### Vendored BlockSuite
 
