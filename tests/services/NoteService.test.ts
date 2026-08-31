@@ -161,7 +161,7 @@ describe("NoteService", () => {
     const x = await service.createNote("ws-1", "X");
 
     await service.trashNote(x.id);
-    const y = await service.createNote("ws-1", "Y");
+    await service.createNote("ws-1", "Y");
     await service.restoreNote(x.id);
 
     const keys = fakeRepo.notes

@@ -52,6 +52,10 @@ export class InMemorySavedViewRepository implements ISavedViewRepository {
     this.views = this.views.map((v) => (v.id === id ? { ...v, rules } : v));
   }
 
+  async updateAllowNoteIds(id: string, allowNoteIds: string[]): Promise<void> {
+    this.views = this.views.map((v) => (v.id === id ? { ...v, allowNoteIds } : v));
+  }
+
   async applyPrune(
     updates: Array<{ id: string; rulesJson: string }>,
     deleteIds: string[],

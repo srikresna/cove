@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
+import type { DatabaseSync as DatabaseSyncType, SQLInputValue } from "node:sqlite";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -18,13 +18,14 @@ function loadNodeSqlite(): typeof import("node:sqlite") {
 function makeDb(raw: DatabaseSyncType): MigrationDb {
   raw.exec("PRAGMA foreign_keys = ON");
   return {
-    execute: async (sql, params) => raw.prepare(sql).run(...(params ?? [])),
+    execute: async (sql, params) => raw.prepare(sql).run(...((params ?? []) as SQLInputValue[])),
     select: async <T>(sql: string, params?: unknown[]) =>
-      raw.prepare(sql).all(...(params ?? [])) as T,
+      raw.prepare(sql).all(...((params ?? []) as SQLInputValue[])) as T,
     runTransaction: async (statements: SqlStatement[]) => {
       raw.exec("BEGIN");
       try {
-        for (const s of statements) raw.prepare(s.sql).run(...(s.params ?? []));
+        for (const s of statements)
+          raw.prepare(s.sql).run(...((s.params ?? []) as SQLInputValue[]));
         raw.exec("COMMIT");
       } catch (err) {
         raw.exec("ROLLBACK");

@@ -183,7 +183,7 @@ describe("PropertyService", () => {
     const b = await service.createDefinition("Effort", "number");
 
     await service.renameDefinition(a.id, "  Owner   Name ");
-    expect((await service.listDefinitions())[0].name).toBe("Owner Name");
+    expect((await service.listDefinitions())[0]?.name).toBe("Owner Name");
 
     await expect(service.renameDefinition(a.id, "effort")).rejects.toThrow(ValidationError);
     await expect(service.renameDefinition("missing", "x")).rejects.toThrow(NotFoundError);

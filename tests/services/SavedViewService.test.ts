@@ -201,6 +201,7 @@ describe("SavedViewService", () => {
       name: "Tagged",
       createdAt: 1,
       rules: tagRule(["work"]),
+      allowNoteIds: [],
     });
     await repo.create({
       id: "vJournal",
@@ -208,6 +209,7 @@ describe("SavedViewService", () => {
       name: "Journals",
       createdAt: 2,
       rules: [{ id: "r1", kind: "journal", op: "is", value: true }],
+      allowNoteIds: [],
     });
     await repo.create({
       id: "vPartly",
@@ -218,6 +220,7 @@ describe("SavedViewService", () => {
         { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live", "dead"] },
         { id: "r2", kind: "text", propertyId: "pGONE", op: "contains", value: "x" },
       ],
+      allowNoteIds: [],
     });
     await repo.create({
       id: "vAllDead",
@@ -225,6 +228,7 @@ describe("SavedViewService", () => {
       name: "All dead",
       createdAt: 4,
       rules: [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["dead"] }],
+      allowNoteIds: [],
     });
     await repo.create({
       id: "vNotDead",
@@ -232,6 +236,7 @@ describe("SavedViewService", () => {
       name: "Not dead",
       createdAt: 5,
       rules: [{ id: "r1", kind: "select", propertyId: "p1", op: "is-not", optionIds: ["dead"] }],
+      allowNoteIds: [],
     });
 
     const deletedByHeal = await service.healRules([liveDef("p1", ["live"])]);

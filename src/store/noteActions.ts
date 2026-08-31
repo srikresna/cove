@@ -8,7 +8,6 @@ import {
   fetchNotes as fetchNotesFn,
   notesKey,
   queryClient,
-  seedLibraryInputsNote,
   trashKey,
 } from "./queryClient";
 import { useNoteUiStore } from "./useNoteUiStore";
@@ -44,12 +43,24 @@ function cacheOf(id: string): { ws: string; notes: Note[] } | null {
 
 /** Marks every notes list stale and refetches, resolving only once the fresh
  *  data has landed — awaited callers (journal open, restore, import) can rely
- *  on the note being present afterwards. */
+ *  on the note being present afterwards. Membership changes also rebuild the
+ *  Library's bulk inputs (rule views, grouping, chips). */
 async function invalidateNotes(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"], refetchType: "all" });
+  await queryClient.invalidateQueries({ queryKey: ["library-inputs"], refetchType: "all" });
 }
 
 export const noteActions = {
+  /** Rebuilds the Library's bulk-loaded filter inputs (property values, tag
+   *  ids) from the post-write DB. Called on every note-membership change —
+   *  create, restore, import, duplicate, workspace move. */
+  invalidateLibraryInputs(): Promise<void> {
+    return queryClient.invalidateQueries({
+      queryKey: ["library-inputs"],
+      refetchType: "all",
+    });
+  },
+
   /** Ensures the workspace's list is cached (fetches on first use) and
    *  keeps the passive-selection invariant: boot, unlock remount, and
    *  workspace switches never click a row, so a landed list selects the
@@ -123,9 +134,9 @@ export const noteActions = {
       // Creating a note opens it: return the main area to the editor even
       // when the trigger sits on the Library/Journals/Trash page.
       useUIStore.getState().setActivePage("editor");
-      // A created note has provably empty filter inputs — record it so
-      // emptiness-rule views in the Library can show it immediately.
-      seedLibraryInputsNote(ws, created);
+      // A created note changes the workspace's input space (rule views,
+      // grouping, chips) — rebuild the bulk inputs from the post-insert DB.
+      void noteActions.invalidateLibraryInputs();
       writeNotes(ws, [created, ...readNotes(ws)]);
       useNoteUiStore.getState().setActiveNoteId(created.id);
       useSaveStatusStore.getState().setSaved();
@@ -153,7 +164,8 @@ export const noteActions = {
       let saved: Note | null = null;
       if (content !== undefined) {
         saved = await noteService.updateContent(id, content);
-        await queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
+        // The rescan runs off the critical path — it must not delay Saved.
+        void queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       }
       if (Object.keys(metadata).length > 0) {
         saved = await noteService.updateMetadata(id, metadata);
@@ -223,6 +235,7 @@ export const noteActions = {
       }
       useWorkspaceStore.getState().setActiveWorkspace(ws);
       await noteActions.fetchNotes(ws);
+      void noteActions.invalidateLibraryInputs();
       useNoteUiStore.getState().setActiveNoteId(id);
       await noteActions.loadActiveNoteContent(id);
       useSaveStatusStore.getState().setSaved();
@@ -248,7 +261,7 @@ export const noteActions = {
 
     try {
       await noteService.trashNote(id);
-      await queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
+      void queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       useSaveStatusStore.getState().setSaved();
       useNotificationStore.getState().pushToast({
         kind: "info",
@@ -288,7 +301,7 @@ export const noteActions = {
     writeTrash(previousTrash.filter((n) => n.id !== id));
     try {
       await noteService.deleteNote(id);
-      await queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
+      void queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       await queryClient.invalidateQueries({ queryKey: trashKey });
     } catch (err) {
       writeTrash(previousTrash);
@@ -314,6 +327,7 @@ export const noteActions = {
       ]);
       const ws = activeWorkspaceId() ?? duplicated.workspaceId;
       writeNotes(ws, [duplicated, ...readNotes(ws)]);
+      void noteActions.invalidateLibraryInputs();
       useNoteUiStore.getState().setActiveNoteId(duplicated.id);
       useSaveStatusStore.getState().setSaved();
     } catch (err) {
@@ -361,6 +375,7 @@ export const noteActions = {
   async persistDocCreatedNote(ws: string, docId: string, title?: string): Promise<Note> {
     const created = await noteService.createNoteWithId(ws, docId, title);
     await noteActions.refreshNotesInPlace(ws);
+    void noteActions.invalidateLibraryInputs();
     return created;
   },
 };

@@ -76,7 +76,6 @@ describe("selectNotesForView", () => {
         notes: [a, b, c],
         rules: [isNotEmptyRule],
         filterable,
-        knownEmptyIds: new Set(["c"]),
         allowNoteIds: [],
       },
       "updated-desc",
@@ -90,7 +89,7 @@ describe("selectNotesForView", () => {
     const isEmpty = rule({ kind: "text", propertyId: "p1", op: "is-empty" });
     const filterable = new Map<string, FilterableNote>([["a", withValue(a, "v")]]);
     const out = selectNotesForView(
-      { notes: [a, b], rules: [isEmpty], filterable, knownEmptyIds: undefined, allowNoteIds: [] },
+      { notes: [a, b], rules: [isEmpty], filterable, allowNoteIds: [] },
       "updated-desc",
     );
     // is-empty admits emptiness -> b (cache-absent) is deferred out.
@@ -101,7 +100,7 @@ describe("selectNotesForView", () => {
     const isEmpty = rule({ kind: "text", propertyId: "p1", op: "is-empty" });
     const filterable = new Map<string, FilterableNote>([["a", withValue(a, "v")]]);
     const out = selectNotesForView(
-      { notes: [a, b], rules: [isEmpty], filterable, knownEmptyIds: undefined, allowNoteIds: [] },
+      { notes: [a, b], rules: [isEmpty], filterable, allowNoteIds: [] },
       "updated-desc",
       { synthesizedPreview: true },
     );
@@ -117,7 +116,6 @@ describe("selectNotesForView", () => {
         notes: [a, b],
         rules: [contains],
         filterable: new Map<string, FilterableNote>([["a", withValue(a, "xylophone")]]),
-        knownEmptyIds: undefined,
         allowNoteIds: [],
       },
       "updated-desc",
@@ -133,7 +131,6 @@ describe("selectNotesForView", () => {
         notes: [a, b],
         rules: [contains],
         filterable: null,
-        knownEmptyIds: undefined,
         allowNoteIds: [],
       },
       "updated-desc",
@@ -147,7 +144,7 @@ describe("selectNotesForView", () => {
     const contains = rule({ kind: "text", propertyId: "p1", op: "contains", value: "x" });
     const filterable = new Map<string, FilterableNote>([["a", withValue(a, "xylophone")]]);
     const out = selectNotesForView(
-      { notes: [a, b], rules: [contains], filterable, knownEmptyIds: undefined, allowNoteIds: [] },
+      { notes: [a, b], rules: [contains], filterable, allowNoteIds: [] },
       "updated-desc",
     );
     expect(out.map((n) => n.id)).toEqual(["a"]);
@@ -160,7 +157,6 @@ describe("selectNotesForView", () => {
         notes: [a, b, c],
         rules: [isNotEmptyRule],
         filterable,
-        knownEmptyIds: undefined,
         allowNoteIds: ["c"],
       },
       "updated-desc",
@@ -173,7 +169,7 @@ describe("selectNotesForView", () => {
     const y = note("y", { orderIndex: "a1", createdAt: 1 });
     const z = note("z", { createdAt: 99 });
     const out = selectNotesForView(
-      { notes: [z, y, x], rules: [], filterable: null, knownEmptyIds: undefined, allowNoteIds: [] },
+      { notes: [z, y, x], rules: [], filterable: null, allowNoteIds: [] },
       "custom",
     );
     // Empty keys sort last, keyed notes in fractional order.

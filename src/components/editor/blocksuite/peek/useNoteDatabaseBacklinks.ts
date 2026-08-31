@@ -16,6 +16,7 @@ export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklin
       queryFn: () =>
         scanNoteRows((nid) => noteService.getNote(nid).then((n) => n?.content), note.id),
       staleTime: Infinity,
+      gcTime: Infinity,
       retry: false,
     })),
   });

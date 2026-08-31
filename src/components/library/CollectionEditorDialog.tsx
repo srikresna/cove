@@ -59,7 +59,7 @@ export const CollectionEditorDialog: React.FC<{
   const { data: inputsData } = useQuery({
     queryKey: libraryInputsKey(activeWorkspaceId ?? ""),
     queryFn: () => fetchLibraryInputs(activeWorkspaceId ?? ""),
-    enabled: activeWorkspaceId != null,
+    enabled: open && activeWorkspaceId != null,
     placeholderData: (previous) => previous,
   });
   const matchedIds = useMemo(() => {

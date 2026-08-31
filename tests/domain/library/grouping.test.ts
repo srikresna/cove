@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { groupNotes } from "@/domain/library/grouping";
 import type { Note } from "@/domain/note/Note";
+import type { PropertyValue } from "@/domain/property/Property";
 import type { Tag } from "@/domain/tag/Tag";
 
 const note = (id: string, overrides: Partial<Note> = {}): Note =>
@@ -85,7 +86,7 @@ describe("groupNotes", () => {
       groupBy: { defId: "p1" },
       notes: [note("none"), note("unchecked"), note("checked")],
       stackDefs: [def],
-      stackValues: new Map([
+      stackValues: new Map<string, Map<string, PropertyValue>>([
         ["unchecked", new Map([["p1", { type: "checkbox", checked: false }]])],
         ["checked", new Map([["p1", { type: "checkbox", checked: true }]])],
       ]),

@@ -13,10 +13,11 @@ vi.mock("@/di/container", () => ({
 
 vi.mock("@/store/notify", () => ({ notifyError }));
 
+import type { FilterRule, FilterRules } from "@/domain/filters/FilterRule";
 import { useViewStore } from "@/store/useViewStore";
 
 function makeView(id: string, workspaceId = "ws1"): SavedView {
-  return { id, workspaceId, name: id, rules: [], createdAt: 1 };
+  return { id, workspaceId, name: id, rules: [], allowNoteIds: [], createdAt: 1 };
 }
 
 describe("useViewStore", () => {
@@ -65,7 +66,7 @@ describe("useViewStore", () => {
           propertyId: "",
           optionIds: [],
           tagIds: [],
-        },
+        } as unknown as FilterRule,
       ],
     });
 
@@ -175,14 +176,23 @@ describe("useViewStore", () => {
   });
 
   it("an untouched applied view whose fresh rules differ gets its drafts re-copied", async () => {
-    const staleRules = [
+    const staleRules: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["dead"] },
     ];
-    const healedRules = [
+    const healedRules: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: [] as string[] },
     ];
     useViewStore.setState({
-      views: [{ id: "v1", workspaceId: "ws1", name: "v1", rules: staleRules, createdAt: 1 }],
+      views: [
+        {
+          id: "v1",
+          workspaceId: "ws1",
+          name: "v1",
+          rules: staleRules,
+          allowNoteIds: [],
+          createdAt: 1,
+        },
+      ],
       activeViewId: "v1",
       // Simulates a straggler click on a stale row: drafts hold pre-heal
       // rules and the snapshot matches them (user hasn't tweaked anything).
@@ -190,7 +200,14 @@ describe("useViewStore", () => {
       appliedRulesSnapshot: JSON.stringify(staleRules),
     });
     listViews.mockResolvedValue([
-      { id: "v1", workspaceId: "ws1", name: "v1", rules: healedRules, createdAt: 1 },
+      {
+        id: "v1",
+        workspaceId: "ws1",
+        name: "v1",
+        rules: healedRules,
+        allowNoteIds: [],
+        createdAt: 1,
+      },
     ]);
 
     await useViewStore.getState().fetchViews("ws1");
@@ -199,13 +216,15 @@ describe("useViewStore", () => {
   });
 
   it("user-tweaked drafts are never overwritten by a fetch", async () => {
-    const applied = [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live"] }];
-    const tweaked = [
+    const applied: FilterRules = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live"] },
+    ];
+    const tweaked: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["other"] },
     ];
     // The DB rules ALSO changed after the apply (e.g. an option was deleted
     // and the view pruned) — the re-copy quadrant that matters.
-    const pruned = [
+    const pruned: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: [] as string[] },
     ];
     useViewStore.setState({
@@ -219,6 +238,7 @@ describe("useViewStore", () => {
         workspaceId: "ws1",
         name: "v1",
         rules: pruned.map((r) => ({ ...r })),
+        allowNoteIds: [],
         createdAt: 1,
       },
     ]);
@@ -229,10 +249,12 @@ describe("useViewStore", () => {
   });
 
   it("untouched drafts ARE re-copied when the view's rules changed", async () => {
-    const applied = [
+    const applied: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["todo", "doing"] },
     ];
-    const pruned = [{ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["todo"] }];
+    const pruned: FilterRules = [
+      { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["todo"] },
+    ];
     useViewStore.setState({
       activeViewId: "v1",
       draftRules: applied.map((r) => ({ ...r })),
@@ -244,6 +266,7 @@ describe("useViewStore", () => {
         workspaceId: "ws1",
         name: "v1",
         rules: pruned.map((r) => ({ ...r })),
+        allowNoteIds: [],
         createdAt: 1,
       },
     ]);

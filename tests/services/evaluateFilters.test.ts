@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateFilters, type FilterableNote } from "@/domain/filters/evaluateFilters";
 import type { FilterRule } from "@/domain/filters/FilterRule";
 import type { Note } from "@/domain/note/Note";
+import type { PropertyValue } from "@/domain/property/Property";
 
 function makeNote(id: string, overrides: Partial<Note> = {}): Note {
   return {
@@ -20,7 +21,7 @@ function makeNote(id: string, overrides: Partial<Note> = {}): Note {
 function makeItem(
   id: string,
   opts: {
-    propertyValues?: [string, unknown][];
+    propertyValues?: [string, PropertyValue][];
     tagIds?: string[];
     journalTimestamp?: number | null;
     isTemplate?: boolean;

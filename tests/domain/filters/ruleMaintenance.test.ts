@@ -75,7 +75,7 @@ describe("healRule", () => {
   });
 
   it("passes through tags/journal/template rules (loader stamps propertyId on them)", () => {
-    const tagged = rule({ kind: "tags", op: "has-none-of", tagIds: ["t"], propertyId: "" });
+    const tagged = rule({ kind: "tags", op: "has-none-of", tagIds: ["t"] });
     expect(healRule(tagged, [])).toEqual({ drop: false, rule: tagged });
   });
 

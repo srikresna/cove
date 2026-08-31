@@ -38,6 +38,9 @@ function makeFakeNoteService(): INoteService & {
     createNoteWithId: () => {
       throw new Error("not implemented in fake");
     },
+    reorderNote: () => {
+      throw new Error("not implemented in fake");
+    },
     updateMetadata: () => Promise.reject(new Error("not implemented in fake")),
     updateContent: () => Promise.reject(new Error("not implemented in fake")),
     getCoverImage: () => Promise.resolve(null),
@@ -63,6 +66,7 @@ function makePropertyService(): PropertyService {
     name: "Journal",
     type: "date",
     options: [],
+    icon: null,
     createdAt: 0,
     order: "a0",
     show: "hide-when-empty",

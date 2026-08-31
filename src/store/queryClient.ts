@@ -119,22 +119,6 @@ export async function fetchLibraryInputs(workspaceId: string): Promise<LibraryIn
   return { filterable, tagIdsByNote: idsByNote };
 }
 
-/** A created note has provably empty filter inputs — write its entry so
- *  emptiness-rule views show it immediately without a reload. */
-export function seedLibraryInputsNote(workspaceId: string, note: Note): void {
-  queryClient.setQueryData<LibraryInputsData>(libraryInputsKey(workspaceId), (prev) => {
-    if (!prev) return prev;
-    const filterable = new Map(prev.filterable);
-    filterable.set(note.id, {
-      note,
-      propertyValues: new Map(),
-      tagIds: [],
-      journalTimestamp: null,
-    });
-    return { filterable, tagIdsByNote: prev.tagIdsByNote };
-  });
-}
-
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
