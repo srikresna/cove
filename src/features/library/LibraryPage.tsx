@@ -328,41 +328,34 @@ export const LibraryPage: React.FC = () => {
             {views.map((view) => {
               const isActive = view.id === activeViewId;
               return (
-                <button
+                <span
                   key={view.id}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => setActiveView(isActive ? null : view.id)}
                   className={cn(
-                    "flex h-6 max-w-32 min-w-8 items-center gap-1 rounded-md px-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex h-6 max-w-44 min-w-8 items-center gap-1 rounded-md text-sm transition-colors",
                     isActive
                       ? "bg-accent text-foreground"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )}
                 >
-                  <span className="truncate">{view.name}</span>
-                  {/* biome-ignore lint/a11y/useSemanticElements: span-role-button nested in the chip's button is deliberate — a nested <button> would be invalid HTML */}
+                  <button
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => setActiveView(isActive ? null : view.id)}
+                    className="flex min-w-0 flex-1 items-center rounded-md px-2 py-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+                  >
+                    <span className="truncate">{view.name}</span>
+                  </button>
                   {isActive && (
-                    <span
-                      role="button"
-                      tabIndex={0}
+                    <button
+                      type="button"
                       aria-label={`${MESSAGES.TAG_FILTER_CLEAR}: ${view.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveView(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.stopPropagation();
-                          setActiveView(null);
-                        }
-                      }}
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded hover:bg-foreground/10"
+                      onClick={() => setActiveView(null)}
+                      className="mr-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <X className="h-3 w-3" aria-hidden="true" />
-                    </span>
+                    </button>
                   )}
-                </button>
+                </span>
               );
             })}
             {!filterAreaVisible && (
