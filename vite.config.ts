@@ -75,7 +75,18 @@ export default defineConfig({
             return "vendor-templates";
           }
           if (p.includes("node_modules")) {
-            if (p.includes("yjs")) return "vendor-yjs";
+            // yjs/lib0/y-protocols/signals-core are BlockSuite's CRDT runtime;
+            // they reference each other through import cycles, so splitting
+            // them from @blocksuite tears a cycle across a chunk boundary and
+            // crashes module init (TDZ ReferenceError) in release builds.
+            if (
+              p.includes("node_modules/yjs") ||
+              p.includes("node_modules/lib0") ||
+              p.includes("node_modules/y-protocols") ||
+              p.includes("node_modules/@preact/signals-core")
+            ) {
+              return "vendor-blocksuite";
+            }
             if (p.includes("@radix-ui") || p.includes("cmdk")) return "vendor-ui-primitives";
             if (p.includes("lucide-react") || p.includes("framer-motion"))
               return "vendor-icons-animation";
