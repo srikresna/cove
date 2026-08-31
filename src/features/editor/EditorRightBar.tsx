@@ -19,9 +19,9 @@ import { CalendarPanel } from "./CalendarPanel";
 import { ExportMenu } from "./ExportMenu";
 import { FramePanelHost } from "./FramePanelHost";
 import { LivePreview } from "./LivePreview";
-import { PROPERTY_TYPE_META } from "./NotePropertiesRows";
 import { OutlinePanelHost } from "./OutlinePanelHost";
 import { PropertyManagerPanel } from "./PropertyManagerPanel";
+import { PROPERTY_TYPE_META } from "./propertyRows/NotePropertiesRows";
 
 const TAB_KEY = "cove-rightbar-tab";
 type RightBarTab = "toc" | "calendar" | "info" | "preview" | "frames";

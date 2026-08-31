@@ -12,7 +12,7 @@ import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { DatabaseBacklinkSection } from "./blocksuite/peek/PeekDatabaseBacklink";
 import { useNoteDatabaseBacklinks } from "./blocksuite/peek/useNoteDatabaseBacklinks";
-import { NotePropertiesRows, TagChip } from "./NotePropertiesRows";
+import { NotePropertiesRows, TagChip } from "./propertyRows/NotePropertiesRows";
 
 const OPEN_KEY = "cove-info-open";
 
