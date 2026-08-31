@@ -160,14 +160,14 @@ export const LibraryPage: React.FC = () => {
 
   const handleNewNote = useCallback(() => {
     if (activeWorkspaceId) void createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE);
-  }, [activeWorkspaceId, createNote]);
+  }, [activeWorkspaceId]);
 
   const handleNewEdgeless = useCallback(() => {
     if (!activeWorkspaceId) return;
     void createNote(activeWorkspaceId, MESSAGES.UNTITLED_NOTE).then((note) => {
       if (note) void updateNote(note.id, { docMode: "edgeless" });
     });
-  }, [activeWorkspaceId, createNote, updateNote]);
+  }, [activeWorkspaceId]);
 
   // Markdown import: multi-file input → one note per .md (the transformer
   // needs at least one existing doc as its schema donor).
@@ -341,6 +341,7 @@ export const LibraryPage: React.FC = () => {
                   )}
                 >
                   <span className="truncate">{view.name}</span>
+                  {/* biome-ignore lint/a11y/useSemanticElements: span-role-button nested in the chip's button is deliberate — a nested <button> would be invalid HTML */}
                   {isActive && (
                     <span
                       role="button"

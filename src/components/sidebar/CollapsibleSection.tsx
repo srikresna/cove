@@ -48,6 +48,7 @@ export const CollapsibleSection: React.FC<{
           {count !== undefined && <span className="font-mono">({count})</span>}
         </button>
         {action != null && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: swallows the row click so the inner action button handles it
           <div
             className="flex shrink-0 items-center"
             onClick={(e) => e.stopPropagation()}

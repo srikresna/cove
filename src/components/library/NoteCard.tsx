@@ -69,6 +69,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     .slice(0, 3);
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: card body must be a div (block children inside a button are invalid HTML); keyboard access stays via role+tabIndex
     <div
       role="button"
       tabIndex={0}

@@ -128,6 +128,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
       });
     }, [showDragHandle, note.id]);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: edgeOf is a stable module-level helper
     React.useEffect(() => {
       const row = rowRef.current;
       if (!row || !showDragHandle) return;

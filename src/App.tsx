@@ -39,13 +39,10 @@ export const AppContent: React.FC = () => {
   const notes = useNotes();
   const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
   const createNote = noteActions.createNote;
-  const fetchNotes = noteActions.fetchNotes;
-  const loadActiveNoteContent = noteActions.loadActiveNoteContent;
-  const purgeExpiredTrash = noteActions.purgeExpiredTrash;
 
   useEffect(() => {
     fetchWorkspaces();
-    void purgeExpiredTrash();
+    void noteActions.purgeExpiredTrash();
     // Startup self-heal: rules referencing dead defs/options are rewritten or
     // deleted before any view is applied (best-effort). The version bump below
     // is required — the initial fetchViews can snapshot pre-heal rows.
@@ -63,19 +60,19 @@ export const AppContent: React.FC = () => {
         );
       })
       .catch(() => {});
-  }, [fetchWorkspaces, purgeExpiredTrash]);
+  }, [fetchWorkspaces]);
 
   useEffect(() => {
     if (activeWorkspaceId) {
-      fetchNotes(activeWorkspaceId);
+      void noteActions.fetchNotes(activeWorkspaceId);
     }
-  }, [activeWorkspaceId, fetchNotes]);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (activeNoteId) {
-      loadActiveNoteContent(activeNoteId);
+      void noteActions.loadActiveNoteContent(activeNoteId);
     }
-  }, [activeNoteId, loadActiveNoteContent]);
+  }, [activeNoteId]);
 
   const workspaceNotes: Note[] = notes.filter((n) => n.workspaceId === activeWorkspaceId);
   const firstWorkspaceNote = workspaceNotes[0];

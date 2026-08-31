@@ -58,10 +58,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   const notes = useNotes();
   const activeNoteId = useNoteUiStore((s) => s.activeNoteId);
   const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
-  const trashNote = noteActions.trashNote;
-  const duplicateNote = noteActions.duplicateNote;
-  const togglePinNote = noteActions.togglePinNote;
-  const toggleFavoriteNote = noteActions.toggleFavoriteNote;
+  const { duplicateNote, toggleFavoriteNote, togglePinNote, trashNote } = noteActions;
 
   // Property stacks under each note title — cached globally (definitions are
   // global), invalidated by property writes through the change bus.
@@ -279,7 +276,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       kind: "info",
       title: MESSAGES.LIBRARY_MOVED_N.replace("{n}", String(ids.length)),
     });
-  }, [selectedIds, trashNote]);
+  }, [selectedIds]);
 
   const handleSelect = useCallback(
     (id: string, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => {
@@ -287,8 +284,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     },
     [handleRowClick],
   );
-  const handleTogglePin = useCallback((id: string) => togglePinNote(id), [togglePinNote]);
-
   // Manual reorder (custom sort): the service computes the fractional gap;
   // a refresh pulls the new keys into the store.
   const handleReorder = useCallback(
@@ -309,12 +304,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     },
     [activeWorkspaceId],
   );
-  const handleToggleFavorite = useCallback(
-    (id: string) => toggleFavoriteNote(id),
-    [toggleFavoriteNote],
-  );
-  const handleDelete = useCallback((id: string) => trashNote(id), [trashNote]);
-  const handleDuplicate = useCallback((id: string) => duplicateNote(id), [duplicateNote]);
 
   // ---- List mode (virtualized, group headers as virtual rows) -------------
 
@@ -354,10 +343,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         showDragHandle={dragHandlesVisible}
         onReorder={dragHandlesVisible ? handleReorder : undefined}
         onSelect={handleSelect}
-        onTogglePin={handleTogglePin}
-        onToggleFavorite={handleToggleFavorite}
-        onDuplicate={handleDuplicate}
-        onDelete={handleDelete}
+        onTogglePin={togglePinNote}
+        onToggleFavorite={toggleFavoriteNote}
+        onDuplicate={duplicateNote}
+        onDelete={trashNote}
         stackRows={stackRowsOf(note.id)}
         tagChips={tagChipsOf(note.id)}
         showIcon={prefs.showIcon}
@@ -366,10 +355,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     [
       activeNoteId,
       handleSelect,
-      handleTogglePin,
-      handleToggleFavorite,
-      handleDuplicate,
-      handleDelete,
       stackRowsOf,
       tagChipsOf,
       selectedIds,
@@ -476,10 +461,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             note={note}
             isActive={note.id === activeNoteId}
             onSelect={handleSelect}
-            onTogglePin={handleTogglePin}
-            onToggleFavorite={handleToggleFavorite}
-            onDuplicate={handleDuplicate}
-            onDelete={handleDelete}
+            onTogglePin={togglePinNote}
+            onToggleFavorite={toggleFavoriteNote}
+            onDuplicate={duplicateNote}
+            onDelete={trashNote}
             stackRows={stackRowsOf(note.id)}
             tagChips={tagChipsOf(note.id)}
             variant="grid"
@@ -494,10 +479,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             note={note}
             isActive={note.id === activeNoteId}
             onSelect={handleSelect}
-            onTogglePin={handleTogglePin}
-            onToggleFavorite={handleToggleFavorite}
-            onDuplicate={handleDuplicate}
-            onDelete={handleDelete}
+            onTogglePin={togglePinNote}
+            onToggleFavorite={toggleFavoriteNote}
+            onDuplicate={duplicateNote}
+            onDelete={trashNote}
             stackRows={stackRowsOf(note.id)}
             tagChips={tagChipsOf(note.id)}
             variant="masonry"

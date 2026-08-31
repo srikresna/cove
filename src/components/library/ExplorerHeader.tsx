@@ -105,6 +105,7 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
     {tab === "docs" && (
       <div className="flex items-center gap-4">
         {/* View toggle: three icon buttons, active gets the hover overlay. */}
+        {/* biome-ignore lint/a11y/useSemanticElements: a styled icon group is a visual cluster, not a form fieldset */}
         <div className="flex items-center gap-1" role="group" aria-label="View mode">
           {VIEW_MODES.map((mode) => (
             <button
