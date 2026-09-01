@@ -88,6 +88,27 @@ const lockedCrypto: IEncryptionService = {
   isUnlocked: () => false,
 };
 
+/** InMemory repo with hooks to interleave with the heal's CAS write. */
+class HealRacingRepo extends InMemoryNoteRepository {
+  public failCas = false;
+  public renameDuringCas: string | null = null;
+
+  override async updateTitleIfUnchanged(
+    id: string,
+    expected: EncryptedPayload,
+    next: EncryptedPayload,
+  ): Promise<boolean> {
+    if (this.renameDuringCas !== null) {
+      // Simulate a title rename committing right before the CAS write.
+      await this.updateNote(id, {
+        title: await envelopeCrypto.encryptPayload(this.renameDuringCas, titleAad(id)),
+      });
+    }
+    if (this.failCas) throw new Error("Fake repo error: updateTitleIfUnchanged (db busy)");
+    return super.updateTitleIfUnchanged(id, expected, next);
+  }
+}
+
 const enc = (s: string): EncryptedPayload => s as EncryptedPayload;
 
 describe("NoteService", () => {
@@ -368,6 +389,140 @@ describe("NoteService", () => {
 
     const fetched = await service.getNote(created.id);
     expect(fetched?.title).toBe("T");
+  });
+
+  it("updateContent returns a decrypted title, never the raw encrypted column", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "My Title", "body");
+    // Content-only save (the autosave path): the returned Note must carry
+    // the plaintext title, or noteActions poisons the notes cache with
+    // ciphertext and the title input displays the encrypted blob.
+    const updated = await service.updateContent(created.id, "new body");
+    expect(updated.title).toBe("My Title");
+    expect(updated.content).toBe("new body");
+    expect(fakeRepo.notes[0]?.title).toBe(`enc[${titleAad(created.id)}]:My Title`);
+  });
+
+  it("heals double-encrypted titles in place on read", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "My Title", "body");
+    // Simulate a row committed while the title input showed ciphertext: the
+    // outer layer wraps the inner encrypted payload the input displayed.
+    const displayed = `enc[${titleAad(created.id)}]:My Title`;
+    const corrupted = fakeRepo.notes[0];
+    if (!corrupted) throw new Error("note row missing");
+    corrupted.title = await envelopeCrypto.encryptPayload(displayed, titleAad(created.id));
+
+    const fetched = await service.getNote(created.id);
+    expect(fetched?.title).toBe("My Title");
+    // The column is repaired to a single encrypted layer.
+    expect(fakeRepo.notes[0]?.title).toBe(`enc[${titleAad(created.id)}]:My Title`);
+
+    // A normal encrypted title never takes the heal path.
+    const again = await service.getNote(created.id);
+    expect(again?.title).toBe("My Title");
+    // The converged state is write-free: no repair attempt on re-reads.
+    const casCalls = fakeRepo.callLog.filter((c) => c.startsWith("updateTitleIfUnchanged")).length;
+    await service.getNote(created.id);
+    expect(fakeRepo.callLog.filter((c) => c.startsWith("updateTitleIfUnchanged")).length).toBe(
+      casCalls,
+    );
+  });
+
+  it("a failed repair write still returns the recovered plaintext (never the inner ciphertext)", async () => {
+    const fakeRepo = new HealRacingRepo();
+    fakeRepo.failCas = true;
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "My Title", "body");
+    const displayed = `enc[${titleAad(created.id)}]:My Title`;
+    const corrupted = fakeRepo.notes[0];
+    if (!corrupted) throw new Error("note row missing");
+    corrupted.title = await envelopeCrypto.encryptPayload(displayed, titleAad(created.id));
+
+    const fetched = await service.getNote(created.id);
+    // The read must surface the recovered plaintext even though the repair
+    // write threw — returning the first-layer ciphertext here is the leak.
+    expect(fetched?.title).toBe("My Title");
+    // The column is still corrupt; a later read (write healthy) heals it.
+    fakeRepo.failCas = false;
+    const healed = await service.getNote(created.id);
+    expect(healed?.title).toBe("My Title");
+    expect(fakeRepo.notes[0]?.title).toBe(`enc[${titleAad(created.id)}]:My Title`);
+  });
+
+  it("a rename committed during the heal never gets clobbered (CAS)", async () => {
+    const fakeRepo = new HealRacingRepo();
+    fakeRepo.renameDuringCas = "Renamed";
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "My Title", "body");
+    const displayed = `enc[${titleAad(created.id)}]:My Title`;
+    const corrupted = fakeRepo.notes[0];
+    if (!corrupted) throw new Error("note row missing");
+    corrupted.title = await envelopeCrypto.encryptPayload(displayed, titleAad(created.id));
+
+    const fetched = await service.getNote(created.id);
+    // The recovered plaintext wins for the reader, but the concurrently
+    // committed rename must survive in the column.
+    expect(fetched?.title).toBe("My Title");
+    const row = fakeRepo.notes[0];
+    if (!row) throw new Error("note row missing");
+    const rowTitle = await envelopeCrypto.decryptPayload(row.title, titleAad(created.id));
+    expect(rowTitle).toBe("Renamed");
+  });
+
+  it("updateContent resolves even when the row's title fails to decrypt", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "My Title", "body");
+    const corrupted = fakeRepo.notes[0];
+    if (!corrupted) throw new Error("note row missing");
+    // A title column that does not decrypt (corruption / wrong AAD): the
+    // committed content save must not reject over it.
+    corrupted.title = "enc[wrong-aad]:garbage";
+
+    const updated = await service.updateContent(created.id, "new body");
+    expect(updated.content).toBe("new body");
+    expect(fakeRepo.notes[0]?.content).toBe(`enc[${created.id}]:new body`);
+  });
+
+  it("updateMetadata resolves even when the row's title fails to decrypt", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    const created = await service.createNote("ws-1", "My Title", "body");
+    const corrupted = fakeRepo.notes[0];
+    if (!corrupted) throw new Error("note row missing");
+    corrupted.title = "enc[wrong-aad]:garbage";
+
+    // The icon write is committed; a title decrypt failure must not reject
+    // the save and trigger a cache rollback of committed data.
+    const updated = await service.updateMetadata(created.id, { icon: "📌" });
+    expect(updated.icon).toBe("📌");
+  });
+
+  it("empty titles never trigger the heal probe (no write per read)", async () => {
+    const fakeRepo = new InMemoryNoteRepository();
+    const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
+
+    // An emptied title is stored as a real payload; decryptPayload("")
+    // short-circuits to "" instead of throwing, which would loop the heal
+    // forever — the guard must keep reads write-free.
+    const created = await service.createNote("ws-1", "", "body");
+    const writesBefore = fakeRepo.callLog.filter((c) => c.startsWith("updateNote")).length;
+
+    await service.getNote(created.id);
+    await service.listMetadataByWorkspace("ws-1");
+    await service.updateContent(created.id, "new body");
+
+    const writesAfter = fakeRepo.callLog.filter((c) => c.startsWith("updateNote")).length;
+    expect(writesAfter - writesBefore).toBe(1); // only the updateContent write
   });
 
   it("createNoteWithId stores encrypted title/content at rest but returns plaintext", async () => {

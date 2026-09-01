@@ -45,7 +45,37 @@ export class NoteService implements INoteService {
 
   private async decryptTitle(rec: NoteRecord): Promise<string> {
     if (rec.titleKmsVersion < 1) return String(rec.title);
-    return this.crypto.decryptPayload(rec.title, titleAad(rec.id));
+    const title = await this.crypto.decryptPayload(rec.title, titleAad(rec.id));
+    // Rows committed while the title input displayed a leaked ciphertext
+    // carry a double-encrypted column (the displayed blob was saved as the
+    // title and re-encrypted). A second successful decrypt under the same
+    // AAD is cryptographically impossible for a genuine title — it can only
+    // be one of those rows. Empty titles are legitimate (the input allows
+    // them) and must not probe: decryptPayload("") short-circuits to ""
+    // instead of throwing, which would loop the heal forever.
+    if (!title) return title;
+    let inner: string;
+    try {
+      inner = await this.crypto.decryptPayload(title, titleAad(rec.id));
+    } catch {
+      // The probe did not authenticate — this is a genuine title.
+      return title;
+    }
+    try {
+      // Repair the column compare-and-swap: the write only lands while the
+      // row still holds the corrupt blob, so a rename committed while this
+      // read was in flight can never be clobbered. A lost race or a failed
+      // write just retries on the next read; the recovered plaintext wins
+      // either way.
+      await this.notes.updateTitleIfUnchanged(
+        rec.id,
+        rec.title,
+        await this.crypto.encryptPayload(inner, titleAad(rec.id)),
+      );
+    } catch {
+      // Best effort — never fail the read over the repair write.
+    }
+    return inner;
   }
 
   private async toNote(rec: NoteRecord): Promise<Note> {
@@ -248,7 +278,17 @@ export class NoteService implements INoteService {
     }
     if (moveTo !== undefined) (recUpdates as { workspaceId?: string }).workspaceId = moveTo;
     const updated = await this.updateNoteOrdered(id, recUpdates, moveTo);
-    return this.toNote(updated);
+    try {
+      return await this.toNote(updated);
+    } catch {
+      // The write is already committed; a decrypt failure (a mid-save
+      // relock) must not reject the save. Degrade field-by-field: prefer
+      // the plaintext title we were given, and let the store's landed
+      // merge keep the cached title when we were not given one.
+      const title = updates.title ?? (await this.decryptTitle(updated).catch(() => ""));
+      const content = await this.crypto.decryptPayload(updated.content, updated.id).catch(() => "");
+      return { ...updated, title, content };
+    }
   }
 
   // A workspace move or an explicit key write changes a workspace's live key
@@ -332,7 +372,16 @@ export class NoteService implements INoteService {
       content: await this.crypto.encryptPayload(content, id),
     });
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
-    return { ...rec, content };
+    // The re-read row carries the encrypted title column — decrypt it like
+    // every other Note-returning method, or content-only autosaves leak
+    // ciphertext into the UI cache. The content write is already committed,
+    // so a title failure (a mid-save relock) must not reject the whole save:
+    // the store's landed merge keeps the cached plaintext title anyway.
+    try {
+      return { ...rec, title: await this.decryptTitle(rec), content };
+    } catch {
+      return { ...rec, title: "", content };
+    }
   }
 
   async backlinksOf(id: string): Promise<NoteMeta[]> {

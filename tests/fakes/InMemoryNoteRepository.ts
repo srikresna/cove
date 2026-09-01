@@ -103,6 +103,21 @@ export class InMemoryNoteRepository implements INoteRepository {
     return updated;
   }
 
+  async updateTitleIfUnchanged(
+    id: string,
+    expected: EncryptedPayload,
+    next: EncryptedPayload,
+  ): Promise<boolean> {
+    this.callLog.push(`updateTitleIfUnchanged:${id}`);
+    if (this.shouldFail) throw new Error("Fake repo error: updateTitleIfUnchanged");
+    const row = this.notes.find((n) => n.id === id);
+    if (!row || row.title !== expected) return false;
+    row.title = next;
+    row.titleKmsVersion = 1;
+    row.updatedAt = Date.now();
+    return true;
+  }
+
   async deleteNote(id: string): Promise<void> {
     this.callLog.push(`deleteNote:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: deleteNote");

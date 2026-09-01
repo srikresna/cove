@@ -317,6 +317,23 @@ export class SQLiteNoteRepository implements INoteRepository {
     return existing;
   }
 
+  async updateTitleIfUnchanged(
+    id: string,
+    expected: EncryptedPayload,
+    next: EncryptedPayload,
+  ): Promise<boolean> {
+    try {
+      const db = await this.getDb();
+      const result = await db.execute(
+        "UPDATE notes SET title = ?, titleKmsVersion = ?, updatedAt = ? WHERE id = ? AND title = ?",
+        [next, KMS_VERSION_DEK, Date.now(), id, expected],
+      );
+      return (result?.rowsAffected ?? 0) > 0;
+    } catch (err) {
+      throw toPersistenceError("updateTitleIfUnchanged", err);
+    }
+  }
+
   async deleteNote(id: string): Promise<void> {
     try {
       await SQLiteDatabase.runTransaction([

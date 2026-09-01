@@ -31,6 +31,15 @@ export interface INoteRepository {
     opts?: { createdAt?: number },
   ): Promise<NoteRecord>;
   updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord>;
+  /** Compare-and-swap title repair: rewrites the column only while it still
+   *  holds `expected`, so a title rename committed concurrently can never be
+   *  clobbered by a stale repair (e.g. the double-encryption heal). Returns
+   *  whether the write landed. */
+  updateTitleIfUnchanged(
+    id: string,
+    expected: EncryptedPayload,
+    next: EncryptedPayload,
+  ): Promise<boolean>;
   deleteNote(id: string): Promise<void>;
   getCover(noteId: string): Promise<EncryptedPayload | null>;
   upsertCover(noteId: string, payload: EncryptedPayload): Promise<void>;

@@ -146,6 +146,49 @@ describe("noteActions", () => {
     expect(queryClient.getQueryData<Note[]>(notesKey("ws1"))?.[0]?.content).toBe("doc-v2");
   });
 
+  it("content-only saves never clobber the cached plaintext title", async () => {
+    // Defense in depth: even if the service hands back the raw encrypted
+    // title column (the updateContent leak), the cache keeps the plaintext
+    // title the user sees — the title input must never display ciphertext.
+    updateContent.mockResolvedValue(
+      makeNote({ title: "AAAAAAAAAAAABOsiwICmX4Kke4lAZFUwsRb9+IyIWtRZQ==", content: "doc-v2" }),
+    );
+
+    await noteActions.updateNote("n1", { content: "doc-v2" });
+
+    const cached = queryClient.getQueryData<Note[]>(notesKey("ws1"))?.[0];
+    expect(cached?.title).toBe("Test");
+    expect(cached?.content).toBe("doc-v2");
+  });
+
+  it("title saves land the committed title in the cache", async () => {
+    updateMetadata.mockResolvedValue(makeNote({ title: "Renamed" }));
+
+    await noteActions.updateNote("n1", { title: "Renamed" });
+
+    expect(updateMetadata).toHaveBeenCalledWith("n1", { title: "Renamed" });
+    expect(queryClient.getQueryData<Note[]>(notesKey("ws1"))?.[0]?.title).toBe("Renamed");
+  });
+
+  it("a rename committed while a content save is in flight survives the landing", async () => {
+    // The merge must read the LIVE cached title at land time — a snapshot
+    // taken before the await would revert the mid-flight rename.
+    updateContent.mockImplementation(async () => {
+      const notes = queryClient.getQueryData<Note[]>(notesKey("ws1")) ?? [];
+      queryClient.setQueryData(
+        notesKey("ws1"),
+        notes.map((n) => (n.id === "n1" ? { ...n, title: "Renamed" } : n)),
+      );
+      return makeNote({ title: "AAAAAAAAciphertext==", content: "doc-v2" });
+    });
+
+    await noteActions.updateNote("n1", { content: "doc-v2" });
+
+    const cached = queryClient.getQueryData<Note[]>(notesKey("ws1"))?.[0];
+    expect(cached?.title).toBe("Renamed");
+    expect(cached?.content).toBe("doc-v2");
+  });
+
   it("createNote prepends to the cache, opens it, and seeds the emptiness cache", async () => {
     const created = makeNote({ id: "fresh", title: "Fresh" });
     createNote.mockResolvedValue(created);

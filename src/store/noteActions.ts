@@ -174,9 +174,14 @@ export const noteActions = {
         blockSuiteEditorService.setDocTitle(id, updates.title);
       }
       if (entry && saved) {
+        // The persisted row re-reads the raw title column; never let it
+        // clobber the live cached title (plaintext, possibly renamed while
+        // this save was in flight) unless this save itself changed it.
         writeNotes(
           entry.ws,
-          readNotes(entry.ws).map((n) => (n.id === id ? saved : n)),
+          readNotes(entry.ws).map((n) =>
+            n.id === id ? (updates.title === undefined ? { ...saved, title: n.title } : saved) : n,
+          ),
         );
       }
       useSaveStatusStore.getState().setSaved();
