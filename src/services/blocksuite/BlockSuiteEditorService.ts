@@ -2,7 +2,7 @@ import { StoreExtensionManager, ViewExtensionManager } from "@blocksuite/affine/
 import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store";
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
 import { FoundationViewExtension } from "@blocksuite/affine/foundation/view";
-import { FeatureFlagService } from "@blocksuite/affine/shared/services";
+import { AffineCanvasTextFonts, FeatureFlagService } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
 // The vendored store package exports Workspace only as an interface — this
 // test entrypoint is its sole concrete implementation.
@@ -61,6 +61,13 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       this.viewManager = new ViewExtensionManager(getInternalViewExtensions());
       this.viewManager.configure(FoundationViewExtension, {
         peekView: covePeekViewService,
+        // Canvas text families (blocksuite:surface:*) only exist once the
+        // FontLoaderService registers them; without a fontConfig the
+        // edgeless font picker switches between families that never resolve.
+        fontConfig: AffineCanvasTextFonts.map((font) => ({
+          ...font,
+          url: `/fonts/${font.url.split("/").pop()}`,
+        })),
       });
     }
     return this.viewManager;
