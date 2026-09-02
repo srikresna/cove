@@ -209,6 +209,23 @@ affine-editor-container .playground-page-editor-container {
   container-type: inline-size;
 }
 
+/* The vendored outline rail clamps itself through max-height:100% chains
+   that only resolve against a definite-height box. The host used to size
+   to its (empty) content, so heading-heavy notes let the 16px indicator
+   stack overflow past the editor's top edge. Give the chain a definite
+   height: the indicators clip and the hover panel scrolls instead. */
+.cove-outline-viewer-host {
+  height: 80%;
+}
+.cove-outline-viewer-host affine-outline-viewer {
+  height: 100%;
+}
+/* Keep the hover panel content-sized on heading-light notes — the definite
+   host height would otherwise stretch it across the whole 80% band. */
+.cove-outline-viewer-host .outline-viewer-panel {
+  align-self: flex-start;
+}
+
 /* Kanban boards: the vendored columns are hard-fixed at 260px. Below ~2
    visible columns the board mostly shows scrollbar, so shrink the columns
    with the container. The selector carries a class so it beats the vendored

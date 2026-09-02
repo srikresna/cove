@@ -132,10 +132,14 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
                     <BlockSuiteSurface note={note} mode="page" onEditorReady={setEditorHost} />
                   </EditorErrorBoundary>
                 </div>
-
-                <OutlineViewerHost editor={editorHost} />
               </div>
             )}
+            {/* Outside the doc scroller: the scroller's layout containment
+                (container-type) makes it the containing block for absolute
+                children, which pinned the rail to the scrollable content —
+                it drifted away on long notes. Sibling of the scroller, its
+                containing block is this stable wrapper instead. */}
+            {mode !== "edgeless" && <OutlineViewerHost editor={editorHost} />}
           </div>
         </div>
 
