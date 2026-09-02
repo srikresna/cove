@@ -75,9 +75,16 @@ const TagRow: React.FC<{
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isActive
-            ? "border-border bg-card font-medium text-foreground shadow-sm"
+            ? "border-transparent font-medium text-foreground"
             : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
         )}
+        style={
+          isActive
+            ? {
+                backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
+              }
+            : undefined
+        }
       >
         <span
           aria-hidden="true"
@@ -85,9 +92,7 @@ const TagRow: React.FC<{
           style={{ backgroundColor: color }}
         />
         <span className="truncate">{name}</span>
-        <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground/70">
-          {noteCount}
-        </span>
+        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70">{noteCount}</span>
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -13,6 +13,7 @@ import type { PropertyDefinition, PropertyValue } from "../../domain/property/Pr
 import { cn } from "../../lib/utils";
 import { resolvePropertyIcon } from "../editor/PropertyValueEditors";
 import { NoteMenuEntries, stackValueText } from "../sidebar/NoteItem";
+import { TagChip } from "../tags/TagChip";
 
 interface NoteCardProps {
   note: Note;
@@ -167,17 +168,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
       {tagChips.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {tagChips.slice(0, 3).map((chip) => (
-            <span
-              key={chip.name}
-              className="inline-flex h-6 max-w-32 items-center gap-1.5 rounded-full border bg-card px-2 text-xs text-foreground"
-            >
-              <span
-                aria-hidden="true"
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: chip.color }}
-              />
-              <span className="truncate">{chip.name}</span>
-            </span>
+            <TagChip key={chip.name} name={chip.name} color={chip.color} />
           ))}
           {tagChips.length > 3 && (
             <span className="text-xs text-muted-foreground/60">+{tagChips.length - 3}</span>

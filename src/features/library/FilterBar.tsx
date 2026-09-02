@@ -1,19 +1,22 @@
-import { Plus, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Hash, Plus, Tags, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { PropertyCalendar } from "../../components/ui/PropertyCalendar";
 import { MESSAGES } from "../../constants/messages";
 import { propertyService } from "../../di/container";
-import type { FilterRule } from "../../domain/filters/FilterRule";
-import { FILTER_OPERATORS, filterKindForType } from "../../domain/filters/FilterRule";
+import {
+  FILTER_OPERATORS,
+  type FilterRule,
+  filterKindForType,
+  isRuleComplete,
+} from "../../domain/filters/FilterRule";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { usePropertyStore } from "../../store/usePropertyStore";
@@ -22,11 +25,23 @@ import { useViewStore } from "../../store/useViewStore";
 
 const makeRuleId = () => crypto.randomUUID();
 
+const controlBase =
+  "flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2 text-[13px] text-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 function opLabel(kind: FilterRule["kind"], op: string): string {
   return FILTER_OPERATORS[kind].find((o) => o.value === op)?.label ?? op;
 }
 
-const RuleChip: React.FC<{
+/** Summary of chosen multi-values: first name + overflow count. */
+function namesSummary(
+  chosen: string[],
+  resolve: (id: string) => { name: string } | undefined,
+): { first: string | null; rest: number } {
+  const names = chosen.map((id) => resolve(id)?.name).filter((n): n is string => Boolean(n));
+  return { first: names[0] ?? null, rest: Math.max(0, names.length - 1) };
+}
+
+const RuleRow: React.FC<{
   rule: FilterRule;
   propertyDefs: PropertyDefinition[];
   onUpdate: (patch: Partial<FilterRule>) => void;
@@ -45,6 +60,7 @@ const RuleChip: React.FC<{
   const ops = FILTER_OPERATORS[rule.kind];
   const currentOp = (rule as { op: string }).op;
   const needsValue = !currentOp.startsWith("is-empty") && !currentOp.startsWith("is-not-empty");
+  const incomplete = needsValue && !isRuleComplete(rule);
 
   const numberValue = rule.kind === "number" ? rule.value : undefined;
   const dateValue = rule.kind === "date" ? rule.value : undefined;
@@ -53,16 +69,29 @@ const RuleChip: React.FC<{
       ? rule.value
       : undefined;
 
+  const optionDef = rule.kind === "select" || rule.kind === "multiSelect" ? def : undefined;
+  const optionIds = optionDef ? (rule as { optionIds: string[] }).optionIds : [];
+  const options = optionsSummaryOf(optionIds, optionDef);
+  const tagPick = rule.kind === "tags" ? rule.tagIds : [];
+  const tagNames = namesSummary(tagPick, (id) => tags.find((t) => t.id === id));
+
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border bg-card px-1.5 py-1 text-xs">
-      <span className="shrink-0 font-medium text-foreground">{ruleName}</span>
+    <div
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-2 rounded-md border bg-card px-2 py-1.5",
+        incomplete && "opacity-60",
+      )}
+      title={incomplete ? MESSAGES.FILTER_INCOMPLETE_HINT : undefined}
+    >
+      <span className="min-w-20 shrink-0 truncate text-[13px] font-medium text-foreground">
+        {ruleName}
+      </span>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="shrink-0 rounded px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
+          <button type="button" className={cn(controlBase, "shrink-0 text-muted-foreground")}>
             {opLabel(rule.kind, currentOp)}
+            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-40">
@@ -83,8 +112,8 @@ const RuleChip: React.FC<{
           defaultValue={rule.value ?? ""}
           onBlur={(e) => onUpdate({ value: e.target.value } as Partial<FilterRule>)}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          placeholder="text"
-          className="h-5 w-20 rounded border border-transparent bg-transparent px-1 outline-none hover:border-border focus-visible:border-border"
+          placeholder={MESSAGES.FILTER_VALUE_PLACEHOLDER}
+          className="h-8 w-36 rounded-md border border-border bg-card px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       )}
       {needsValue && rule.kind === "number" && (
@@ -102,23 +131,21 @@ const RuleChip: React.FC<{
           }}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           placeholder="0"
-          className="h-5 w-16 rounded border border-transparent bg-transparent px-1 outline-none hover:border-border focus-visible:border-border"
+          className="h-8 w-24 rounded-md border border-border bg-card px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       )}
       {needsValue && rule.kind === "date" && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
+            <button type="button" className={cn(controlBase, "w-32 justify-start")}>
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               {dateValue != null
                 ? new Date(dateValue).toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
                   })
-                : MESSAGES.INFO_EMPTY_VALUE}
+                : MESSAGES.FILTER_PICK_DATE}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-auto p-2">
@@ -132,47 +159,51 @@ const RuleChip: React.FC<{
       {(rule.kind === "checkbox" || rule.kind === "journal" || rule.kind === "template") && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              {boolValue === true ? "✓" : "✗"}
+            <button type="button" className={cn(controlBase, "w-32 justify-start")}>
+              {boolValue === true ? MESSAGES.FILTER_IS_CHECKED : MESSAGES.FILTER_IS_UNCHECKED}
+              <ChevronDown className="ml-auto h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-24">
+          <DropdownMenuContent align="start" className="w-36">
             <DropdownMenuItem onSelect={() => onUpdate({ value: true } as Partial<FilterRule>)}>
-              ✓ true
+              <Check className={cn(boolValue !== true && "invisible")} aria-hidden="true" />
+              {MESSAGES.FILTER_IS_CHECKED}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onUpdate({ value: false } as Partial<FilterRule>)}>
-              ✗ false
+              <Check className={cn(boolValue !== false && "invisible")} aria-hidden="true" />
+              {MESSAGES.FILTER_IS_UNCHECKED}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {(rule.kind === "select" || rule.kind === "multiSelect") && def && (
+      {optionDef && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              {(rule as { optionIds: string[] }).optionIds.length > 0
-                ? `${(rule as { optionIds: string[] }).optionIds.length} opts`
-                : MESSAGES.INFO_EMPTY_VALUE}
+            <button type="button" className={cn(controlBase, "min-w-24 max-w-48 justify-start")}>
+              {options.first ? (
+                <span className="truncate">
+                  {options.first}
+                  {options.rest > 0 && (
+                    <span className="text-muted-foreground"> +{options.rest}</span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">{MESSAGES.FILTER_PICK_OPTIONS}</span>
+              )}
+              <ChevronDown className="ml-auto h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44">
-            {def.options.map((option) => {
-              const selected = (rule as { optionIds: string[] }).optionIds.includes(option.id);
+            {optionDef.options.map((option) => {
+              const selected = optionIds.includes(option.id);
               return (
                 <DropdownMenuItem
                   key={option.id}
                   onSelect={() => {
-                    const ids = (rule as { optionIds: string[] }).optionIds;
                     onUpdate({
                       optionIds: selected
-                        ? ids.filter((i) => i !== option.id)
-                        : [...ids, option.id],
+                        ? optionIds.filter((i) => i !== option.id)
+                        : [...optionIds, option.id],
                     } as Partial<FilterRule>);
                   }}
                 >
@@ -182,7 +213,7 @@ const RuleChip: React.FC<{
                     style={{ backgroundColor: option.color }}
                   />
                   <span className="truncate">{option.name}</span>
-                  {selected && <span className="ml-auto text-muted-foreground">✓</span>}
+                  <Check className={cn("ml-auto", !selected && "invisible")} aria-hidden="true" />
                 </DropdownMenuItem>
               );
             })}
@@ -192,11 +223,19 @@ const RuleChip: React.FC<{
       {rule.kind === "tags" && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              {rule.tagIds.length > 0 ? `${rule.tagIds.length}` : MESSAGES.INFO_EMPTY_VALUE}
+            <button type="button" className={cn(controlBase, "min-w-24 max-w-48 justify-start")}>
+              <Tags className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              {tagNames.first ? (
+                <span className="truncate">
+                  {tagNames.first}
+                  {tagNames.rest > 0 && (
+                    <span className="text-muted-foreground"> +{tagNames.rest}</span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">{MESSAGES.FILTER_PICK_TAGS}</span>
+              )}
+              <ChevronDown className="ml-auto h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44">
@@ -219,7 +258,7 @@ const RuleChip: React.FC<{
                     style={{ backgroundColor: tag.color }}
                   />
                   <span className="truncate">{tag.name}</span>
-                  {selected && <span className="ml-auto text-muted-foreground">✓</span>}
+                  <Check className={cn("ml-auto", !selected && "invisible")} aria-hidden="true" />
                 </DropdownMenuItem>
               );
             })}
@@ -227,21 +266,35 @@ const RuleChip: React.FC<{
         </DropdownMenu>
       )}
 
+      {incomplete && (
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {MESSAGES.FILTER_INCOMPLETE_HINT}
+        </span>
+      )}
+
       <button
         type="button"
         aria-label="Remove rule"
         onClick={onRemove}
-        className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <X className="h-3 w-3" aria-hidden="true" />
+        <X className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );
 };
 
+function optionsSummaryOf(
+  chosen: string[],
+  def: PropertyDefinition | undefined,
+): { first: string | null; rest: number } {
+  return namesSummary(chosen, (id) => def?.options.find((o) => o.id === id));
+}
+
 /**
- * The rule-chip editor inside the Library filter area. Save/Cancel live in
- * the surrounding area (LibraryPage) — this bar only composes and edits rules.
+ * The rule editor inside the Library filter area and the collection editor
+ * — one full-width row per rule at the app's control scale. Save/Cancel
+ * live in the surrounding surface; this bar only composes and edits rules.
  */
 export const FilterBar: React.FC<{
   /** Controlled mode (collection editor): edit an explicit rules array. */
@@ -319,9 +372,9 @@ export const FilterBar: React.FC<{
   };
 
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {draftRules.map((rule) => (
-        <RuleChip
+        <RuleRow
           key={rule.id}
           rule={rule}
           propertyDefs={filterableDefs}
@@ -335,34 +388,38 @@ export const FilterBar: React.FC<{
             type="button"
             aria-label={MESSAGES.VIEW_ADD_RULE}
             className={cn(
-              "flex h-7 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              draftRules.length === 0 && "border-dashed",
+              "flex h-8 w-fit items-center gap-1.5 rounded-md border border-dashed px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              draftRules.length > 0 && "border-transparent",
             )}
           >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
             {MESSAGES.VIEW_ADD_RULE}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-44">
+        <DropdownMenuContent align="start" className="w-48">
           {filterableDefs.map((def) => {
             const kind = filterKindForType(def.type);
             if (!kind) return null;
             return (
               <DropdownMenuItem key={def.id} onSelect={() => handleAdd(kind, def.id)}>
+                <Hash className="text-muted-foreground" aria-hidden="true" />
                 <span className="truncate">{def.name}</span>
-                <span className="ml-auto text-[10px] uppercase text-muted-foreground">
-                  {def.type}
-                </span>
               </DropdownMenuItem>
             );
           })}
           <DropdownMenuSeparator />
-          <DropdownMenuLabel>{MESSAGES.VIEW_SPECIAL}</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => handleAdd("tags")}>
+            <Tags className="text-muted-foreground" aria-hidden="true" />
             {MESSAGES.TAGS_HEADER}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => handleAdd("journal")}>Journal</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => handleAdd("template")}>Template</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => handleAdd("journal")}>
+            <CalendarDays className="text-muted-foreground" aria-hidden="true" />
+            Journal
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => handleAdd("template")}>
+            <Check className="text-muted-foreground" aria-hidden="true" />
+            Template
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

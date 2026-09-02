@@ -30,6 +30,7 @@ import { stackValueText } from "../../domain/property/format";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import { resolvePropertyIcon } from "../editor/PropertyValueEditors";
+import { TagChip } from "../tags/TagChip";
 
 interface NoteItemProps {
   note: Note;
@@ -256,17 +257,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 {tagChips.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {tagChips.slice(0, 3).map((chip) => (
-                      <span
-                        key={chip.name}
-                        className="inline-flex h-[18px] max-w-28 items-center gap-1 rounded-full border bg-card px-1.5 text-[10px] text-foreground"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: chip.color }}
-                        />
-                        <span className="truncate">{chip.name}</span>
-                      </span>
+                      <TagChip key={chip.name} name={chip.name} color={chip.color} size="sm" />
                     ))}
                     {tagChips.length > 3 && (
                       <span className="text-[10px] text-muted-foreground/60">

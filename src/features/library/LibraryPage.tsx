@@ -1,17 +1,11 @@
-import { Check, Plus, Save, Tag as TagIcon, X } from "lucide-react";
+import { Layers as LayersIcon, Save, Tag as TagIcon, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../components/ui/dropdown-menu";
 import { PromptDialog } from "../../components/ui/prompt-dialog";
 import { MESSAGES } from "../../constants/messages";
 import { blockSuiteEditorService, propertyService, savedViewService } from "../../di/container";
+import { isRuleComplete } from "../../domain/filters/FilterRule";
 import { isStackEligibleDef } from "../../domain/library/query";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { useNotes } from "../../hooks/useNotes";
@@ -114,6 +108,8 @@ export const LibraryPage: React.FC = () => {
   });
   const [filterEditing, setFilterEditing] = useState(false);
   const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
   const [editorOpen, setEditorOpen] = useState<"create" | string | null>(null);
 
   // Stack-eligible defs feed the Display menu (grouping + chip toggles).
@@ -303,14 +299,23 @@ export const LibraryPage: React.FC = () => {
       void updateActiveViewRules();
       return;
     }
+    setSaveError(null);
     setSavePromptOpen(true);
   }, [activeViewId, updateActiveViewRules]);
 
-  const handleCancelFilter = useCallback(() => {
-    clearDraft();
-    setFilterEditing(false);
-    void setTagFilter(null);
-  }, [clearDraft, setTagFilter]);
+  /** Reset reverts the drafts to the applied collection's saved rules (a
+   *  plain clear would silently un-apply the collection); ad-hoc drafts and
+   *  tag filters clear outright. */
+  const handleResetFilter = useCallback(() => {
+    if (activeViewId) {
+      setActiveView(activeViewId);
+      setFilterEditing(false);
+    } else {
+      clearDraft();
+      setFilterEditing(false);
+      void setTagFilter(null);
+    }
+  }, [activeViewId, setActiveView, clearDraft, setTagFilter]);
 
   const openTagInDocs = useCallback(
     (tagId: string) => {
@@ -378,10 +383,7 @@ export const LibraryPage: React.FC = () => {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <CollectionsTab
             onEditView={(viewId) => setEditorOpen(viewId)}
-            onOpenInDocs={() => {
-              setTab("docs");
-              setFilterEditing(true);
-            }}
+            onOpenInDocs={() => setTab("docs")}
           />
         </div>
       ) : tab === "tags" ? (
@@ -439,82 +441,127 @@ export const LibraryPage: React.FC = () => {
               );
             })}
             {!filterAreaVisible && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={MESSAGES.VIEW_ADD_RULE}
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-44">
-                  <DropdownMenuItem onSelect={() => setFilterEditing(true)}>
-                    <TagIcon aria-hidden="true" />
-                    {MESSAGES.LIBRARY_ADD_FILTER}
-                  </DropdownMenuItem>
-                  {views.length > 0 && <DropdownMenuSeparator />}
-                  {views.map((view) => (
-                    <DropdownMenuItem
-                      key={view.id}
-                      onSelect={() => {
-                        setActiveView(view.id);
-                        setFilterEditing(true);
-                      }}
-                    >
-                      <Check
-                        className={cn(view.id !== activeViewId && "invisible")}
-                        aria-hidden="true"
-                      />
-                      <span className="truncate">{view.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 shrink-0 gap-1 px-2 text-[13px]"
+                onClick={() => setFilterEditing(true)}
+              >
+                <TagIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                {MESSAGES.LIBRARY_ADD_FILTER}
+              </Button>
             )}
           </div>
 
-          {/* Inline filter area: chips + Save/Cancel. */}
+          {/* Inline filter area. An applied collection collapses to a
+              summary row until the user opens the rule editor; rules apply
+              live, Save only persists them as a collection. */}
           {filterAreaVisible && (
             <div className="px-6 pt-2">
-              <div className="flex items-center gap-2 rounded-xl bg-muted/60 p-2">
-                {activeTag && (
-                  <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-xs text-foreground">
-                    <span
-                      aria-hidden="true"
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: activeTag.color }}
-                    />
-                    <span className="max-w-32 truncate">{activeTag.name}</span>
+              <div className="rounded-md bg-muted/60 p-2">
+                {activeViewId && !filterEditing ? (
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] text-foreground">
+                      <LayersIcon
+                        className="h-3.5 w-3.5 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <span className="max-w-40 truncate">
+                        {views.find((v) => v.id === activeViewId)?.name}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {draftRules.length} {draftRules.length === 1 ? "rule" : "rules"}
+                    </span>
+                    {activeTag && (
+                      <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] text-foreground">
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: activeTag.color }}
+                        />
+                        <span className="max-w-32 truncate">{activeTag.name}</span>
+                        <button
+                          type="button"
+                          aria-label={MESSAGES.TAG_FILTER_CLEAR}
+                          onClick={() => void setTagFilter(null)}
+                          className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <X className="h-3 w-3" aria-hidden="true" />
+                        </button>
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 px-2 text-xs"
+                      onClick={() => setFilterEditing(true)}
+                    >
+                      {MESSAGES.FILTER_EDIT_RULES}
+                    </Button>
                     <button
                       type="button"
                       aria-label={MESSAGES.TAG_FILTER_CLEAR}
-                      onClick={() => void setTagFilter(null)}
-                      className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => {
+                        // Clearing the collection clears its rules too —
+                        // setActiveView(null) alone would keep filtering.
+                        clearDraft();
+                        setFilterEditing(false);
+                      }}
+                      className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <X className="h-3 w-3" aria-hidden="true" />
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
-                  </span>
+                  </div>
+                ) : (
+                  <>
+                    {activeTag && (
+                      <div className="mb-1.5 flex items-center">
+                        <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] text-foreground">
+                          <span
+                            aria-hidden="true"
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: activeTag.color }}
+                          />
+                          <span className="max-w-32 truncate">{activeTag.name}</span>
+                          <button
+                            type="button"
+                            aria-label={MESSAGES.TAG_FILTER_CLEAR}
+                            onClick={() => void setTagFilter(null)}
+                            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <X className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                        </span>
+                      </div>
+                    )}
+                    <FilterBar />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        {MESSAGES.FILTER_LIVE_HINT}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 shrink-0 px-3 text-xs"
+                          onClick={handleResetFilter}
+                        >
+                          {activeViewId ? MESSAGES.COLLECTION_RESET : MESSAGES.COLLECTION_CLEAR}
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 shrink-0 gap-1 px-3 text-xs font-semibold"
+                          disabled={!draftRules.some(isRuleComplete)}
+                          onClick={handleSaveFilter}
+                        >
+                          <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                          {activeViewId ? MESSAGES.COLLECTION_UPDATE : MESSAGES.VIEW_SAVE}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 )}
-                <FilterBar />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 shrink-0 px-3 text-xs"
-                  onClick={handleCancelFilter}
-                >
-                  {MESSAGES.COLLECTION_CANCEL_FILTER}
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-7 shrink-0 gap-1 px-3 text-xs font-semibold"
-                  disabled={draftRules.length === 0}
-                  onClick={handleSaveFilter}
-                >
-                  <Save className="h-3.5 w-3.5" aria-hidden="true" />
-                  {activeViewId ? MESSAGES.COLLECTION_UPDATE : MESSAGES.VIEW_SAVE}
-                </Button>
               </div>
             </div>
           )}
@@ -526,15 +573,30 @@ export const LibraryPage: React.FC = () => {
       <PromptDialog
         open={savePromptOpen}
         title={MESSAGES.COLLECTION_SAVE_NEW}
-        label={MESSAGES.COLLECTION_NAME_LABEL}
         placeholder={MESSAGES.COLLECTION_NAME_PLACEHOLDER}
-        description={MESSAGES.COLLECTION_SAVE_NEW_TIPS}
+        description={MESSAGES.COLLECTION_SAVE_NEW_TIPS_SHORT}
         confirmLabel={MESSAGES.COLLECTION_SAVE}
+        error={saveError}
+        busy={saveBusy}
         onConfirm={(name) => {
-          setSavePromptOpen(false);
-          if (activeWorkspaceId) void saveDraftAsView(activeWorkspaceId, name);
+          if (!activeWorkspaceId) return;
+          setSaveBusy(true);
+          void (async () => {
+            try {
+              await saveDraftAsView(activeWorkspaceId, name);
+              setSaveError(null);
+              setSavePromptOpen(false);
+            } catch (err) {
+              setSaveError(err instanceof Error ? err.message : MESSAGES.SOMETHING_WENT_WRONG);
+            } finally {
+              setSaveBusy(false);
+            }
+          })();
         }}
-        onCancel={() => setSavePromptOpen(false)}
+        onCancel={() => {
+          setSaveError(null);
+          setSavePromptOpen(false);
+        }}
       />
 
       <CollectionEditorDialog

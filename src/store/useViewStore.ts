@@ -28,7 +28,7 @@ interface ViewState {
   updateDraftRule: (id: string, patch: Partial<FilterRule>) => void;
   removeDraftRule: (id: string) => void;
   clearDraft: () => void;
-  saveDraftAsView: (workspaceId: string, name: string) => Promise<SavedView | null>;
+  saveDraftAsView: (workspaceId: string, name: string) => Promise<SavedView>;
   updateActiveViewRules: () => Promise<void>;
   renameView: (id: string, name: string) => Promise<void>;
   deleteView: (id: string) => Promise<void>;
@@ -121,21 +121,18 @@ export const useViewStore = create<ViewState>((set, get) => ({
     })),
 
   saveDraftAsView: async (workspaceId, name) => {
-    try {
-      const view = await savedViewService.createView(workspaceId, name, get().draftRules);
-      await get().fetchViews(workspaceId);
-      // The saved view's rules ARE the drafts — stamp the snapshot so the
-      // straggler guard doesn't treat the next fetch as a stale copy.
-      set((s) => ({
-        activeViewId: view.id,
-        appliedRulesSnapshot: JSON.stringify(view.rules),
-        version: s.version + 1,
-      }));
-      return view;
-    } catch (err) {
-      notifyError(err);
-      return null;
-    }
+    // Rejects on failure (duplicate name, empty rules) — callers decide
+    // between an inline error and a toast.
+    const view = await savedViewService.createView(workspaceId, name, get().draftRules);
+    await get().fetchViews(workspaceId);
+    // The saved view's rules ARE the drafts — stamp the snapshot so the
+    // straggler guard doesn't treat the next fetch as a stale copy.
+    set((s) => ({
+      activeViewId: view.id,
+      appliedRulesSnapshot: JSON.stringify(view.rules),
+      version: s.version + 1,
+    }));
+    return view;
   },
 
   updateActiveViewRules: async () => {

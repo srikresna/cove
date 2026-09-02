@@ -1,4 +1,4 @@
-import { Layers, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Layers, MoreHorizontal, Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
@@ -15,8 +15,10 @@ import { useViewStore } from "../../store/useViewStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
 /**
- * The Collections directory: every saved view with rename/edit/delete
- * management and one-click apply.
+ * The Collections directory: every saved collection with rename/edit/delete
+ * management and one-click apply. Rows share the Tags tab anatomy (h-11,
+ * quiet hover, sans meta) so the sibling tabs read as one surface. Clicking
+ * a row applies it in Docs without forcing the rule editor open.
  */
 export const CollectionsTab: React.FC<{
   onOpenInDocs: () => void;
@@ -34,7 +36,7 @@ export const CollectionsTab: React.FC<{
   const deleteTarget = views.find((v) => v.id === deleting) ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-8 pt-8">
+    <div className="mx-auto w-full max-w-2xl px-6 pt-6">
       <div className="flex items-center justify-between pb-4">
         <h2 className="text-lg font-semibold text-foreground">
           {MESSAGES.LIBRARY_COLLECTIONS_TITLE}
@@ -42,7 +44,7 @@ export const CollectionsTab: React.FC<{
         <Button
           variant="secondary"
           size="sm"
-          className="h-7 gap-1 px-3 text-xs"
+          className="h-8 gap-1 px-3 text-[13px]"
           onClick={() => onEditView("create")}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -51,9 +53,18 @@ export const CollectionsTab: React.FC<{
       </div>
 
       {views.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          {MESSAGES.LIBRARY_COLLECTIONS_EMPTY}
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-md border border-dashed py-14 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Layers className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <p className="max-w-72 text-[13px] text-muted-foreground">
+            {MESSAGES.LIBRARY_COLLECTIONS_EMPTY}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => onEditView("create")}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {MESSAGES.LIBRARY_COLLECTIONS_NEW}
+          </Button>
+        </div>
       ) : (
         <div className="space-y-0.5">
           {views.map((view) => (
@@ -66,16 +77,16 @@ export const CollectionsTab: React.FC<{
                   onOpenInDocs();
                 }}
                 className={
-                  "flex min-w-0 flex-1 items-center gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                  "flex h-11 min-w-0 flex-1 items-center gap-3 rounded-md border px-3 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                   (view.id === activeViewId
                     ? "border-border bg-card font-medium text-foreground shadow-sm"
                     : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground")
                 }
               >
                 <Layers className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{view.name}</span>
-                <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground/70">
-                  {view.rules.length} {MESSAGES.LIBRARY_TAGS_RULES}
+                <span className="truncate font-medium text-foreground">{view.name}</span>
+                <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                  {view.rules.length} {view.rules.length === 1 ? "rule" : "rules"}
                 </span>
               </button>
               <DropdownMenu>
@@ -90,8 +101,8 @@ export const CollectionsTab: React.FC<{
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
                   <DropdownMenuItem onSelect={() => onEditView(view.id)}>
-                    <Pencil aria-hidden="true" />
-                    Edit rules
+                    <SlidersHorizontal aria-hidden="true" />
+                    {MESSAGES.FILTER_EDIT_RULES}
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setRenaming(view.id)}>
                     <Pencil aria-hidden="true" />
@@ -115,7 +126,6 @@ export const CollectionsTab: React.FC<{
       <PromptDialog
         open={renaming !== null}
         title={MESSAGES.PROP_RENAME}
-        label={MESSAGES.COLLECTION_NAME_LABEL}
         placeholder={MESSAGES.COLLECTION_NAME_PLACEHOLDER}
         confirmLabel={MESSAGES.PROP_RENAME}
         initialValue={renameTarget?.name}
