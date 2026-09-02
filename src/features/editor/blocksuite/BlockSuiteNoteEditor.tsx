@@ -80,12 +80,32 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     }
   };
 
-  const toggleRightBar = () => {
+  // The right-bar toggle migrates between the topbar and the bar's own
+  // header (AFFiNE behavior). Keyboard activation of a control that then
+  // unmounts or hides would drop focus to <body>, so keyboard toggles move
+  // focus to the counterpart control.
+  const openToggleRef = useRef<HTMLButtonElement>(null);
+  const rightBarHeaderRef = useRef<HTMLDivElement>(null);
+  const toggledViaKeyboard = useRef(false);
+  const prevRightBarOpenRef = useRef(isRightBarOpen);
+
+  const toggleRightBar = (viaKeyboard: boolean) => {
+    toggledViaKeyboard.current = viaKeyboard;
     setRightBarOpen((open) => {
       localStorage.setItem(RIGHTBAR_KEY, String(!open));
       return !open;
     });
   };
+
+  useEffect(() => {
+    const opened = isRightBarOpen && !prevRightBarOpenRef.current;
+    const closed = !isRightBarOpen && prevRightBarOpenRef.current;
+    prevRightBarOpenRef.current = isRightBarOpen;
+    if (!toggledViaKeyboard.current) return;
+    toggledViaKeyboard.current = false;
+    if (opened) rightBarHeaderRef.current?.querySelector<HTMLElement>("button")?.focus();
+    else if (closed) openToggleRef.current?.focus();
+  }, [isRightBarOpen]);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -107,6 +127,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
             }
             onToggleFullscreen={toggleFullscreen}
             onToggleRightBar={toggleRightBar}
+            openToggleRef={openToggleRef}
           />
 
           <div className="relative h-full min-h-0 min-w-0 flex-1">
@@ -147,6 +168,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
           note={note}
           scrollRef={scrollRef}
           onClose={toggleRightBar}
+          headerRef={rightBarHeaderRef}
           editorHost={editorHost}
           open={isRightBarOpen}
         />

@@ -2,11 +2,11 @@ import {
   ArrowRightLeft,
   CalendarCheck,
   Copy,
+  FileText,
   Maximize2,
   Minimize2,
   MoreHorizontal,
   PanelRight,
-  PanelRightClose,
   Pin,
   Shapes,
   Star,
@@ -33,6 +33,7 @@ import { cn } from "../../lib/utils";
 import { noteActions } from "../../store/noteActions";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { SaveStatusBadge } from "./SaveStatusBadge";
+import { SegmentedIconGroup } from "./SegmentedIconGroup";
 
 interface EditorTopbarProps {
   note: Note;
@@ -45,7 +46,10 @@ interface EditorTopbarProps {
   onToggleDocMode?: () => void;
   onToggleFullWidth: () => void;
   onToggleFullscreen: () => void;
-  onToggleRightBar: () => void;
+  onToggleRightBar: (viaKeyboard: boolean) => void;
+  /** Receives the open toggle so a keyboard close of the right bar can
+   *  return focus to it (the toggle unmounts while the bar is open). */
+  openToggleRef?: React.Ref<HTMLButtonElement>;
 }
 
 const IconAction: React.FC<{
@@ -70,6 +74,26 @@ const IconAction: React.FC<{
   </Tooltip>
 );
 
+/** The doc-mode switch: a joined two-segment pill, Page | Edgeless. */
+const DocModeSwitch: React.FC<{
+  docMode: DocMode;
+  onToggle: () => void;
+  className?: string;
+}> = ({ docMode, onToggle, className }) => (
+  <SegmentedIconGroup
+    aria-label={MESSAGES.DOC_MODE}
+    className={className}
+    items={[
+      { value: "page", label: MESSAGES.DOC_MODE_PAGE_SEGMENT, icon: FileText },
+      { value: "edgeless", label: MESSAGES.DOC_MODE_EDGELESS_SEGMENT, icon: Shapes },
+    ]}
+    value={docMode}
+    onChange={(next) => {
+      if (next !== docMode) onToggle();
+    }}
+  />
+);
+
 export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   note,
   wordCount,
@@ -82,6 +106,7 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   onToggleFullWidth,
   onToggleFullscreen,
   onToggleRightBar,
+  openToggleRef,
 }) => {
   const trashNote = noteActions.trashNote;
   const duplicateNote = noteActions.duplicateNote;
@@ -90,8 +115,10 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   const propertyVersion = usePropertyStore((s) => s.version);
   const openJournal = useOpenJournal();
   const [journalDate, setJournalDate] = useState<number | null>(null);
-  // Journal affordances hide as the header narrows: Today under 300px,
-  // TemplateMark under 400px.
+  // Journal affordances hide as the header narrows so the "..." menu (the
+  // last, unclippable item) stays reachable: Today below ~390px, the
+  // template badge below ~470px — the segmented mode pill raised these
+  // floors from the old 300/400 by its extra width.
   const [headerRef, headerWidth] = useElementWidth<HTMLDivElement>();
 
   // A journal note's topbar swaps the meta strip for a week calendar
@@ -117,6 +144,52 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     minute: "2-digit",
   }).format(note.updatedAt);
 
+  /** The "..." overflow: layout and doc-level actions that must not crowd
+   *  the bar (AFFiNE's topbar more-menu). Journal mode also parks Favorite
+   *  here — its cluster has no room for the standalone star. */
+  const renderOverflowMenu = (includeFavorite: boolean) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="iconSm"
+          aria-label={MESSAGES.TOPBAR_MORE}
+          className="shrink-0 text-muted-foreground"
+        >
+          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        {includeFavorite && (
+          <DropdownMenuItem onSelect={() => toggleFavoriteNote(note.id)}>
+            <Star className={cn(note.isFavorite && "text-warm")} aria-hidden="true" />
+            <span>{note.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}</span>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={onToggleFullWidth}>
+          <ArrowRightLeft aria-hidden="true" />
+          <span>{isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => duplicateNote(note.id)}>
+          <Copy aria-hidden="true" />
+          <span>{MESSAGES.DUPLICATE_NOTE}</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onToggleFullscreen}>
+          {isFullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+          <span>{isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+          onSelect={() => trashNote(note.id)}
+        >
+          <Trash2 aria-hidden="true" />
+          <span>{MESSAGES.MOVE_TO_TRASH}</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div
       ref={headerRef}
@@ -124,14 +197,8 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     >
       {journalDate != null ? (
         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-          {onToggleDocMode && (
-            <IconAction
-              label={docMode === "edgeless" ? MESSAGES.DOC_MODE_PAGE : MESSAGES.DOC_MODE_CANVAS}
-              onClick={onToggleDocMode}
-              className={cn(docMode === "edgeless" && "text-primary")}
-            >
-              <Shapes className="h-4 w-4" aria-hidden="true" />
-            </IconAction>
+          {onToggleDocMode && docMode && (
+            <DocModeSwitch docMode={docMode} onToggle={onToggleDocMode} />
           )}
           <div className="flex min-w-[100px] flex-1 items-center justify-center">
             <WeekDatePicker
@@ -140,12 +207,12 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
               className="min-w-0 max-w-[800px]"
             />
           </div>
-          {note.isTemplate && headerWidth >= 400 && (
+          {note.isTemplate && headerWidth >= 470 && (
             <span className="flex h-6 shrink-0 items-center rounded bg-primary/10 px-2 text-xs font-medium text-primary">
               {MESSAGES.TEMPLATE_BADGE}
             </span>
           )}
-          {(headerWidth === 0 || headerWidth >= 300) && (
+          {(headerWidth === 0 || headerWidth >= 390) && (
             <Button
               variant="secondary"
               size="sm"
@@ -158,41 +225,7 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
             </Button>
           )}
           <SaveStatusBadge />
-          <span aria-hidden="true" className="h-5 w-px shrink-0 bg-border" />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="iconSm"
-                aria-label="Journal options"
-                className="shrink-0 text-muted-foreground"
-              >
-                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onSelect={() => toggleFavoriteNote(note.id)}>
-                <Star className={cn(note.isFavorite && "text-warm")} aria-hidden="true" />
-                <span>{note.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onToggleFullWidth}>
-                <ArrowRightLeft aria-hidden="true" />
-                <span>{isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onToggleFullscreen}>
-                {isFullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
-                <span>{isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                onSelect={() => trashNote(note.id)}
-              >
-                <Trash2 aria-hidden="true" />
-                <span>{MESSAGES.MOVE_TO_TRASH}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {renderOverflowMenu(true)}
         </div>
       ) : (
         <div className="flex min-w-0 items-center gap-x-3 overflow-hidden whitespace-nowrap font-mono text-[11px] text-muted-foreground">
@@ -212,38 +245,13 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
       )}
 
       <div className="flex items-center gap-0.5">
-        {/* Journal mode owns its actions in the left cluster — only the
-            right-bar toggle stays here. */}
+        {/* Journal mode owns its actions in the left cluster (the shared
+            overflow menu); the right cluster stays out of its way. */}
         {journalDate == null && (
           <>
-            {onToggleDocMode && (
-              <>
-                <IconAction
-                  label={docMode === "edgeless" ? MESSAGES.DOC_MODE_PAGE : MESSAGES.DOC_MODE_CANVAS}
-                  onClick={onToggleDocMode}
-                  className={cn(docMode === "edgeless" && "text-primary")}
-                >
-                  <Shapes className="h-4 w-4" aria-hidden="true" />
-                </IconAction>
-                <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
-              </>
+            {onToggleDocMode && docMode && (
+              <DocModeSwitch docMode={docMode} onToggle={onToggleDocMode} />
             )}
-            <IconAction
-              label={isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}
-              onClick={onToggleFullWidth}
-            >
-              <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
-            </IconAction>
-            <IconAction
-              label={isFullscreen ? MESSAGES.EXIT_FULL_WINDOW : MESSAGES.FULL_WINDOW}
-              onClick={onToggleFullscreen}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <Maximize2 className="h-4 w-4" aria-hidden="true" />
-              )}
-            </IconAction>
 
             <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
 
@@ -261,32 +269,35 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
             >
               <Star className="h-4 w-4" aria-hidden="true" />
             </IconAction>
-            <IconAction label={MESSAGES.DUPLICATE_NOTE} onClick={() => duplicateNote(note.id)}>
-              <Copy className="h-4 w-4" aria-hidden="true" />
-            </IconAction>
-            <IconAction
-              label={MESSAGES.MOVE_TO_TRASH}
-              onClick={() => trashNote(note.id)}
-              className="hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </IconAction>
 
-            <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+            {renderOverflowMenu(false)}
           </>
         )}
 
-        <IconAction
-          label={isRightBarOpen ? MESSAGES.RIGHTBAR_CLOSE : MESSAGES.RIGHTBAR_OPEN}
-          onClick={onToggleRightBar}
-          className={cn(isRightBarOpen && "text-foreground")}
-        >
-          {isRightBarOpen ? (
-            <PanelRightClose className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <PanelRight className="h-4 w-4" aria-hidden="true" />
-          )}
-        </IconAction>
+        {/* AFFiNE behavior: the panel toggle lives in the opened right
+            bar's own header; it returns here only while the bar is closed.
+            The divider travels with it so the cluster never ends in a
+            dangling rule. */}
+        {!isRightBarOpen && (
+          <>
+            <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  ref={openToggleRef}
+                  variant="ghost"
+                  size="iconSm"
+                  aria-label={MESSAGES.RIGHTBAR_OPEN}
+                  onClick={(e) => onToggleRightBar(e.detail === 0)}
+                  className="text-muted-foreground"
+                >
+                  <PanelRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{MESSAGES.RIGHTBAR_OPEN}</TooltipContent>
+            </Tooltip>
+          </>
+        )}
       </div>
     </div>
   );

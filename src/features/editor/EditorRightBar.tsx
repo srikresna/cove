@@ -22,6 +22,7 @@ import { LivePreview } from "./LivePreview";
 import { OutlinePanelHost } from "./OutlinePanelHost";
 import { PropertyManagerPanel } from "./PropertyManagerPanel";
 import { PROPERTY_TYPE_META } from "./propertyRows/NotePropertiesRows";
+import { SegmentedIconGroup } from "./SegmentedIconGroup";
 
 const TAB_KEY = "cove-rightbar-tab";
 type RightBarTab = "toc" | "calendar" | "info" | "preview" | "frames";
@@ -36,7 +37,10 @@ const isRightBarTab = (value: string | null): value is RightBarTab =>
 interface EditorRightBarProps {
   note: Note;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
-  onClose: () => void;
+  onClose: (viaKeyboard: boolean) => void;
+  /** Receives the header row so a keyboard open can land focus on the
+   *  bar's first control. */
+  headerRef?: React.Ref<HTMLDivElement>;
 
   editorHost?: EditorHost | null;
 
@@ -52,6 +56,7 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 export const EditorRightBar: React.FC<EditorRightBarProps> = ({
   note,
   onClose,
+  headerRef,
   editorHost,
   open = true,
 }) => {
@@ -115,47 +120,42 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
         open ? "w-[340px] opacity-100" : "w-0 border-l-0 opacity-0 invisible",
       )}
     >
-      <div className="flex w-[340px] flex-shrink-0 flex-col h-full">
-        <div className="flex flex-shrink-0 items-center justify-between px-3 pt-3">
+      <div className="flex h-full w-[340px] flex-shrink-0 flex-col">
+        {/* Same 40px band as the topbar so the two rows read as one bar:
+            the tab group centers on the same line as the topbar actions,
+            the card surface continues across the seam, and the shared
+            border runs through both. */}
+        <div
+          ref={headerRef}
+          className="flex h-10 flex-shrink-0 items-center justify-between border-b bg-card px-2"
+        >
+          <SegmentedIconGroup
+            variant="tabs"
+            aria-label={MESSAGES.RIGHTBAR_TABS}
+            items={[
+              { value: "toc", label: MESSAGES.RIGHTBAR_TAB_TOC, icon: List },
+              { value: "preview", label: MESSAGES.RIGHTBAR_TAB_PREVIEW, icon: Eye },
+              { value: "frames", label: MESSAGES.RIGHTBAR_TAB_FRAMES, icon: LayoutGrid },
+              { value: "calendar", label: MESSAGES.RIGHTBAR_TAB_CALENDAR, icon: CalendarDays },
+              { value: "info", label: MESSAGES.RIGHTBAR_TAB_INFO, icon: Info },
+            ]}
+            value={tab}
+            onChange={selectTab}
+          />
           <div className="flex items-center gap-0.5">
-            {(
-              [
-                ["toc", MESSAGES.RIGHTBAR_TAB_TOC, List],
-                ["preview", MESSAGES.RIGHTBAR_TAB_PREVIEW, Eye],
-                ["frames", MESSAGES.RIGHTBAR_TAB_FRAMES, LayoutGrid],
-                ["calendar", MESSAGES.RIGHTBAR_TAB_CALENDAR, CalendarDays],
-                ["info", MESSAGES.RIGHTBAR_TAB_INFO, Info],
-              ] as const
-            ).map(([value, label, Icon]) => (
-              <Tooltip key={value}>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="iconSm"
-                    aria-label={label}
-                    aria-pressed={tab === value}
-                    onClick={() => selectTab(value)}
-                    className={cn(
-                      tab === value ? "bg-accent text-foreground" : "text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{label}</TooltipContent>
-              </Tooltip>
-            ))}
+            {tab === "toc" && <ExportMenu noteId={note.id} />}
+            {/* The panel toggle lives here while the bar is open (AFFiNE
+                behavior); it returns to the topbar when closed. */}
+            <Button
+              variant="ghost"
+              size="iconSm"
+              aria-label={MESSAGES.RIGHTBAR_CLOSE}
+              onClick={(e) => onClose(e.detail === 0)}
+              className="text-muted-foreground"
+            >
+              <PanelRightClose className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
-          {tab === "toc" && <ExportMenu noteId={note.id} />}
-          <Button
-            variant="ghost"
-            size="iconSm"
-            aria-label={MESSAGES.RIGHTBAR_CLOSE}
-            onClick={onClose}
-            className="text-muted-foreground"
-          >
-            <PanelRightClose className="h-4 w-4" aria-hidden="true" />
-          </Button>
         </div>
 
         {(tab === "preview" || tab === "frames") && (
