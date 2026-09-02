@@ -11,6 +11,9 @@ interface SettingsState {
   setAutoUnlockOnLaunch: (value: boolean) => void;
   canvasPrefs: CanvasPrefs;
   setCanvasPref: <K extends keyof CanvasPrefs>(key: K, value: CanvasPrefs[K]) => void;
+  /** App-wide UI zoom factor (Ctrl+= / Ctrl+- / Ctrl+0), clamped 0.5-2.0. */
+  zoomFactor: number;
+  setZoomFactor: (value: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -21,6 +24,8 @@ export const useSettingsStore = create<SettingsState>()(
       canvasPrefs: DEFAULT_CANVAS_PREFS,
       setCanvasPref: (key, value) =>
         set((state) => ({ canvasPrefs: { ...state.canvasPrefs, [key]: value } })),
+      zoomFactor: 1,
+      setZoomFactor: (value) => set({ zoomFactor: value }),
     }),
     {
       name: "cove-settings",
@@ -31,6 +36,7 @@ export const useSettingsStore = create<SettingsState>()(
         return {
           ...base,
           ...p,
+          zoomFactor: p.zoomFactor ?? 1,
           canvasPrefs: { ...DEFAULT_CANVAS_PREFS, ...(p.canvasPrefs ?? {}) },
         };
       },

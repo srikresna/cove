@@ -5,8 +5,10 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./di/container";
 import "./index.css";
+import { setupAppZoom } from "./lib/appZoom";
 import "./lib/disposableGuard";
 import { setupFullscreenShim } from "./lib/fullscreenShim";
+import { useSettingsStore } from "./store/useSettingsStore";
 import "./store/blockSuiteBridge";
 import { queryClient } from "./store/queryClient";
 
@@ -26,6 +28,13 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 void setupFullscreenShim();
+
+// Apply the persisted zoom before the first React paint so the UI never
+// flashes at the wrong scale; #root is empty until the render below.
+void setupAppZoom({
+  getFactor: () => useSettingsStore.getState().zoomFactor,
+  setFactor: (factor) => useSettingsStore.getState().setZoomFactor(factor),
+});
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
