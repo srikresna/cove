@@ -42,6 +42,32 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the scroll div unmounts/remounts when the doc mode flips, so the listener must re-attach — mode is load-bearing here
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    // The vendored kanban board scrolls its column strip horizontally but
+    // never maps the vertical wheel to it — with a plain desktop mouse an
+    // overflowing board is unscrollable. Capture runs before the board's own
+    // wheel handler (which stops propagation) and converts deltaY to
+    // scrollLeft only when the pointer is over a strip that can consume it.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return; // pinch-zoom / app zoom
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const strip = target?.closest("affine-data-view-kanban-group")?.parentElement;
+      if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+      // Only swallow the event while the strip can actually move — at either
+      // end the doc must keep scrolling vertically.
+      const next = strip.scrollLeft + e.deltaY;
+      if (next < 0 || next > strip.scrollWidth - strip.clientWidth) return;
+      strip.scrollLeft = next;
+      e.preventDefault();
+    };
+    scroller.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    return () => scroller.removeEventListener("wheel", onWheel, { capture: true });
+  }, [mode]);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
@@ -96,6 +122,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
                 <EditorHeader note={note} isFullWidth={isFullWidth} />
 
                 <div
+                  data-page-width={isFullWidth ? "fullWidth" : "standard"}
                   className={cn(
                     "flex min-h-0 w-full flex-1 flex-col",
                     !isFullWidth && "mx-auto max-w-3xl",

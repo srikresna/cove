@@ -206,6 +206,34 @@ affine-editor-container .playground-page-editor-container {
 
 .cove-doc-scroll {
   scroll-padding-bottom: 96px;
+  container-type: inline-size;
+}
+
+/* Kanban boards: the vendored columns are hard-fixed at 260px. Below ~2
+   visible columns the board mostly shows scrollbar, so shrink the columns
+   with the container. The selector carries a class so it beats the vendored
+   Lit styles, which ShadowlessElement appends to <head> AFTER this sheet in
+   production builds (source order would otherwise win the tie). */
+@container (max-width: 620px) {
+  .cove-doc-scroll affine-data-view-kanban-group {
+    width: 220px;
+  }
+}
+
+@container (max-width: 480px) {
+  .cove-doc-scroll affine-data-view-kanban-group {
+    width: 180px;
+  }
+}
+
+/* Full-width page mode: the vendored page root clamps the doc body to
+   --affine-editor-width (944px from @toeverything/theme) and centers it with
+   margin: 0 auto. Release the clamp so the note body shares the header's
+   48px left edge (px-12 = --affine-editor-side-padding); the 48px side
+   padding is kept, so the body sits flush with the title and properties
+   panel instead of a centered 944px column. */
+[data-page-width="fullWidth"] {
+  --affine-editor-width: 100%;
 }
 
 doc-title {

@@ -2,6 +2,7 @@ import {
   ChevronDown,
   FileDown,
   FileText,
+  FolderDown,
   LayoutGrid,
   List,
   Plus,
@@ -63,6 +64,7 @@ interface ExplorerHeaderProps {
   onNewNote: () => void;
   onNewEdgeless: () => void;
   onImportMarkdown: () => void;
+  onImportMarkdownFolder: () => void;
 }
 
 /**
@@ -83,9 +85,10 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
   onNewNote,
   onNewEdgeless,
   onImportMarkdown,
+  onImportMarkdownFolder,
 }) => (
-  <div className="flex h-[52px] shrink-0 items-center justify-between border-b px-4">
-    <nav className="flex items-center gap-3 pl-2" aria-label="Library sections">
+  <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b px-4 py-1.5">
+    <nav className="flex min-w-0 items-center gap-3 pl-2" aria-label="Library sections">
       {NAV_ITEMS.map((item) => (
         <button
           key={item.value}
@@ -103,7 +106,7 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
     </nav>
 
     {tab === "docs" && (
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-4">
         {/* View toggle: three icon buttons, active gets the hover overlay. */}
         {/* biome-ignore lint/a11y/useSemanticElements: a styled icon group is a visual cluster, not a form fieldset */}
         <div className="flex items-center gap-1" role="group" aria-label="View mode">
@@ -188,6 +191,18 @@ export const ExplorerHeader: React.FC<ExplorerHeaderProps> = ({
                 </span>
                 <span className="pl-7 text-xs text-muted-foreground">
                   {MESSAGES.LIBRARY_IMPORT_MD_DESC}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={onImportMarkdownFolder}
+                className="flex-col items-start gap-0.5 py-2"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <FolderDown className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                  {MESSAGES.LIBRARY_IMPORT_MD_FOLDER}
+                </span>
+                <span className="pl-7 text-xs text-muted-foreground">
+                  {MESSAGES.LIBRARY_IMPORT_MD_FOLDER_DESC}
                 </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
