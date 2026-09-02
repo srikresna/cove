@@ -2,6 +2,7 @@ import { StoreExtensionManager, ViewExtensionManager } from "@blocksuite/affine/
 import { getInternalStoreExtensions } from "@blocksuite/affine/extensions/store";
 import { getInternalViewExtensions } from "@blocksuite/affine/extensions/view";
 import { FoundationViewExtension } from "@blocksuite/affine/foundation/view";
+import { BlockPlainTextAdapterExtension } from "@blocksuite/affine/shared/adapters";
 import { AffineCanvasTextFonts, FeatureFlagService } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
 // The vendored store package exports Workspace only as an interface — this
@@ -29,6 +30,27 @@ interface BlockSuiteEditorServiceDeps {
   blobSource: BlobSource;
 }
 
+// Image blocks carry no text, so plaintext exports of image-heavy notes
+// (tweet saves) come out as nothing but the title. Emit a stand-in line so
+// plaintext previews and exports keep the note's structure.
+const imagePlainTextAdapter = BlockPlainTextAdapterExtension({
+  flavour: "affine:image",
+  toMatch: () => false,
+  fromMatch: (o: { node: { flavour: string } }) => o.node.flavour === "affine:image",
+  toBlockSnapshot: {},
+  fromBlockSnapshot: {
+    enter: (
+      o: { node: { props: { caption?: unknown } } },
+      context: { textBuffer: { content: string } },
+    ) => {
+      const caption = o.node.props.caption;
+      const label =
+        typeof caption === "string" && caption.trim() ? `[image: ${caption}]` : "[image]";
+      context.textBuffer.content += `${label}\n`;
+    },
+  },
+});
+
 export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private workspace: TestWorkspace | null = null;
   private viewManager: ViewExtensionManager | null = null;
@@ -47,6 +69,8 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     undefined;
   private noteSavedHandler: (docId: string, content: string) => Promise<void> = async () =>
     undefined;
+
+  private docTitleHandler: (docId: string, title: string) => Promise<void> = async () => undefined;
 
   private readonly docCreatedPromises = new Map<string, Promise<void>>();
 
@@ -89,7 +113,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
         id: "cove",
         blobSources: { main: this.deps.blobSource },
       });
-      workspace.storeExtensions = storeManager.get("store");
+      workspace.storeExtensions = [...storeManager.get("store"), imagePlainTextAdapter];
       workspace.meta.initialize();
       workspace.start();
 
@@ -214,27 +238,74 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     const ws = this.getWorkspace();
     const markdown = await file.text();
     const { MarkdownTransformer } = await import("@blocksuite/affine/widgets/linked-doc");
-    const extensions = this.getViewManager().get("page");
 
     const sampleDoc = ws.docs.values().next().value;
     if (!sampleDoc) throw new Error("Open a note before importing.");
+    // Adapter matchers (markdown/plain-text per block) are registered ONLY
+    // in the STORE scope — passing view extensions imports an empty note
+    // with nothing but the title surviving.
     const docId = await MarkdownTransformer.importMarkdownToDoc({
       collection: ws,
       schema: sampleDoc.getStore().schema,
       markdown,
       fileName: file.name.replace(/\.md$/i, ""),
-      extensions,
+      extensions: ws.storeExtensions,
     });
     if (!docId) return docId;
+    await this.persistImportedDoc(docId);
+    return docId;
+  }
+
+  async importMarkdownBatch(files: File[]): Promise<string[]> {
+    const ws = this.getWorkspace();
+    const { ObsidianTransformer, commitImportBatchToWorkspace } = await import(
+      "@blocksuite/affine/widgets/linked-doc"
+    );
+
+    const sampleDoc = ws.docs.values().next().value;
+    if (!sampleDoc) throw new Error("Open a note before importing.");
+    const schema = sampleDoc.getStore().schema;
+    // The planner only recognizes .md notes; everything else stages as an
+    // asset, and .markdown files would silently become stray blobs.
+    const plannerFiles = files.filter(
+      (f) => /\.(md)$/i.test(f.name) || !/\.markdown$/i.test(f.name),
+    );
+    const planned = await ObsidianTransformer.planObsidianVault({
+      collection: ws,
+      schema,
+      importedFiles: plannerFiles,
+      extensions: ws.storeExtensions,
+    });
+    const committed = await commitImportBatchToWorkspace(ws, schema, planned.batch);
+    const persisted: string[] = [];
+    for (const docId of committed.docIds) {
+      try {
+        await this.persistImportedDoc(docId);
+        // The commit path stamps doc titles only AFTER creation, so the
+        // doc-created handler persisted each row as "Untitled" — push the
+        // planned title through now.
+        const title = ws.meta.getDocMeta(docId)?.title;
+        if (title) await this.docTitleHandler(docId, title);
+        persisted.push(docId);
+      } catch {
+        // One unpersistable doc must not abandon the rest of the batch.
+      }
+    }
+    return persisted;
+  }
+
+  /** Waits for the doc-created handler's notes row, then persists the
+   *  imported content through the normal save path. */
+  private async persistImportedDoc(docId: string): Promise<void> {
     const created = this.docCreatedPromises.get(docId);
     if (created) await created;
-    const doc = ws.getDoc(docId);
+    const ws = this.workspace;
+    const doc = ws?.getDoc(docId);
     if (doc) {
       if (!doc.ready) doc.load();
       const content = packBlockSuiteContent(encodeDocSnapshot(doc.spaceDoc));
       await this.noteSavedHandler(docId, content);
     }
-    return docId;
   }
 
   getDocStoreForPeek(docId: string): BlockSuiteStore | null {
@@ -333,6 +404,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
 
   provideNoteSavedHandler(handler: (docId: string, content: string) => Promise<void>): void {
     this.noteSavedHandler = handler;
+  }
+
+  provideDocTitleHandler(handler: (docId: string, title: string) => Promise<void>): void {
+    this.docTitleHandler = handler;
   }
 
   setDocTitle(docId: string, title: string): void {

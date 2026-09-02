@@ -408,3 +408,9 @@ blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
 blockSuiteEditorService.provideNoteSavedHandler(async (docId, content) => {
   await noteActions.updateNote(docId, { content });
 });
+
+// Folder imports stamp doc titles only after the notes row exists; route
+// them through the normal title save so the row, cache, and doc meta agree.
+blockSuiteEditorService.provideDocTitleHandler(async (docId, title) => {
+  await noteActions.updateNote(docId, { title });
+});

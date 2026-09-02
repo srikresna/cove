@@ -63,6 +63,7 @@ vi.mock("@/di/container", () => ({
     provideNoteSavedHandler: (fn: (docId: string, content: string) => Promise<void>) => {
       handlers.noteSaved = fn;
     },
+    provideDocTitleHandler: () => {},
     setDocTitle: vi.fn(),
     provideCanvasPrefs: () => {},
     getViewSpecs: () => [],

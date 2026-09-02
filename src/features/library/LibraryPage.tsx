@@ -172,6 +172,7 @@ export const LibraryPage: React.FC = () => {
   // Markdown import: multi-file input → one note per .md (the transformer
   // needs at least one existing doc as its schema donor).
   const importInputRef = useRef<HTMLInputElement>(null);
+  const importFolderInputRef = useRef<HTMLInputElement>(null);
   const handleImportMarkdown = useCallback(() => {
     if (notes.length === 0) {
       useNotificationStore.getState().pushToast({
@@ -183,6 +184,68 @@ export const LibraryPage: React.FC = () => {
     }
     importInputRef.current?.click();
   }, [notes.length]);
+
+  const handleImportMarkdownFolder = useCallback(() => {
+    if (notes.length === 0) {
+      useNotificationStore.getState().pushToast({
+        kind: "info",
+        title: MESSAGES.LIBRARY_IMPORT_NEEDS_NOTE,
+        description: MESSAGES.LIBRARY_IMPORT_NEEDS_NOTE_DESC,
+      });
+      return;
+    }
+    importFolderInputRef.current?.click();
+  }, [notes.length]);
+
+  /** Folder import (md + assets): one planner run stages every image so
+   *  relative ![](assets/x.png) references resolve to real blobs. */
+  const handleImportFolder = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0 || !activeWorkspaceId) return;
+      const mdCount = Array.from(files).filter((f) => /\.(md)$/i.test(f.name)).length;
+      if (mdCount === 0) {
+        useNotificationStore.getState().pushToast({
+          kind: "info",
+          title: MESSAGES.LIBRARY_IMPORT_MD_FOLDER,
+          description: MESSAGES.LIBRARY_IMPORT_MD_FOLDER_NO_MD,
+        });
+        return;
+      }
+      let imported = 0;
+      let failed = 0;
+      let notifiedFailed = 0;
+      try {
+        const docIds = await blockSuiteEditorService.importMarkdownBatch(Array.from(files));
+        imported = docIds.length;
+        failed = mdCount - imported;
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified
+        ) {
+          notifiedFailed = mdCount;
+        } else {
+          failed = mdCount;
+        }
+      }
+      if (imported > 0 || notifiedFailed > 0) {
+        await noteActions.refreshNotesInPlace(activeWorkspaceId);
+      }
+      const totalFailed = failed + notifiedFailed;
+      const description = [
+        MESSAGES.LIBRARY_IMPORTED_DESC.replace("{n}", String(imported)),
+        totalFailed > 0 ? `${totalFailed} file(s) failed.` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      useNotificationStore.getState().pushToast({
+        kind: imported > 0 ? "info" : "error",
+        title: imported > 0 ? MESSAGES.LIBRARY_IMPORTED : MESSAGES.SOMETHING_WENT_WRONG,
+        description,
+      });
+    },
+    [activeWorkspaceId],
+  );
 
   const handleImportFiles = useCallback(
     async (files: FileList | null) => {
@@ -280,6 +343,7 @@ export const LibraryPage: React.FC = () => {
         onNewNote={handleNewNote}
         onNewEdgeless={handleNewEdgeless}
         onImportMarkdown={handleImportMarkdown}
+        onImportMarkdownFolder={handleImportMarkdownFolder}
       />
 
       <input
@@ -290,6 +354,22 @@ export const LibraryPage: React.FC = () => {
         className="hidden"
         onChange={(e) => {
           void handleImportFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      <input
+        ref={importFolderInputRef}
+        type="file"
+        className="hidden"
+        // Folder picks keep each file's relative path (md + assets/), which
+        // the import planner needs to resolve image references.
+        // @ts-expect-error non-standard but universally supported directory picker
+        webkitdirectory=""
+        directory=""
+        multiple
+        onChange={(e) => {
+          void handleImportFolder(e.target.files);
           e.target.value = "";
         }}
       />
