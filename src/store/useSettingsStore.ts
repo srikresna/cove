@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { blockSuiteEditorService } from "../di/container";
+import { clampZoom } from "../lib/appZoom";
 import {
   type CanvasPrefs,
   DEFAULT_CANVAS_PREFS,
@@ -36,7 +37,12 @@ export const useSettingsStore = create<SettingsState>()(
         return {
           ...base,
           ...p,
-          zoomFactor: p.zoomFactor ?? 1,
+          // A corrupted or hand-edited blob must not desync the stored
+          // factor from the clamped value the webview actually applies.
+          zoomFactor:
+            typeof p.zoomFactor === "number" && Number.isFinite(p.zoomFactor)
+              ? clampZoom(p.zoomFactor)
+              : 1,
           canvasPrefs: { ...DEFAULT_CANVAS_PREFS, ...(p.canvasPrefs ?? {}) },
         };
       },

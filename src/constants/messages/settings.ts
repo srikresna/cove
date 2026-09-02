@@ -3,6 +3,9 @@ export const SettingsMessages = {
   SETTINGS_CLOSE: "Close settings",
   SETTINGS_DARK_MODE_LABEL: "Dark mode",
   SETTINGS_DARK_MODE_DESC: "Deep-tide theme for low-light writing.",
+  SETTINGS_ZOOM_LABEL: "Zoom",
+  SETTINGS_ZOOM_DESC: "App-wide zoom (Ctrl+= / Ctrl+- / Ctrl+0 or Ctrl+scroll).",
+  SETTINGS_ZOOM_RESET: "Reset",
   SETTINGS_AUTO_UNLOCK_LABEL: "Trust this device",
   SETTINGS_AUTO_UNLOCK_DESC:
     'Keeps a device-bound copy of the vault key in the OS keychain: the app auto-unlocks on launch and "forgot passphrase" recovery works on this device. Anyone with access to this computer\'s login can bypass the passphrase while this is on. Turning it off deletes the keychain copy.',
