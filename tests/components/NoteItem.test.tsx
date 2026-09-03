@@ -54,6 +54,20 @@ describe("NoteItem", () => {
     expect(rowOf(note)).toBeInTheDocument();
   });
 
+  it("shows the body preview line when previewText is passed", () => {
+    const note = makeNote();
+    render(
+      <NoteItem
+        note={note}
+        isActive={false}
+        onSelect={vi.fn()}
+        previewText="First paragraph"
+        {...baseProps}
+      />,
+    );
+    expect(screen.getByText("First paragraph")).toBeInTheDocument();
+  });
+
   it("a plain click opens the note (no selection toggle)", () => {
     const onSelect = vi.fn();
     const note = makeNote();

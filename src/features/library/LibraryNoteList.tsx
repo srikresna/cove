@@ -12,6 +12,7 @@ import type { PropertyDefinition, PropertyValue } from "../../domain/property/Pr
 import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
 import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
+import { extractParagraphs } from "../../services/editor/plainText";
 import { noteActions } from "../../store/noteActions";
 import {
   fetchLibraryInputs,
@@ -31,6 +32,16 @@ import { SelectionToolbar } from "./SelectionToolbar";
 
 export type { LibrarySort } from "../../domain/library/query";
 export type LibraryViewMode = "list" | "grid" | "masonry";
+
+/** First paragraphs of a note's body as an AFFiNE-style content preview.
+ *  The list path already carries decrypted content, and extractParagraphs
+ *  memoizes on the content string, so this is cheap per rendered row. */
+const previewTextOf = (note: Note, show: boolean): string | null => {
+  if (!show) return null;
+  const paragraphs = extractParagraphs(note.content);
+  if (paragraphs.length === 0) return null;
+  return paragraphs.slice(0, 2).join(" ").trim() || null;
+};
 
 type GroupItem =
   | { kind: "header"; key: string; label: string; count: number; dotColor?: string }
@@ -349,6 +360,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         onDelete={trashNote}
         stackRows={stackRowsOf(note.id)}
         tagChips={tagChipsOf(note.id)}
+        previewText={previewTextOf(note, prefs.showBody)}
         showIcon={prefs.showIcon}
       />
     ),
@@ -357,6 +369,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       handleSelect,
       stackRowsOf,
       tagChipsOf,
+      prefs.showBody,
       selectedIds,
       selectMode,
       dragHandlesVisible,
@@ -469,6 +482,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             onDelete={trashNote}
             stackRows={stackRowsOf(note.id)}
             tagChips={tagChipsOf(note.id)}
+            previewText={previewTextOf(note, prefs.showBody)}
             variant="grid"
           />
         ))}
@@ -487,6 +501,7 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             onDelete={trashNote}
             stackRows={stackRowsOf(note.id)}
             tagChips={tagChipsOf(note.id)}
+            previewText={previewTextOf(note, prefs.showBody)}
             variant="masonry"
           />
         ))}

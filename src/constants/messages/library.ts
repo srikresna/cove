@@ -29,7 +29,7 @@ export const LibraryMessages = {
   LIBRARY_DISPLAY_PROPERTIES: "Display properties",
   LIBRARY_LIST_OPTIONS: "List view options",
   LIBRARY_SHOW_ICON: "Icon",
-  LIBRARY_SHOW_BODY: "Body",
+  LIBRARY_SHOW_BODY: "Preview",
   LIBRARY_COLLECTIONS_TITLE: "Collections",
   LIBRARY_COLLECTIONS_NEW: "New collection",
   LIBRARY_COLLECTIONS_EMPTY: "No collections yet. Build a filter and save it as a collection.",

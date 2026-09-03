@@ -51,6 +51,8 @@ interface NoteItemProps {
   stackRows?: Array<{ def: PropertyDefinition; value: PropertyValue }>;
   /** Tag chips after the stacks (Library display option). */
   tagChips?: Array<{ name: string; color: string }>;
+  /** First lines of the note body (Library "Preview" display option). */
+  previewText?: string | null;
   /** Show the note's icon/emoji (Library list display option). */
   showIcon?: boolean;
 }
@@ -108,6 +110,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
     onDelete,
     stackRows = [],
     tagChips = [],
+    previewText = null,
     showIcon = true,
   }) => {
     // Drag-reorder (Library list + custom sort): the row is both the drag
@@ -217,6 +220,11 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 <div className="truncate text-[13px] font-medium leading-4 text-foreground">
                   {note.title || MESSAGES.UNTITLED_NOTE}
                 </div>
+                {previewText && (
+                  <div className="truncate text-[12px] leading-4 text-muted-foreground/80">
+                    {previewText}
+                  </div>
+                )}
                 <div className="truncate font-mono text-[10px] leading-4 text-muted-foreground">
                   {note.updatedAt ? updatedTimeFormatter.format(note.updatedAt) : "Just now"}
                 </div>

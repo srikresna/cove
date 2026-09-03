@@ -28,6 +28,8 @@ interface NoteCardProps {
   stackRows: Array<{ def: PropertyDefinition; value: PropertyValue }>;
   /** Tag chips after the stack chips (Library display option). */
   tagChips?: Array<{ name: string; color: string }>;
+  /** First lines of the note body (Library "Preview" display option). */
+  previewText?: string | null;
   /** Masonry cards size to content; grid cards keep a uniform min-height. */
   variant: "grid" | "masonry";
 }
@@ -60,6 +62,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onDelete,
   stackRows,
   tagChips = [],
+  previewText = null,
   variant,
 }) => {
   const chips = stackRows
@@ -140,6 +143,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {previewText && (
+        <p className="line-clamp-3 text-[13px] leading-5 text-muted-foreground">{previewText}</p>
+      )}
 
       <div className="flex-1 text-xs leading-5 text-muted-foreground">
         {relativeDay(note.updatedAt)}
