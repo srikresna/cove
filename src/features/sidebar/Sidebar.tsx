@@ -118,7 +118,7 @@ export const Sidebar: React.FC = () => {
                 type="button"
                 aria-label="Quick Search"
                 onClick={() => setQuickSearchOpen(true)}
-                className="flex h-8 min-w-0 flex-1 items-center justify-between gap-2 rounded-md border border-transparent bg-muted/60 pl-2 pr-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-8 min-w-0 flex-1 items-center justify-between gap-2 rounded-md border border-transparent bg-muted/60 pl-2 pr-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="flex min-w-0 items-center gap-2 truncate">
                   <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
