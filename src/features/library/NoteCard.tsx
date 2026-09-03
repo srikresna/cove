@@ -145,12 +145,12 @@ export const NoteCard: React.FC<NoteCardProps> = ({
       </div>
 
       {previewText && (
-        <p className="line-clamp-3 text-[13px] leading-5 text-muted-foreground">{previewText}</p>
+        <p className="line-clamp-6 flex-1 overflow-hidden text-[12px] leading-5 text-foreground/90">
+          {previewText}
+        </p>
       )}
 
-      <div className="flex-1 text-xs leading-5 text-muted-foreground">
-        {relativeDay(note.updatedAt)}
-      </div>
+      <div className="text-xs leading-5 text-muted-foreground">{relativeDay(note.updatedAt)}</div>
 
       {chips.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

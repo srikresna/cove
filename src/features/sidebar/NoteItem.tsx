@@ -221,7 +221,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                   {note.title || MESSAGES.UNTITLED_NOTE}
                 </div>
                 {previewText && (
-                  <div className="truncate text-[12px] leading-4 text-muted-foreground/80">
+                  <div className="truncate text-[12px] leading-5 text-muted-foreground">
                     {previewText}
                   </div>
                 )}

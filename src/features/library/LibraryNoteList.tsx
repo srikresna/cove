@@ -33,14 +33,18 @@ import { SelectionToolbar } from "./SelectionToolbar";
 export type { LibrarySort } from "../../domain/library/query";
 export type LibraryViewMode = "list" | "grid" | "masonry";
 
-/** First paragraphs of a note's body as an AFFiNE-style content preview.
- *  The list path already carries decrypted content, and extractParagraphs
+/** First paragraphs of a note's body as an AFFiNE-style content preview —
+ *  a bounded plain-text summary (AFFiNE's indexer stores one per doc). The
+ *  list path already carries decrypted content, and extractParagraphs
  *  memoizes on the content string, so this is cheap per rendered row. */
+const PREVIEW_MAX_CHARS = 200;
 const previewTextOf = (note: Note, show: boolean): string | null => {
   if (!show) return null;
   const paragraphs = extractParagraphs(note.content);
   if (paragraphs.length === 0) return null;
-  return paragraphs.slice(0, 2).join(" ").trim() || null;
+  const text = paragraphs.slice(0, 2).join(" ").trim();
+  if (!text) return null;
+  return text.length > PREVIEW_MAX_CHARS ? `${text.slice(0, PREVIEW_MAX_CHARS).trimEnd()}…` : text;
 };
 
 type GroupItem =
