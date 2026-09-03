@@ -113,7 +113,7 @@ const RuleRow: React.FC<{
           onBlur={(e) => onUpdate({ value: e.target.value } as Partial<FilterRule>)}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           placeholder={MESSAGES.FILTER_VALUE_PLACEHOLDER}
-          className="h-8 w-36 rounded-md border border-border bg-card px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-8 w-36 rounded-md border border-border bg-card px-2 text-[13px] leading-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       )}
       {needsValue && rule.kind === "number" && (
@@ -131,7 +131,7 @@ const RuleRow: React.FC<{
           }}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           placeholder="0"
-          className="h-8 w-24 rounded-md border border-border bg-card px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-8 w-24 rounded-md border border-border bg-card px-2 text-[13px] leading-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       )}
       {needsValue && rule.kind === "date" && (
@@ -267,7 +267,7 @@ const RuleRow: React.FC<{
       )}
 
       {incomplete && (
-        <span className="shrink-0 text-[11px] text-muted-foreground">
+        <span className="shrink-0 text-[11px] leading-4 text-muted-foreground">
           {MESSAGES.FILTER_INCOMPLETE_HINT}
         </span>
       )}

@@ -91,8 +91,10 @@ const TagRow: React.FC<{
           className="h-2 w-2 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <span className="truncate">{name}</span>
-        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/70">{noteCount}</span>
+        <span className="truncate leading-4">{name}</span>
+        <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground/70">
+          {noteCount}
+        </span>
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -157,7 +157,7 @@ export const JournalsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setActiveNoteId(note.id)}
-                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span aria-hidden="true" className="shrink-0 text-sm">
                         {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -166,7 +166,7 @@ export const JournalsPage: React.FC = () => {
                       {index > 0 && (
                         <span
                           className={cn(
-                            "ml-1 shrink-0 rounded border border-destructive/40 bg-destructive/10 px-1.5 text-[10px] text-destructive",
+                            "ml-1 shrink-0 rounded border border-destructive/40 bg-destructive/10 px-1.5 text-[10px] leading-4 text-destructive",
                           )}
                         >
                           {MESSAGES.JOURNAL_CONFLICT}

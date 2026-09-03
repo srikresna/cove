@@ -537,7 +537,7 @@ export const LibraryPage: React.FC = () => {
                     )}
                     <FilterBar />
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[11px] leading-4 text-muted-foreground">
                         {MESSAGES.FILTER_LIVE_HINT}
                       </span>
                       <div className="flex items-center gap-2">

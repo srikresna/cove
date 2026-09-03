@@ -228,7 +228,7 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
           {renderOverflowMenu(true)}
         </div>
       ) : (
-        <div className="flex min-w-0 items-center gap-x-3 overflow-hidden whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-x-3 overflow-hidden whitespace-nowrap font-mono text-[11px] leading-4 text-muted-foreground">
           <span>
             {wordCount} {MESSAGES.META_WORDS}
           </span>

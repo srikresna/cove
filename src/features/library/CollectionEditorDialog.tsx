@@ -219,7 +219,7 @@ export const CollectionEditorDialog: React.FC<{
                         {note.title || MESSAGES.UNTITLED_NOTE}
                       </span>
                       {allowIds.includes(note.id) && (
-                        <span className="ml-auto shrink-0 rounded border px-1.5 text-[10px] text-muted-foreground">
+                        <span className="ml-auto shrink-0 rounded border px-1.5 text-[10px] leading-4 text-muted-foreground">
                           {MESSAGES.COLLECTION_ADDED_BADGE}
                         </span>
                       )}

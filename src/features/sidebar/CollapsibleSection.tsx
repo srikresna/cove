@@ -44,8 +44,8 @@ export const CollapsibleSection: React.FC<{
           ) : (
             <ChevronRight className="h-3 w-3 shrink-0" aria-hidden="true" />
           )}
-          <span className="truncate">{label}</span>
-          {count !== undefined && <span className="font-mono">({count})</span>}
+          <span className="truncate leading-4">{label}</span>
+          {count !== undefined && <span className="font-mono leading-4">({count})</span>}
         </button>
         {action != null && (
           // biome-ignore lint/a11y/noStaticElementInteractions: swallows the row click so the inner action button handles it

@@ -55,7 +55,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   return (
     <div>
       <div className="flex items-center justify-between pb-1">
-        <span className="text-[13px] font-semibold text-foreground">{monthLabel}</span>
+        <span className="text-[13px] font-semibold leading-4 text-foreground">{monthLabel}</span>
         <div className="flex items-center">
           <Button
             variant="ghost"

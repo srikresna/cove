@@ -452,7 +452,7 @@ export const PropertyManagerPanel: React.FC<{
               </button>
             );
           })}
-          <p className="flex items-center gap-1.5 px-2 pt-1 text-[11px] text-muted-foreground/70">
+          <p className="flex items-center gap-1.5 px-2 pt-1 text-[11px] leading-4 text-muted-foreground/70">
             <EyeOff className="h-3 w-3 shrink-0" aria-hidden="true" />
             {MESSAGES.PROP_MANAGER_HINT}
           </p>

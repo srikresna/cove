@@ -324,7 +324,7 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
                 {PROPERTY_TYPE_META[type].icon}
                 <span>{PROPERTY_TYPE_META[type].label}</span>
                 {hasOptions(type) && (
-                  <span className="ml-auto text-[10px] uppercase text-muted-foreground">
+                  <span className="ml-auto text-[10px] uppercase leading-4 text-muted-foreground">
                     {MESSAGES.PROP_OPTIONS_BADGE}
                   </span>
                 )}

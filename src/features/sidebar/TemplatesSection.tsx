@@ -66,7 +66,7 @@ const TemplateRow: React.FC<{
       <span aria-hidden="true" className="shrink-0 text-sm">
         {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
       </span>
-      <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
+      <span className="truncate leading-4">{note.title || MESSAGES.UNTITLED_NOTE}</span>
       {isJournalTemplate && (
         <Star
           className="h-3 w-3 shrink-0 fill-primary text-primary"
@@ -171,7 +171,7 @@ export const TemplatesSection: React.FC = () => {
       }
     >
       {templates.length === 0 ? (
-        <div className="flex items-center gap-1.5 px-2 py-1.5 text-[13px] text-muted-foreground/70">
+        <div className="flex items-center gap-1.5 px-2 py-1.5 text-[13px] leading-4 text-muted-foreground/70">
           <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
           {MESSAGES.TPL_EMPTY}
         </div>

@@ -136,8 +136,8 @@ const ViewRow: React.FC<{
         )}
       >
         <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <span className="truncate">{name}</span>
-        <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground/70">
+        <span className="truncate leading-4">{name}</span>
+        <span className="ml-auto shrink-0 font-mono text-[11px] leading-4 text-muted-foreground/70">
           {ruleCount}
         </span>
       </button>

@@ -200,7 +200,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
                   key={meta.id}
                   type="button"
                   onClick={() => openNote(meta)}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span aria-hidden="true" className="shrink-0 text-sm">
                     {meta.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -224,7 +224,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
                   key={meta.id}
                   type="button"
                   onClick={() => openNote(meta)}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span aria-hidden="true" className="shrink-0 text-sm">
                     {meta.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}

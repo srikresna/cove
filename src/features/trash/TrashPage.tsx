@@ -78,10 +78,10 @@ export const TrashPage: React.FC = () => {
                       {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-medium text-foreground">
+                      <div className="truncate text-[13px] font-medium leading-4 text-foreground">
                         {note.title || MESSAGES.UNTITLED_NOTE}
                       </div>
-                      <div className="truncate font-mono text-[10px] text-muted-foreground">
+                      <div className="truncate font-mono text-[10px] leading-4 text-muted-foreground">
                         {ws ? `${ws.emoji} ${ws.name} · ` : ""}
                         {note.deletedAt
                           ? `${MESSAGES.TRASH_DELETED_PREFIX}${formatRelativeDay(note.deletedAt)}`

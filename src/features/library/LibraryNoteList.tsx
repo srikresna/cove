@@ -387,8 +387,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
             style={{ backgroundColor: item.dotColor }}
           />
         )}
-        <span className="truncate">{item.label}</span>
-        <span className="shrink-0 font-mono text-xs text-muted-foreground/70">{item.count}</span>
+        <span className="truncate leading-6">{item.label}</span>
+        <span className="shrink-0 font-mono text-xs leading-4 text-muted-foreground/70">
+          {item.count}
+        </span>
       </button>
     ),
     [collapsedGroups],

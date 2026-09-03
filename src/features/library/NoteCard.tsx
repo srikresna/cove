@@ -166,7 +166,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
       )}
 
       {tagChips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {tagChips.slice(0, 3).map((chip) => (
             <TagChip key={chip.name} name={chip.name} color={chip.color} />
           ))}

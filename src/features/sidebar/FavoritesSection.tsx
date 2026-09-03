@@ -19,7 +19,7 @@ const Group: React.FC<{
   if (notes.length === 0) return null;
   return (
     <div className="space-y-0.5">
-      <div className="flex items-center gap-1.5 px-1 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <div className="flex items-center gap-1.5 px-1 pt-1 text-[10px] font-semibold uppercase leading-4 tracking-widest text-muted-foreground">
         {icon}
         {label} <span className="font-mono">({notes.length})</span>
       </div>

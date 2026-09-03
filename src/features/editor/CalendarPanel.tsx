@@ -165,7 +165,7 @@ export const CalendarPanel: React.FC = () => {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-3">
       <div className="flex items-center justify-between pt-2">
-        <span className="text-[13px] font-semibold text-foreground">{monthLabel}</span>
+        <span className="text-[13px] font-semibold leading-4 text-foreground">{monthLabel}</span>
         <div className="flex items-center">
           {field === "journal" && (
             <Button
@@ -174,7 +174,7 @@ export const CalendarPanel: React.FC = () => {
               aria-label={MESSAGES.JOURNAL_TODAY}
               title={MESSAGES.JOURNAL_TODAY}
               onClick={() => openJournalFor(new Date())}
-              className="mr-1 h-7 gap-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+              className="mr-1 h-7 gap-1 px-2 text-[11px] font-semibold uppercase leading-4 tracking-wide text-muted-foreground"
             >
               <CalendarCheck className="h-3.5 w-3.5" aria-hidden="true" />
               {MESSAGES.JOURNAL_TODAY}
@@ -288,14 +288,14 @@ export const CalendarPanel: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setActiveNoteId(note.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span aria-hidden="true" className="shrink-0 text-sm">
                     {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
                   </span>
                   <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
                   {index > 0 && (
-                    <span className="ml-1 shrink-0 rounded border border-destructive/40 bg-destructive/10 px-1.5 text-[10px] text-destructive">
+                    <span className="ml-1 shrink-0 rounded border border-destructive/40 bg-destructive/10 px-1.5 text-[10px] leading-4 text-destructive">
                       {MESSAGES.JOURNAL_CONFLICT}
                     </span>
                   )}
@@ -319,7 +319,7 @@ export const CalendarPanel: React.FC = () => {
             <button
               type="button"
               onClick={() => openJournalFor(dateOfSelectedDay)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[13px] leading-4 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{MESSAGES.JOURNAL_NEW}</span>
@@ -335,7 +335,7 @@ export const CalendarPanel: React.FC = () => {
               key={note.id}
               type="button"
               onClick={() => setActiveNoteId(note.id)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span aria-hidden="true" className="shrink-0 text-sm">
                 {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}

@@ -214,10 +214,10 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 </span>
               )}
               <div className="min-w-0 truncate">
-                <div className="truncate text-[13px] font-medium text-foreground">
+                <div className="truncate text-[13px] font-medium leading-4 text-foreground">
                   {note.title || MESSAGES.UNTITLED_NOTE}
                 </div>
-                <div className="truncate font-mono text-[10px] text-muted-foreground">
+                <div className="truncate font-mono text-[10px] leading-4 text-muted-foreground">
                   {note.updatedAt ? updatedTimeFormatter.format(note.updatedAt) : "Just now"}
                 </div>
                 {visibleStacks.length > 0 && (

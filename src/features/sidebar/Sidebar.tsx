@@ -25,7 +25,7 @@ import { TemplatesSection } from "./TemplatesSection";
 import { WorkspaceRail } from "./WorkspaceRail";
 
 const navRow =
-  "flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-[13px] leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -124,7 +124,9 @@ export const Sidebar: React.FC = () => {
                   <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span className="truncate leading-4">Search</span>
                 </span>
-                <Kbd className="h-4 border-border/60 bg-background/70 px-1 text-[10px]">⌘K</Kbd>
+                <Kbd className="h-4 border-border/60 bg-background/70 px-1 text-[10px] leading-4">
+                  ⌘K
+                </Kbd>
               </button>
               <button
                 type="button"

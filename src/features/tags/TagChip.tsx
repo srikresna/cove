@@ -25,7 +25,7 @@ export const TagChip: React.FC<{
         className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: color }}
       />
-      <span className={cn("min-w-0 truncate", size === "md" ? "max-w-40" : "max-w-28")}>
+      <span className={cn("min-w-0 truncate leading-4", size === "md" ? "max-w-40" : "max-w-28")}>
         {name}
       </span>
       {onRemove && (
@@ -62,7 +62,7 @@ export const TagChip: React.FC<{
           className="h-1.5 w-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <span className={cn("min-w-0 truncate", size === "md" ? "max-w-40" : "max-w-28")}>
+        <span className={cn("min-w-0 truncate leading-4", size === "md" ? "max-w-40" : "max-w-28")}>
           {name}
         </span>
       </button>

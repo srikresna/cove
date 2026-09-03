@@ -44,7 +44,7 @@ export const CollectionsTab: React.FC<{
         <Button
           variant="secondary"
           size="sm"
-          className="h-8 gap-1 px-3 text-[13px]"
+          className="h-8 gap-1 px-3 text-[13px] leading-4"
           onClick={() => onEditView("create")}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -84,8 +84,8 @@ export const CollectionsTab: React.FC<{
                 }
               >
                 <Layers className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate font-medium text-foreground">{view.name}</span>
-                <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                <span className="truncate font-medium leading-4 text-foreground">{view.name}</span>
+                <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">
                   {view.rules.length} {view.rules.length === 1 ? "rule" : "rules"}
                 </span>
               </button>

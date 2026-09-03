@@ -23,6 +23,6 @@ export const NoteRow: React.FC<{
     <span aria-hidden="true" className="shrink-0 text-sm">
       {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
     </span>
-    <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
+    <span className="truncate leading-4">{note.title || MESSAGES.UNTITLED_NOTE}</span>
   </button>
 );
