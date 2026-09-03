@@ -258,11 +258,16 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       else if (format === "html") await HtmlTransformer.exportDoc(store);
       else {
         // The PDF adapter pins pdfmake fonts to cdn.affine.pro at import
-        // time — repoint both font names at the bundled TTF AFTER the
-        // import so an offline app still renders text.
+        // time — repoint both font names at the bundled Liberation Sans
+        // (the app font) AFTER the import so an offline app still renders
+        // text and exports match the UI.
         const pdfMake = (await import("pdfmake/build/pdfmake")).default;
-        const ttf = "/fonts/Inter.ttf";
-        const slots = { normal: ttf, bold: ttf, italics: ttf, bolditalics: ttf };
+        const slots = {
+          normal: "/fonts/LiberationSans-Regular.ttf",
+          bold: "/fonts/LiberationSans-Bold.ttf",
+          italics: "/fonts/LiberationSans-Italic.ttf",
+          bolditalics: "/fonts/LiberationSans-BoldItalic.ttf",
+        };
         pdfMake.fonts = { Inter: { ...slots }, SarasaGothicCL: { ...slots } };
         await PdfTransformer.exportDoc(store);
       }
