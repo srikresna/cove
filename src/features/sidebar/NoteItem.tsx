@@ -204,19 +204,6 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 )}
               />
             )}
-            {selectionMode && (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full border text-[9px] font-bold",
-                  isSelected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-muted-foreground/40 bg-card text-transparent",
-                )}
-              >
-                ✓
-              </span>
-            )}
             <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
               {showIcon && (
                 <span
@@ -268,6 +255,24 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                 )}
               </div>
             </div>
+
+            {/* Selection state: an in-flow circle at the row's right edge,
+                vertically centered on the same line for every row — the old
+                absolute top-right badge overlapped tall rows' titles and
+                drifted between row heights. */}
+            {selectionMode && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "ml-2 flex h-4 w-4 shrink-0 items-center justify-center self-center rounded-full border text-[9px] font-bold leading-none",
+                  isSelected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/40 bg-card text-transparent",
+                )}
+              >
+                ✓
+              </span>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

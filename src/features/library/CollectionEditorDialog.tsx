@@ -119,7 +119,7 @@ export const CollectionEditorDialog: React.FC<{
                 value={name}
                 placeholder={MESSAGES.COLLECTION_NAME_PLACEHOLDER}
                 onChange={(e) => setName(e.target.value)}
-                className="h-8 w-full text-[13px]"
+                className="w-full"
               />
             </div>
 
@@ -149,7 +149,7 @@ export const CollectionEditorDialog: React.FC<{
                     placeholder={MESSAGES.COLLECTION_DOCS_SEARCH}
                     aria-label={MESSAGES.COLLECTION_DOCS_SEARCH}
                     onChange={(e) => setDocQuery(e.target.value)}
-                    className="h-8 pl-7 text-[13px]"
+                    className="h-9 pl-7"
                   />
                 </div>
                 <div className="space-y-0.5">
@@ -158,7 +158,7 @@ export const CollectionEditorDialog: React.FC<{
                     return (
                       <label
                         key={note.id}
-                        className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] transition-colors hover:bg-accent"
+                        className="flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-[13px] transition-colors hover:bg-accent"
                       >
                         <input
                           type="checkbox"
@@ -173,7 +173,9 @@ export const CollectionEditorDialog: React.FC<{
                         <span aria-hidden="true" className="shrink-0 text-sm">
                           {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
                         </span>
-                        <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
+                        <span className="truncate leading-4">
+                          {note.title || MESSAGES.UNTITLED_NOTE}
+                        </span>
                       </label>
                     );
                   })}
@@ -213,7 +215,9 @@ export const CollectionEditorDialog: React.FC<{
                       <span aria-hidden="true" className="shrink-0 text-base">
                         {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
                       </span>
-                      <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
+                      <span className="truncate leading-4">
+                        {note.title || MESSAGES.UNTITLED_NOTE}
+                      </span>
                       {allowIds.includes(note.id) && (
                         <span className="ml-auto shrink-0 rounded border px-1.5 text-[10px] text-muted-foreground">
                           {MESSAGES.COLLECTION_ADDED_BADGE}

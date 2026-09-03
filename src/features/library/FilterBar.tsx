@@ -26,7 +26,7 @@ import { useViewStore } from "../../store/useViewStore";
 const makeRuleId = () => crypto.randomUUID();
 
 const controlBase =
-  "flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2 text-[13px] text-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2 text-[13px] leading-4 text-foreground transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function opLabel(kind: FilterRule["kind"], op: string): string {
   return FILTER_OPERATORS[kind].find((o) => o.value === op)?.label ?? op;
@@ -83,7 +83,7 @@ const RuleRow: React.FC<{
       )}
       title={incomplete ? MESSAGES.FILTER_INCOMPLETE_HINT : undefined}
     >
-      <span className="min-w-20 shrink-0 truncate text-[13px] font-medium text-foreground">
+      <span className="min-w-20 shrink-0 truncate text-[13px] font-medium leading-4 text-foreground">
         {ruleName}
       </span>
 
@@ -388,7 +388,7 @@ export const FilterBar: React.FC<{
             type="button"
             aria-label={MESSAGES.VIEW_ADD_RULE}
             className={cn(
-              "flex h-8 w-fit items-center gap-1.5 rounded-md border border-dashed px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "flex h-8 w-fit items-center gap-1.5 rounded-md border border-dashed px-2.5 text-[13px] leading-4 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               draftRules.length > 0 && "border-transparent",
             )}
           >

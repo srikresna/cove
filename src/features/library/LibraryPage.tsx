@@ -444,7 +444,7 @@ export const LibraryPage: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 shrink-0 gap-1 px-2 text-[13px]"
+                className="h-6 shrink-0 gap-1 px-2 text-[13px] leading-4"
                 onClick={() => setFilterEditing(true)}
               >
                 <TagIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -461,23 +461,23 @@ export const LibraryPage: React.FC = () => {
               <div className="rounded-md bg-muted/60 p-2">
                 {activeViewId && !filterEditing ? (
                   <div className="flex items-center gap-2">
-                    <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] text-foreground">
+                    <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] leading-4 text-foreground">
                       <LayersIcon
-                        className="h-3.5 w-3.5 text-muted-foreground"
+                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                         aria-hidden="true"
                       />
                       <span className="max-w-40 truncate">
                         {views.find((v) => v.id === activeViewId)?.name}
                       </span>
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                    <span className="shrink-0 text-[11px] leading-4 text-muted-foreground">
                       {draftRules.length} {draftRules.length === 1 ? "rule" : "rules"}
                     </span>
                     {activeTag && (
-                      <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] text-foreground">
+                      <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] leading-4 text-foreground">
                         <span
                           aria-hidden="true"
-                          className="h-2 w-2 rounded-full"
+                          className="h-2 w-2 shrink-0 rounded-full"
                           style={{ backgroundColor: activeTag.color }}
                         />
                         <span className="max-w-32 truncate">{activeTag.name}</span>
@@ -517,10 +517,10 @@ export const LibraryPage: React.FC = () => {
                   <>
                     {activeTag && (
                       <div className="mb-1.5 flex items-center">
-                        <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] text-foreground">
+                        <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] leading-4 text-foreground">
                           <span
                             aria-hidden="true"
-                            className="h-2 w-2 rounded-full"
+                            className="h-2 w-2 shrink-0 rounded-full"
                             style={{ backgroundColor: activeTag.color }}
                           />
                           <span className="max-w-32 truncate">{activeTag.name}</span>

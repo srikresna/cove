@@ -50,12 +50,9 @@ export const TagsTab: React.FC<{ onOpenTag: (tagId: string) => void }> = ({ onOp
       <h2 className="pb-4 text-lg font-semibold text-foreground">{MESSAGES.LIBRARY_TAGS_TITLE}</h2>
 
       {tags.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-md border border-dashed py-14 text-center">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <TagIcon className="h-5 w-5" aria-hidden="true" />
-          </span>
+        <div className="flex flex-col items-center gap-2 rounded-md border border-dashed py-14 text-center">
           <p className="text-sm font-medium text-foreground">{MESSAGES.LIBRARY_TAGS_EMPTY}</p>
-          <p className="max-w-64 text-[13px] text-muted-foreground">
+          <p className="max-w-64 text-[13px] leading-5 text-muted-foreground">
             {MESSAGES.LIBRARY_TAGS_EMPTY_HINT}
           </p>
         </div>
@@ -66,16 +63,17 @@ export const TagsTab: React.FC<{ onOpenTag: (tagId: string) => void }> = ({ onOp
               <button
                 type="button"
                 onClick={() => onOpenTag(tag.id)}
-                className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-md border border-transparent px-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md border border-transparent px-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span
+                <TagIcon
+                  className="h-4 w-4 shrink-0"
                   aria-hidden="true"
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted"
-                >
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                  style={{ color: tag.color }}
+                />
+                <span className="truncate text-[13px] font-medium leading-4 text-foreground">
+                  {tag.name}
                 </span>
-                <span className="truncate text-[13px] font-medium text-foreground">{tag.name}</span>
-                <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">
                   {countOf(tag.id)} {countOf(tag.id) === 1 ? "note" : "notes"}
                 </span>
               </button>

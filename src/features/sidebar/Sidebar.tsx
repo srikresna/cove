@@ -122,7 +122,7 @@ export const Sidebar: React.FC = () => {
               >
                 <span className="flex min-w-0 items-center gap-2 truncate">
                   <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">Search</span>
+                  <span className="truncate leading-4">Search</span>
                 </span>
                 <Kbd className="h-4 border-border/60 bg-background/70 px-1 text-[10px]">⌘K</Kbd>
               </button>
