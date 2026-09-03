@@ -30,6 +30,31 @@ interface BlockSuiteEditorServiceDeps {
   blobSource: BlobSource;
 }
 
+// The vendored transformers finish with a browser-style blob download that
+// dies silently in the Tauri webview (no download handler). We register a
+// native saver on globalThis that the patched `download()` delegates to;
+// its promises queue here so exportDoc can await the actual write before
+// reporting success.
+declare global {
+  var __coveNativeSave: ((blob: Blob, fileName: string) => Promise<string | null>) | undefined;
+  var __coveSaveQueue: Promise<string | null>[] | undefined;
+}
+
+/** Native save: system Save dialog → bytes → Rust write. Resolves null when
+ *  the user cancels, so cancellation stays silent. */
+const nativeSaveBlob = async (blob: Blob, fileName: string): Promise<string | null> => {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const ext = fileName.includes(".") ? (fileName.split(".").pop() ?? "") : "";
+  const path = await save({
+    defaultPath: fileName,
+    filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : undefined,
+  });
+  if (!path) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("save_exported_file", { path, bytes: new Uint8Array(await blob.arrayBuffer()) });
+  return path;
+};
+
 // Image blocks carry no text, so plaintext exports of image-heavy notes
 // (tweet saves) come out as nothing but the title. Emit a stand-in line so
 // plaintext previews and exports keep the note's structure.
@@ -215,7 +240,9 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     return doc;
   }
 
-  async exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<void> {
+  /** Exports via the vendored transformers and saves through the native
+   *  dialog. Resolves the written path, or null when the user cancelled. */
+  async exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<string | null> {
     const ws = this.getWorkspace();
     const doc = ws.getDoc(noteId);
     if (!doc) throw new Error("Note doc is not open; cannot export.");
@@ -223,14 +250,27 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     const { MarkdownTransformer, HtmlTransformer, PdfTransformer } = await import(
       "@blocksuite/affine/widgets/linked-doc"
     );
-    if (format === "markdown") await MarkdownTransformer.exportDoc(store);
-    else if (format === "html") await HtmlTransformer.exportDoc(store);
-    else {
-      const pdfMake = (await import("pdfmake/build/pdfmake")).default;
-      const inter = "/fonts/Inter.ttf";
-      const slots = { normal: inter, bold: inter, italics: inter, bolditalics: inter };
-      pdfMake.fonts = { Inter: { ...slots }, SarasaGothicCL: { ...slots } };
-      await PdfTransformer.exportDoc(store);
+    globalThis.__coveSaveQueue = [];
+    const queue = globalThis.__coveSaveQueue;
+    globalThis.__coveNativeSave = nativeSaveBlob;
+    try {
+      if (format === "markdown") await MarkdownTransformer.exportDoc(store);
+      else if (format === "html") await HtmlTransformer.exportDoc(store);
+      else {
+        // The PDF adapter pins pdfmake fonts to cdn.affine.pro at import
+        // time — repoint both font names at the bundled TTF AFTER the
+        // import so an offline app still renders text.
+        const pdfMake = (await import("pdfmake/build/pdfmake")).default;
+        const ttf = "/fonts/Inter.ttf";
+        const slots = { normal: ttf, bold: ttf, italics: ttf, bolditalics: ttf };
+        pdfMake.fonts = { Inter: { ...slots }, SarasaGothicCL: { ...slots } };
+        await PdfTransformer.exportDoc(store);
+      }
+      const saved = await Promise.all(queue);
+      return saved.find((p): p is string => p !== null) ?? null;
+    } finally {
+      delete globalThis.__coveNativeSave;
+      queue.length = 0;
     }
   }
 

@@ -44,7 +44,9 @@ export interface IBlockSuiteEditorService {
 
   reset(): void;
 
-  exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<void>;
+  /** Exports and saves through the native Save dialog; resolves the written
+   *  path, or null when the user cancelled the dialog. */
+  exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<string | null>;
 
   importMarkdownFile(file: File): Promise<string | undefined>;
 

@@ -179,6 +179,15 @@ export async function createAssetsArchive(assetsMap, assetsIds) {
     return zip;
 }
 export function download(blob, name) {
+    // Cove: a Tauri webview has no handler for blob-URL <a download> clicks,
+    // so the browser path silently saves nothing. When the host registers a
+    // native saver, route the bytes to it instead; the promise lands on
+    // __coveSaveQueue, which the exporting service awaits before it reports
+    // success.
+    if (globalThis.__coveNativeSave) {
+        (globalThis.__coveSaveQueue ??= []).push(globalThis.__coveNativeSave(blob, name));
+        return;
+    }
     const element = document.createElement('a');
     element.setAttribute('download', name);
     const fileURL = URL.createObjectURL(blob);

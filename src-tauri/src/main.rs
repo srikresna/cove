@@ -18,6 +18,13 @@ fn js_log(level: String, msg: String) {
   }
 }
 
+/// Writes export bytes to a user-chosen path (the frontend shows the native
+/// save dialog first; the transformers themselves can only produce blobs).
+#[tauri::command]
+fn save_exported_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
+  std::fs::write(&path, &bytes).map_err(|e| format!("failed to write {path}: {e}"))
+}
+
 fn main() {
   tracing_subscriber::fmt::init();
 
@@ -44,6 +51,7 @@ fn main() {
         backup::pre_restore_backup_path,
         restore::restore_database,
         transaction::run_sql_transaction,
+        save_exported_file,
         js_log
     ])
     .build(tauri::generate_context!())

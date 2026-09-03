@@ -26,8 +26,15 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ noteId }) => {
 
   const run = async (format: "markdown" | "html" | "pdf") => {
     try {
-      await blockSuiteEditorService.exportDoc(noteId, format);
-      toast(`Exported as ${format.toUpperCase()}`);
+      const saved = await blockSuiteEditorService.exportDoc(noteId, format);
+      // A cancelled Save dialog is not an outcome worth announcing.
+      if (saved) {
+        useNotificationStore.getState().pushToast({
+          kind: "info",
+          title: `Exported as ${format.toUpperCase()}`,
+          description: saved,
+        });
+      }
     } catch (err) {
       notifyError(err);
     }
