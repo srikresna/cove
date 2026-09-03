@@ -23,7 +23,6 @@ interface ViewState {
 
   fetchViews: (workspaceId: string) => Promise<void>;
   setActiveView: (viewId: string | null) => void;
-  setDraftRules: (rules: FilterRules) => void;
   addDraftRule: (rule: FilterRule) => void;
   updateDraftRule: (id: string, patch: Partial<FilterRule>) => void;
   removeDraftRule: (id: string) => void;
@@ -94,8 +93,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       version: s.version + 1,
     }));
   },
-
-  setDraftRules: (rules) => set((s) => ({ draftRules: rules, version: s.version + 1 })),
 
   addDraftRule: (rule) =>
     set((s) => ({ draftRules: [...s.draftRules, rule], version: s.version + 1 })),

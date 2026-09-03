@@ -17,7 +17,6 @@ import { usePropertyStore } from "../../store/usePropertyStore";
 import { useTagStore } from "../../store/useTagStore";
 import { useViewStore } from "../../store/useViewStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
-import { CollectionEditorDialog } from "./CollectionEditorDialog";
 import { CollectionsTab } from "./CollectionsTab";
 import type { LibraryDisplayPrefs } from "./DisplayMenu";
 import { ExplorerHeader, type LibraryTab, type LibraryViewMode } from "./ExplorerHeader";
@@ -110,7 +109,6 @@ export const LibraryPage: React.FC = () => {
   const [savePromptOpen, setSavePromptOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
-  const [editorOpen, setEditorOpen] = useState<"create" | string | null>(null);
 
   // Stack-eligible defs feed the Display menu (grouping + chip toggles).
   const [defs, setDefs] = useState<PropertyDefinition[]>([]);
@@ -325,6 +323,51 @@ export const LibraryPage: React.FC = () => {
     [setTagFilter],
   );
 
+  /** Editing a collection = loading it into the Docs filter bar; creating
+   *  one = opening an empty builder. No editor modal — the builder is the
+   *  editor, the same surface that saved the collection in the first place.
+   *  Both drop any active tag filter: collections scope over the whole
+   *  workspace, and a leftover tag would silently narrow the builder's
+   *  live result while Save persists the wider rules. */
+  const handleEditView = useCallback(
+    (viewId: string) => {
+      setTab("docs");
+      void setTagFilter(null);
+      setActiveView(viewId);
+      setFilterEditing(true);
+    },
+    [setActiveView, setTagFilter],
+  );
+
+  const handleCreateView = useCallback(() => {
+    setTab("docs");
+    void setTagFilter(null);
+    clearDraft();
+    setFilterEditing(true);
+  }, [clearDraft, setTagFilter]);
+
+  const activeView = useMemo(
+    () => views.find((v) => v.id === activeViewId) ?? null,
+    [views, activeViewId],
+  );
+
+  /** Clearing the always-include list is the one manual-include control that
+   *  survives without the old editor modal — adding notes by hand is gone,
+   *  existing lists stay honored until cleared here. */
+  const handleClearManualIncludes = useCallback(() => {
+    if (!activeView || activeView.allowNoteIds.length === 0) return;
+    void (async () => {
+      try {
+        await savedViewService.updateViewAllowIds(activeView.id, []);
+        // Bump after the write commits — CollectionsSection refetches on
+        // version, refreshing the store list this page reads.
+        useViewStore.setState((s) => ({ version: s.version + 1 }));
+      } catch (err) {
+        notifyError(err);
+      }
+    })();
+  }, [activeView]);
+
   // Simple-typed custom defs are groupable and chip-toggleable.
   const eligibleDefs = useMemo(() => defs.filter(isStackEligibleDef), [defs]);
 
@@ -382,7 +425,8 @@ export const LibraryPage: React.FC = () => {
       {tab === "collections" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <CollectionsTab
-            onEditView={(viewId) => setEditorOpen(viewId)}
+            onEditView={handleEditView}
+            onCreateView={handleCreateView}
             onOpenInDocs={() => setTab("docs")}
           />
         </div>
@@ -472,6 +516,9 @@ export const LibraryPage: React.FC = () => {
                     </span>
                     <span className="shrink-0 text-[11px] leading-4 text-muted-foreground">
                       {draftRules.length} {draftRules.length === 1 ? "rule" : "rules"}
+                      {activeView && activeView.allowNoteIds.length > 0
+                        ? ` · ${MESSAGES.COLLECTION_MANUAL_COUNT.replace("{n}", String(activeView.allowNoteIds.length))}`
+                        : ""}
                     </span>
                     {activeTag && (
                       <span className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border bg-card px-2 text-[13px] leading-4 text-foreground">
@@ -537,9 +584,24 @@ export const LibraryPage: React.FC = () => {
                     )}
                     <FilterBar />
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="text-[11px] leading-4 text-muted-foreground">
-                        {MESSAGES.FILTER_LIVE_HINT}
-                      </span>
+                      <div className="flex min-w-0 items-center gap-1">
+                        <span className="text-[11px] leading-4 text-muted-foreground">
+                          {MESSAGES.FILTER_LIVE_HINT}
+                        </span>
+                        {activeView && activeView.allowNoteIds.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 shrink-0 px-2 text-[11px]"
+                            onClick={handleClearManualIncludes}
+                          >
+                            {MESSAGES.COLLECTION_CLEAR_MANUAL.replace(
+                              "{n}",
+                              String(activeView.allowNoteIds.length),
+                            )}
+                          </Button>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
@@ -596,53 +658,6 @@ export const LibraryPage: React.FC = () => {
         onCancel={() => {
           setSaveError(null);
           setSavePromptOpen(false);
-        }}
-      />
-
-      <CollectionEditorDialog
-        open={editorOpen !== null}
-        view={
-          editorOpen !== null && editorOpen !== "create"
-            ? (views.find((v) => v.id === editorOpen) ?? null)
-            : null
-        }
-        onCancel={() => setEditorOpen(null)}
-        onSave={({ name, rules, allowNoteIds }) => {
-          const editingId = editorOpen !== null && editorOpen !== "create" ? editorOpen : null;
-          setEditorOpen(null);
-          if (!activeWorkspaceId) return;
-          if (editingId) {
-            void (async () => {
-              try {
-                await savedViewService.renameView(editingId, name);
-                await savedViewService.updateViewRules(editingId, rules);
-                await savedViewService.updateViewAllowIds(editingId, allowNoteIds);
-                // Bump AFTER the writes commit — CollectionsSection refetches
-                // on version, so the store sees the fully-edited view.
-                useViewStore.setState((s) => ({ version: s.version + 1 }));
-              } catch (err) {
-                notifyError(err);
-              }
-            })();
-          } else {
-            // Create: route the editor rules through the store's draft path
-            // (validation + fetches), then attach the allow-list.
-            useViewStore.getState().setDraftRules(rules);
-            void useViewStore
-              .getState()
-              .saveDraftAsView(activeWorkspaceId, name)
-              .then(async (created) => {
-                if (created) {
-                  await savedViewService.updateViewAllowIds(created.id, allowNoteIds);
-                  // The store's last fetch ran inside saveDraftAsView BEFORE
-                  // this UPDATE — bump so CollectionsSection refetches the
-                  // view WITH its allow-list.
-                  useViewStore.setState((s) => ({ version: s.version + 1 }));
-                }
-                return null;
-              })
-              .catch(notifyError);
-          }
         }}
       />
     </div>

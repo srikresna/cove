@@ -15,15 +15,17 @@ import { useViewStore } from "../../store/useViewStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
 /**
- * The Collections directory: every saved collection with rename/edit/delete
+ * The Collections directory: every saved collection with rename/delete
  * management and one-click apply. Rows share the Tags tab anatomy (h-11,
- * quiet hover, sans meta) so the sibling tabs read as one surface. Clicking
- * a row applies it in Docs without forcing the rule editor open.
+ * quiet hover, sans meta) so the sibling tabs read as one surface. There is
+ * no editor modal — "Edit rules" jumps to Docs with the collection loaded
+ * into the filter bar, and "New collection" opens an empty builder there.
  */
 export const CollectionsTab: React.FC<{
   onOpenInDocs: () => void;
   onEditView: (viewId: string) => void;
-}> = ({ onOpenInDocs, onEditView }) => {
+  onCreateView: () => void;
+}> = ({ onOpenInDocs, onEditView, onCreateView }) => {
   const views = useViewStore((s) => s.views);
   const activeViewId = useViewStore((s) => s.activeViewId);
   const setActiveView = useViewStore((s) => s.setActiveView);
@@ -45,7 +47,7 @@ export const CollectionsTab: React.FC<{
           variant="secondary"
           size="sm"
           className="h-8 gap-1 px-3 text-[13px] leading-4"
-          onClick={() => onEditView("create")}
+          onClick={onCreateView}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {MESSAGES.LIBRARY_COLLECTIONS_NEW}
@@ -60,7 +62,7 @@ export const CollectionsTab: React.FC<{
           <p className="max-w-72 text-[13px] text-muted-foreground">
             {MESSAGES.LIBRARY_COLLECTIONS_EMPTY}
           </p>
-          <Button variant="outline" size="sm" onClick={() => onEditView("create")}>
+          <Button variant="outline" size="sm" onClick={onCreateView}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             {MESSAGES.LIBRARY_COLLECTIONS_NEW}
           </Button>

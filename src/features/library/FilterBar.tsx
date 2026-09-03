@@ -292,25 +292,18 @@ function optionsSummaryOf(
 }
 
 /**
- * The rule editor inside the Library filter area and the collection editor
- * — one full-width row per rule at the app's control scale. Save/Cancel
- * live in the surrounding surface; this bar only composes and edits rules.
+ * The rule editor inside the Library filter area — one full-width row per
+ * rule at the app's control scale, editing the view-store drafts directly.
+ * Save/Cancel live in the surrounding surface; this bar only composes and
+ * edits rules.
  */
-export const FilterBar: React.FC<{
-  /** Controlled mode (collection editor): edit an explicit rules array. */
-  rules?: FilterRule[];
-  onChange?: (next: FilterRule[]) => void;
-}> = ({ rules, onChange }) => {
-  // Uncontrolled mode edits the view-store drafts (Library filter area).
-  const storeRules = useViewStore((s) => s.draftRules);
+export const FilterBar: React.FC = () => {
+  const draftRules = useViewStore((s) => s.draftRules);
   const addDraftRule = useViewStore((s) => s.addDraftRule);
   const updateDraftRule = useViewStore((s) => s.updateDraftRule);
   const removeDraftRule = useViewStore((s) => s.removeDraftRule);
   const propertyVersion = usePropertyStore((s) => s.version);
   const [defs, setDefs] = useState<PropertyDefinition[]>([]);
-
-  const controlled = rules !== undefined && onChange !== undefined;
-  const draftRules = controlled ? rules : storeRules;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   useEffect(() => {
@@ -324,19 +317,9 @@ export const FilterBar: React.FC<{
     (d) => d.show !== "always-hide" && d.id !== "system:tags" && filterKindForType(d.type) !== null,
   );
 
-  const addRule = (rule: FilterRule) => {
-    if (controlled) onChange([...rules, rule]);
-    else addDraftRule(rule);
-  };
-  const patchRule = (id: string, patch: Partial<FilterRule>) => {
-    if (controlled) {
-      onChange(rules.map((r) => (r.id === id ? ({ ...r, ...patch } as FilterRule) : r)));
-    } else updateDraftRule(id, patch);
-  };
-  const dropRule = (id: string) => {
-    if (controlled) onChange(rules.filter((r) => r.id !== id));
-    else removeDraftRule(id);
-  };
+  const addRule = addDraftRule;
+  const patchRule = updateDraftRule;
+  const dropRule = removeDraftRule;
 
   const handleAdd = (kind: FilterRule["kind"], propertyId?: string) => {
     const base = { id: makeRuleId(), propertyId: propertyId ?? "" };

@@ -485,7 +485,7 @@ describe("NoteService", () => {
     if (!corrupted) throw new Error("note row missing");
     // A title column that does not decrypt (corruption / wrong AAD): the
     // committed content save must not reject over it.
-    corrupted.title = "enc[wrong-aad]:garbage";
+    corrupted.title = "enc[wrong-aad]:garbage" as EncryptedPayload;
 
     const updated = await service.updateContent(created.id, "new body");
     expect(updated.content).toBe("new body");
@@ -499,7 +499,7 @@ describe("NoteService", () => {
     const created = await service.createNote("ws-1", "My Title", "body");
     const corrupted = fakeRepo.notes[0];
     if (!corrupted) throw new Error("note row missing");
-    corrupted.title = "enc[wrong-aad]:garbage";
+    corrupted.title = "enc[wrong-aad]:garbage" as EncryptedPayload;
 
     // The icon write is committed; a title decrypt failure must not reject
     // the save and trigger a cache rollback of committed data.
