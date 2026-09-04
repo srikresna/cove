@@ -65,7 +65,63 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
       e.preventDefault();
     };
     scroller.addEventListener("wheel", onWheel, { capture: true, passive: false });
-    return () => scroller.removeEventListener("wheel", onWheel, { capture: true });
+
+    // Dev-only scroll tracer: "the screen scrolls by itself" reports get a
+    // ring buffer of every scroll with the hovered element, readable from
+    // the WebView2 profile's localStorage (cove-scroll-trace) to identify
+    // the culprit without devtools. The dev server always serves from
+    // localhost — installed builds never match.
+    let stopTrace = () => {};
+    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+      const KEY = "cove-scroll-trace";
+      const ring: string[] = [];
+      let lastTop = scroller.scrollTop;
+      let lastWheelAt = 0;
+      let hover = "";
+      let lastHoverAt = 0;
+      const describe = (el: Element | null): string => {
+        if (!el) return "";
+        const tag = el.tagName.toLowerCase();
+        const cls = typeof el.className === "string" ? el.className.split(/\s+/)[0] : "";
+        return cls ? `${tag}.${cls}` : tag;
+      };
+      const flush = () => {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(ring));
+        } catch {}
+      };
+      const onScroll = () => {
+        const top = scroller.scrollTop;
+        const dy = top - lastTop;
+        lastTop = top;
+        const sinceWheel = performance.now() - lastWheelAt;
+        if (Math.abs(dy) < 1) return;
+        ring.push(
+          `${Math.round(performance.now())}ms top=${Math.round(top)} dy=${Math.round(dy)} sinceWheel=${Math.round(sinceWheel)}ms hover=${hover} hoverAge=${Math.round(performance.now() - lastHoverAt)}ms`,
+        );
+        if (ring.length > 120) ring.splice(0, ring.length - 120);
+        flush();
+      };
+      const onWheelTrace = () => {
+        lastWheelAt = performance.now();
+      };
+      const onPointerMove = (e: PointerEvent) => {
+        hover = describe(e.target instanceof Element ? e.target : null);
+        lastHoverAt = performance.now();
+      };
+      scroller.addEventListener("scroll", onScroll, { passive: true });
+      scroller.addEventListener("wheel", onWheelTrace, { passive: true });
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      stopTrace = () => {
+        scroller.removeEventListener("scroll", onScroll);
+        scroller.removeEventListener("wheel", onWheelTrace);
+        window.removeEventListener("pointermove", onPointerMove);
+      };
+    }
+    return () => {
+      stopTrace();
+      scroller.removeEventListener("wheel", onWheel, { capture: true });
+    };
   }, [mode]);
 
   const toggleFullscreen = () => {

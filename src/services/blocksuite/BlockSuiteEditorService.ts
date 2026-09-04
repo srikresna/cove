@@ -55,6 +55,42 @@ const nativeSaveBlob = async (blob: Blob, fileName: string): Promise<string | nu
   return path;
 };
 
+// pdfmake resolves font names through its virtual file system — a relative
+// URL is treated as a vfs key, not something to fetch (the vendored adapter's
+// absolute https URLs only work online). Load the bundled Liberation faces
+// into the vfs as base64 once, offline-safe, mapped onto both font names the
+// PDF adapter uses.
+let pdfFontsReady: Promise<void> | null = null;
+const PDF_FACES = [
+  ["normal", "LiberationSans-Regular.ttf"],
+  ["bold", "LiberationSans-Bold.ttf"],
+  ["italics", "LiberationSans-Italic.ttf"],
+  ["bolditalics", "LiberationSans-BoldItalic.ttf"],
+] as const;
+const loadPdfFonts = async (): Promise<void> => {
+  const pdfMake = (await import("pdfmake/build/pdfmake")).default;
+  const vfs: Record<string, string> = {};
+  for (const [, file] of PDF_FACES) {
+    const res = await fetch(`/fonts/${file}`);
+    if (!res.ok) throw new Error(`PDF export font ${file} failed to load (${res.status})`);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    let binary = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < buf.length; i += CHUNK) {
+      binary += String.fromCharCode(...buf.subarray(i, i + CHUNK));
+    }
+    vfs[file] = btoa(binary);
+  }
+  pdfMake.vfs = vfs;
+  const slots = {
+    normal: "LiberationSans-Regular.ttf",
+    bold: "LiberationSans-Bold.ttf",
+    italics: "LiberationSans-Italic.ttf",
+    bolditalics: "LiberationSans-BoldItalic.ttf",
+  } as const;
+  pdfMake.fonts = { Inter: slots, SarasaGothicCL: slots };
+};
+
 // Image blocks carry no text, so plaintext exports of image-heavy notes
 // (tweet saves) come out as nothing but the title. Emit a stand-in line so
 // plaintext previews and exports keep the note's structure.
@@ -257,18 +293,11 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       if (format === "markdown") await MarkdownTransformer.exportDoc(store);
       else if (format === "html") await HtmlTransformer.exportDoc(store);
       else {
-        // The PDF adapter pins pdfmake fonts to cdn.affine.pro at import
-        // time — repoint both font names at the bundled Liberation Sans
-        // (the app font) AFTER the import so an offline app still renders
-        // text and exports match the UI.
-        const pdfMake = (await import("pdfmake/build/pdfmake")).default;
-        const slots = {
-          normal: "/fonts/LiberationSans-Regular.ttf",
-          bold: "/fonts/LiberationSans-Bold.ttf",
-          italics: "/fonts/LiberationSans-Italic.ttf",
-          bolditalics: "/fonts/LiberationSans-BoldItalic.ttf",
-        };
-        pdfMake.fonts = { Inter: { ...slots }, SarasaGothicCL: { ...slots } };
+        // pdfmake fonts come from the local vfs (Liberation Sans, the app
+        // font) — the adapter's cdn.affine.pro assignment is replaced after
+        // its module import so an offline app still renders text.
+        if (!pdfFontsReady) pdfFontsReady = loadPdfFonts();
+        await pdfFontsReady;
         await PdfTransformer.exportDoc(store);
       }
       const saved = await Promise.all(queue);
