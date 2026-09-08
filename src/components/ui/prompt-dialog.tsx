@@ -4,6 +4,7 @@ import { MESSAGES } from "../../constants/messages";
 import { Button } from "./button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "./dialog";
 import { Input } from "./input";
+import { Label } from "./label";
 
 export const PromptDialog: React.FC<{
   open: boolean;
@@ -45,19 +46,12 @@ export const PromptDialog: React.FC<{
         if (!next) onCancel();
       }}
     >
-      <DialogContent className="max-w-sm" hideClose>
+      <DialogContent className="max-w-sm gap-5 p-8" hideClose>
         <DialogTitle>{title}</DialogTitle>
         {description && <DialogDescription>{description}</DialogDescription>}
 
-        <div className="flex flex-col gap-2 pt-1">
-          {label && (
-            <label
-              className="text-sm leading-[22px] text-muted-foreground"
-              htmlFor="prompt-dialog-input"
-            >
-              {label}
-            </label>
-          )}
+        <div className="flex flex-col gap-1.5">
+          {label && <Label htmlFor="prompt-dialog-input">{label}</Label>}
           <Input
             id="prompt-dialog-input"
             autoFocus
