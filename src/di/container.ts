@@ -1,5 +1,9 @@
 import type { BlobSource } from "@blocksuite/sync";
 import { invoke } from "@tauri-apps/api/core";
+// Side-effect import, first in the file: every later customElements.define
+// (all the vendored effects modules route through the DI-created editor
+// service) must hit the idempotent wrapper.
+import "./../services/blocksuite/idempotentCustomElements";
 import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
