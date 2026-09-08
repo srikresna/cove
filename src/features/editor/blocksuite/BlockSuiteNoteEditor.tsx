@@ -70,11 +70,15 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     // ring buffer of every scroll with the hovered element, readable from
     // the WebView2 profile's localStorage (cove-scroll-trace) to identify
     // the culprit without devtools. The dev server always serves from
-    // localhost — installed builds never match.
+    // localhost — installed builds never match. The API patch layer records
+    // a stack for every programmatic scrollIntoView/scrollTo so the next
+    // trace names the caller, not just the motion.
     let stopTrace = () => {};
     if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
       const KEY = "cove-scroll-trace";
+      const API_KEY = "cove-scroll-api";
       const ring: string[] = [];
+      const apiRing: string[] = [];
       let lastTop = scroller.scrollTop;
       let lastWheelAt = 0;
       let hover = "";
@@ -88,6 +92,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
       const flush = () => {
         try {
           localStorage.setItem(KEY, JSON.stringify(ring));
+          localStorage.setItem(API_KEY, JSON.stringify(apiRing));
         } catch {}
       };
       const onScroll = () => {
@@ -109,6 +114,48 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
         hover = describe(e.target instanceof Element ? e.target : null);
         lastHoverAt = performance.now();
       };
+      const inOurTree = (el: Element | null): boolean => {
+        for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+          if (cur === scroller) return true;
+        }
+        return false;
+      };
+      const recordApi = (method: string, el: Element | null, opts: unknown) => {
+        if (!inOurTree(el)) return;
+        const stack = (new Error().stack ?? "")
+          .split("\n")
+          .slice(2, 8)
+          .map((l) => l.trim().replace(/^at\s+/, ""))
+          .join(" | ");
+        apiRing.push(
+          `${Math.round(performance.now())}ms ${method} ${describe(el)} ${JSON.stringify(opts)} <= ${stack}`,
+        );
+        if (apiRing.length > 60) apiRing.splice(0, apiRing.length - 60);
+        flush();
+      };
+      const proto = Element.prototype as Element & {
+        scrollIntoView: Element["scrollIntoView"];
+        scrollTo: Element["scrollTo"];
+        scrollBy: Element["scrollBy"];
+      };
+      const origIntoView = proto.scrollIntoView;
+      const origScrollTo = proto.scrollTo;
+      const origScrollBy = proto.scrollBy;
+      proto.scrollIntoView = function patchedScrollIntoView(
+        this: Element,
+        arg?: boolean | ScrollIntoViewOptions,
+      ) {
+        recordApi("scrollIntoView", this, typeof arg === "object" ? arg : undefined);
+        return origIntoView.call(this, arg as boolean | ScrollIntoViewOptions);
+      };
+      proto.scrollTo = function patchedScrollTo(this: Element, arg?: unknown) {
+        recordApi("scrollTo", this, arg);
+        return (origScrollTo as (options?: unknown) => void).call(this, arg);
+      };
+      proto.scrollBy = function patchedScrollBy(this: Element, arg?: unknown) {
+        recordApi("scrollBy", this, arg);
+        return (origScrollBy as (options?: unknown) => void).call(this, arg);
+      };
       scroller.addEventListener("scroll", onScroll, { passive: true });
       scroller.addEventListener("wheel", onWheelTrace, { passive: true });
       window.addEventListener("pointermove", onPointerMove, { passive: true });
@@ -116,6 +163,9 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
         scroller.removeEventListener("scroll", onScroll);
         scroller.removeEventListener("wheel", onWheelTrace);
         window.removeEventListener("pointermove", onPointerMove);
+        proto.scrollIntoView = origIntoView;
+        proto.scrollTo = origScrollTo;
+        proto.scrollBy = origScrollBy;
       };
     }
     return () => {

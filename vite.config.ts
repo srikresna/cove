@@ -53,7 +53,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     entries: ["index.html", "src/features/editor/blocksuite/**/*.{ts,tsx}"],
-    exclude: ["@vanilla-extract/css", "@vanilla-extract/private"],
+    // The linked-doc transformer is vendored and carries our native-save
+    // patch; esbuild's dep cache only hashes lockfiles, so a vendored-file
+    // edit ships a stale download() until the cache is manually cleared.
+    // Serving it unbundled keeps vendor patches live on every restart.
+    exclude: ["@vanilla-extract/css", "@vanilla-extract/private", "@blocksuite/affine-widget-linked-doc"],
   },
   server: {
     port: 1420,
