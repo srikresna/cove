@@ -266,7 +266,15 @@ let RichText = (() => {
                     const range = inlineEditor.toDomRange(inlineRange);
                     if (!range)
                         return;
-                    if (verticalScrollContainer) {
+                    // Cove: the vertical auto-scroll is disabled. Our scroll
+                    // container is outside the editor (the app's doc scroller
+                    // with a 96px scroll-padding), so this block's rect math
+                    // compared caret positions against the wrong viewport and
+                    // repeatedly fought itself — clicking a block near the
+                    // bottom made the page glide down and snap back in a loop.
+                    // The browser's native caret reveal still keeps typed text
+                    // visible.
+                    if (false && verticalScrollContainer) {
                         const nativeRange = inlineEditor.getNativeRange();
                         if (!nativeRange ||
                             nativeRange.commonAncestorContainer.parentElement?.contains(inlineEditor.rootElement))

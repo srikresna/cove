@@ -23,6 +23,9 @@ export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklin
 
   const backlinks: DatabaseBacklinkRef[] = [];
   if (!noteId) return backlinks;
+  // A note can reference the same database row from several cells — the
+  // panel keys sections by databaseId:rowId, so dedupe to one section each.
+  const seen = new Set<string>();
   for (let i = 0; i < notes.length; i += 1) {
     const rows = scans[i]?.data;
     if (!rows) continue;
@@ -30,6 +33,9 @@ export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklin
     if (!sourceId) continue;
     for (const row of rows) {
       if (row.refDocId !== noteId) continue;
+      const key = `${row.databaseId}:${row.databaseRowId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       backlinks.push({
         databaseDocId: sourceId,
         databaseId: row.databaseId,
