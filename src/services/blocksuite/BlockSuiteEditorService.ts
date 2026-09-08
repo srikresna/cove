@@ -43,28 +43,15 @@ declare global {
 /** Native save: system Save dialog → bytes → Rust write. Resolves null when
  *  the user cancels, so cancellation stays silent. */
 const nativeSaveBlob = async (blob: Blob, fileName: string): Promise<string | null> => {
-  const trace = (stage: string) => {
-    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-      try {
-        const ring = JSON.parse(localStorage.getItem("cove-export-trace") ?? "[]") as string[];
-        ring.push(`${Math.round(performance.now())}ms save(${fileName}) ${stage}`);
-        localStorage.setItem("cove-export-trace", JSON.stringify(ring.slice(-40)));
-      } catch {}
-    }
-  };
-  trace("start");
   const { save } = await import("@tauri-apps/plugin-dialog");
-  trace("plugin-dialog loaded");
   const ext = fileName.includes(".") ? (fileName.split(".").pop() ?? "") : "";
   const path = await save({
     defaultPath: fileName,
     filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : undefined,
   });
-  trace(`dialog resolved: ${JSON.stringify(path)}`);
   if (!path) return null;
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("save_exported_file", { path, bytes: new Uint8Array(await blob.arrayBuffer()) });
-  trace("file written");
   return path;
 };
 
@@ -305,16 +292,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     globalThis.__coveSaveQueue = [];
     const queue = globalThis.__coveSaveQueue;
     globalThis.__coveNativeSave = nativeSaveBlob;
-    const trace = (stage: string) => {
-      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-        try {
-          const ring = JSON.parse(localStorage.getItem("cove-export-trace") ?? "[]") as string[];
-          ring.push(`${Math.round(performance.now())}ms [${format}] ${stage}`);
-          localStorage.setItem("cove-export-trace", JSON.stringify(ring.slice(-40)));
-        } catch {}
-      }
-    };
-    trace(`transformers imported; hook=${typeof globalThis.__coveNativeSave}`);
     try {
       if (format === "markdown") await MarkdownTransformer.exportDoc(store);
       else if (format === "html") await HtmlTransformer.exportDoc(store);
@@ -326,13 +303,8 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
         await pdfFontsReady;
         await PdfTransformer.exportDoc(store);
       }
-      trace(`transformer done; queue=${queue.length}`);
       const saved = await Promise.all(queue);
-      trace(`settled: ${JSON.stringify(saved)}`);
       return saved.find((p): p is string => p !== null) ?? null;
-    } catch (err) {
-      trace(`THREW: ${err instanceof Error ? err.message : String(err)}`);
-      throw err;
     } finally {
       delete globalThis.__coveNativeSave;
       queue.length = 0;
