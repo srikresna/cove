@@ -694,14 +694,15 @@ export class PdfAdapter extends BaseAdapter {
         };
     }
     async _createPdfBlob(docDefinition) {
-        return new Promise((resolve, reject) => {
-            try {
-                const pdfDocGenerator = pdfMake.createPdf(docDefinition);
-                pdfDocGenerator.getBlob(blob => resolve(blob));
-            }
-            catch (error) {
-                reject(error);
-            }
-        });
+        // Cove: pdfmake 0.3 made getBlob() promise-based and silently ignores
+        // the 0.2-style callback - the old form left this promise pending
+        // forever (export hung with no error, dialog, or toast).
+        try {
+            const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+            return await pdfDocGenerator.getBlob();
+        }
+        catch (error) {
+            throw error;
+        }
     }
 }
