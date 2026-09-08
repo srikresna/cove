@@ -88,7 +88,6 @@ const lockedCrypto: IEncryptionService = {
   isUnlocked: () => false,
 };
 
-/** InMemory repo with hooks to interleave with the heal's CAS write. */
 class HealRacingRepo extends InMemoryNoteRepository {
   public failCas = false;
   public renameDuringCas: string | null = null;
@@ -99,7 +98,6 @@ class HealRacingRepo extends InMemoryNoteRepository {
     next: EncryptedPayload,
   ): Promise<boolean> {
     if (this.renameDuringCas !== null) {
-      // Simulate a title rename committing right before the CAS write.
       await this.updateNote(id, {
         title: await envelopeCrypto.encryptPayload(this.renameDuringCas, titleAad(id)),
       });
@@ -142,9 +140,6 @@ describe("NoteService", () => {
     const fakeRepo = new InMemoryNoteRepository();
     const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
 
-    // Two overlapping creates — the exact interleaving a fast double-click
-    // produces: both mints run before either INSERT lands, so a DB-only
-    // max would return the same value twice and mint duplicate keys.
     const [a, b] = await Promise.all([
       service.createNote("ws-race", "First"),
       service.createNote("ws-race", "Second"),
@@ -210,8 +205,6 @@ describe("NoteService", () => {
   it("a drag into a gap whose midpoint key belongs to a trashed note never re-mints it", async () => {
     const fakeRepo = new InMemoryNoteRepository();
     const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
-    // Consecutive tail mints produce keys one midpoint apart, so the trashed
-    // note's key is exactly generateKeyBetween(its neighbors).
     const a = await service.createNote("ws-1", "A");
     const t = await service.createNote("ws-1", "T");
     const c = await service.createNote("ws-1", "C");
@@ -237,8 +230,6 @@ describe("NoteService", () => {
     const d = await service.createNote("ws-1", "D");
     expect(a.orderIndex).toBe("a0");
     expect(c.orderIndex).toBe("a1");
-    // A corrupt-title note hidden from every list, sitting exactly at the
-    // a0..a1 midpoint.
     fakeRepo.notes.push({
       id: "hidden",
       workspaceId: "ws-1",
@@ -265,7 +256,6 @@ describe("NoteService", () => {
     const service = new NoteService(fakeRepo, unlockedCrypto, new InMemoryNoteLinkRepository());
     const x = await service.createNote("ws-1", "X");
     await service.trashNote(x.id);
-    // Pre-existing damage: another live row already holds X's key.
     fakeRepo.notes.push({
       id: "squat",
       workspaceId: "ws-1",
@@ -396,9 +386,6 @@ describe("NoteService", () => {
     const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
 
     const created = await service.createNote("ws-1", "My Title", "body");
-    // Content-only save (the autosave path): the returned Note must carry
-    // the plaintext title, or noteActions poisons the notes cache with
-    // ciphertext and the title input displays the encrypted blob.
     const updated = await service.updateContent(created.id, "new body");
     expect(updated.title).toBe("My Title");
     expect(updated.content).toBe("new body");
@@ -410,8 +397,6 @@ describe("NoteService", () => {
     const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
 
     const created = await service.createNote("ws-1", "My Title", "body");
-    // Simulate a row committed while the title input showed ciphertext: the
-    // outer layer wraps the inner encrypted payload the input displayed.
     const displayed = `enc[${titleAad(created.id)}]:My Title`;
     const corrupted = fakeRepo.notes[0];
     if (!corrupted) throw new Error("note row missing");
@@ -419,13 +404,10 @@ describe("NoteService", () => {
 
     const fetched = await service.getNote(created.id);
     expect(fetched?.title).toBe("My Title");
-    // The column is repaired to a single encrypted layer.
     expect(fakeRepo.notes[0]?.title).toBe(`enc[${titleAad(created.id)}]:My Title`);
 
-    // A normal encrypted title never takes the heal path.
     const again = await service.getNote(created.id);
     expect(again?.title).toBe("My Title");
-    // The converged state is write-free: no repair attempt on re-reads.
     const casCalls = fakeRepo.callLog.filter((c) => c.startsWith("updateTitleIfUnchanged")).length;
     await service.getNote(created.id);
     expect(fakeRepo.callLog.filter((c) => c.startsWith("updateTitleIfUnchanged")).length).toBe(
@@ -445,10 +427,7 @@ describe("NoteService", () => {
     corrupted.title = await envelopeCrypto.encryptPayload(displayed, titleAad(created.id));
 
     const fetched = await service.getNote(created.id);
-    // The read must surface the recovered plaintext even though the repair
-    // write threw — returning the first-layer ciphertext here is the leak.
     expect(fetched?.title).toBe("My Title");
-    // The column is still corrupt; a later read (write healthy) heals it.
     fakeRepo.failCas = false;
     const healed = await service.getNote(created.id);
     expect(healed?.title).toBe("My Title");
@@ -467,8 +446,6 @@ describe("NoteService", () => {
     corrupted.title = await envelopeCrypto.encryptPayload(displayed, titleAad(created.id));
 
     const fetched = await service.getNote(created.id);
-    // The recovered plaintext wins for the reader, but the concurrently
-    // committed rename must survive in the column.
     expect(fetched?.title).toBe("My Title");
     const row = fakeRepo.notes[0];
     if (!row) throw new Error("note row missing");
@@ -483,8 +460,6 @@ describe("NoteService", () => {
     const created = await service.createNote("ws-1", "My Title", "body");
     const corrupted = fakeRepo.notes[0];
     if (!corrupted) throw new Error("note row missing");
-    // A title column that does not decrypt (corruption / wrong AAD): the
-    // committed content save must not reject over it.
     corrupted.title = "enc[wrong-aad]:garbage" as EncryptedPayload;
 
     const updated = await service.updateContent(created.id, "new body");
@@ -501,8 +476,6 @@ describe("NoteService", () => {
     if (!corrupted) throw new Error("note row missing");
     corrupted.title = "enc[wrong-aad]:garbage" as EncryptedPayload;
 
-    // The icon write is committed; a title decrypt failure must not reject
-    // the save and trigger a cache rollback of committed data.
     const updated = await service.updateMetadata(created.id, { icon: "📌" });
     expect(updated.icon).toBe("📌");
   });
@@ -511,9 +484,6 @@ describe("NoteService", () => {
     const fakeRepo = new InMemoryNoteRepository();
     const service = new NoteService(fakeRepo, envelopeCrypto, new InMemoryNoteLinkRepository());
 
-    // An emptied title is stored as a real payload; decryptPayload("")
-    // short-circuits to "" instead of throwing, which would loop the heal
-    // forever — the guard must keep reads write-free.
     const created = await service.createNote("ws-1", "", "body");
     const writesBefore = fakeRepo.callLog.filter((c) => c.startsWith("updateNote")).length;
 
@@ -522,7 +492,7 @@ describe("NoteService", () => {
     await service.updateContent(created.id, "new body");
 
     const writesAfter = fakeRepo.callLog.filter((c) => c.startsWith("updateNote")).length;
-    expect(writesAfter - writesBefore).toBe(1); // only the updateContent write
+    expect(writesAfter - writesBefore).toBe(1);
   });
 
   it("createNoteWithId stores encrypted title/content at rest but returns plaintext", async () => {

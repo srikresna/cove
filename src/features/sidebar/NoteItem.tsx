@@ -35,25 +35,18 @@ import { TagChip } from "../tags/TagChip";
 interface NoteItemProps {
   note: Note;
   isActive: boolean;
-  /** Library selection mode: the row toggles selection instead of opening. */
   selectionMode?: boolean;
   isSelected?: boolean;
-  /** Show the drag handle (Library list + custom sort only). */
   showDragHandle?: boolean;
   onReorder?: (id: string, targetId: string, position: "before" | "after") => void;
-  /** The optional event carries ctrl/meta/shift for Library multi-select. */
   onSelect: (id: string, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void;
   onTogglePin: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
-  /** Stack rows under the title. */
   stackRows?: Array<{ def: PropertyDefinition; value: PropertyValue }>;
-  /** Tag chips after the stacks (Library display option). */
   tagChips?: Array<{ name: string; color: string }>;
-  /** First lines of the note body (Library "Preview" display option). */
   previewText?: string | null;
-  /** Show the note's icon/emoji (Library list display option). */
   showIcon?: boolean;
 }
 
@@ -92,7 +85,6 @@ export const NoteMenuEntries: React.FC<{
   </>
 );
 
-/** Stack value formatter for note rows and cards (compact, no editors). */
 export { stackValueText };
 
 export const NoteItem: React.FC<NoteItemProps> = React.memo(
@@ -113,9 +105,6 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
     previewText = null,
     showIcon = true,
   }) => {
-    // Drag-reorder (Library list + custom sort): the row is both the drag
-    // source (via the hover grip) and a top/bottom-edge drop target, the
-    // NotePropertiesRows pattern.
     const rowRef = useRef<HTMLDivElement | null>(null);
     const gripRef = useRef<HTMLButtonElement | null>(null);
     const [closestEdge, setClosestEdge] = React.useState<"top" | "bottom" | null>(null);
@@ -264,10 +253,6 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
               </div>
             </div>
 
-            {/* Selection state: an in-flow circle at the row's right edge,
-                vertically centered on the same line for every row — the old
-                absolute top-right badge overlapped tall rows' titles and
-                drifted between row heights. */}
             {selectionMode && (
               <span
                 aria-hidden="true"

@@ -74,7 +74,6 @@ export const NoteHeaderBody: React.FC<{
   saveStatus?: string;
   uploadCoverImage: (id: string, file: File) => Promise<void>;
   removeCoverImage: (id: string) => Promise<void>;
-  /** Forwarded to the Info panel so the peek origin backlink starts open. */
   backlinkDefaultOpenRef?: { databaseId: string; databaseRowId: string } | null;
 }> = ({
   note,
@@ -93,8 +92,6 @@ export const NoteHeaderBody: React.FC<{
   const commitTitleRef = useRef<() => void>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Journal notes show a read-only localized date + Today/weekday pill instead
-  // of the editable raw YYYY-MM-DD title.
   const [journalDate, setJournalDate] = useState<number | null>(null);
   const propertyVersion = usePropertyStore((s) => s.version);
 

@@ -10,18 +10,12 @@ const CHECKED_PATH =
 const INDETERMINATE_PATH =
   "M6 3.25C4.48122 3.25 3.25 4.48122 3.25 6V18C3.25 19.5188 4.48122 20.75 6 20.75H18C19.5188 20.75 20.75 19.5188 20.75 18V6C20.75 4.48122 19.5188 3.25 18 3.25H6ZM8.54 11.25C8.12579 11.25 7.79 11.5858 7.79 12C7.79 12.4142 8.12579 12.75 8.54 12.75H15.54C15.9542 12.75 16.29 12.4142 16.29 12C16.29 11.5858 15.9542 11.25 15.54 11.25H8.54Z";
 
-/**
- * A 24px property checkbox: an SVG glyph inside a label whose invisible
- * native input covers the hit area — clicking anywhere on the label toggles,
- * and keyboard focus/space works through the input.
- */
 export const PropertyCheckbox: React.FC<{
   checked: boolean;
   indeterminate?: boolean;
   onChange: (checked: boolean) => void;
   ariaLabel?: string;
   className?: string;
-  /** Extra content rendered inside the label (journal date, conflict pill...). */
   children?: React.ReactNode;
 }> = ({ checked, indeterminate = false, onChange, ariaLabel, className, children }) => (
   <label

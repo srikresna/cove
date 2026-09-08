@@ -35,10 +35,6 @@ const Group: React.FC<{
   );
 };
 
-/**
- * The sidebar's Favorites accordion; Pinned notes live here as a labelled
- * sub-group since both are per-note flags.
- */
 export const FavoritesSection: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const notes = useNotes();
@@ -67,7 +63,6 @@ export const FavoritesSection: React.FC = () => {
         activeNoteId={activeNoteId}
         onSelect={setActiveNoteId}
       />
-      {/* The favorites sub-label is redundant unless pinned notes sit above. */}
       {pinned.length > 0 ? (
         <Group
           icon={<Star className="h-3 w-3" aria-hidden="true" />}

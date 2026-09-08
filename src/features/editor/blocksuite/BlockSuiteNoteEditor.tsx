@@ -29,7 +29,6 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
   const scrollRef = useRef<HTMLDivElement>(null);
   const [editorHost, setEditorHost] = useState<EditorHost | null>(null);
   const mode = note.docMode ?? "page";
-  // Page width is a persisted per-doc property.
   const isFullWidth = (note.pageWidth ?? "standard") === "fullWidth";
   const { wordCount, characterCount } = useMemo(
     () => countWordsAndChars(note.content),
@@ -46,19 +45,12 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
-    // The vendored kanban board scrolls its column strip horizontally but
-    // never maps the vertical wheel to it — with a plain desktop mouse an
-    // overflowing board is unscrollable. Capture runs before the board's own
-    // wheel handler (which stops propagation) and converts deltaY to
-    // scrollLeft only when the pointer is over a strip that can consume it.
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) return; // pinch-zoom / app zoom
+      if (e.ctrlKey || e.metaKey) return;
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       const target = e.target instanceof Element ? e.target : null;
       const strip = target?.closest("affine-data-view-kanban-group")?.parentElement;
       if (!strip || strip.scrollWidth <= strip.clientWidth) return;
-      // Only swallow the event while the strip can actually move — at either
-      // end the doc must keep scrolling vertically.
       const next = strip.scrollLeft + e.deltaY;
       if (next < 0 || next > strip.scrollWidth - strip.clientWidth) return;
       strip.scrollLeft = next;
@@ -66,11 +58,6 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     };
     scroller.addEventListener("wheel", onWheel, { capture: true, passive: false });
 
-    // Follow the caret the way AFFiNE does, replacing the vendored auto-scroll
-    // we disabled: when a selection lands outside the visible band (Enter at
-    // the bottom pushes the new line below the fold), scroll the MINIMUM
-    // needed to reveal it. One-way and minimal by construction — it only ever
-    // fires while the caret is out of view, so it cannot oscillate.
     const CARET_MARGIN = 24;
     const onSelectionChange = () => {
       const sel = document.getSelection();
@@ -78,7 +65,6 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
       const node = sel.anchorNode;
       const el = node?.nodeType === 1 ? (node as Element) : (node?.parentElement ?? null);
       if (!el || !scroller.contains(el)) return;
-      // Measure after layout settles — Enter's new line renders async in Lit.
       requestAnimationFrame(() => {
         const rect = sel.getRangeAt(0).getBoundingClientRect();
         const view = scroller.getBoundingClientRect();
@@ -109,10 +95,6 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     }
   };
 
-  // The right-bar toggle migrates between the topbar and the bar's own
-  // header (AFFiNE behavior). Keyboard activation of a control that then
-  // unmounts or hides would drop focus to <body>, so keyboard toggles move
-  // focus to the counterpart control.
   const openToggleRef = useRef<HTMLButtonElement>(null);
   const rightBarHeaderRef = useRef<HTMLDivElement>(null);
   const toggledViaKeyboard = useRef(false);
@@ -184,11 +166,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
                 </div>
               </div>
             )}
-            {/* Outside the doc scroller: the scroller's layout containment
-                (container-type) makes it the containing block for absolute
-                children, which pinned the rail to the scrollable content —
-                it drifted away on long notes. Sibling of the scroller, its
-                containing block is this stable wrapper instead. */}
+
             {mode !== "edgeless" && <OutlineViewerHost editor={editorHost} />}
           </div>
         </div>

@@ -5,8 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/plugin-sql", () => ({ default: class {} }));
 
-// node:sqlite is experimental — vite's resolver does not know it, so load it
-// through native require instead of an import vite would transform.
 const nodeRequire = createRequire(import.meta.url);
 
 import { type MigrationDb, runMigrations, type SqlStatement } from "@/repositories/SQLiteDatabase";
@@ -104,7 +102,6 @@ describe("migration ladder", () => {
         [`n${i}`, `N${i}`, 100 - i, 100 - i],
       );
     }
-    // Rewind to pre-v23 with unkeyed rows and re-run the ladder.
     await db.execute("PRAGMA user_version = 22");
     await runMigrations(db);
 
@@ -133,8 +130,6 @@ describe("migration ladder", () => {
   });
 
   it("a mid-ladder failure leaves user_version at the prior version (crash recovery)", async () => {
-    // Fail the v23 stamp itself: the version must NOT advance and the seed
-    // writes from the same transaction must roll back.
     const failing: MigrationDb = {
       execute: db.execute,
       select: db.select,
@@ -146,7 +141,6 @@ describe("migration ladder", () => {
       },
     };
     await expect(runMigrations(failing)).rejects.toThrow("simulated crash mid-v23");
-    // The stamp and the seed writes share one transaction — both rolled back.
     expect(await userVersion(db)).toBe(22);
   });
 

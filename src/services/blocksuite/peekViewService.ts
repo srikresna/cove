@@ -23,14 +23,11 @@ export interface TemplatePeekRequest {
 
 export type PeekRequest = DocPeekRequest | TemplatePeekRequest;
 
-/** UI-side peek surface: open/close the modal holding the request. */
 export interface PeekSink {
   open(request: PeekRequest, resolve: () => void): void;
   close(): void;
 }
 
-// Bound by the store layer at module load; the unbound default resolves
-// immediately so callers never hang before boot wiring.
 let peekSink: PeekSink = {
   open: (_request, resolve) => resolve(),
   close: () => {},

@@ -46,9 +46,6 @@ function scanDocForDatabaseRows(doc: Y.Doc): DatabaseRowRef[] {
   return rows;
 }
 
-/** Pure scan of one note's content for database rows referencing other docs.
- *  Caching, dedupe, and invalidation live in the query layer
- *  (["backlink-scan", noteId]). */
 export async function scanNoteRows(
   getNoteContent: (noteId: string) => Promise<string | undefined>,
   noteId: string,

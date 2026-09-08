@@ -13,20 +13,12 @@ import type { PropertyDefinition, PropertyValue } from "../domain/property/Prope
 import { changeBus } from "../services/changeBus";
 import { notifyErrorWithSaveStatus as notifyError } from "./notify";
 
-/** The notes-list cache key — per workspace. */
 export const notesKey = (workspaceId: string) => ["notes", workspaceId] as const;
 export const trashKey = ["trash"] as const;
-/** One note's database-row backlink scan — per source note. */
 export const backlinkScanKey = (noteId: string) => ["backlink-scan", noteId] as const;
-/** The Library's bulk-loaded row stacks (definitions are global). */
 export const libraryStacksKey = ["library-stacks"] as const;
-/** The Library's filter inputs (property values + tag ids) — per workspace. */
 export const libraryInputsKey = (workspaceId: string) => ["library-inputs", workspaceId] as const;
 
-/**
- * Fetches a workspace's note list and mirrors it into the editor's doc
- * registry (the doc-registry side effect kept at the cache boundary).
- */
 export async function fetchNotes(workspaceId: string): Promise<Note[]> {
   const notes = await noteService.listMetadataByWorkspace(workspaceId);
   blockSuiteEditorService.registerExistingNotes(notes.map((n) => ({ id: n.id, title: n.title })));
@@ -122,8 +114,6 @@ export async function fetchLibraryInputs(workspaceId: string): Promise<LibraryIn
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Local DB: data only changes through this app's own mutations, so
-      // refetching happens on explicit invalidation, not on staleness timers.
       staleTime: Infinity,
       retry: false,
       refetchOnWindowFocus: false,
@@ -131,20 +121,15 @@ export const queryClient = new QueryClient({
     },
   },
   queryCache: new QueryCache({
-    // One surface for fetch failures (the old per-call notifyError paths).
     onError: (err) => notifyError(err, { saveStatus: false }),
   }),
 });
 
-// Vault lock wipes the caches; the unlock remount refetches through the
-// vault gate.
 vaultService.onLock(() => {
   void queryClient.cancelQueries();
   queryClient.clear();
 });
 
-// Repo writes publish change topics — the Library's bulk-input queries ride
-// on them instead of version-signal effect deps.
 changeBus.on("properties", () => {
   void queryClient.invalidateQueries({ queryKey: libraryStacksKey });
   void queryClient.invalidateQueries({ queryKey: ["library-inputs"] });

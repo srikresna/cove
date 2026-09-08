@@ -1,7 +1,6 @@
 import { html } from "lit";
 import { beforeEach, describe, expect, it } from "vitest";
 import { covePeekViewService } from "@/services/blocksuite/peekViewService";
-// Importing the store module binds the peek service to its UI surface.
 import { usePeekViewStore } from "@/store/usePeekViewStore";
 
 function makeSurfaceRefTarget(docId: string, xywh: string): HTMLElement {

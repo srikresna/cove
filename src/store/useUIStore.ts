@@ -1,6 +1,5 @@
 import { create } from "zustand";
 
-/** Main-area pages: exactly one is visible at a time. */
 export type ActivePage = "editor" | "library" | "journals" | "trash";
 
 interface UIState {

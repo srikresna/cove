@@ -29,7 +29,6 @@ describe("parseMarkdown", () => {
     const heading = blocks[0];
     expect(heading?.kind === "heading" && heading.level).toBe(1);
 
-    // The image line parses to a standalone image token with the raw path.
     const imagePara = blocks[2];
     expect(
       imagePara?.kind === "paragraph" &&

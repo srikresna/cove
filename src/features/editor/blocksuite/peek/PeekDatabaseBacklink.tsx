@@ -100,9 +100,6 @@ function formatCell(raw: unknown, type: string): string {
   return "";
 }
 
-// Sections for the same backlink can be mounted side by side (header Info
-// panel + right-bar Info panel + peek) with independent cell snapshots; a
-// shared rev signal makes any instance's edit invalidate every copy.
 const backlinkRevListeners = new Set<() => void>();
 let backlinkRevCounter = 0;
 
@@ -126,7 +123,6 @@ function useBacklinkRev(): number {
 const cellInputClass =
   "h-7 w-full rounded-[4px] border border-transparent bg-transparent px-[5px] text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-[#1e96eb] focus:shadow-[0_0_0_2px_rgba(30,150,235,0.30)]";
 
-/** The whole chip is tinted with the option color. */
 const OptionChip: React.FC<{
   option: BacklinkOption;
   onRemove?: () => void;
@@ -147,7 +143,6 @@ const OptionChip: React.FC<{
         type="button"
         aria-label={`${MESSAGES.PROP_CLEAR}: ${option.value}`}
         onClick={(e) => {
-          // The chip can sit inside a popover trigger; clearing must not also open it.
           e.stopPropagation();
           onRemove();
         }}
@@ -228,13 +223,6 @@ const OptionPickerPopover: React.FC<{
   );
 };
 
-// Per-type cell editors mirror the Info panel affordances; rich-text, title
-// and created-time cells stay read-only (Y.Text / engine-managed values).
-/**
- * Rich-text cells hold a Y.Text; the real BlockSuite RichText inline editor is
- * mounted against it (not a plain input), sharing the page view's inline
- * schema through a lightweight std scope.
- */
 const RichTextCellEditor: React.FC<{
   yText: Y.Text;
   store: Store;
@@ -265,9 +253,6 @@ const RichTextCellEditor: React.FC<{
       richText.readonly = (store as { readonly?: boolean }).readonly ?? false;
       richText.attributesSchema = inlineManager.getSchema() as never;
       richText.attributeRenderer = inlineManager.getRenderer();
-      // The vendored RichText never dispatches a DOM 'change' event; observe
-      // the Y.Text directly instead (same mechanism as the vendored property
-      // config's onUpdate) so edits actually reach scheduleSave.
       const listener = () => onLiveChange();
       yText.observe(listener);
       el.replaceChildren(richText);
@@ -284,7 +269,6 @@ const RichTextCellEditor: React.FC<{
   return <div ref={ref} className="min-h-7 w-full text-sm text-foreground" />;
 };
 
-/** Formatted text opening a calendar popover; the picker stays open after a pick. */
 const DateCellEditor: React.FC<{
   timestamp: number | null;
   onChange: (next: number | null) => void;
@@ -321,10 +305,6 @@ const DateCellEditor: React.FC<{
   );
 };
 
-/**
- * A slider with a live percentage label, a hover-revealed thumb, and a
- * single commit on blur.
- */
 const ProgressSlider: React.FC<{
   value: number;
   ariaLabel: string;
@@ -370,7 +350,6 @@ const ProgressSlider: React.FC<{
   );
 };
 
-/** Display mode is an anchor; editing commits on Enter/blur, Escape reverts. */
 const LinkCellEditor: React.FC<{
   value: string;
   onChange: (next: string) => void;
@@ -466,7 +445,6 @@ const BacklinkCellEditor: React.FC<{
   cell: BacklinkCell;
   onChange: (next: unknown) => void;
   onCreateOption: (name: string) => void;
-  /** Persists without bumping the shared rev - for in-place Y.Text mutation. */
   onQuietChange: () => void;
   dataSourceDoc: Store;
 }> = ({ cell, onChange, onCreateOption, onQuietChange, dataSourceDoc }) => {
@@ -482,8 +460,6 @@ const BacklinkCellEditor: React.FC<{
 
   switch (cell.type) {
     case "rich-text": {
-      // The reactive props layer surfaces BlockSuite Text wrappers, not raw
-      // Y.Text - accept both and unwrap so the editor and observer see Y.Text.
       if (cell.raw instanceof Text || cell.raw instanceof Y.Text) {
         const yText = cell.raw instanceof Text ? cell.raw.yText : cell.raw;
         return (
@@ -541,9 +517,6 @@ const BacklinkCellEditor: React.FC<{
           defaultValue={cell.value}
           placeholder={MESSAGES.INFO_EMPTY_VALUE}
           onBlur={(e) => {
-            // Only write when the value actually changed: the official text
-            // cell stores untrimmed input, so trim-on-no-edit would silently
-            // rewrite stored whitespace.
             const next = e.target.value;
             if (next === cell.value) return;
             onChange(next.trim());
@@ -557,8 +530,6 @@ const BacklinkCellEditor: React.FC<{
     case "select": {
       const selectedId = typeof cell.raw === "string" ? cell.raw : null;
       const selected = cell.options.find((o) => o.id === selectedId);
-      // A dead option id (deleted in the database view) still is a value:
-      // show a removable Unknown chip instead of the Empty affordance.
       if (selectedId && !selected) {
         return (
           <OptionChip
@@ -569,7 +540,6 @@ const BacklinkCellEditor: React.FC<{
       }
       return (
         <div className="flex items-center">
-          {/* The chip itself opens the picker, so A -> B is one write. */}
           <OptionPickerPopover
             options={cell.options}
             selectedIds={selectedId ? [selectedId] : []}
@@ -629,8 +599,6 @@ const BacklinkCellEditor: React.FC<{
   }
 };
 
-// Theme tokens used by BlockSuite's own tag palette; defined on :root by the
-// globally imported @toeverything/theme css.
 const OPTION_COLOR_TOKENS = [
   "var(--affine-v2-chip-label-red)",
   "var(--affine-v2-chip-label-orange)",
@@ -711,7 +679,6 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
         });
       }
 
-      // Cells are sorted alphabetically by property name.
       cells.sort((a, b) => a.name.localeCompare(b.name));
       return { cells, ds, databaseName, doc: ds.doc };
     } catch {
@@ -724,8 +691,6 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    // Only flush when an edit actually happened — a no-op save would
-    // re-encrypt identical content, bump updatedAt, and drop the scan cache.
     if (!dirtyRef.current) return;
     try {
       if (!blockSuiteEditorService.isNoteDocLoaded(databaseDocId)) return;
@@ -802,7 +767,6 @@ export const DatabaseBacklinkSection: React.FC<DatabaseBacklinkRef & { defaultOp
     [data, databaseRowId, scheduleSave],
   );
 
-  // The whole section hides when the row has no visible cells.
   if (!data || data.cells.length === 0) return null;
 
   const sectionTitle = `${data.databaseName || MESSAGES.UNNAMED} ${MESSAGES.PROPERTIES}`;

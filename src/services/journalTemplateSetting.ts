@@ -1,7 +1,3 @@
-/**
- * Per-workspace journal template selection, stored in localStorage for now;
- * a workspace settings table can replace this later without changing callers.
- */
 const PREFIX = "cove-journal-template:";
 
 export function getJournalTemplateId(workspaceId: string): string | null {
@@ -16,7 +12,5 @@ export function setJournalTemplateId(workspaceId: string, noteId: string | null)
   try {
     if (noteId === null) localStorage.removeItem(PREFIX + workspaceId);
     else localStorage.setItem(PREFIX + workspaceId, noteId);
-  } catch {
-    // storage unavailable - setting simply doesn't persist
-  }
+  } catch {}
 }

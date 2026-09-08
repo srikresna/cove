@@ -6,15 +6,8 @@ import { useTagStore } from "./useTagStore";
 import { useUIStore } from "./useUIStore";
 import { useViewStore } from "./useViewStore";
 
-/**
- * Tag filters and saved-view rules are workspace-scoped; drop them whenever
- * the active workspace changes so the old workspace's filters never leak.
- */
 function resetWorkspaceScopedFilters(): void {
   useTagStore.setState({ activeTagId: null, taggedNoteIds: null });
-  // Bumping fetchSeq also invalidates any in-flight views fetch from the
-  // previous workspace: letting it land would swap in the old workspace's
-  // list (and reconcile away the next workspace's legitimate selection).
   useViewStore.setState((s) => ({
     activeViewId: null,
     draftRules: [],
@@ -71,9 +64,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         workspaces: [...state.workspaces, created],
         activeWorkspaceId: created.id,
       }));
-      // created.id is brand new, so the workspace always actually changed —
-      // without the reset, the previous workspace's tag filter would hide
-      // every note in the fresh workspace with no visible chip to clear it.
       resetWorkspaceScopedFilters();
 
       useUIStore.getState().setCreateModalOpen(false);

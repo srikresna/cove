@@ -112,7 +112,6 @@ export class InMemoryNoteRepository implements INoteRepository {
     if (this.shouldFail) throw new Error("Fake repo error: updateTitleIfUnchanged");
     const row = this.notes.find((n) => n.id === id);
     if (!row || row.title !== expected) return false;
-    // NoteRecord's timestamps are readonly — swap the row instead of mutating.
     this.notes = this.notes.map((n) =>
       n.id === id ? { ...n, title: next, titleKmsVersion: 1, updatedAt: Date.now() } : n,
     );

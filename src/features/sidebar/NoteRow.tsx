@@ -4,7 +4,6 @@ import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 
-/** Compact sidebar note row shared by Recent and Favorites. */
 export const NoteRow: React.FC<{
   note: Note;
   isActive: boolean;

@@ -43,15 +43,10 @@ export const AppContent: React.FC = () => {
   useEffect(() => {
     fetchWorkspaces();
     void noteActions.purgeExpiredTrash();
-    // Startup self-heal: rules referencing dead defs/options are rewritten or
-    // deleted before any view is applied (best-effort). The version bump below
-    // is required — the initial fetchViews can snapshot pre-heal rows.
     void propertyService
       .listDefinitions()
       .then(async (defs) => {
         const deleted = await savedViewService.healRules(defs);
-        // Prune drafts of dead references unconditionally, then clear a deleted
-        // ACTIVE selection; the fetchViews reconcile covers straggler clicks.
         useViewStore.getState().healDrafts(defs);
         useViewStore.setState((s) =>
           s.activeViewId && deleted.includes(s.activeViewId)

@@ -1,10 +1,5 @@
 import type { PropertyDefinition, PropertyType } from "../property/Property";
 
-/**
- * Filter AST for note views: a list of rules combined with AND;
- * tags participate as their own rule kind.
- */
-
 export type TextFilterOp = "contains" | "is" | "is-not" | "is-empty" | "is-not-empty";
 export type NumberFilterOp = "=" | "≠" | "<" | ">" | "≤" | "≥" | "is-empty" | "is-not-empty";
 export type DateFilterOp = "is" | "before" | "after" | "is-empty" | "is-not-empty";
@@ -34,7 +29,6 @@ export interface DateFilterRule extends FilterRuleBase {
   readonly kind: "date";
   readonly propertyId: string;
   readonly op: DateFilterOp;
-  /** Local-midnight timestamp for is/before/after. */
   readonly value?: number;
 }
 
@@ -42,7 +36,6 @@ export interface SelectFilterRule extends FilterRuleBase {
   readonly kind: "select";
   readonly propertyId: string;
   readonly op: SelectFilterOp;
-  /** Option ids (single value for is/is-not, ignored for emptiness ops). */
   readonly optionIds: string[];
 }
 
@@ -63,7 +56,6 @@ export interface MultiSelectFilterRule extends FilterRuleBase {
 export interface TagFilterRule extends FilterRuleBase {
   readonly kind: "tags";
   readonly op: TagFilterOp;
-  /** Tag ids. */
   readonly tagIds: string[];
 }
 
@@ -92,7 +84,6 @@ export type FilterRule =
 
 export type FilterRules = FilterRule[];
 
-/** Per-type selectable operators, used to build the filter UI. */
 export const FILTER_OPERATORS: Record<
   FilterRule["kind"],
   ReadonlyArray<{ value: string; label: string }>
@@ -151,7 +142,6 @@ export const FILTER_OPERATORS: Record<
   ],
 };
 
-/** The filter kind a property definition contributes. */
 export function filterKindForType(type: PropertyType): FilterRule["kind"] | null {
   switch (type) {
     case "text":
@@ -178,10 +168,6 @@ export function isFilterKind(value: string): value is FilterRule["kind"] {
   return value in FILTER_OPERATORS;
 }
 
-/**
- * A rule whose value has not been chosen yet is incomplete — treated as
- * inactive (matches everything), not blanking the list. Emptiness ops need no value.
- */
 export function isRuleComplete(rule: FilterRule): boolean {
   const emptiness = rule.op === "is-empty" || rule.op === "is-not-empty";
   switch (rule.kind) {

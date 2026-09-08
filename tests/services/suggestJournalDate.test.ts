@@ -15,7 +15,6 @@ describe("suggestJournalDate", () => {
     );
     expect(suggestJournalDate("tomorrow")?.alias).toBe("Tomorrow");
     expect(suggestJournalDate("yesterday")?.alias).toBe("Yesterday");
-    // Subsequence fuzzy: t-o-m-r-w all appear in order in "tomorrow".
     expect(suggestJournalDate("tmrw")?.alias).toBe("Tomorrow");
   });
 
@@ -36,7 +35,6 @@ describe("suggestJournalDate", () => {
     expect(new Date(dec10?.timestamp ?? 0).getMonth()).toBe(11);
     expect(new Date(dec10?.timestamp ?? 0).getDate()).toBe(10);
 
-    // Invalid day falls back to today's day-of-month, not NaN.
     const dec99 = suggestJournalDate("dec99");
     expect(dec99).not.toBeNull();
     expect(Number.isFinite(dec99?.timestamp ?? NaN)).toBe(true);

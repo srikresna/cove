@@ -35,11 +35,6 @@ export const DateValue: React.FC<{ timestamp: number }> = ({ timestamp }) => (
   </Tooltip>
 );
 
-/**
- * Journal row editor: a 24px checkbox marks the note as a journal note; when
- * checked, the localized date opens the calendar popover, and a red conflict
- * pill appears when another note shares the date.
- */
 export const JournalValue: React.FC<{
   noteId: string;
   value: { timestamp: number } | undefined;
@@ -92,9 +87,6 @@ export const JournalValue: React.FC<{
   }, [noteId, value, propertyVersion]);
 
   return (
-    // The hidden input inside PropertyCheckbox covers the whole cell, so
-    // clicking anywhere toggles; the date trigger and the conflict pill are
-    // buttons that naturally stop the label activation.
     <PropertyCheckbox
       checked={value !== undefined}
       onChange={() => onSetOrClear()}
@@ -139,7 +131,6 @@ export const JournalValue: React.FC<{
   );
 };
 
-/** System row: tags chips + create/pick popover, backed by the tag service. */
 export const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({
   noteId,
   workspaceId,
@@ -267,7 +258,6 @@ export const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({
   );
 };
 
-/** System row: workspace picker, derived from the note's workspaceId. */
 export const WorkspaceValue: React.FC<{ note: Note }> = ({ note }) => {
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const moveNoteToWorkspace = noteActions.moveNoteToWorkspace;

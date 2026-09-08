@@ -2,12 +2,6 @@ import { X } from "lucide-react";
 import type React from "react";
 import { cn } from "../../lib/utils";
 
-/**
- * The single tag-chip anatomy shared by every surface (property rows,
- * pickers, note cards/rows, info panel, filter rules): a colored dot and a
- * 13px label on a bordered pill. `sm` fits dense rows; `onRemove` adds the
- * hover X; `onClick` promotes the chip to a jump button.
- */
 export const TagChip: React.FC<{
   name: string;
   color: string;
@@ -53,8 +47,6 @@ export const TagChip: React.FC<{
   );
 
   if (interactive) {
-    // A remove button cannot nest inside the interactive chip (invalid
-    // HTML) — interactive chips drop it.
     return (
       <button type="button" onClick={onClick} title={title ?? name} className={base}>
         <span

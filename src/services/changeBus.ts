@@ -1,8 +1,3 @@
-/**
- * Post-commit change topics. Services publish after a write lands; stores
- * subscribe and invalidate their caches — a new write path cannot forget to
- * refresh UI because the service itself publishes.
- */
 export type ChangeTopic = "properties" | "tags";
 
 type Listener = () => void;
@@ -24,11 +19,6 @@ export const changeBus = {
   },
 };
 
-/**
- * Wraps a repository so each listed WRITE method publishes its topic after
- * the write commits. New service methods over the repo invalidate by
- * construction; read methods stay silent.
- */
 export function publishingWrites<T extends object>(
   repo: T,
   writeMethods: string[],

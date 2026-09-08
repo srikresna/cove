@@ -7,7 +7,6 @@ import type { INoteService } from "@/services/INoteService";
 import { TagService } from "@/services/TagService";
 import { InMemoryTagRepository } from "../fakes/InMemoryTagRepository";
 
-/** Minimal note lookup: note id -> workspace id. */
 function makeNoteLookup(workspacesByNote: Record<string, string>): INoteService {
   const notes = new Map<string, Note>(
     Object.entries(workspacesByNote).map(([id, workspaceId]) => [
@@ -83,7 +82,6 @@ describe("TagService", () => {
     const reused = await service.addTag("n2", "  ideas ");
     expect(reused.id).toBe(created.id);
 
-    // Same name in another workspace is a separate tag.
     const other = await service.addTag("n3", "ideas");
     expect(other.id).not.toBe(created.id);
     expect(await repo.countInWorkspace(WS_A)).toBe(1);
@@ -130,9 +128,7 @@ describe("TagService", () => {
     await service.renameTag(a.id, "Deep Work");
     expect((await service.listTags(WS_A)).map((t: Tag) => t.name)).toEqual(["Deep Work", "Focus"]);
 
-    // Renaming to a sibling name in the SAME workspace collides.
     await expect(service.renameTag(a.id, "focus")).rejects.toThrow(ValidationError);
-    // Same new name in another workspace is fine.
     await expect(service.renameTag(b.id, "Deep Work")).resolves.toBeUndefined();
 
     await service.setTagColor(a.id, TAG_COLORS[4] as string);

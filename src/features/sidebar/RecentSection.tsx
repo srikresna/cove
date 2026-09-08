@@ -9,7 +9,6 @@ import { NoteRow } from "./NoteRow";
 
 const RECENT_LIMIT = 5;
 
-/** A short, compact list of the most recently touched notes. */
 export const RecentSection: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const notes = useNotes();

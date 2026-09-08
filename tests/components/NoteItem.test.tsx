@@ -43,8 +43,6 @@ describe("NoteItem", () => {
     useNoteUiStore.setState({ activeNoteId: null, activeCoverImage: null });
   });
 
-  // The row and its hover "..." menu button both match /My Note/ — scope to
-  // the row by its exact accessible name.
   const rowOf = (note: Note) =>
     screen.getByRole("button", { name: `Note: ${note.title || "Untitled"}` });
 
@@ -81,7 +79,6 @@ describe("NoteItem", () => {
     const note = makeNote();
     render(<NoteItem note={note} isActive={false} onSelect={onSelect} {...baseProps} />);
     fireEvent.click(rowOf(note), { ctrlKey: true });
-    // The event reaches the handler; LibraryNoteList decides what it means.
     expect(onSelect).toHaveBeenCalledWith("n1", expect.objectContaining({ ctrlKey: true }));
   });
 

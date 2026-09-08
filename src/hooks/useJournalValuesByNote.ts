@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { journalService } from "../di/container";
 import { usePropertyStore } from "../store/usePropertyStore";
 
-/**
- * Bulk journal-date map (noteId -> local-midnight timestamp), refetched on
- * property-store refreshes.
- */
 export const useJournalValuesByNote = (): Map<string, number> => {
   const [map, setMap] = useState<Map<string, number>>(new Map());
   const propertyVersion = usePropertyStore((s) => s.version);

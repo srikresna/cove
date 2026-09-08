@@ -48,7 +48,6 @@ describe("groupNotes", () => {
         ["__untagged__", ["c"]],
       ].sort(),
     );
-    // The Untagged meta bucket sorts last.
     expect(groups[groups.length - 1]?.key).toBe("__untagged__");
   });
 

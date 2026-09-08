@@ -33,10 +33,6 @@ import { SelectionToolbar } from "./SelectionToolbar";
 export type { LibrarySort } from "../../domain/library/query";
 export type LibraryViewMode = "list" | "grid" | "masonry";
 
-/** First paragraphs of a note's body as an AFFiNE-style content preview —
- *  a bounded plain-text summary (AFFiNE's indexer stores one per doc). The
- *  list path already carries decrypted content, and extractParagraphs
- *  memoizes on the content string, so this is cheap per rendered row. */
 const PREVIEW_MAX_CHARS = 200;
 const previewTextOf = (note: Note, show: boolean): string | null => {
   if (!show) return null;
@@ -58,11 +54,6 @@ interface LibraryNoteListProps {
   defs: PropertyDefinition[];
 }
 
-/**
- * The all-docs list: tag pre-filter + saved-view rules + sort, then three
- * view modes — virtualized list (group headers as virtual rows) or CSS
- * grid/masonry cards — with optional grouping.
- */
 export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   sort,
   viewMode,
@@ -75,8 +66,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const { duplicateNote, toggleFavoriteNote, togglePinNote, trashNote } = noteActions;
 
-  // Property stacks under each note title — cached globally (definitions are
-  // global), invalidated by property writes through the change bus.
   const { data: stacksData } = useQuery({
     queryKey: libraryStacksKey,
     queryFn: fetchLibraryStacks,
@@ -91,8 +80,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   const activeViewId = useViewStore((s) => s.activeViewId);
   const allViews = useViewStore((s) => s.views);
 
-  // Filter inputs (property values + journal dates + tag ids) for the rules
-  // engine, group-by-tags, and row/card tag chips.
   const { data: inputsData } = useQuery({
     queryKey: libraryInputsKey(activeWorkspaceId ?? ""),
     queryFn: () => fetchLibraryInputs(activeWorkspaceId ?? ""),
@@ -129,8 +116,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     allViews,
     activeViewId,
   ]);
-
-  // ---- Grouping -----------------------------------------------------------
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const toggleGroup = useCallback((key: string) => {
@@ -170,7 +155,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
 
   const visibleItems = useMemo<GroupItem[]>(() => {
     if (!groups) {
-      // Ungrouped: bare ids are unique.
       return workspaceNotes.map((note) => ({ kind: "note", note, group: null }) as GroupItem);
     }
     const items: GroupItem[] = [];
@@ -183,18 +167,12 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
         dotColor: group.dotColor,
       });
       if (!collapsedGroups.has(group.key)) {
-        // The group qualifier keeps virtualizer keys unique when a note appears
-        // under several groups (tag grouping) — duplicate sibling keys would
-        // corrupt React reconciliation and the shared measurement cache.
         for (const note of group.notes) items.push({ kind: "note", note, group: group.key });
       }
     }
     return items;
   }, [groups, workspaceNotes, collapsedGroups]);
 
-  // ---- Shared row handlers + stack rows -----------------------------------
-
-  /** Tag chips per note (name+color), gated by the Tags display toggle. */
   const tagChipsOf = useCallback(
     (noteId: string): Array<{ name: string; color: string }> => {
       if (prefs.hiddenProps.includes("tags")) return [];
@@ -224,13 +202,10 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     [stackDefs, stackValues, prefs.showBody, prefs.hiddenProps],
   );
 
-  // ---- Multi-select --------------------------------------------------------
-
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const anchorIdRef = useRef<string | null>(null);
   const selectMode = selectedIds.size > 0;
 
-  // Escape exits selection mode.
   useEffect(() => {
     if (!selectMode) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -240,7 +215,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectMode]);
 
-  /** Flat visible order for shift-range selection. */
   const orderedNoteIds = useMemo(
     () => visibleItems.flatMap((item): string[] => (item.kind === "note" ? [item.note.id] : [])),
     [visibleItems],
@@ -299,8 +273,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     },
     [handleRowClick],
   );
-  // Manual reorder (custom sort): the service computes the fractional gap;
-  // a refresh pulls the new keys into the store.
   const handleReorder = useCallback(
     (id: string, targetId: string, position: "before" | "after") => {
       noteService
@@ -320,12 +292,8 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     [activeWorkspaceId],
   );
 
-  // ---- List mode (virtualized, group headers as virtual rows) -------------
-
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Keyed by note id, not index — notes re-sort under unchanged indexes;
-  // grouped notes carry their group key so multi-group entries stay unique.
   const getItemKey = useCallback(
     (index: number) => {
       const item = visibleItems[index];
@@ -340,8 +308,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
     count: visibleItems.length,
     getScrollElement: () => parentRef.current,
     getItemKey,
-    // 54px covers a bare row; headers are 28; real heights come from
-    // measureElement (stack rows grow past the estimate).
     estimateSize: (index) => (visibleItems[index]?.kind === "header" ? 28 : 54),
     measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 5,
@@ -450,9 +416,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
                       top: 0,
                       left: 0,
                       width: "100%",
-                      // No inline height: the row must stay content-sized so
-                      // measureElement observes real heights; pinning
-                      // virtualRow.size would freeze measurement at the estimate.
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
@@ -468,8 +431,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       </div>
     );
   }
-
-  // ---- Grid / masonry modes ------------------------------------------------
 
   const cardLayout = (groupNotes: Note[]) =>
     viewMode === "grid" ? (

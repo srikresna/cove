@@ -2,12 +2,8 @@ import type { PropertyDefinition } from "../property/Property";
 import { matchesEmptyInputs } from "./evaluateFilters";
 import type { FilterRule } from "./FilterRule";
 
-/** Rewrite outcome for one rule: the replacement, or the drop (with whether
- *  the dropped rule was vacuously satisfied by EVERY note post-deletion —
- *  used to decide keep-as-match-all vs delete the whole view). */
 export type RuleRewrite = { drop: false; rule: FilterRule } | { drop: true; vacuouslyAll: boolean };
 
-/** The rule kinds whose filter references a property definition. */
 type ValueRule = Extract<FilterRule, { propertyId: string }>;
 
 const isValueRule = (rule: FilterRule): rule is ValueRule =>
@@ -18,9 +14,6 @@ const isValueRule = (rule: FilterRule): rule is ValueRule =>
   rule.kind === "multiSelect" ||
   rule.kind === "checkbox";
 
-/** Removes a deleted option from a select/multiSelect rule (defs are global
- *  across workspaces). A rule left with no options drops: `is-not` was
- *  vacuously true, `is` matched nothing. */
 export function removeOption(
   rule: FilterRule,
   definitionId: string,
@@ -40,8 +33,6 @@ export function removeOption(
   return { drop: false, rule };
 }
 
-/** Every rule referencing a dead def drops; `vacuouslyAll` mirrors the
- *  evaluator's empty-input behavior (a deleted def is empty on every note). */
 export function dropDeadDef(rule: FilterRule, definitionId: string): RuleRewrite {
   if (isValueRule(rule) && rule.propertyId === definitionId) {
     return { drop: true, vacuouslyAll: matchesEmptyInputs(rule) };
@@ -49,15 +40,6 @@ export function dropDeadDef(rule: FilterRule, definitionId: string): RuleRewrite
   return { drop: false, rule };
 }
 
-/**
- * Startup self-heal against live defs and options. Kinds are narrowed
- * explicitly because the SQLite loader stamps every decoded rule with a
- * propertyId — `in`-checks are meaningless on loaded rules.
- *
- * `emptySelectIsComposing` keeps an ALREADY-empty select rule (drafts sit in
- * that state mid-composition); persisted rules never do, so the service
- * prunes them.
- */
 export function healRule(
   rule: FilterRule,
   defs: PropertyDefinition[],

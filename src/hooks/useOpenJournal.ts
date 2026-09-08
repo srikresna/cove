@@ -6,11 +6,6 @@ import { useNoteUiStore } from "../store/useNoteUiStore";
 import { useUIStore } from "../store/useUIStore";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 
-/**
- * Ensure-or-create the journal note for a date, refresh stores, open it.
- * A same-id re-select skips setActiveNoteId (it would null activeCoverImage)
- * but still returns the main area to the editor page.
- */
 export function useOpenJournal(): (timestamp: number) => void {
   const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);

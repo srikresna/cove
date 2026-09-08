@@ -88,7 +88,6 @@ export const CalendarPanel: React.FC = () => {
   }, [workspaceNotes, field, journalByNoteId]);
 
   const cells = useMemo(() => {
-    // Full 6-week grid; adjacent-month days render faded (and clickable), no leading blanks.
     const year = monthCursor.getFullYear();
     const month = monthCursor.getMonth();
     const firstOfMonth = new Date(year, month, 1);
@@ -107,7 +106,6 @@ export const CalendarPanel: React.FC = () => {
 
   const todayKey = dayKey(new Date());
   const selectedNotes = selectedDay ? (notesByDay.get(selectedDay) ?? []) : [];
-  // Journal notes sharing the selected day (conflict block input).
   const journalNotesForSelected = useMemo(() => {
     if (!selectedDay) return [];
     return workspaceNotes.filter((n) => {
@@ -145,8 +143,6 @@ export const CalendarPanel: React.FC = () => {
       journalService
         .ensureJournalByDate(activeWorkspaceId, date.getTime())
         .then(async (noteId) => {
-          // The service bypasses the stores, so refresh both before pointing
-          // the UI at the (possibly just-created) journal note.
           await noteActions.refreshNotesInPlace(activeWorkspaceId);
           setSelectedDay(dayKey(date));
           setActiveNoteId(noteId);
@@ -157,7 +153,6 @@ export const CalendarPanel: React.FC = () => {
   );
 
   const handleDayClick = (key: string, hasNotes: boolean) => {
-    // Day click only selects; the New-journal-note row/button is the single creation path.
     void hasNotes;
     setSelectedDay((prev) => (prev === key ? null : key));
   };
@@ -241,9 +236,6 @@ export const CalendarPanel: React.FC = () => {
           const hasNotes = notesByDay.has(key);
           const isSelected = key === selectedDay;
           const notCurrentMonth = date.getMonth() !== monthCursor.getMonth();
-          // Typed dots: journal = primary, activity (created/updated) = muted.
-          // In journal mode notesByDay is keyed by the same journal-day
-          // predicate, so hasNotes already answers this — no per-cell rescan.
           const journalDay = field === "journal" && hasNotes;
           return (
             <button
@@ -280,7 +272,6 @@ export const CalendarPanel: React.FC = () => {
       </div>
 
       <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto border-t pt-2">
-        {/* Journal conflict block: >1 journal notes sharing the selected day. */}
         {field === "journal" && dateOfSelectedDay && journalNotesForSelected.length > 1 && (
           <div className="space-y-0.5">
             {journalNotesForSelected.map((note, index) => (

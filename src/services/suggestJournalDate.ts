@@ -1,8 +1,3 @@
-/**
- * Natural-language date suggestions for quick search ("today", "tomorrow",
- * "next tuesday", "dec 10"). Returns local midnight + matched alias, or null.
- */
-
 const MONTH_NAMES = Array.from({ length: 12 }, (_, index) =>
   new Intl.DateTimeFormat("en-US", { month: "long" }).format(new Date(2024, index)),
 );
@@ -20,7 +15,6 @@ const addDays = (base: Date, n: number): Date => {
   return copy;
 };
 
-/** Subsequence match: every query char appears in order within target. */
 function fuzzyMatch(query: string, target: string): boolean {
   let ti = 0;
   for (const ch of query) {
@@ -48,8 +42,6 @@ export function suggestJournalDate(query: string): SuggestedJournalDate | null {
   if (fuzzyMatch(q, "yesterday"))
     return { timestamp: midnightOf(addDays(now, -1)), alias: "Yesterday" };
 
-  // Weekday aliases ("next tuesday") — the letters must fuzzy-match a
-  // weekday name, so bare "next week" never matches.
   const weekMatch = q.match(/^(next|last)([a-z]+)$/);
   if (weekMatch) {
     const [, direction = "", letters = ""] = weekMatch;
@@ -66,7 +58,6 @@ export function suggestJournalDate(query: string): SuggestedJournalDate | null {
     }
   }
 
-  // Month + optional day: "dec", "dec10".
   const monthMatch = q.match(/^([a-z]+)(\d*)$/);
   if (monthMatch) {
     const [, letters = "", numbers = ""] = monthMatch;

@@ -7,18 +7,11 @@ import type { PropertyDefinition } from "../domain/property/Property";
 import { notifyError } from "./notify";
 
 interface ViewState {
-  /** Saved views of the active workspace. */
   views: SavedView[];
   activeViewId: string | null;
-  /**
-   * Snapshot of the rules setActiveView copied into the drafts; lets fetchViews
-   * detect a stale copy and re-copy healed rules, never touching tweaked drafts.
-   */
   appliedRulesSnapshot: string | null;
-  /** Ad-hoc rules the user is composing in the filter bar (unsaved). */
   draftRules: FilterRules;
   version: number;
-  /** Monotonic fetch generation: a late stale fetch is dropped entirely. */
   fetchSeq: number;
 
   fetchViews: (workspaceId: string) => Promise<void>;
@@ -33,7 +26,6 @@ interface ViewState {
   deleteView: (id: string) => Promise<void>;
   syncAfterOptionDelete: (propertyId: string, optionId: string) => Promise<void>;
   syncAfterPropertyDelete: (propertyId: string) => Promise<void>;
-  /** Prune draft rules referencing dead defs/options (startup heal). */
   healDrafts: (defs: PropertyDefinition[]) => void;
 }
 
@@ -50,19 +42,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set({ fetchSeq: seq });
     try {
       const fresh = await savedViewService.listViews(workspaceId);
-      // A fetch for a superseded generation (racing workspace switches) must be
-      // dropped entirely — applying it would swap in another workspace's list.
       if (get().fetchSeq !== seq) return;
       set((s) => {
         const active = s.activeViewId ? fresh.find((v) => v.id === s.activeViewId) : undefined;
         if (s.activeViewId && !active) {
-          // Self-reconciling: the active view was deleted underneath the
-          // fetch (startup heal, prune) — clear the stranded selection.
           return { views: fresh, activeViewId: null, draftRules: [], appliedRulesSnapshot: null };
         }
-        // Straggler guard: drafts still match the snapshot yet the fresh rules
-        // differ — the copy came from a stale pre-heal row, so re-copy. Tweaked
-        // drafts are never touched.
         if (
           active &&
           s.appliedRulesSnapshot != null &&
@@ -86,8 +71,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
     const view = get().views.find((v) => v.id === viewId) ?? null;
     set((s) => ({
       activeViewId: viewId,
-      // Applying a view loads its rules into the draft so the filter bar
-      // shows and can tweak them; clearing keeps the drafts untouched.
       draftRules: view ? view.rules.map((r) => ({ ...r })) : viewId === null ? s.draftRules : [],
       appliedRulesSnapshot: view ? JSON.stringify(view.rules) : null,
       version: s.version + 1,
@@ -118,12 +101,8 @@ export const useViewStore = create<ViewState>((set, get) => ({
     })),
 
   saveDraftAsView: async (workspaceId, name) => {
-    // Rejects on failure (duplicate name, empty rules) — callers decide
-    // between an inline error and a toast.
     const view = await savedViewService.createView(workspaceId, name, get().draftRules);
     await get().fetchViews(workspaceId);
-    // The saved view's rules ARE the drafts — stamp the snapshot so the
-    // straggler guard doesn't treat the next fetch as a stale copy.
     set((s) => ({
       activeViewId: view.id,
       appliedRulesSnapshot: JSON.stringify(view.rules),
@@ -137,9 +116,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
     if (!activeViewId) return;
     try {
       await savedViewService.updateViewRules(activeViewId, get().draftRules);
-      // Bump AFTER the commit (CollectionsSection refetches on version) and
-      // re-stamp the snapshot so the straggler guard doesn't treat the
-      // just-saved rules as a stale copy on the next fetch.
       set((s) => ({
         appliedRulesSnapshot: JSON.stringify(s.draftRules),
         version: s.version + 1,
@@ -178,8 +154,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
 
   syncAfterOptionDelete: async (propertyId, optionId) => {
-    // Prune drafts FIRST and unconditionally — the dropdown only renders live
-    // options, so a dead id could never be cleared from a draft.
     set((s) => ({
       draftRules: s.draftRules.flatMap((r) => {
         const next = removeOption(r, propertyId, optionId);
@@ -195,8 +169,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
     }
     const activeDeleted =
       get().activeViewId !== null && deletedViewIds.includes(get().activeViewId ?? "");
-    // Bump AFTER the prune commits — CollectionsSection refetches on version
-    // changes, so an earlier bump would cache pre-commit rows.
     set((s) => ({
       ...(activeDeleted ? { activeViewId: null, draftRules: [], appliedRulesSnapshot: null } : {}),
       version: s.version + 1,
@@ -224,8 +196,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   healDrafts: (defs) => {
     set((s) => ({
-      // Drafts referencing dead defs/options are pruned unconditionally (the
-      // FilterBar can never clear a dead reference).
       draftRules: s.draftRules.flatMap((r): FilterRule[] => {
         const next = healRule(r, defs, { emptySelectIsComposing: true });
         return next.drop ? [] : [next.rule];

@@ -5,8 +5,6 @@ import { FoundationViewExtension } from "@blocksuite/affine/foundation/view";
 import { BlockPlainTextAdapterExtension } from "@blocksuite/affine/shared/adapters";
 import { AffineCanvasTextFonts, FeatureFlagService } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
-// The vendored store package exports Workspace only as an interface — this
-// test entrypoint is its sole concrete implementation.
 import { TestWorkspace } from "@blocksuite/affine/store/test";
 import { effects as registerEditorContainer } from "@blocksuite/integration-test/effects";
 import type { BlobSource } from "@blocksuite/sync";
@@ -30,18 +28,11 @@ interface BlockSuiteEditorServiceDeps {
   blobSource: BlobSource;
 }
 
-// The vendored transformers finish with a browser-style blob download that
-// dies silently in the Tauri webview (no download handler). We register a
-// native saver on globalThis that the patched `download()` delegates to;
-// its promises queue here so exportDoc can await the actual write before
-// reporting success.
 declare global {
   var __coveNativeSave: ((blob: Blob, fileName: string) => Promise<string | null>) | undefined;
   var __coveSaveQueue: Promise<string | null>[] | undefined;
 }
 
-/** Native save: system Save dialog → bytes → Rust write. Resolves null when
- *  the user cancels, so cancellation stays silent. */
 const nativeSaveBlob = async (blob: Blob, fileName: string): Promise<string | null> => {
   const { save } = await import("@tauri-apps/plugin-dialog");
   const ext = fileName.includes(".") ? (fileName.split(".").pop() ?? "") : "";
@@ -55,11 +46,6 @@ const nativeSaveBlob = async (blob: Blob, fileName: string): Promise<string | nu
   return path;
 };
 
-// pdfmake resolves font names through its virtual file system — a relative
-// URL is treated as a vfs key, not something to fetch (the vendored adapter's
-// absolute https URLs only work online). Load the bundled Liberation faces
-// into the vfs as base64 once, offline-safe, mapped onto both font names the
-// PDF adapter uses.
 let pdfFontsReady: Promise<void> | null = null;
 const PDF_FACES = [
   ["normal", "LiberationSans-Regular.ttf"],
@@ -81,9 +67,6 @@ const loadPdfFonts = async (): Promise<void> => {
     }
     vfs[file] = btoa(binary);
   }
-  // pdfmake 0.3 dropped the `vfs` property — addVirtualFileSystem feeds the
-  // module-level VirtualFileSystem singleton the adapter's fonts resolve
-  // against (entries are base64 strings).
   pdfMake.addVirtualFileSystem(vfs);
   const slots = {
     normal: "LiberationSans-Regular.ttf",
@@ -94,9 +77,6 @@ const loadPdfFonts = async (): Promise<void> => {
   pdfMake.fonts = { Inter: slots, SarasaGothicCL: slots };
 };
 
-// Image blocks carry no text, so plaintext exports of image-heavy notes
-// (tweet saves) come out as nothing but the title. Emit a stand-in line so
-// plaintext previews and exports keep the note's structure.
 const imagePlainTextAdapter = BlockPlainTextAdapterExtension({
   flavour: "affine:image",
   toMatch: () => false,
@@ -149,9 +129,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       this.viewManager = new ViewExtensionManager(getInternalViewExtensions());
       this.viewManager.configure(FoundationViewExtension, {
         peekView: covePeekViewService,
-        // Canvas text families (blocksuite:surface:*) only exist once the
-        // FontLoaderService registers them; without a fontConfig the
-        // edgeless font picker switches between families that never resolve.
         fontConfig: AffineCanvasTextFonts.map((font) => ({
           ...font,
           url: `/fonts/${font.url.split("/").pop()}`,
@@ -190,9 +167,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
           try {
             await this.docCreatedHandler(docId, title);
           } catch (err) {
-            // Without a notes row the in-memory doc could never save — drop
-            // it, unless the user already has it open (same guard as
-            // registerExistingNotes: never removeDoc a mounted doc).
             if (!this.initializedDocs.has(docId)) {
               try {
                 workspace.removeDoc(docId);
@@ -204,9 +178,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
           }
         })();
         this.docCreatedPromises.set(docId, created);
-        // Successful entries are dropped; failed ones stay so late awaiters
-        // (markdown import) still see the rejection. The no-op rejection
-        // handler marks the fire-and-forget path as handled.
         void created.then(
           () => this.docCreatedPromises.delete(docId),
           () => {},
@@ -279,8 +250,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     return doc;
   }
 
-  /** Exports via the vendored transformers and saves through the native
-   *  dialog. Resolves the written path, or null when the user cancelled. */
   async exportDoc(noteId: string, format: "markdown" | "html" | "pdf"): Promise<string | null> {
     const ws = this.getWorkspace();
     const doc = ws.getDoc(noteId);
@@ -296,9 +265,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
       if (format === "markdown") await MarkdownTransformer.exportDoc(store);
       else if (format === "html") await HtmlTransformer.exportDoc(store);
       else {
-        // pdfmake fonts come from the local vfs (Liberation Sans, the app
-        // font) — the adapter's cdn.affine.pro assignment is replaced after
-        // its module import so an offline app still renders text.
         if (!pdfFontsReady) pdfFontsReady = loadPdfFonts();
         await pdfFontsReady;
         await PdfTransformer.exportDoc(store);
@@ -318,9 +284,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
 
     const sampleDoc = ws.docs.values().next().value;
     if (!sampleDoc) throw new Error("Open a note before importing.");
-    // Adapter matchers (markdown/plain-text per block) are registered ONLY
-    // in the STORE scope — passing view extensions imports an empty note
-    // with nothing but the title surviving.
     const docId = await MarkdownTransformer.importMarkdownToDoc({
       collection: ws,
       schema: sampleDoc.getStore().schema,
@@ -342,8 +305,6 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     const sampleDoc = ws.docs.values().next().value;
     if (!sampleDoc) throw new Error("Open a note before importing.");
     const schema = sampleDoc.getStore().schema;
-    // The planner only recognizes .md notes; everything else stages as an
-    // asset, and .markdown files would silently become stray blobs.
     const plannerFiles = files.filter(
       (f) => /\.(md)$/i.test(f.name) || !/\.markdown$/i.test(f.name),
     );
@@ -358,21 +319,14 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     for (const docId of committed.docIds) {
       try {
         await this.persistImportedDoc(docId);
-        // The commit path stamps doc titles only AFTER creation, so the
-        // doc-created handler persisted each row as "Untitled" — push the
-        // planned title through now.
         const title = ws.meta.getDocMeta(docId)?.title;
         if (title) await this.docTitleHandler(docId, title);
         persisted.push(docId);
-      } catch {
-        // One unpersistable doc must not abandon the rest of the batch.
-      }
+      } catch {}
     }
     return persisted;
   }
 
-  /** Waits for the doc-created handler's notes row, then persists the
-   *  imported content through the normal save path. */
   private async persistImportedDoc(docId: string): Promise<void> {
     const created = this.docCreatedPromises.get(docId);
     if (created) await created;

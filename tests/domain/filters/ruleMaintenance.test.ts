@@ -85,7 +85,6 @@ describe("healRule", () => {
       drop: false,
       rule: empty,
     });
-    // Persisted rules never sit mid-composition: the service path drops it.
     expect(healRule(empty, [def({})])).toEqual({ drop: true, vacuouslyAll: false });
   });
 });

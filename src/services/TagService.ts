@@ -38,7 +38,6 @@ export class TagService implements ITagService {
     const normalized = normalizeTagName(name);
     if (!normalized) throw new ValidationError("Tag name cannot be empty.");
 
-    // Tags belong to the note's workspace; two workspaces can share a name.
     const note = await this.notes.getNote(noteId);
     if (!note) throw new NotFoundError("Note", noteId);
 
@@ -58,8 +57,6 @@ export class TagService implements ITagService {
     try {
       await this.tags.create(tag);
     } catch (err) {
-      // Lost a create race against a concurrent addTag of the same name
-      // (UNIQUE(workspaceId, name)): reuse the winner instead of failing.
       const winner = await this.tags.findByName(note.workspaceId, normalized);
       if (winner) {
         await this.tags.addToNote(noteId, winner.id);

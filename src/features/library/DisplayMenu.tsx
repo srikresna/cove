@@ -26,7 +26,6 @@ import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import type { LibrarySort } from "./LibraryNoteList";
 
-/** What the list groups notes by; custom properties group by their def id. */
 export type GroupBy = "none" | "tags" | "journal" | "created" | "updated" | { defId: string };
 
 export const isGroupByDef = (value: GroupBy): value is { defId: string } =>
@@ -34,7 +33,6 @@ export const isGroupByDef = (value: GroupBy): value is { defId: string } =>
 
 export interface LibraryDisplayPrefs {
   groupBy: GroupBy;
-  /** Def ids (+ "tags") whose chips are HIDDEN on rows/cards (default: none hidden). */
   hiddenProps: string[];
   showIcon: boolean;
   showBody: boolean;
@@ -45,7 +43,6 @@ interface DisplayMenuProps {
   onChange: (next: Partial<LibraryDisplayPrefs>) => void;
   orderBy: LibrarySort;
   onOrderByChange: (next: LibrarySort) => void;
-  /** Simple-typed custom defs eligible for grouping + chip toggles. */
   defs: PropertyDefinition[];
   viewMode: "list" | "grid" | "masonry";
 }
@@ -88,10 +85,6 @@ const ORDER_ITEMS: Array<{ value: LibrarySort; label: string; icon: React.ReactN
   },
 ];
 
-/**
- * Explorer display menu: Grouping + Ordering submenus, display property
- * chip toggles, and list-only icon/body switches.
- */
 export const DisplayMenu: React.FC<DisplayMenuProps> = ({
   prefs,
   onChange,

@@ -61,11 +61,6 @@ const isDisplayPrefs = (value: unknown): value is LibraryDisplayPrefs => {
   );
 };
 
-/**
- * The all-docs page: a 52px header bar with Docs/Collections/Tags navigation,
- * view modes, the Display menu and the New dropdown; below it the collection
- * chip strip and the inline filter area, then the virtualized note list.
- */
 export const LibraryPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const notes = useNotes();
@@ -92,7 +87,6 @@ export const LibraryPage: React.FC = () => {
     const stored = localStorage.getItem(SORT_KEY) ?? "";
     return isLibrarySort(stored) ? stored : "updated-desc";
   });
-  // Display prefs persist PER VIEW MODE (list/grid/masonry).
   const [prefs, setPrefs] = useState<LibraryDisplayPrefs>(() => {
     const readPrefs = (mode: LibraryViewMode): LibraryDisplayPrefs => {
       try {
@@ -110,7 +104,6 @@ export const LibraryPage: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
 
-  // Stack-eligible defs feed the Display menu (grouping + chip toggles).
   const [defs, setDefs] = useState<PropertyDefinition[]>([]);
   const propertyVersion = usePropertyStore((s) => s.version);
 
@@ -138,7 +131,6 @@ export const LibraryPage: React.FC = () => {
     localStorage.setItem(SORT_KEY, next);
   };
   const chooseViewMode = (next: LibraryViewMode) => {
-    // Swap the per-mode prefs alongside the mode itself.
     setViewMode((prevMode) => {
       localStorage.setItem(displayKeyFor(prevMode), JSON.stringify(prefs));
       localStorage.setItem(VIEW_MODE_KEY, next);
@@ -163,8 +155,6 @@ export const LibraryPage: React.FC = () => {
     });
   }, [activeWorkspaceId]);
 
-  // Markdown import: multi-file input → one note per .md (the transformer
-  // needs at least one existing doc as its schema donor).
   const importInputRef = useRef<HTMLInputElement>(null);
   const importFolderInputRef = useRef<HTMLInputElement>(null);
   const handleImportMarkdown = useCallback(() => {
@@ -191,8 +181,6 @@ export const LibraryPage: React.FC = () => {
     importFolderInputRef.current?.click();
   }, [notes.length]);
 
-  /** Folder import (md + assets): one planner run stages every image so
-   *  relative ![](assets/x.png) references resolve to real blobs. */
   const handleImportFolder = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0 || !activeWorkspaceId) return;
@@ -253,9 +241,6 @@ export const LibraryPage: React.FC = () => {
           if (docId) imported += 1;
           else failed += 1;
         } catch (err) {
-          // Per-file failures shouldn't abort the batch; the toast reports
-          // the counts. Persistence failures were already toasted by the
-          // doc-created handler — count them separately.
           if (
             err instanceof Error &&
             (err as Error & { coveAlreadyNotified?: boolean }).coveAlreadyNotified
@@ -287,8 +272,6 @@ export const LibraryPage: React.FC = () => {
     [activeWorkspaceId],
   );
 
-  // An applied tag filter must always be visible and one-click clearable —
-  // the tag entry path (Tags tab / sidebar) never opens the rule editor.
   const filterAreaVisible = draftRules.length > 0 || filterEditing || activeTagId !== null;
   const activeTag = tags.find((t) => t.id === activeTagId);
 
@@ -301,9 +284,6 @@ export const LibraryPage: React.FC = () => {
     setSavePromptOpen(true);
   }, [activeViewId, updateActiveViewRules]);
 
-  /** Reset reverts the drafts to the applied collection's saved rules (a
-   *  plain clear would silently un-apply the collection); ad-hoc drafts and
-   *  tag filters clear outright. */
   const handleResetFilter = useCallback(() => {
     if (activeViewId) {
       setActiveView(activeViewId);
@@ -323,12 +303,6 @@ export const LibraryPage: React.FC = () => {
     [setTagFilter],
   );
 
-  /** Editing a collection = loading it into the Docs filter bar; creating
-   *  one = opening an empty builder. No editor modal — the builder is the
-   *  editor, the same surface that saved the collection in the first place.
-   *  Both drop any active tag filter: collections scope over the whole
-   *  workspace, and a leftover tag would silently narrow the builder's
-   *  live result while Save persists the wider rules. */
   const handleEditView = useCallback(
     (viewId: string) => {
       setTab("docs");
@@ -351,16 +325,11 @@ export const LibraryPage: React.FC = () => {
     [views, activeViewId],
   );
 
-  /** Clearing the always-include list is the one manual-include control that
-   *  survives without the old editor modal — adding notes by hand is gone,
-   *  existing lists stay honored until cleared here. */
   const handleClearManualIncludes = useCallback(() => {
     if (!activeView || activeView.allowNoteIds.length === 0) return;
     void (async () => {
       try {
         await savedViewService.updateViewAllowIds(activeView.id, []);
-        // Bump after the write commits — CollectionsSection refetches on
-        // version, refreshing the store list this page reads.
         useViewStore.setState((s) => ({ version: s.version + 1 }));
       } catch (err) {
         notifyError(err);
@@ -368,7 +337,6 @@ export const LibraryPage: React.FC = () => {
     })();
   }, [activeView]);
 
-  // Simple-typed custom defs are groupable and chip-toggleable.
   const eligibleDefs = useMemo(() => defs.filter(isStackEligibleDef), [defs]);
 
   const docsBody = useMemo(
@@ -410,8 +378,6 @@ export const LibraryPage: React.FC = () => {
         ref={importFolderInputRef}
         type="file"
         className="hidden"
-        // Folder picks keep each file's relative path (md + assets/), which
-        // the import planner needs to resolve image references.
         // @ts-expect-error non-standard but universally supported directory picker
         webkitdirectory=""
         directory=""
@@ -436,7 +402,6 @@ export const LibraryPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Collection chip strip. */}
           <div className="flex items-center gap-1 px-6 pt-3">
             <button
               type="button"
@@ -497,9 +462,6 @@ export const LibraryPage: React.FC = () => {
             )}
           </div>
 
-          {/* Inline filter area. An applied collection collapses to a
-              summary row until the user opens the rule editor; rules apply
-              live, Save only persists them as a collection. */}
           {filterAreaVisible && (
             <div className="px-6 pt-2">
               <div className="rounded-md bg-muted/60 p-2">
@@ -550,8 +512,6 @@ export const LibraryPage: React.FC = () => {
                       type="button"
                       aria-label={MESSAGES.TAG_FILTER_CLEAR}
                       onClick={() => {
-                        // Clearing the collection clears its rules too —
-                        // setActiveView(null) alone would keep filtering.
                         clearDraft();
                         setFilterEditing(false);
                       }}

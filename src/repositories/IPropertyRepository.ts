@@ -13,7 +13,6 @@ export interface PropertyDefinitionPatch {
   icon?: string | null;
 }
 
-/** One note-value write in an option-deletion sweep; null valueJson = remove. */
 export interface OptionDeletionWrite {
   noteId: string;
   valueJson: string | null;
@@ -26,10 +25,6 @@ export interface IPropertyRepository {
   updateOptions(id: string, optionsJson: string): Promise<void>;
   appendOption(id: string, optionJson: string): Promise<void>;
   deleteDefinition(id: string): Promise<void>;
-  /**
-   * Atomically removes one option: replaces optionsJson (skipped when null)
-   * and applies the value sweep in the same transaction.
-   */
   applyOptionDeletion(
     definitionId: string,
     optionsJson: string | null,

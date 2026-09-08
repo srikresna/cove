@@ -111,8 +111,6 @@ vaultService.onLock(() => {
   useTagStore.setState({ tags: [], tagCounts: [], activeTagId: null, taggedNoteIds: null });
 });
 
-// Repo writes publish "tags" — refresh is centralized here instead of every
-// mutation call site.
 changeBus.on("tags", () => {
   void useTagStore.getState().refresh();
 });

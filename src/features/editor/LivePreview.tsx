@@ -30,8 +30,6 @@ export const LivePreview: React.FC<{ noteId: string }> = ({ noteId }) => {
   const [format, setFormat] = useState<Format>("markdown");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
-  /** blob key -> object URL, so the markdown preview shows the actual
-   *  images instead of dead `assets/<sha>.png` references. */
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -76,15 +74,12 @@ export const LivePreview: React.FC<{ noteId: string }> = ({ noteId }) => {
                   if (!blob) return;
                   const url = URL.createObjectURL(blob);
                   if (cancelled) {
-                    // Cleanup already ran and would never revoke this one.
                     URL.revokeObjectURL(url);
                     return;
                   }
                   created.push(url);
                   urls[id] = url;
-                } catch {
-                  // A missing blob just leaves the placeholder.
-                }
+                } catch {}
               }),
             );
           }
@@ -112,15 +107,11 @@ export const LivePreview: React.FC<{ noteId: string }> = ({ noteId }) => {
     [format, content],
   );
 
-  // Exported refs look like assets/<blobId>.<ext> with the raw sha as the
-  // file name; resolve them back to the fetched blobs.
   const resolveImage = (url: string): string | undefined => {
     let name = url.split("/").pop() ?? url;
     try {
       name = decodeURIComponent(name);
-    } catch {
-      // Malformed escapes fall through to the raw name.
-    }
+    } catch {}
     const blobId = name.replace(/\.[a-z0-9]+$/i, "");
     return imageUrls[blobId];
   };

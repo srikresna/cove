@@ -90,7 +90,6 @@ export const PROPERTY_TYPE_META: Record<PropertyType, { label: string; icon: Rea
   updated: { label: "Updated", icon: <Calendar /> },
 };
 
-/** Selectable custom icons (PROPERTY_ICON_NAMES in the domain, one component each). */
 export const PROPERTY_ICONS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   type: Type,
   hash: Hash,
@@ -114,7 +113,6 @@ export const PROPERTY_ICONS: Record<string, React.FC<React.SVGProps<SVGSVGElemen
   heart: Heart,
 };
 
-/** Custom icon when set, the type's default icon otherwise. */
 export const resolvePropertyIcon = (def: PropertyDefinition): React.ReactNode => {
   const custom = def.icon != null ? PROPERTY_ICONS[def.icon] : undefined;
   if (custom) return <Icon icon={custom} />;
@@ -159,11 +157,6 @@ const OptionChip: React.FC<{ option: PropertyOption; onRemove?: () => void }> = 
   </span>
 );
 
-/**
- * Option-picker popover: keyboard Up/Down/Enter navigation with a focused
- * row, Backspace on empty input removes the last selected chip, and a
- * hover-revealed "..." per-option menu (rename / recolor / delete).
- */
 const OptionPicker: React.FC<{
   def: PropertyDefinition;
   selectedIds: string[];
@@ -180,12 +173,10 @@ const OptionPicker: React.FC<{
       (!trimmed || o.name.toLowerCase().includes(trimmed.toLowerCase())) &&
       (multi ? !selectedIds.includes(o.id) : true),
   );
-  // The Create row participates in keyboard navigation as the last row.
   const showCreate = trimmed.length > 0 && !exactExists;
   const rowCount = visible.length + (showCreate ? 1 : 0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Random-start rotating palette index.
   const colorOffset = useRef(Math.floor(Math.random() * TAG_COLORS.length));
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: trimmed is the intentional reset signal; listing query would re-run on every keystroke anyway
@@ -235,7 +226,6 @@ const OptionPicker: React.FC<{
             activateRow(focusedIndex);
           } else if (e.key === "Backspace" && query === "" && multi && selectedIds.length > 0) {
             e.preventDefault();
-            // Remove the last selected chip.
             onPick(selectedIds[selectedIds.length - 1] ?? "");
           }
         }}
@@ -312,7 +302,6 @@ const OptionRow: React.FC<{
     if (renaming) inputRef.current?.focus();
   }, [renaming]);
 
-  // Option mutations write through PropertyService, which has no reactive
   const commitRename = (name: string) => {
     const next = name.trim();
     if (next && next !== option.name) {
@@ -412,8 +401,6 @@ const OptionRow: React.FC<{
               void propertyService
                 .deleteOption(defId, option.id)
                 .then(async () => {
-                  // Saved views + draft rules may filter on the deleted
-                  // option; prune them so no view silently goes empty.
                   await useViewStore.getState().syncAfterOptionDelete(defId, option.id);
                 })
                 .catch(notifyError)
@@ -524,10 +511,6 @@ export interface PropertyValueEditorProps {
   createOption: (def: PropertyDefinition, name: string, thenPick: boolean, color?: string) => void;
 }
 
-/**
- * An auto-growing textarea over a hidden mirror div; multiline, committed on
- * blur with trim. Focus styling lives on the wrapper (focus-within).
- */
 const TextLikeValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet, onClear }) => {
   const current =
     value?.type === "text"
@@ -599,8 +582,6 @@ const NumberValue: React.FC<PropertyValueEditorProps> = ({ value, onSet, onClear
 const CheckboxValue: React.FC<PropertyValueEditorProps> = ({ def, value, onSet }) => {
   const checked = value?.type === "checkbox" && value.checked;
   return (
-    // The label stretches across the whole value cell, so the entire cell
-    // toggles through the hidden native input.
     <PropertyCheckbox
       checked={checked}
       onChange={(next) => onSet({ type: "checkbox", checked: next })}
@@ -811,10 +792,6 @@ const RelationValue: React.FC<PropertyValueEditorProps> = ({ value, noteId, onCl
   );
 };
 
-/**
- * Declarative per-type value editor registry: every surface (Info panel,
- * doc-list columns, filters) resolves editors from here, not a switch.
- */
 export const PROPERTY_VALUE_EDITORS: Record<PropertyType, React.FC<PropertyValueEditorProps>> = {
   text: TextLikeValue,
   number: NumberValue,
@@ -827,8 +804,6 @@ export const PROPERTY_VALUE_EDITORS: Record<PropertyType, React.FC<PropertyValue
   checkbox: CheckboxValue,
   url: TextLikeValue,
   relation: RelationValue,
-  // System rows own their renderers inside the Info panel; these entries
-  // exist only to satisfy the Record and are never reached.
   tags: TextLikeValue,
   workspace: TextLikeValue,
   created: TextLikeValue,

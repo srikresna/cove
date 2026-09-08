@@ -2,8 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The store pulls the DI container (and with it the vendored BlockSuite
-// runtime) at module level — mock it like tests/store/useViewStore.test.ts.
 vi.mock("@/di/container", () => ({
   savedViewService: { listViews: vi.fn() },
   vaultService: { onLock: vi.fn() },
@@ -47,8 +45,6 @@ describe("CollectionsTab", () => {
     render(
       <CollectionsTab onOpenInDocs={vi.fn()} onEditView={onEditView} onCreateView={vi.fn()} />,
     );
-    // Radix DropdownMenu opens on the full pointer sequence — userEvent
-    // provides it, plain fireEvent.click does not.
     await userEvent.click(screen.getByRole("button", { name: /journal entries: collections/i }));
     fireEvent.click(await screen.findByText("Edit rules"));
     expect(onEditView).toHaveBeenCalledWith("v1");
@@ -69,8 +65,6 @@ describe("CollectionsTab", () => {
     render(
       <CollectionsTab onOpenInDocs={vi.fn()} onEditView={vi.fn()} onCreateView={onCreateView} />,
     );
-    // Header button + empty-state CTA both read "New collection" — the CTA
-    // is the second one; either way both must route through the handoff.
     const buttons = screen.getAllByRole("button", { name: /new collection/i });
     const cta = buttons[buttons.length - 1];
     if (!cta) throw new Error("empty-state CTA missing");

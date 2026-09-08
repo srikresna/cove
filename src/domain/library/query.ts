@@ -49,8 +49,6 @@ const STACK_ELIGIBLE_TYPES = [
   "url",
 ] as const;
 
-/** Simple-typed, visible, custom properties — groupable, chip-toggleable,
- *  and stackable on note rows. */
 export function isStackEligibleDef(def: PropertyDefinition): boolean {
   return (
     def.show !== "always-hide" &&
@@ -60,21 +58,12 @@ export function isStackEligibleDef(def: PropertyDefinition): boolean {
 }
 
 export interface ViewSelectionInputs {
-  /** Live notes of the workspace, already tag-prefiltered. */
   notes: Note[];
   rules: FilterRule[];
-  /** Bulk-loaded filter inputs by note id (null while loading). App-created
-   *  notes carry a seeded empty entry, so membership implies "known". */
   filterable: Map<string, FilterableNote> | null;
-  /** Manually-included ids (a collection's Docs tab): rules OR membership. */
   allowNoteIds: string[];
 }
 
-/** The one definition of "which notes does this view show": rule evaluation
- *  with cache-aware deferral, OR-unioned with the manual allow-list, sorted.
- *  Notes absent from the cache are synthesized empty ONLY where fabricated
- *  emptiness cannot decide the outcome; otherwise they wait for
- *  revalidation. */
 export function selectNotesForView(inputs: ViewSelectionInputs, sort: LibrarySort): Note[] {
   const { notes, rules, filterable, allowNoteIds } = inputs;
   const rulesActive = rules.length > 0;
@@ -89,10 +78,8 @@ export function selectNotesForView(inputs: ViewSelectionInputs, sort: LibrarySor
   });
   let filtered: Note[];
   if (!rulesActive) {
-    // No rules = match-all; the allow-list only adds.
     filtered = notes;
   } else if (!filterable) {
-    // Bulk inputs still loading — the list's own loader re-runs this.
     filtered = notes;
   } else {
     const deferUnknown = rules.filter(isRuleComplete).some(decidesByFabricatedEmptiness);

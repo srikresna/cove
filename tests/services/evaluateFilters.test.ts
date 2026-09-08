@@ -156,7 +156,6 @@ describe("evaluateFilters", () => {
   it("rules without a chosen value are inactive and match everything", () => {
     const items = [makeItem("a"), makeItem("b")];
     const incomplete: FilterRule[] = [
-      // Fresh from the "+ Filter" menu, before the user picks anything.
       { id: rid(), kind: "text", propertyId: "p", op: "contains", value: "" },
       { id: rid(), kind: "number", propertyId: "p", op: "=", value: undefined },
       { id: rid(), kind: "date", propertyId: "p", op: "is", value: undefined },

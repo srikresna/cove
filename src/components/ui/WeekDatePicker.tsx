@@ -23,12 +23,6 @@ const addDaysLocal = (d: Date, n: number): Date => {
   return copy;
 };
 
-/**
- * A compact week strip navigator. Visible day count adapts to the container
- * width (1..7 via ResizeObserver); dense mode under 300px truncates weekday
- * labels; arrow keys move the cursor. Purely presentational — callers decide
- * what a day click does.
- */
 export const WeekDatePicker: React.FC<{
   value: number | null;
   onChange: (timestamp: number) => void;
@@ -55,8 +49,6 @@ export const WeekDatePicker: React.FC<{
     if (selected) setCursor(selected);
   }, [selected]);
 
-  // The measured width includes the two chevrons + gutters (56px) the day
-  // strip never sees — subtract them. 7 cells is only the unmeasured default.
   const fitCount = Math.floor((width - 56) / (CELL_W + CELL_GAP));
   const viewport = width > 0 ? Math.max(1, Math.min(7, fitCount)) : 7;
   const dense = width > 0 && width < 300;

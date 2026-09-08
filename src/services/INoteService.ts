@@ -41,7 +41,6 @@ export interface INoteService {
     >,
   ): Promise<Note>;
   updateContent(id: string, content: string): Promise<Note>;
-  /** Move a note before/after another in the manual (custom) order. */
   reorderNote(id: string, targetId: string, position: "before" | "after"): Promise<void>;
 
   getCoverImage(id: string): Promise<string | null>;

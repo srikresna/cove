@@ -25,7 +25,6 @@ const {
 vi.mock("@/di/container", () => ({
   workspaceService: { getAllWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace },
   noteService: { collectWorkspaceBlobCandidates, gcOrphanBlobs },
-  // Pulled in transitively by the tag/view stores the workspace store resets.
   tagService: {},
   savedViewService: {},
   vaultService: { onLock: vi.fn() },

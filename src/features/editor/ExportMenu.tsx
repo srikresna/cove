@@ -27,7 +27,6 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ noteId }) => {
   const run = async (format: "markdown" | "html" | "pdf") => {
     try {
       const saved = await blockSuiteEditorService.exportDoc(noteId, format);
-      // A cancelled Save dialog is not an outcome worth announcing.
       if (saved) {
         useNotificationStore.getState().pushToast({
           kind: "info",
@@ -48,7 +47,6 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ noteId }) => {
       const id = await blockSuiteEditorService.importMarkdownFile(file);
       toast(id ? "Markdown imported" : "Import returned no doc");
     } catch (err) {
-      // The doc-created handler already toasted persistence failures.
       if (
         !(
           err instanceof Error &&

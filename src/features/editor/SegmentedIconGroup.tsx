@@ -11,16 +11,6 @@ export interface SegmentedIconItem<T extends string> {
 
 const segmentId = (value: string): string => `cove-segment-${value}`;
 
-/**
- * A joined pill of icon segments — the AFFiNE-style segmented control used
- * by the doc-mode switch and the right-bar tab strip. Buttons size to a
- * 40px bar; the active segment lifts onto the card surface.
- *
- * `toggle` models a mutually exclusive mode switch (role=group,
- * aria-pressed). `tabs` models one-selection-of-many panel content
- * (role=tablist/tab, aria-selected, roving arrow keys with automatic
- * activation).
- */
 export function SegmentedIconGroup<T extends string>({
   items,
   value,
@@ -37,8 +27,6 @@ export function SegmentedIconGroup<T extends string>({
   "aria-label"?: string;
 }): React.ReactNode {
   const isTabs = variant === "tabs";
-  // Roving focus with automatic activation: arrows select as they move,
-  // the standard compact tab-strip behavior.
   const moveFocus = (fromValue: T, delta: number) => {
     const count = items.length;
     const index = items.findIndex((i) => i.value === fromValue);

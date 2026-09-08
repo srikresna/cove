@@ -30,8 +30,6 @@ const writeTrash = (notes: Note[]): void => {
   queryClient.setQueryData(trashKey, notes);
 };
 
-/** Finds the cache entry holding a note (mutations may target a note from a
- *  non-active workspace, e.g. a peeked backlink). */
 function cacheOf(id: string): { ws: string; notes: Note[] } | null {
   for (const [key, cached] of queryClient.getQueriesData<Note[]>({ queryKey: ["notes"] })) {
     if (cached?.some((n) => n.id === id)) {
@@ -41,19 +39,12 @@ function cacheOf(id: string): { ws: string; notes: Note[] } | null {
   return null;
 }
 
-/** Marks every notes list stale and refetches, resolving only once the fresh
- *  data has landed — awaited callers (journal open, restore, import) can rely
- *  on the note being present afterwards. Membership changes also rebuild the
- *  Library's bulk inputs (rule views, grouping, chips). */
 async function invalidateNotes(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"], refetchType: "all" });
   await queryClient.invalidateQueries({ queryKey: ["library-inputs"], refetchType: "all" });
 }
 
 export const noteActions = {
-  /** Rebuilds the Library's bulk-loaded filter inputs (property values, tag
-   *  ids) from the post-write DB. Called on every note-membership change —
-   *  create, restore, import, duplicate, workspace move. */
   invalidateLibraryInputs(): Promise<void> {
     return queryClient.invalidateQueries({
       queryKey: ["library-inputs"],
@@ -61,10 +52,6 @@ export const noteActions = {
     });
   },
 
-  /** Ensures the workspace's list is cached (fetches on first use) and
-   *  keeps the passive-selection invariant: boot, unlock remount, and
-   *  workspace switches never click a row, so a landed list selects the
-   *  first note when nothing valid is active. */
   async fetchNotes(ws: string): Promise<void> {
     await queryClient.ensureQueryData({
       queryKey: notesKey(ws),
@@ -75,17 +62,14 @@ export const noteActions = {
     const activeId = useNoteUiStore.getState().activeNoteId;
     const valid = activeId != null && notes.some((n) => n.id === activeId);
     if (!valid && notes.length > 0) {
-      // Direct state write: selecting passively must not flip the page.
       useNoteUiStore.setState({ activeNoteId: notes[0]?.id ?? null, activeCoverImage: null });
     }
   },
 
-  /** Forces a refetch of the workspace's list, resolving after it lands. */
   async refreshNotesInPlace(ws: string): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: notesKey(ws), refetchType: "all" });
   },
 
-  /** Snapshot for non-React code (polling, guards). */
   currentNotes(ws: string | null | undefined = activeWorkspaceId()): Note[] {
     return ws ? readNotes(ws) : [];
   },
@@ -98,8 +82,6 @@ export const noteActions = {
       ]);
       if (useNoteUiStore.getState().activeNoteId !== id) return;
       if (note) {
-        // The owning list may not be cached yet (a cross-workspace Quick
-        // Search hit) — fetch it so the full-note patch always lands.
         let entry = cacheOf(id);
         if (!entry) {
           await queryClient.ensureQueryData({
@@ -131,11 +113,7 @@ export const noteActions = {
     try {
       const created = await noteService.createNote(ws, title, content, icon);
       blockSuiteEditorService.registerExistingNotes([{ id: created.id, title: created.title }]);
-      // Creating a note opens it: return the main area to the editor even
-      // when the trigger sits on the Library/Journals/Trash page.
       useUIStore.getState().setActivePage("editor");
-      // A created note changes the workspace's input space (rule views,
-      // grouping, chips) — rebuild the bulk inputs from the post-insert DB.
       void noteActions.invalidateLibraryInputs();
       writeNotes(ws, [created, ...readNotes(ws)]);
       useNoteUiStore.getState().setActiveNoteId(created.id);
@@ -164,7 +142,6 @@ export const noteActions = {
       let saved: Note | null = null;
       if (content !== undefined) {
         saved = await noteService.updateContent(id, content);
-        // The rescan runs off the critical path — it must not delay Saved.
         void queryClient.invalidateQueries({ queryKey: backlinkScanKey(id) });
       }
       if (Object.keys(metadata).length > 0) {
@@ -174,9 +151,6 @@ export const noteActions = {
         blockSuiteEditorService.setDocTitle(id, updates.title);
       }
       if (entry && saved) {
-        // The persisted row re-reads the raw title column; never let it
-        // clobber the live cached title (plaintext, possibly renamed while
-        // this save was in flight) unless this save itself changed it.
         writeNotes(
           entry.ws,
           readNotes(entry.ws).map((n) =>
@@ -294,9 +268,6 @@ export const noteActions = {
       notifyError(err, { saveStatus: false });
       return;
     }
-    // The restore committed — refetching the owning workspace's list (and
-    // the trash list) can only ADD the note back; a failed refetch never
-    // re-trashes it.
     await invalidateNotes();
     await queryClient.invalidateQueries({ queryKey: trashKey });
   },
@@ -376,7 +347,6 @@ export const noteActions = {
   togglePinNote: (id: string) => noteActions.toggleFlag(id, "isPinned"),
   toggleFavoriteNote: (id: string) => noteActions.toggleFlag(id, "isFavorite"),
 
-  /** Persists an editor/import-created doc as a note row. */
   async persistDocCreatedNote(ws: string, docId: string, title?: string): Promise<Note> {
     const created = await noteService.createNoteWithId(ws, docId, title);
     await noteActions.refreshNotesInPlace(ws);
@@ -387,14 +357,10 @@ export const noteActions = {
 
 blockSuiteEditorService.provideDocCreatedHandler(async (docId, title) => {
   const activeWs = useWorkspaceStore.getState().activeWorkspaceId;
-  // Rejecting (not returning) lets the editor drop the unpersistable doc and
-  // the markdown import count the file as failed.
   if (!activeWs) throw new Error("No active workspace to persist a new doc into.");
   try {
     await noteActions.persistDocCreatedNote(activeWs, docId, title);
   } catch (err) {
-    // Editor-created docs have no awaiter — surface the failure here. The
-    // tag lets awaiting callers (markdown import) skip their own toast.
     notifyError(err, { saveStatus: false });
     const tagged =
       err instanceof Error
@@ -409,8 +375,6 @@ blockSuiteEditorService.provideNoteSavedHandler(async (docId, content) => {
   await noteActions.updateNote(docId, { content });
 });
 
-// Folder imports stamp doc titles only after the notes row exists; route
-// them through the normal title save so the row, cache, and doc meta agree.
 blockSuiteEditorService.provideDocTitleHandler(async (docId, title) => {
   await noteActions.updateNote(docId, { title });
 });

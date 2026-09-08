@@ -17,7 +17,6 @@ export interface Note {
   readonly isTemplate?: boolean;
   readonly isPinned: boolean;
   readonly isFavorite: boolean;
-  /** Fractional-index manual order (Library "custom" sort). */
   readonly orderIndex?: string;
   readonly createdAt: number;
   readonly updatedAt: number;

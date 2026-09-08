@@ -21,10 +21,6 @@ export const PROPERTY_TYPES = [
 
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
-/**
- * Built-in rows (Tags / Workspace / Created / Updated) are seeded as property
- * definitions so they order and hide like any row; their values stay derived.
- */
 export const SYSTEM_PROPERTY_IDS = [
   "system:tags",
   "system:workspace",
@@ -37,10 +33,6 @@ export const SYSTEM_PROPERTY_IDS = [
   "system:template",
 ] as const;
 
-/**
- * The journal row is value-backed (unlike the derived rows): its value lives
- * in note_properties, so hide-when-empty is meaningful for it.
- */
 export const JOURNAL_PROPERTY_ID = "system:journal";
 
 export type SystemPropertyId = (typeof SYSTEM_PROPERTY_IDS)[number];
@@ -56,7 +48,6 @@ export const CREATABLE_PROPERTY_TYPES = PROPERTY_TYPES.filter(
   (type) => !(SYSTEM_PROPERTY_TYPES as readonly string[]).includes(type),
 ) as Exclude<PropertyType, SystemPropertyType>[];
 
-/** Selectable custom icons for property rows (resolved to components in the UI). */
 export const PROPERTY_ICON_NAMES = [
   "type",
   "hash",
@@ -103,7 +94,6 @@ export interface PropertyDefinition {
   readonly createdAt: number;
   readonly order: string;
   readonly show: PropertyVisibility;
-  /** Optional custom icon name; falls back to the type's default icon. */
   readonly icon: string | null;
 }
 
@@ -131,10 +121,6 @@ export const makePropertyId = (): string => crypto.randomUUID();
 export const nextOptionColor = (existingCount: number): string =>
   TAG_COLORS[existingCount % TAG_COLORS.length] as string;
 
-/**
- * Fractional key strictly between two keys (null = list head/tail) — a
- * reorder writes one row instead of renumbering the list.
- */
 export const orderKeyBetween = (before: string | null, after: string | null): string =>
   generateKeyBetween(before || null, after || null);
 

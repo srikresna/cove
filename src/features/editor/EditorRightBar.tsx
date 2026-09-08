@@ -38,8 +38,6 @@ interface EditorRightBarProps {
   note: Note;
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   onClose: (viaKeyboard: boolean) => void;
-  /** Receives the header row so a keyboard open can land focus on the
-   *  bar's first control. */
   headerRef?: React.Ref<HTMLDivElement>;
 
   editorHost?: EditorHost | null;
@@ -121,10 +119,6 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
       )}
     >
       <div className="flex h-full w-[340px] flex-shrink-0 flex-col">
-        {/* Same 40px band as the topbar so the two rows read as one bar:
-            the tab group centers on the same line as the topbar actions,
-            the card surface continues across the seam, and the shared
-            border runs through both. */}
         <div
           ref={headerRef}
           className="flex h-10 flex-shrink-0 items-center justify-between border-b bg-card px-2"
@@ -144,8 +138,6 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
           />
           <div className="flex items-center gap-0.5">
             {tab === "toc" && <ExportMenu noteId={note.id} />}
-            {/* The panel toggle lives here while the bar is open (AFFiNE
-                behavior); it returns to the topbar when closed. */}
             <Button
               variant="ghost"
               size="iconSm"

@@ -64,9 +64,6 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
   const handleRef = useRef<HTMLButtonElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const cancelRenameRef = useRef(false);
-  // Radix returns focus to the menu trigger when the dropdown closes; when the
-  // close was caused by picking "Rename", that would steal focus from the
-  // rename input (after its exit animation) and blur-cancel it immediately.
   const suppressTriggerFocusRef = useRef(false);
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
 
@@ -89,9 +86,6 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
     if (!element) return;
     return dropTargetForElements({
       element,
-      // The edge must live on the drop-target data: attachClosestEdge returns
-      // a fresh object and never writes into self.data, so without getData
-      // the edge computed for the indicator would be lost by drop time.
       getData: (args) =>
         attachClosestEdge(
           {},
@@ -170,8 +164,6 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
           className="absolute -bottom-1 left-0 right-0 z-10 h-0.5 rounded-full bg-primary"
         />
       )}
-      {/* A hover-revealed grip on the row's outer left edge, consuming no
-          layout space. */}
       <button
         type="button"
         ref={handleRef}
@@ -202,8 +194,6 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
       >
         {children}
       </InfoRow>
-      {/* The menu lives on an invisible layer above the name cell (clicking
-          the name opens it) without stealing value width. */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

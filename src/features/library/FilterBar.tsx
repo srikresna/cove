@@ -32,7 +32,6 @@ function opLabel(kind: FilterRule["kind"], op: string): string {
   return FILTER_OPERATORS[kind].find((o) => o.value === op)?.label ?? op;
 }
 
-/** Summary of chosen multi-values: first name + overflow count. */
 function namesSummary(
   chosen: string[],
   resolve: (id: string) => { name: string } | undefined,
@@ -123,8 +122,6 @@ const RuleRow: React.FC<{
           defaultValue={numberValue ?? ""}
           onBlur={(e) => {
             const raw = e.target.value.trim();
-            // Blurring an untouched input must leave the rule valueless
-            // (Number("") would coerce it to 0 and start filtering).
             onUpdate({
               value: raw !== "" && Number.isFinite(Number(raw)) ? Number(raw) : undefined,
             } as Partial<FilterRule>);
@@ -291,12 +288,6 @@ function optionsSummaryOf(
   return namesSummary(chosen, (id) => def?.options.find((o) => o.id === id));
 }
 
-/**
- * The rule editor inside the Library filter area — one full-width row per
- * rule at the app's control scale, editing the view-store drafts directly.
- * Save/Cancel live in the surrounding surface; this bar only composes and
- * edits rules.
- */
 export const FilterBar: React.FC = () => {
   const draftRules = useViewStore((s) => s.draftRules);
   const addDraftRule = useViewStore((s) => s.addDraftRule);

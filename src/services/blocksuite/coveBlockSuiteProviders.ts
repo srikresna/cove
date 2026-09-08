@@ -6,10 +6,6 @@ import {
 } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
 
-/**
- * The UI surface BlockSuite services delegate to — bound by the store layer
- * (see store/blockSuiteBridge.ts), keeping this module store-free.
- */
 export interface CoveUiPort {
   toast(message: string): void;
   confirm(options: {

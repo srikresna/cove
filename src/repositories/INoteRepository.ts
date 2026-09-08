@@ -10,12 +10,7 @@ export interface NoteRecord extends Omit<Note, "content" | "title"> {
 
 export interface INoteRepository {
   getNotesMetadataByWorkspace(workspaceId: string): Promise<NoteRecord[]>;
-  /** Largest non-empty manual-order key in the workspace (BINARY order —
-   *  fractional-index keys are ASCII code-unit ordered), or null. Includes
-   *  soft-trashed rows so a tail mint can never re-mint a trashed key. */
   getMaxOrderIndex(workspaceId: string): Promise<string | null>;
-  /** Every non-empty manual-order key in the workspace (trashed included,
-   *  plaintext — no decrypt). Midpoint mints must skip all of them. */
   getOrderIndexesByWorkspace(
     workspaceId: string,
   ): Promise<Array<{ id: string; orderIndex: string }>>;
@@ -31,10 +26,6 @@ export interface INoteRepository {
     opts?: { createdAt?: number },
   ): Promise<NoteRecord>;
   updateNote(id: string, updates: Partial<NoteRecord>): Promise<NoteRecord>;
-  /** Compare-and-swap title repair: rewrites the column only while it still
-   *  holds `expected`, so a title rename committed concurrently can never be
-   *  clobbered by a stale repair (e.g. the double-encryption heal). Returns
-   *  whether the write landed. */
   updateTitleIfUnchanged(
     id: string,
     expected: EncryptedPayload,

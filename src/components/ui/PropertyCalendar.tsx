@@ -20,11 +20,6 @@ const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const CELL = 28;
 const GAP = 8;
 
-/**
- * A month calendar for property date pickers: 28px day cells with 8px gaps,
- * Sunday-start week header, adjacent-month days faded, month switcher with a
- * TODAY shortcut that commits today directly.
- */
 export const PropertyCalendar: React.FC<{
   value: number | null;
   onChange: (timestamp: number) => void;

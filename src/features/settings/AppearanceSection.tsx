@@ -13,9 +13,6 @@ export const AppearanceSection: React.FC = () => {
   const toggleDarkMode = useUIStore((s) => s.toggleDarkMode);
   const zoomFactor = useSettingsStore((s) => s.zoomFactor);
   const setZoomFactor = useSettingsStore((s) => s.setZoomFactor);
-  // The slider itself lives inside the zoomed webview: applying per drag
-  // tick would rescale the track under the pointer and fight the drag, so
-  // the factor is committed once, on release.
   const [dragPercent, setDragPercent] = useState<number | null>(null);
 
   const changeZoom = (factor: number) => {
@@ -31,8 +28,6 @@ export const AppearanceSection: React.FC = () => {
     if (factor !== zoomFactor) changeZoom(factor);
   };
 
-  // A cancelled drag (gesture takeover, capture loss) discards rather
-  // than committing later as a surprise zoom.
   const cancelDrag = () => setDragPercent(null);
 
   const shownPercent = dragPercent ?? Math.round(zoomFactor * 100);

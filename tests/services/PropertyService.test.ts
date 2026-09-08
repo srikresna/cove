@@ -82,19 +82,16 @@ describe("PropertyService", () => {
     await service.deleteOption(select.id, gone.id);
     await service.deleteOption(multi.id, mGone.id);
 
-    // select rows holding the deleted option are removed; others survive.
     expect((await service.valuesForNote("n1")).has(select.id)).toBe(false);
     expect((await service.valuesForNote("n2")).get(select.id)).toEqual({
       type: "select",
       optionId: kept.id,
     });
-    // multiSelect rows drop the id; empty arrays remove the row entirely.
     expect((await service.valuesForNote("n3")).has(multi.id)).toBe(false);
     expect((await service.valuesForNote("n4")).get(multi.id)).toEqual({
       type: "multiSelect",
       optionIds: [mKept.id],
     });
-    // The definition no longer lists the deleted options.
     const defs = await service.listDefinitions();
     expect(defs.find((d) => d.id === select.id)?.options.map((o) => o.id)).toEqual([kept.id]);
     expect(defs.find((d) => d.id === multi.id)?.options.map((o) => o.id)).toEqual([mKept.id]);
@@ -107,12 +104,8 @@ describe("PropertyService", () => {
     const gone = await service.addOption(select.id, "Draft");
     await service.setValue("n1", select.id, { type: "select", optionId: gone.id });
 
-    // Simulate a crash between the optionsJson commit and the sweep: the
-    // option is missing from the definition but the note value survives.
     await repo.updateOptions(select.id, JSON.stringify([]));
 
-    // The retry must sweep instead of throwing NotFound, and a fully-clean
-    // retry afterwards must throw NotFound (the option truly no longer exists).
     await expect(service.deleteOption(select.id, gone.id)).resolves.toBeUndefined();
     expect((await service.valuesForNote("n1")).has(select.id)).toBe(false);
     await expect(service.deleteOption(select.id, gone.id)).rejects.toThrow(NotFoundError);
@@ -159,14 +152,10 @@ describe("PropertyService", () => {
     const c = await service.createDefinition("C", "text");
     const d = await service.createDefinition("D", "text");
 
-    // Arrange A, D, C, B.
     await service.reorderDefinition(d.id, a.id, "after");
     await service.reorderDefinition(c.id, b.id, "before");
     expect((await service.listDefinitions()).map((x) => x.name)).toEqual(["A", "D", "C", "B"]);
 
-    // Dropping C "before B" and D "after A" leave them in place; regression:
-    // these used to emit duplicate edge keys (e.g. a second "a0") that
-    // silently reordered rows and later crashed generateKeyBetween.
     await service.reorderDefinition(c.id, b.id, "before");
     await service.reorderDefinition(d.id, a.id, "after");
 
@@ -221,7 +210,6 @@ describe("PropertyService", () => {
     ).rejects.toThrow(ValidationError);
     await expect(service.setDefinitionIcon("system:tags", "star")).rejects.toThrow(ValidationError);
 
-    // Reordering and show/hide stay allowed for system rows.
     const custom = await service.createDefinition("Owner", "text");
     await expect(
       service.setDefinitionVisibility("system:tags", "always-hide"),

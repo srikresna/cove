@@ -39,7 +39,6 @@ const rule = (r: Partial<FilterRule>): FilterRule => r as FilterRule;
 describe("matchesEmptyInputs (derived from the evaluator)", () => {
   it("agrees with the evaluator's empty-input behavior on every op class", () => {
     expect(matchesEmptyInputs(rule({ kind: "text", op: "is-empty", value: undefined }))).toBe(true);
-    // The unified twin: `is-not` is satisfied by emptiness too (no value ≠ needle).
     expect(matchesEmptyInputs(rule({ kind: "text", op: "is-not", value: "x" }))).toBe(true);
     expect(matchesEmptyInputs(rule({ kind: "text", op: "contains", value: "x" }))).toBe(false);
     expect(matchesEmptyInputs(rule({ kind: "number", op: "is-empty" }))).toBe(true);
@@ -80,8 +79,6 @@ describe("selectNotesForView", () => {
       },
       "updated-desc",
     );
-    // is-not-empty is NOT emptiness-admitting, so nothing defers: b evaluates
-    // with synthesized empty inputs and fails; c (provably empty) fails too.
     expect(out.map((n) => n.id)).toEqual(["a"]);
   });
 
@@ -92,7 +89,6 @@ describe("selectNotesForView", () => {
       { notes: [a, b], rules: [isEmpty], filterable, allowNoteIds: [] },
       "updated-desc",
     );
-    // is-empty admits emptiness -> b (cache-absent) is deferred out.
     expect(out.map((n) => n.id)).toEqual([]);
   });
 
@@ -111,8 +107,6 @@ describe("selectNotesForView", () => {
   });
 
   it("positive rules evaluate unknown notes with synthesized empty inputs (no deferral)", () => {
-    // Shipped policy: only fabricated-ADMITTING rules defer unknowns — a
-    // positive rule simply excludes an empty-input note.
     const contains = rule({ kind: "text", propertyId: "p1", op: "contains", value: "x" });
     const filterable = new Map<string, FilterableNote>([["a", withValue(a, "xylophone")]]);
     const out = selectNotesForView(
@@ -144,7 +138,6 @@ describe("selectNotesForView", () => {
       { notes: [z, y, x], rules: [], filterable: null, allowNoteIds: [] },
       "custom",
     );
-    // Empty keys sort last, keyed notes in fractional order.
     expect(out.map((n) => n.id)).toEqual(["x", "y", "z"]);
     expect(compareBy("custom")(x, y)).toBeLessThan(0);
   });

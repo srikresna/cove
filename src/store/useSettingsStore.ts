@@ -12,7 +12,6 @@ interface SettingsState {
   setAutoUnlockOnLaunch: (value: boolean) => void;
   canvasPrefs: CanvasPrefs;
   setCanvasPref: <K extends keyof CanvasPrefs>(key: K, value: CanvasPrefs[K]) => void;
-  /** App-wide UI zoom factor (Ctrl+= / Ctrl+- / Ctrl+0), clamped 0.5-2.0. */
   zoomFactor: number;
   setZoomFactor: (value: number) => void;
 }
@@ -37,8 +36,6 @@ export const useSettingsStore = create<SettingsState>()(
         return {
           ...base,
           ...p,
-          // A corrupted or hand-edited blob must not desync the stored
-          // factor from the clamped value the webview actually applies.
           zoomFactor:
             typeof p.zoomFactor === "number" && Number.isFinite(p.zoomFactor)
               ? clampZoom(p.zoomFactor)

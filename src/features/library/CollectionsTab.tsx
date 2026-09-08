@@ -14,13 +14,6 @@ import { MESSAGES } from "../../constants/messages";
 import { useViewStore } from "../../store/useViewStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
-/**
- * The Collections directory: every saved collection with rename/delete
- * management and one-click apply. Rows share the Tags tab anatomy (h-11,
- * quiet hover, sans meta) so the sibling tabs read as one surface. There is
- * no editor modal — "Edit rules" jumps to Docs with the collection loaded
- * into the filter bar, and "New collection" opens an empty builder there.
- */
 export const CollectionsTab: React.FC<{
   onOpenInDocs: () => void;
   onEditView: (viewId: string) => void;

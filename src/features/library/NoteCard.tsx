@@ -18,19 +18,14 @@ import { TagChip } from "../tags/TagChip";
 interface NoteCardProps {
   note: Note;
   isActive: boolean;
-  /** The optional event carries ctrl/meta/shift for Library multi-select. */
   onSelect: (id: string, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void;
   onTogglePin: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
-  /** Stack chips shown in the card footer (already filtered by visibility). */
   stackRows: Array<{ def: PropertyDefinition; value: PropertyValue }>;
-  /** Tag chips after the stack chips (Library display option). */
   tagChips?: Array<{ name: string; color: string }>;
-  /** First lines of the note body (Library "Preview" display option). */
   previewText?: string | null;
-  /** Masonry cards size to content; grid cards keep a uniform min-height. */
   variant: "grid" | "masonry";
 }
 
@@ -47,11 +42,6 @@ const relativeDay = (ts: number): string => {
   return `${days} days ago`;
 };
 
-/**
- * A rounded-12 padded card with icon + title header, hover-revealed quick
- * actions, meta line and property stack chips. Grid keeps cards uniform;
- * masonry lets content set the height.
- */
 export const NoteCard: React.FC<NoteCardProps> = ({
   note,
   isActive,
@@ -88,7 +78,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({
       className={cn(
         "group/card flex cursor-pointer flex-col gap-2 rounded-xl border bg-card p-4 text-left outline-none transition-[box-shadow,border-color] focus-visible:ring-2 focus-visible:ring-ring",
         variant === "masonry" && "mb-6 break-inside-avoid",
-        // Cards render outside the virtualizer; skip offscreen painting cost.
         "[content-visibility:auto] [contain-intrinsic-size:auto_240px]",
         isActive
           ? "border-primary/40 shadow-[0_0_0_1px_var(--ring),0_4px_6px_rgba(0,0,0,0.1)]"

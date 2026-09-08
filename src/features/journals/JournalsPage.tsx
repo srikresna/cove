@@ -16,10 +16,6 @@ import { dayKey, MonthGrid } from "./MonthGrid";
 
 const keyOf = (timestamp: number): string => dayKey(new Date(timestamp));
 
-/**
- * The Journals page: week strip + Today shortcut, month grid with journal
- * dots, and the selected day's journals (conflict block when several).
- */
 export const JournalsPage: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const notes = useNotes();
@@ -40,8 +36,6 @@ export const JournalsPage: React.FC = () => {
     [notes, activeWorkspaceId],
   );
 
-  // Journal day keys + the selected day's journal notes (a day can hold
-  // several — the conflict block resolves them).
   const journalsByDay = useMemo(() => {
     const byDay = new Map<string, typeof workspaceNotes>();
     for (const note of workspaceNotes) {
@@ -70,8 +64,6 @@ export const JournalsPage: React.FC = () => {
     setMonthCursor(new Date(now.getFullYear(), now.getMonth(), 1));
   };
 
-  // Week-strip picks must sync the month grid too — the strip can walk into
-  // an adjacent month whose cells the grid isn't showing.
   const selectFromStrip = (timestamp: number) => {
     setSelectedDate(timestamp);
     const date = new Date(timestamp);

@@ -43,8 +43,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
   const [values, setValues] = useState<Map<string, PropertyValue>>(new Map());
   const [deletingDef, setDeletingDef] = useState<PropertyDefinition | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  // A freshly created property stays visible on this note until it gains a
-  // value, so the user always has a row through which to set one.
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const propertyVersion = usePropertyStore((s) => s.version);
@@ -168,8 +166,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
     if (def.id === justCreatedId) return true;
     if (def.show === "always-hide") return false;
     if (def.show !== "hide-when-empty") return true;
-    // Value-backed rows check note_properties; note-field-backed rows check
-    // their note field instead.
     if (def.id === "system:edgeless-theme") return note.edgelessTheme !== undefined;
     if (def.id === "system:template") return note.isTemplate === true;
     return values.has(def.id);
@@ -345,8 +341,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
             propertyService
               .deleteDefinition(deletingDef.id)
               .then(async () => {
-                // Saved views may filter on the deleted definition; prune
-                // their rules so no view silently goes empty or undead.
                 await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
               })
               .catch(notifyError);

@@ -132,9 +132,6 @@ export const TemplatesSection: React.FC = () => {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [trashingId, setTrashingId] = useState<string | null>(null);
 
-  // The setting is per workspace and the workspace id arrives async at launch
-  // (and changes on switch without remount), so resync instead of capturing
-  // once in a lazy initializer.
   useEffect(() => {
     setJournalTemplateIdState(activeWorkspaceId ? getJournalTemplateId(activeWorkspaceId) : null);
   }, [activeWorkspaceId]);

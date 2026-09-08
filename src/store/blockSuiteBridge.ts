@@ -3,7 +3,6 @@ import { useBlockSuiteDialogStore } from "./useBlockSuiteDialogStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useUIStore } from "./useUIStore";
 
-// Importing this module binds the BlockSuite UI services to Cove's stores.
 provideCoveUi({
   toast: (message) => useNotificationStore.getState().pushToast({ kind: "info", title: message }),
   confirm: (options) => useBlockSuiteDialogStore.getState().confirm(options),

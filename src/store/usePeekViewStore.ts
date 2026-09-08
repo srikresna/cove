@@ -21,7 +21,6 @@ export const usePeekViewStore = create<PeekViewState>((set, get) => ({
   },
 }));
 
-// Importing this module binds the peek service to its UI surface.
 providePeekSink({
   open: (request, resolve) => usePeekViewStore.getState().open(request, resolve),
   close: () => usePeekViewStore.getState().close(),

@@ -2,12 +2,6 @@ import type { FilterRule, FilterRules } from "@/domain/filters/FilterRule";
 import type { SavedView } from "@/domain/filters/SavedView";
 import type { ISavedViewRepository } from "@/repositories/ISavedViewRepository";
 
-/**
- * Mirrors SQLiteSavedViewRepository.decodeRules: every rule read back from
- * storage carries ALL keys, with propertyId defaulting to "" and the id
- * arrays to []. Service code must therefore never rely on `"propertyId" in
- * rule` — tags/journal/template rules come back stamped with propertyId "".
- */
 function stampRules(rules: FilterRules): FilterRules {
   return rules.map((rule) => {
     const stamped = { ...rule } as FilterRule & {

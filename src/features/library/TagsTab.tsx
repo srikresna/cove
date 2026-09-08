@@ -17,12 +17,6 @@ import { useTagStore } from "../../store/useTagStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
-/**
- * The Tags directory: every workspace tag with rename/recolor/delete
- * management; clicking a tag filters the Docs list. Rows share the
- * Collections tab anatomy (h-11, quiet hover, sans meta) so the sibling
- * tabs read as one surface.
- */
 export const TagsTab: React.FC<{ onOpenTag: (tagId: string) => void }> = ({ onOpenTag }) => {
   const tags = useTagStore((s) => s.tags);
   const tagCounts = useTagStore((s) => s.tagCounts);

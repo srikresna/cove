@@ -57,7 +57,6 @@ describe("useViewStore", () => {
         { id: "r2", kind: "select", propertyId: "pLive", op: "is", optionIds: ["live", "dead"] },
         { id: "r3", kind: "checkbox", propertyId: "pLive", op: "is", value: true },
         { id: "r4", kind: "tags", op: "has-any-of", tagIds: ["t1"] },
-        // Loader-stamped tags rule (propertyId "" on a loaded view's copy).
         {
           id: "r5",
           kind: "journal",
@@ -127,11 +126,7 @@ describe("useViewStore", () => {
 
   it("healDrafts keeps freshly-added empty select rules (mid-composition)", () => {
     useViewStore.setState({
-      draftRules: [
-        // FilterBar's "+ Filter" creates exactly this shape before the
-        // user picks an option — it is inactive, not stranded.
-        { id: "r1", kind: "select", propertyId: "pLive", op: "is", optionIds: [] },
-      ],
+      draftRules: [{ id: "r1", kind: "select", propertyId: "pLive", op: "is", optionIds: [] }],
     });
 
     useViewStore.getState().healDrafts([
@@ -151,9 +146,6 @@ describe("useViewStore", () => {
   });
 
   it("a superseded fetch is dropped entirely and cannot clear a later selection", async () => {
-    // Stale fetch for workspace A is slow; a fetch for B dispatches and
-    // resolves first; the user then re-applies a view; the stale fetch
-    // lands last — it must be dropped, not applied.
     let releaseStale: (views: SavedView[]) => void = () => {};
     const stalePromise = new Promise<SavedView[]>((resolve) => {
       releaseStale = resolve;
@@ -194,8 +186,6 @@ describe("useViewStore", () => {
         },
       ],
       activeViewId: "v1",
-      // Simulates a straggler click on a stale row: drafts hold pre-heal
-      // rules and the snapshot matches them (user hasn't tweaked anything).
       draftRules: staleRules.map((r) => ({ ...r })),
       appliedRulesSnapshot: JSON.stringify(staleRules),
     });
@@ -222,8 +212,6 @@ describe("useViewStore", () => {
     const tweaked: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["other"] },
     ];
-    // The DB rules ALSO changed after the apply (e.g. an option was deleted
-    // and the view pruned) — the re-copy quadrant that matters.
     const pruned: FilterRules = [
       { id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: [] as string[] },
     ];

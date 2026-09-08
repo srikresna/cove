@@ -16,11 +16,8 @@ export interface GroupingInputs {
   groupBy: GroupBy;
   notes: Note[];
   allTags: Tag[];
-  /** Per-note tag ids (null = not loaded yet). */
   tagIdsByNote: Map<string, string[]> | null;
-  /** Per-note journal timestamps (absent/null = not a journal note). */
   journalByNoteId: { get(id: string): number | null | undefined };
-  /** Bulk-loaded property values by note id (group-by-def input). */
   stackValues: Map<string, Map<string, PropertyValue>> | null;
   stackDefs: PropertyDefinition[];
   defs: PropertyDefinition[];
@@ -47,7 +44,6 @@ export const relativeDayLabel = (ts: number): string => {
   });
 };
 
-// "Absent/meta" buckets sort after every real group.
 const isSpecialKey = (key: string): boolean =>
   key === "__untagged__" ||
   key === "__empty__" ||
@@ -55,10 +51,6 @@ const isSpecialKey = (key: string): boolean =>
   key === "p:__unchecked__" ||
   key === "p:__novalue__";
 
-/** Bucket notes into display groups. A tagged note appears under EACH of its
- *  tags; date-like keys bucket by calendar day; an explicitly-set unchecked
- *  checkbox is NOT empty. Keys are value-space-stable (day-truncated dates,
- *  group-qualified ids). */
 export function groupNotes(inputs: GroupingInputs): NoteGroup[] {
   const { groupBy, notes, allTags, tagIdsByNote, journalByNoteId, stackValues, stackDefs, defs } =
     inputs;
@@ -128,8 +120,6 @@ export function groupNotes(inputs: GroupingInputs): NoteGroup[] {
     }
   }
 
-  // Stable display order: date groups newest-first, others by label, the
-  // absent/meta buckets last.
   const entries = [...buckets.entries()].sort((a, b) => {
     if (isSpecialKey(a[0]) !== isSpecialKey(b[0])) return isSpecialKey(a[0]) ? 1 : -1;
     if (a[0].startsWith("d:") && b[0].startsWith("d:")) {

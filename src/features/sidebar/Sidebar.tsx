@@ -109,10 +109,6 @@ export const Sidebar: React.FC = () => {
               </DropdownMenu>
             </div>
 
-            {/* Search + new-page row, then flat nav links above the
-                scrollable accordion area. The search trigger is the quiet
-                first row of the nav: inset fill, nav-row radius, one
-                shortcut chip — not a floating white capsule. */}
             <div className="flex items-center gap-1.5 px-3 pt-3">
               <button
                 type="button"
@@ -168,9 +164,6 @@ export const Sidebar: React.FC = () => {
               </button>
             </div>
 
-            {/* The ONLY scrolling element in the sidebar: bounded accordions,
-                never a nested list scroller (that was the double-scrollbar
-                bug). */}
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               <RecentSection />
               <FavoritesSection />

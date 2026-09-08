@@ -21,7 +21,6 @@ describe("stackValueText", () => {
       { id: "o2", name: "Two", color: "#222" },
     ]);
     expect(stackValueText(d, { type: "select", optionId: "o1" })).toBe("One");
-    // Multi-select renders in DEFINITION order, not value order.
     expect(stackValueText(d, { type: "multiSelect", optionIds: ["o2", "o1"] })).toBe("One, Two");
     expect(stackValueText(d, { type: "multiSelect", optionIds: ["gone"] })).toBeNull();
   });

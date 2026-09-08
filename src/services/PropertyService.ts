@@ -61,7 +61,6 @@ export class PropertyService implements IPropertyService {
       options,
       createdAt: Date.now(),
       order: orderKeyBetween(lastOrder, null),
-      // New properties stay out of the way until they carry a value.
       show: "hide-when-empty",
       icon: null,
     };
@@ -103,9 +102,6 @@ export class PropertyService implements IPropertyService {
       id !== "system:template" &&
       show === "hide-when-empty"
     ) {
-      // Derived system values live outside note_properties, so "empty" never
-      // resolves and the row could never come back. Value-backed rows
-      // (journal, template) accept the full visibility range.
       throw new ValidationError("Built-in properties only support always-show or always-hide.");
     }
     const existing = await this.properties.listDefinitions();
@@ -123,9 +119,6 @@ export class PropertyService implements IPropertyService {
     const currentIndex = sorted.findIndex((d) => d.id === id);
     if (currentIndex === -1) throw new NotFoundError("Property", id);
 
-    // Compute the gap with the dragged definition removed: otherwise it can
-    // become its own neighbor on the gap side, the key collapses onto a list
-    // edge, and generateKeyBetween emits a duplicate of an existing key.
     const others = sorted.filter((d) => d.id !== id);
     const targetIndex = others.findIndex((d) => d.id === targetId);
     if (targetIndex === -1) throw new NotFoundError("Property", targetId);
@@ -203,8 +196,6 @@ export class PropertyService implements IPropertyService {
     const def = (await this.properties.listDefinitions()).find((d) => d.id === definitionId);
     if (!def) throw new NotFoundError("Property", definitionId);
     const hasOption = def.options.some((o) => o.id === optionId);
-    // Sweep values referencing the option (select/status removed, multiSelect
-    // drops the id) — else hide-when-empty rows render "Empty" with no way to clear.
     const writes: OptionDeletionWrite[] = [];
     for (const record of await this.properties.valuesForPropertyAll(definitionId)) {
       const value = deserializePropertyValue(record.valueJson, def.type);
@@ -222,12 +213,7 @@ export class PropertyService implements IPropertyService {
         });
       }
     }
-    // Idempotent retry: if a previous deleteOption committed the definition
-    // update but crashed mid-sweep, the option is gone yet values still
-    // reference it — finish the sweep instead of throwing NotFound.
     if (!hasOption && writes.length === 0) throw new NotFoundError("Option", optionId);
-    // One transaction: either the option disappears together with every
-    // value referencing it, or neither happens.
     await this.properties.applyOptionDeletion(
       definitionId,
       hasOption ? JSON.stringify(def.options.filter((o) => o.id !== optionId)) : null,

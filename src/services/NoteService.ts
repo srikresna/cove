@@ -46,35 +46,20 @@ export class NoteService implements INoteService {
   private async decryptTitle(rec: NoteRecord): Promise<string> {
     if (rec.titleKmsVersion < 1) return String(rec.title);
     const title = await this.crypto.decryptPayload(rec.title, titleAad(rec.id));
-    // Rows committed while the title input displayed a leaked ciphertext
-    // carry a double-encrypted column (the displayed blob was saved as the
-    // title and re-encrypted). A second successful decrypt under the same
-    // AAD is cryptographically impossible for a genuine title — it can only
-    // be one of those rows. Empty titles are legitimate (the input allows
-    // them) and must not probe: decryptPayload("") short-circuits to ""
-    // instead of throwing, which would loop the heal forever.
     if (!title) return title;
     let inner: string;
     try {
       inner = await this.crypto.decryptPayload(title, titleAad(rec.id));
     } catch {
-      // The probe did not authenticate — this is a genuine title.
       return title;
     }
     try {
-      // Repair the column compare-and-swap: the write only lands while the
-      // row still holds the corrupt blob, so a rename committed while this
-      // read was in flight can never be clobbered. A lost race or a failed
-      // write just retries on the next read; the recovered plaintext wins
-      // either way.
       await this.notes.updateTitleIfUnchanged(
         rec.id,
         rec.title,
         await this.crypto.encryptPayload(inner, titleAad(rec.id)),
       );
-    } catch {
-      // Best effort — never fail the read over the repair write.
-    }
+    } catch {}
     return inner;
   }
 
@@ -95,8 +80,6 @@ export class NoteService implements INoteService {
     };
   }
 
-  // One corrupt ciphertext must not blank the whole list (search already
-  // degrades per note).
   private async degradeAll<T>(promises: Array<Promise<T>>): Promise<T[]> {
     const settled = await Promise.allSettled(promises);
     return settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
@@ -163,9 +146,6 @@ export class NoteService implements INoteService {
     return hits;
   }
 
-  // Every orderIndex-writing operation runs end-to-end serialized per
-  // workspace: unordered writes read a stale DB max or neighbor set and mint
-  // duplicate keys (there is no UNIQUE constraint).
   private orderWrites = new Map<string, Promise<unknown>>();
 
   private enqueueOrderWrite<T>(workspaceId: string, op: () => Promise<T>): Promise<T> {
@@ -201,7 +181,6 @@ export class NoteService implements INoteService {
           coverColor: undefined,
           isPinned: false,
           isFavorite: false,
-          // New notes get a tail key immediately (empty anchors break drag math).
           orderIndex: generateKeyBetween(await this.notes.getMaxOrderIndex(workspaceId), null),
         },
         opts,
@@ -231,16 +210,10 @@ export class NoteService implements INoteService {
     });
     try {
       await this.links.replaceForSource(id, extractNoteLinkIds(content));
-    } catch {
-      // Empty content means "no link rows" is already the end state, and the
-      // caller's artifact is a mounted editor doc — deleting the row would
-      // strand it unsavable.
-    }
+    } catch {}
     return { ...rec, content, title };
   }
 
-  // A create whose link row write fails must not leave a half-created note
-  // (row committed, call rejected) — compensate by removing the row.
   private async persistLinksGuarded(id: string, linkIds: string[]): Promise<void> {
     try {
       await this.links.replaceForSource(id, linkIds);
@@ -281,18 +254,12 @@ export class NoteService implements INoteService {
     try {
       return await this.toNote(updated);
     } catch {
-      // The write is already committed; a decrypt failure (a mid-save
-      // relock) must not reject the save. Degrade field-by-field: prefer
-      // the plaintext title we were given, and let the store's landed
-      // merge keep the cached title when we were not given one.
       const title = updates.title ?? (await this.decryptTitle(updated).catch(() => ""));
       const content = await this.crypto.decryptPayload(updated.content, updated.id).catch(() => "");
       return { ...updated, title, content };
     }
   }
 
-  // A workspace move or an explicit key write changes a workspace's live key
-  // set and must be ordered against concurrent mints.
   private async updateNoteOrdered(
     id: string,
     recUpdates: Partial<NoteRecord>,
@@ -304,8 +271,6 @@ export class NoteService implements INoteService {
     const before = await this.notes.getNoteById(id);
     if (!before) throw new NotFoundError("Note", id);
     if (moveTo !== undefined && before.workspaceId !== moveTo) {
-      // The source key could collide with a destination key — re-key at the
-      // destination tail (a moved note lands at the end of its new list).
       return this.enqueueOrderWrite(moveTo, async () =>
         this.notes.updateNote(id, {
           ...recUpdates,
@@ -316,10 +281,6 @@ export class NoteService implements INoteService {
     return this.enqueueOrderWrite(before.workspaceId, () => this.notes.updateNote(id, recUpdates));
   }
 
-  /**
-   * Manual reorder: computes the fractional key between the drop target's
-   * neighbors, with the dragged note removed first (never its own neighbor).
-   */
   async reorderNote(id: string, targetId: string, position: "before" | "after"): Promise<void> {
     this.assertUnlocked();
     if (id === targetId) return;
@@ -336,7 +297,6 @@ export class NoteService implements INoteService {
       if (targetIndex === -1) throw new NotFoundError("Note", targetId);
 
       const insertAt = position === "before" ? targetIndex : targetIndex + 1;
-      // No neighbor = head (null anchor); empty key = after every real key; real key = itself.
       const realKeys = others.map((n) => n.orderIndex).filter((k): k is string => Boolean(k));
       const prev = others[insertAt - 1];
       const before =
@@ -345,9 +305,6 @@ export class NoteService implements INoteService {
           : prev.orderIndex || (realKeys.length > 0 ? realKeys[realKeys.length - 1] : null);
       const after = others[insertAt]?.orderIndex ?? null;
 
-      // Midpoints are deterministic: the (before, after) interval can already
-      // hold keys invisible to the live sibling list (soft-trashed or
-      // undecryptable notes). Mint past every occupant — never re-mint one.
       const taken = new Set(
         (await this.notes.getOrderIndexesByWorkspace(target.workspaceId)).map((r) => r.orderIndex),
       );
@@ -357,8 +314,6 @@ export class NoteService implements INoteService {
         key = generateKeyBetween(before, after);
         while (taken.has(key)) key = generateKeyBetween(key, after);
       } catch {
-        // Equal anchors mean pre-existing duplicate damage — heal by
-        // appending after `before` instead of failing the drag.
         key = generateKeyBetween(before, null);
         while (taken.has(key)) key = generateKeyBetween(key, null);
       }
@@ -372,11 +327,6 @@ export class NoteService implements INoteService {
       content: await this.crypto.encryptPayload(content, id),
     });
     await this.links.replaceForSource(id, extractNoteLinkIds(content));
-    // The re-read row carries the encrypted title column — decrypt it like
-    // every other Note-returning method, or content-only autosaves leak
-    // ciphertext into the UI cache. The content write is already committed,
-    // so a title failure (a mid-save relock) must not reject the whole save:
-    // the store's landed merge keeps the cached plaintext title anyway.
     try {
       return { ...rec, title: await this.decryptTitle(rec), content };
     } catch {
@@ -437,9 +387,6 @@ export class NoteService implements INoteService {
     await this.setDeletedOrdered(id, null);
   }
 
-  // A trashed note leaves the live key set (and a restored one rejoins with
-  // its old key): unordered, a concurrent create could mint that same key
-  // back into use — on restore the two notes would collide.
   private async setDeletedOrdered(id: string, deletedAt: number | null): Promise<void> {
     const rec = await this.notes.getNoteById(id);
     if (!rec) {
@@ -449,8 +396,6 @@ export class NoteService implements INoteService {
     await this.enqueueOrderWrite(rec.workspaceId, async () => {
       await this.notes.setDeleted(id, deletedAt);
       if (deletedAt !== null || !rec.orderIndex) return;
-      // Self-heal legacy duplicate keys: if the restored key is still held by
-      // another row, re-key at the tail instead of rejoining with a twin.
       const held = (await this.notes.getOrderIndexesByWorkspace(rec.workspaceId)).filter(
         (r) => r.id !== id && r.orderIndex === rec.orderIndex,
       );

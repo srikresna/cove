@@ -34,7 +34,6 @@ describe("SegmentedIconGroup", () => {
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("false");
-    // Roving tabindex: only the selected tab is in the tab order.
     expect(tabs[0]?.tabIndex).toBe(0);
     expect(tabs[1]?.tabIndex).toBe(-1);
   });
@@ -49,7 +48,6 @@ describe("SegmentedIconGroup", () => {
     await userEvent.keyboard("{ArrowRight}");
     expect(onChange).toHaveBeenCalledWith("edgeless");
     expect(screen.getByRole("tab", { name: "Edgeless" })).toHaveFocus();
-    // Wraps around at the end.
     await userEvent.keyboard("{ArrowRight}");
     expect(onChange).toHaveBeenCalledWith("page");
   });

@@ -6,9 +6,6 @@ import { SQLiteDatabase } from "./SQLiteDatabase";
 
 const KMS_VERSION_DEK = 1;
 
-// The SELECT column list every list-shaped notes query must match. Kept next
-// to the row type it produces so a mapper field with no column fails loudly
-// instead of silently defaulting.
 const NOTE_META_COLUMNS =
   "id, workspaceId, title, titleKmsVersion, icon, coverColor, docMode, edgelessTheme, pageWidth, isTemplate, isPinned, isFavorite, orderIndex, createdAt, updatedAt";
 
@@ -105,8 +102,6 @@ export class SQLiteNoteRepository implements INoteRepository {
   async getMaxOrderIndex(workspaceId: string): Promise<string | null> {
     try {
       const db = await this.getDb();
-      // Deliberately includes soft-trashed rows: minting above only the live
-      // max would re-mint a trashed note's key, colliding on restore.
       const rows = await db.select<Array<{ orderIndex: string }>>(
         "SELECT orderIndex FROM notes WHERE workspaceId = ? AND orderIndex != '' ORDER BY orderIndex DESC LIMIT 1",
         [workspaceId],
@@ -227,8 +222,6 @@ export class SQLiteNoteRepository implements INoteRepository {
           note.isTemplate ? 1 : 0,
           note.isPinned ? 1 : 0,
           note.isFavorite ? 1 : 0,
-          // The column is NOT NULL — an unset key must bind the empty-string
-          // default, never SQL NULL (explicit NULLs bypass the DEFAULT).
           note.orderIndex ?? "",
           KMS_VERSION_DEK,
           note.createdAt,

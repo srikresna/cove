@@ -1,12 +1,5 @@
 ﻿import type React from "react";
 
-/**
- * Minimal markdown renderer for the export preview. Deliberately tiny and
- * React-element based â€” imported markdown is untrusted input, so nothing may
- * reach the DOM as raw HTML (no dangerouslySetInnerHTML). Unsupported syntax
- * degrades to plain text instead of erroring.
- */
-
 export type InlineToken =
   | { kind: "text"; text: string }
   | { kind: "bold"; children: InlineToken[] }
@@ -26,17 +19,11 @@ export type BlockToken =
 const IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/;
 const LINK_RE = /\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/;
 const BOLD_RE = /\*\*([^*]+)\*\*/;
-// Single-star italics whose content may itself contain **bold** spans; the
-// underscore branch requires word boundaries so snake_case stays literal.
 const ITALIC_RE =
   /(?<!\*)\*((?:[^*\n]|\*\*[^*\n]+\*\*)+)\*(?!\*)|(?<![A-Za-z0-9_])_([^_\n]+)_(?![A-Za-z0-9_])/;
 
-// Untrusted notes can carry megabyte one-liners; the scanner re-scans the
-// remainder per construct, so degenerate lines get plain-text treatment
-// instead of quadratic parsing.
 const MAX_INLINE_LENGTH = 8000;
 
-/** Parses one line of inline markdown into tokens, left to right. */
 export function parseInline(line: string): InlineToken[] {
   if (line.length > MAX_INLINE_LENGTH) {
     return [{ kind: "text", text: line }];
@@ -58,8 +45,6 @@ export function parseInline(line: string): InlineToken[] {
     const bold = rest.match(BOLD_RE);
     const italic = rest.match(ITALIC_RE);
 
-    // Whichever construct starts earliest wins; code spans win ties because
-    // they may contain the other markers.
     const codeStart = (() => {
       const open = rest.indexOf("`");
       if (open === -1) return null;
@@ -122,7 +107,6 @@ export function parseInline(line: string): InlineToken[] {
             {
               at: codeStart.open,
               take: () => {
-                // rest has already been sliced to start at this construct.
                 flush();
                 const close = rest.indexOf("`", 1);
                 tokens.push({ kind: "code", text: rest.slice(1, close) });
@@ -139,7 +123,6 @@ export function parseInline(line: string): InlineToken[] {
       rest = "";
       break;
     }
-    // Text before the winning construct.
     buffer += rest.slice(0, winner.at);
     rest = rest.slice(winner.at);
     flush();
@@ -150,13 +133,10 @@ export function parseInline(line: string): InlineToken[] {
   return tokens;
 }
 
-/** Parses a markdown document into renderable block tokens. */
 export function parseMarkdown(doc: string): BlockToken[] {
   const lines = doc.split(/\r?\n/);
   const blocks: BlockToken[] = [];
 
-  // Soft-wrapped lines render as separate paragraphs: joining them would
-  // hand the inline scanner megabyte strings and buy nothing visually.
   const pushParagraph = (line: string) => {
     blocks.push({ kind: "paragraph", children: parseInline(line) });
   };
@@ -278,8 +258,6 @@ export function InlineTokens({
               </code>
             );
           case "link":
-            // Rendered as text: note content is untrusted and following
-            // arbitrary links must not navigate the app webview.
             return (
               <span
                 // biome-ignore lint/suspicious/noArrayIndexKey: parsed tokens are positional and never reordered

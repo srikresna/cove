@@ -211,8 +211,6 @@ export const PeekDocView: React.FC<PeekDocViewProps> = ({
           />
         )}
 
-        {/* editor body — doc-title is hidden (the header above owns the title).
-            Same centered column as the header content so the text aligns. */}
         <div className="relative mx-auto min-h-0 w-full max-w-3xl flex-1">
           <div ref={containerRef} className="peek-doc-editor-host" />
         </div>

@@ -5,13 +5,6 @@ import { Button } from "./button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "./dialog";
 import { Input } from "./input";
 
-/**
- * The canonical window.prompt replacement for naming flows (save-as-
- * collection, rename). Confirm is disabled while the required input is
- * empty; Enter commits, Escape/outside cancels. The label row is optional
- * (the title plus placeholder usually carry the labeling); `error` renders
- * inline instead of the caller closing and toasting.
- */
 export const PromptDialog: React.FC<{
   open: boolean;
   title: string;
@@ -20,9 +13,7 @@ export const PromptDialog: React.FC<{
   description?: string;
   confirmLabel: string;
   initialValue?: string;
-  /** Shown inline under the input; the caller keeps the dialog open. */
   error?: string | null;
-  /** Disables confirm while an async save is in flight (no double submit). */
   busy?: boolean;
   onConfirm: (name: string) => void;
   onCancel: () => void;
@@ -41,7 +32,6 @@ export const PromptDialog: React.FC<{
 }) => {
   const [value, setValue] = useState(initialValue ?? "");
 
-  // Reset whenever the dialog opens so stale text never leaks between uses.
   useEffect(() => {
     if (open) setValue(initialValue ?? "");
   }, [open, initialValue]);

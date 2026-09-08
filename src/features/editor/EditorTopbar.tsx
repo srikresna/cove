@@ -47,8 +47,6 @@ interface EditorTopbarProps {
   onToggleFullWidth: () => void;
   onToggleFullscreen: () => void;
   onToggleRightBar: (viaKeyboard: boolean) => void;
-  /** Receives the open toggle so a keyboard close of the right bar can
-   *  return focus to it (the toggle unmounts while the bar is open). */
   openToggleRef?: React.Ref<HTMLButtonElement>;
 }
 
@@ -74,7 +72,6 @@ const IconAction: React.FC<{
   </Tooltip>
 );
 
-/** The doc-mode switch: a joined two-segment pill, Page | Edgeless. */
 const DocModeSwitch: React.FC<{
   docMode: DocMode;
   onToggle: () => void;
@@ -115,14 +112,8 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   const propertyVersion = usePropertyStore((s) => s.version);
   const openJournal = useOpenJournal();
   const [journalDate, setJournalDate] = useState<number | null>(null);
-  // Journal affordances hide as the header narrows so the "..." menu (the
-  // last, unclippable item) stays reachable: Today below ~390px, the
-  // template badge below ~470px — the segmented mode pill raised these
-  // floors from the old 300/400 by its extra width.
   const [headerRef, headerWidth] = useElementWidth<HTMLDivElement>();
 
-  // A journal note's topbar swaps the meta strip for a week calendar
-  // navigated by the note's journal date.
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   useEffect(() => {
     let alive = true;
@@ -144,9 +135,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     minute: "2-digit",
   }).format(note.updatedAt);
 
-  /** The "..." overflow: layout and doc-level actions that must not crowd
-   *  the bar (AFFiNE's topbar more-menu). Journal mode also parks Favorite
-   *  here — its cluster has no room for the standalone star. */
   const renderOverflowMenu = (includeFavorite: boolean) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -245,8 +233,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
       )}
 
       <div className="flex items-center gap-0.5">
-        {/* Journal mode owns its actions in the left cluster (the shared
-            overflow menu); the right cluster stays out of its way. */}
         {journalDate == null && (
           <>
             {onToggleDocMode && docMode && (
@@ -274,10 +260,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
           </>
         )}
 
-        {/* AFFiNE behavior: the panel toggle lives in the opened right
-            bar's own header; it returns here only while the bar is closed.
-            The divider travels with it so the cluster never ends in a
-            dangling rule. */}
         {!isRightBarOpen && (
           <>
             <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />

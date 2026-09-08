@@ -1,8 +1,5 @@
 import type { BlobSource } from "@blocksuite/sync";
 import { invoke } from "@tauri-apps/api/core";
-// Side-effect import, first in the file: every later customElements.define
-// (all the vendored effects modules route through the DI-created editor
-// service) must hit the idempotent wrapper.
 import "./../services/blocksuite/idempotentCustomElements";
 import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
@@ -47,8 +44,6 @@ const cryptoVault = new CryptoVault(kmsRepository);
 const noteRepository = new SQLiteNoteRepository();
 const workspaceRepository = new SQLiteWorkspaceRepository();
 const noteLinkRepository = new SQLiteNoteLinkRepository();
-// Repo writes publish change topics — every store cache riding on them
-// invalidates by construction, not by each caller remembering to refresh.
 const tagRepository = publishingWrites(
   new SQLiteTagRepository(),
   ["create", "update", "delete", "addToNote", "removeFromNote"],

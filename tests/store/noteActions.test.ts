@@ -100,8 +100,6 @@ describe("noteActions", () => {
     vi.clearAllMocks();
     vault.unlocked = true;
     queryClient.clear();
-    // Seeded entries carry no queryFn of their own — register one so
-    // invalidation-driven refetches have a fetcher to run.
     queryClient.setQueryDefaults(notesKey("ws1"), {
       queryFn: () => listMetadataByWorkspace("ws1"),
     });
@@ -136,7 +134,6 @@ describe("noteActions", () => {
     await noteActions.updateNote("n1", { content: "doc-v2" });
 
     expect(updateContent).toHaveBeenCalledWith("n1", "doc-v2");
-    // The scan query for the note was marked stale by the content write.
     expect(
       queryClient
         .getQueryCache()
@@ -148,9 +145,6 @@ describe("noteActions", () => {
   });
 
   it("content-only saves never clobber the cached plaintext title", async () => {
-    // Defense in depth: even if the service hands back the raw encrypted
-    // title column (the updateContent leak), the cache keeps the plaintext
-    // title the user sees — the title input must never display ciphertext.
     updateContent.mockResolvedValue(
       makeNote({ title: "AAAAAAAAAAAABOsiwICmX4Kke4lAZFUwsRb9+IyIWtRZQ==", content: "doc-v2" }),
     );
@@ -172,8 +166,6 @@ describe("noteActions", () => {
   });
 
   it("a rename committed while a content save is in flight survives the landing", async () => {
-    // The merge must read the LIVE cached title at land time — a snapshot
-    // taken before the await would revert the mid-flight rename.
     updateContent.mockImplementation(async () => {
       const notes = queryClient.getQueryData<Note[]>(notesKey("ws1")) ?? [];
       queryClient.setQueryData(
@@ -226,7 +218,6 @@ describe("noteActions", () => {
     await noteActions.restoreNote("t1");
 
     expect(restoreNote).toHaveBeenCalledWith("t1");
-    // The optimistic trash removal rolled back.
     expect(queryClient.getQueryData<Note[]>(["trash"])?.[0]?.id).toBe("t1");
   });
 

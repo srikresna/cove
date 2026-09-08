@@ -6,7 +6,6 @@ import { getJournalTemplateId } from "./journalTemplateSetting";
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
-/** Journal values are local-midnight timestamps; compare by calendar day. */
 const sameCalendarDay = (a: number, b: number): boolean => {
   const da = new Date(a);
   const db = new Date(b);
@@ -22,14 +21,12 @@ const localMidnight = (timestamp: number): number => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
 
-/** Daily-note title: YYYY-MM-DD. */
 export const journalTitleFor = (timestamp: number): string => {
   const d = new Date(timestamp);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
 export class JournalService implements IJournalService {
-  /** Serializes same-day ensures so double-clicks cannot create duplicates. */
   private readonly inFlightEnsures = new Map<string, Promise<string>>();
 
   constructor(
@@ -68,11 +65,8 @@ export class JournalService implements IJournalService {
     for (const [noteId, value] of await this.journalValuesByNote()) {
       if (value.type !== "date" || !sameCalendarDay(value.timestamp, midnight)) continue;
       const note = await this.notes.getNote(noteId);
-      // Trash is soft and keeps note_properties rows; a trashed journal note
-      // must not hijack the day, so only live notes are reusable.
       if (note && note.deletedAt == null && note.workspaceId === workspaceId) return noteId;
     }
-    // Apply the workspace journal template's content, when one is configured.
     let content: string | undefined;
     const templateId = getJournalTemplateId(workspaceId);
     if (templateId) {

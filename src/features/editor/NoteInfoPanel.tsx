@@ -20,9 +20,7 @@ export const InfoRow: React.FC<{
   icon: React.ReactNode;
   label: React.ReactNode;
   handle?: React.ReactNode;
-  /** Editors that carry their own 5/6px padding (text/number) sit flush. */
   flush?: boolean;
-  /** Radio/segmented rows don't highlight on hover. */
   noHover?: boolean;
   children: React.ReactNode;
 }> = ({ icon, label, handle, flush = false, noHover = false, children }) => (
@@ -48,7 +46,6 @@ export const InfoRow: React.FC<{
 
 export const NoteInfoPanel: React.FC<{
   note: Note;
-  /** In the peek view, the row the doc was opened from starts expanded. */
   defaultOpenBacklinkRef?: { databaseId: string; databaseRowId: string } | null;
 }> = ({ note, defaultOpenBacklinkRef = null }) => {
   const [isOpen, setIsOpen] = useState(() => localStorage.getItem(OPEN_KEY) === "true");
@@ -83,7 +80,6 @@ export const NoteInfoPanel: React.FC<{
     localStorage.setItem(OPEN_KEY, String(next));
   };
 
-  // Collapsed state shows a one-line summary instead of nothing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
   useEffect(() => {
     if (isOpen) return;
@@ -95,7 +91,6 @@ export const NoteInfoPanel: React.FC<{
         const rows: Array<{ id: string; name: string; text: string }> = [];
         const defById = new Map(defs.map((d) => [d.id, d]));
         const visible = (id: string) => defById.get(id)?.show !== "always-hide";
-        // Note-field-backed rows (no note_properties value) summarize from the note.
         const derived: Array<[string, string | undefined]> = [
           ["system:doc-mode", note.docMode === "edgeless" ? "Edgeless" : "Page"],
           ["system:page-width", note.pageWidth === "fullWidth" ? "Full width" : "Standard"],
@@ -174,8 +169,6 @@ export const NoteInfoPanel: React.FC<{
           </div>
         )}
 
-      {/* Stays mounted while collapsed (hidden via CSS) so expand/collapse
-          choices inside the rows and backlink sections survive Info toggles. */}
       <div className={cn("mt-2 space-y-2 pb-2", !isOpen && "hidden")}>
         <NotePropertiesRows note={note} />
         {backlinks.length > 0 && (

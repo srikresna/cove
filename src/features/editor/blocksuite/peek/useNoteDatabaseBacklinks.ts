@@ -5,9 +5,6 @@ import type { DatabaseBacklinkRef } from "../../../../services/blocksuite/IBlock
 import { scanNoteRows } from "../../../../services/editor/backlinkScan";
 import { backlinkScanKey } from "../../../../store/queryClient";
 
-/** Database rows across the workspace's notes that reference `noteId`. Each
- *  source note scans once and lives in the query cache (invalidated when the
- *  note's content changes). */
 export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklinkRef[] {
   const notes = useNotes();
   const scans = useQueries({
@@ -23,8 +20,6 @@ export function useNoteDatabaseBacklinks(noteId: string | null): DatabaseBacklin
 
   const backlinks: DatabaseBacklinkRef[] = [];
   if (!noteId) return backlinks;
-  // A note can reference the same database row from several cells — the
-  // panel keys sections by databaseId:rowId, so dedupe to one section each.
   const seen = new Set<string>();
   for (let i = 0; i < notes.length; i += 1) {
     const rows = scans[i]?.data;

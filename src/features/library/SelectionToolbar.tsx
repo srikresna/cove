@@ -3,10 +3,6 @@ import type React from "react";
 import { Button } from "../../components/ui/button";
 import { MESSAGES } from "../../constants/messages";
 
-/**
- * A floating pill at the bottom of the Library while notes are selected,
- * with the count and bulk actions.
- */
 export const SelectionToolbar: React.FC<{
   count: number;
   onBulkTrash: () => void;

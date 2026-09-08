@@ -18,10 +18,8 @@ function normalizeViewName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-/** The prune engine's classification shape (drop carries the keep-as-match-all verdict). */
 type PruneRewrite = { drop: false; rule: FilterRule } | { drop: true; postDeleteMatchAll: boolean };
 
-/** Adapts the domain rewrite to the prune engine's classification shape. */
 function toPruneRewrite(r: RuleRewrite): PruneRewrite {
   return r.drop
     ? { drop: true, postDeleteMatchAll: r.vacuouslyAll }
@@ -39,9 +37,6 @@ export class SavedViewService implements ISavedViewService {
     const normalized = normalizeViewName(name);
     if (!normalized) throw new ValidationError("View name cannot be empty.");
     if (rules.length === 0) throw new ValidationError("A view needs at least one rule.");
-    // A view whose every rule is incomplete evaluates to match-all (the
-    // gate treats value-less rules as inactive), which is never what the
-    // user meant when they hit Save — refuse it up front.
     if (rules.filter(isRuleComplete).length === 0) {
       throw new ValidationError("Pick a value for at least one rule before saving.");
     }
@@ -68,7 +63,6 @@ export class SavedViewService implements ISavedViewService {
     if (!normalized) throw new ValidationError("View name cannot be empty.");
     const view = await this.views.findById(id);
     if (!view) throw new NotFoundError("SavedView", id);
-    // Same uniqueness rule as createView, scoped to the view's workspace.
     const existing = await this.views.listByWorkspace(view.workspaceId);
     if (existing.some((v) => v.id !== id && v.name.toLowerCase() === normalized.toLowerCase())) {
       throw new ValidationError("A view with this name already exists.");
@@ -76,10 +70,6 @@ export class SavedViewService implements ISavedViewService {
     await this.views.rename(id, normalized);
   }
 
-  /**
-   * Persists edited rules back into an existing view (the "save changes"
-   * half of collection editing). Same completeness contract as createView.
-   */
   async updateViewRules(id: string, rules: FilterRules): Promise<void> {
     const view = await this.views.findById(id);
     if (!view) throw new NotFoundError("SavedView", id);
@@ -89,7 +79,6 @@ export class SavedViewService implements ISavedViewService {
     await this.views.updateRules(id, rules);
   }
 
-  /** Persists the manually-included note ids of an existing view. */
   async updateViewAllowIds(id: string, allowNoteIds: string[]): Promise<void> {
     const view = await this.views.findById(id);
     if (!view) throw new NotFoundError("SavedView", id);
@@ -100,11 +89,6 @@ export class SavedViewService implements ISavedViewService {
     return this.views.delete(id);
   }
 
-  /**
-   * Shared prune engine: computes every view's outcome first, then applies
-   * all rewrites + deletions in one transaction. A view left with no complete
-   * rule is kept with [] iff it was match-all before the prune, else deleted.
-   */
   private async applyViewPrune(rewriteRule: (rule: FilterRule) => PruneRewrite): Promise<string[]> {
     const updates: Array<{ id: string; rulesJson: string }> = [];
     const deletes: string[] = [];
@@ -116,7 +100,6 @@ export class SavedViewService implements ISavedViewService {
         const outcome = rewriteRule(rule);
         if (outcome.drop) {
           changed = true;
-          // Only pre-prune ACTIVE rules shaped the view's behavior.
           if (isRuleComplete(rule) && !outcome.postDeleteMatchAll) {
             wasMatchAllBeforePrune = false;
           }
@@ -139,25 +122,16 @@ export class SavedViewService implements ISavedViewService {
     return deletes;
   }
 
-  /**
-   * Removes a deleted select/multiSelect option from every view's rules
-   * (defs are global across workspaces). Returns the deleted view ids.
-   */
   pruneOption(definitionId: string, optionId: string): Promise<string[]> {
     return this.applyViewPrune((rule) =>
       toPruneRewrite(removeOption(rule, definitionId, optionId)),
     );
   }
 
-  /** Removes every rule referencing a deleted property definition. */
   pruneProperty(definitionId: string): Promise<string[]> {
     return this.applyViewPrune((rule) => toPruneRewrite(dropDeadDef(rule, definitionId)));
   }
 
-  /**
-   * Startup self-heal: drops rules referencing dead defs/options (idempotent,
-   * one transaction).
-   */
   healRules(liveDefs: PropertyDefinition[]): Promise<string[]> {
     return this.applyViewPrune((rule) => toPruneRewrite(healRule(rule, liveDefs)));
   }

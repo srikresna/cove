@@ -12,19 +12,13 @@ export const dayKey = (date: Date): string =>
 const keyOf = (timestamp: number): string => dayKey(new Date(timestamp));
 
 interface MonthGridProps {
-  /** First day of the month to show. */
   month: Date;
   selectedKey: string | null;
-  /** Calendar-day keys that carry a journal note. */
   journalDays: Set<string>;
   onSelectDay: (key: string) => void;
   onShiftMonth: (delta: number) => void;
 }
 
-/**
- * A full 6-week (42-cell) month grid with faded adjacent days and typed
- * journal dots.
- */
 export const MonthGrid: React.FC<MonthGridProps> = ({
   month,
   selectedKey,
@@ -33,7 +27,6 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   onShiftMonth,
 }) => {
   const cells = useMemo(() => {
-    // Full 6-week grid; adjacent-month days render faded (and clickable), no leading blanks.
     const year = month.getFullYear();
     const monthIndex = month.getMonth();
     const firstOfMonth = new Date(year, monthIndex, 1);
@@ -124,5 +117,4 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   );
 };
 
-/** Convenience: calendar-day key for a journal timestamp. */
 export const journalDayKey = keyOf;

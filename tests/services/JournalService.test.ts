@@ -89,12 +89,10 @@ describe("JournalService", () => {
     const values = await journal.journalValuesByNote();
     expect(values.get(first)).toEqual({ type: "date", timestamp: date });
 
-    // Same day, same workspace -> reuse, no second note.
     const second = await journal.ensureJournalByDate("w1", new Date(2026, 7, 21, 17, 30).getTime());
     expect(second).toBe(first);
     expect(notes.created).toHaveLength(1);
 
-    // Same day, different workspace -> creates its own.
     const other = await journal.ensureJournalByDate("w2", date);
     expect(other).not.toBe(first);
     expect(notes.created).toHaveLength(2);
@@ -106,7 +104,6 @@ describe("JournalService", () => {
     const journal = new JournalService(propertyService, notes);
     const date = new Date(2026, 7, 21).getTime();
 
-    // Trash is soft: the note still resolves via getNote but must be skipped.
     const trashed = await journal.ensureJournalByDate("w1", date);
     const trashedNote = await notes.getNote(trashed);
     expect(trashedNote).not.toBeNull();
@@ -115,7 +112,6 @@ describe("JournalService", () => {
     expect(recreated).not.toBe(trashed);
     expect(notes.created).toHaveLength(2);
 
-    // Two concurrent ensures for the same day resolve to the same note.
     const [a, b] = await Promise.all([
       journal.ensureJournalByDate("w1", new Date(2026, 7, 22).getTime()),
       journal.ensureJournalByDate("w1", new Date(2026, 7, 22, 20).getTime()),
@@ -132,7 +128,6 @@ describe("JournalService", () => {
 
     await journal.setJournalDate(note.id, new Date(2026, 0, 2, 12).getTime());
     let values = await journal.journalValuesByNote();
-    // Stored at local midnight, not the original midday timestamp.
     expect(values.get(note.id)).toEqual({
       type: "date",
       timestamp: new Date(2026, 0, 2).getTime(),

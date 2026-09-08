@@ -296,11 +296,6 @@ const ManagerRow: React.FC<ManagerRowProps> = ({
   );
 };
 
-/**
- * Workspace property manager for the right bar: reorder and configure every
- * property definition, and add new ones from the type list. Definitions are
- * workspace-wide, so changes apply to every note.
- */
 export const PropertyManagerPanel: React.FC<{
   typeMeta: Record<string, { label: string; icon: React.ReactNode }>;
 }> = ({ typeMeta }) => {
@@ -470,8 +465,6 @@ export const PropertyManagerPanel: React.FC<{
             propertyService
               .deleteDefinition(deletingDef.id)
               .then(async () => {
-                // Saved views may filter on the deleted definition; prune
-                // their rules so no view silently goes empty or undead.
                 await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
               })
               .catch(notifyError);
@@ -484,7 +477,6 @@ export const PropertyManagerPanel: React.FC<{
   );
 };
 
-/** "Text" -> "Text 2" -> "Text 3" ... following the Info panel's add flow. */
 function generateSequencedName(base: string, existing: string[]): string {
   let index = 2;
   let candidate = `${base} ${index}`;

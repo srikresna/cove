@@ -5,7 +5,6 @@ import type { Note } from "../../../domain/note/Note";
 import { cn } from "../../../lib/utils";
 import { noteActions } from "../../../store/noteActions";
 
-/** A small fixed-width segmented control. */
 const SegmentedValue: React.FC<{
   options: Array<{ value: string; label: string }>;
   value: string;

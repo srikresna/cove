@@ -97,9 +97,6 @@ export class VaultService implements IVaultService {
   private locking = false;
 
   isUnlocked(): boolean {
-    // lock() fires its listeners, then persists the IV high-water mark
-    // (async) before the keys clear — during that gap the session keys are
-    // still live, but the app must already behave as locked.
     return !this.locking && this.crypto.isUnlocked();
   }
 

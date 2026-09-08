@@ -1,7 +1,6 @@
 import { formatRelativeDay } from "../../utils/time";
 import type { PropertyDefinition, PropertyValue } from "./Property";
 
-/** Compact stack-value formatting for note rows, cards, and group labels. */
 export function stackValueText(def: PropertyDefinition, value: PropertyValue): string | null {
   switch (value.type) {
     case "text":
@@ -32,7 +31,6 @@ export function stackValueText(def: PropertyDefinition, value: PropertyValue): s
   }
 }
 
-/** Compact value rendering for the collapsed Info summary chips. */
 export function summarizePropertyValue(
   def: PropertyDefinition,
   value: PropertyValue,
