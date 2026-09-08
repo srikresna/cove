@@ -1,7 +1,17 @@
 import { motion } from "framer-motion";
-import { CalendarCheck, ChevronDown, Library, Plus, Search, Trash2 } from "lucide-react";
+import {
+  CalendarCheck,
+  ChevronDown,
+  Image as ImageIcon,
+  ImageOff,
+  Library,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { Kbd } from "../../components/ui/kbd";
+import { PromptDialog } from "../../components/ui/prompt-dialog";
 import { TooltipProvider } from "../../components/ui/tooltip";
 import { MESSAGES } from "../../constants/messages";
 import { useNotes } from "../../hooks/useNotes";
@@ -30,7 +41,17 @@ const navRow =
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDeleteWorkspaceOpen, setDeleteWorkspaceOpen] = useState(false);
-  const { workspaces, activeWorkspaceId, deleteWorkspace } = useWorkspaceStore();
+  const [isRenameWorkspaceOpen, setRenameWorkspaceOpen] = useState(false);
+  const {
+    workspaces,
+    activeWorkspaceId,
+    deleteWorkspace,
+    renameWorkspace,
+    uploadWorkspaceIcon,
+    removeWorkspaceIcon,
+    icons,
+  } = useWorkspaceStore();
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const setQuickSearchOpen = useUIStore((s) => s.setQuickSearchOpen);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const activePage = useUIStore((s) => s.activePage);
@@ -39,10 +60,11 @@ export const Sidebar: React.FC = () => {
   const notes = useNotes();
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
+  const activeWorkspaceIcon = activeWorkspace ? icons[activeWorkspace.id] : undefined;
   const noteCount = notes.filter((n) => n.workspaceId === activeWorkspace?.id).length;
 
   const handleDeleteWorkspace = () => {
-    if (activeWorkspace) deleteWorkspace(activeWorkspace.id);
+    if (activeWorkspace) void deleteWorkspace(activeWorkspace.id);
     setDeleteWorkspaceOpen(false);
   };
 
@@ -97,6 +119,21 @@ export const Sidebar: React.FC = () => {
                     <span>{MESSAGES.CREATE_WORKSPACE_TITLE}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setRenameWorkspaceOpen(true)}>
+                    <Pencil aria-hidden="true" />
+                    <span>{MESSAGES.WORKSPACE_RENAME}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => iconInputRef.current?.click()}>
+                    <ImageIcon aria-hidden="true" />
+                    <span>{MESSAGES.WORKSPACE_CHANGE_ICON}</span>
+                  </DropdownMenuItem>
+                  {activeWorkspace && activeWorkspaceIcon != null && (
+                    <DropdownMenuItem onSelect={() => void removeWorkspaceIcon(activeWorkspace.id)}>
+                      <ImageOff aria-hidden="true" />
+                      <span>{MESSAGES.WORKSPACE_REMOVE_ICON}</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     disabled={workspaces.length <= 1}
                     onSelect={() => setDeleteWorkspaceOpen(true)}
@@ -108,6 +145,21 @@ export const Sidebar: React.FC = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            <input
+              ref={iconInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              hidden
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file || !activeWorkspace) return;
+                void uploadWorkspaceIcon(activeWorkspace.id, file);
+              }}
+            />
 
             <div className="flex items-center gap-1.5 px-3 pt-3">
               <button
@@ -183,6 +235,20 @@ export const Sidebar: React.FC = () => {
         danger
         onConfirm={handleDeleteWorkspace}
         onCancel={() => setDeleteWorkspaceOpen(false)}
+      />
+
+      <PromptDialog
+        open={isRenameWorkspaceOpen}
+        title={MESSAGES.WORKSPACE_RENAME}
+        label={MESSAGES.WORKSPACE_NAME_LABEL}
+        placeholder={MESSAGES.WORKSPACE_NAME_PLACEHOLDER}
+        confirmLabel={MESSAGES.WORKSPACE_RENAME}
+        initialValue={activeWorkspace?.name}
+        onConfirm={(name) => {
+          if (activeWorkspace) void renameWorkspace(activeWorkspace.id, name);
+          setRenameWorkspaceOpen(false);
+        }}
+        onCancel={() => setRenameWorkspaceOpen(false)}
       />
     </TooltipProvider>
   );

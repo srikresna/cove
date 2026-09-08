@@ -1,8 +1,10 @@
+import type { EncryptedPayload } from "@/domain/EncryptedPayload";
 import type { Workspace } from "@/domain/workspace/Workspace";
 import type { IWorkspaceRepository } from "@/repositories/IWorkspaceRepository";
 
 export class InMemoryWorkspaceRepository implements IWorkspaceRepository {
   public workspaces: Workspace[] = [];
+  public icons = new Map<string, EncryptedPayload>();
   public callLog: string[] = [];
   public shouldFail = false;
 
@@ -42,5 +44,24 @@ export class InMemoryWorkspaceRepository implements IWorkspaceRepository {
     this.callLog.push(`deleteWorkspace:${id}`);
     if (this.shouldFail) throw new Error("Fake repo error: deleteWorkspace");
     this.workspaces = this.workspaces.filter((w) => w.id !== id);
+    this.icons.delete(id);
+  }
+
+  async getIcon(workspaceId: string): Promise<EncryptedPayload | null> {
+    this.callLog.push(`getIcon:${workspaceId}`);
+    if (this.shouldFail) throw new Error("Fake repo error: getIcon");
+    return this.icons.get(workspaceId) ?? null;
+  }
+
+  async upsertIcon(workspaceId: string, payload: EncryptedPayload): Promise<void> {
+    this.callLog.push(`upsertIcon:${workspaceId}`);
+    if (this.shouldFail) throw new Error("Fake repo error: upsertIcon");
+    this.icons.set(workspaceId, payload);
+  }
+
+  async deleteIcon(workspaceId: string): Promise<void> {
+    this.callLog.push(`deleteIcon:${workspaceId}`);
+    if (this.shouldFail) throw new Error("Fake repo error: deleteIcon");
+    this.icons.delete(workspaceId);
   }
 }

@@ -82,7 +82,10 @@ export const journalService: IJournalService = new JournalService(propertyServic
 export const savedViewService: ISavedViewService = new SavedViewService(
   new SQLiteSavedViewRepository(),
 );
-export const workspaceService: IWorkspaceService = new WorkspaceService(workspaceRepository);
+export const workspaceService: IWorkspaceService = new WorkspaceService({
+  workspaces: workspaceRepository,
+  crypto: cryptoVault,
+});
 const deviceBind = new DeviceBind();
 const deriveKeyFn: KdfDerive = async (passphrase, salt, kdfAlg, params) => {
   const result = await invoke<number[]>("derive_key_kdf", {

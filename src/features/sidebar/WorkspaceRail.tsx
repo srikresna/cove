@@ -15,7 +15,7 @@ const tile =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onToggleCollapsed }) => {
-  const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore();
+  const { workspaces, activeWorkspaceId, setActiveWorkspace, icons } = useWorkspaceStore();
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const activePage = useUIStore((s) => s.activePage);
@@ -48,6 +48,7 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
       <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto py-0.5">
         {workspaces.map((ws) => {
           const isActive = ws.id === activeWorkspaceId;
+          const icon = icons[ws.id];
           return (
             <Tooltip key={ws.id}>
               <TooltipTrigger asChild>
@@ -64,7 +65,15 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
                       : "border border-transparent opacity-70 hover:border-border hover:bg-card hover:opacity-100",
                   )}
                 >
-                  <span aria-hidden="true">{ws.emoji}</span>
+                  {icon ? (
+                    <img
+                      src={icon}
+                      alt=""
+                      className="h-8 w-8 rounded-lg object-cover leading-none"
+                    />
+                  ) : (
+                    <span aria-hidden="true">{ws.emoji}</span>
+                  )}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">{ws.name}</TooltipContent>

@@ -1,10 +1,16 @@
 export const WorkspaceMessages = {
   CREATE_WORKSPACE_TITLE: "Create Workspace",
   WORKSPACE_NAME_LABEL: "Workspace Name",
+  WORKSPACE_NAME_PLACEHOLDER: "Workspace name",
   WORKSPACE_EMOJI_LABEL: "Emoji Icon",
   WORKSPACE_COLOR_LABEL: "Accent Color",
   WORKSPACE_DESC_LABEL: "Description",
   CREATE_WORKSPACE_BUTTON: "Create Workspace",
+  WORKSPACE_RENAME: "Rename workspace…",
+  WORKSPACE_CHANGE_ICON: "Change icon…",
+  WORKSPACE_REMOVE_ICON: "Remove icon",
+  WORKSPACE_ICON_INVALID: "That file is not a readable image.",
+  WORKSPACE_ICON_TOO_LARGE: "The image is too large (max 15 MB).",
   DELETE_WORKSPACE: "Delete workspace",
   DELETE_WORKSPACE_CONFIRM_TITLE: "Delete this workspace?",
   DELETE_WORKSPACE_CONFIRM_DESC:

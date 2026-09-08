@@ -666,6 +666,13 @@ export class SQLiteDatabase {
       }
       await db.execute("PRAGMA user_version = 24");
     }
+
+    if (version < 25) {
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS workspace_icons (workspaceId TEXT PRIMARY KEY, payload TEXT NOT NULL, kmsVersion INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, FOREIGN KEY (workspaceId) REFERENCES workspaces(id) ON DELETE CASCADE)",
+      );
+      await db.execute("PRAGMA user_version = 25");
+    }
   }
 
   private static vacuousRuleWasMatchAll(rule: Record<string, unknown>, op: string): boolean {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { noteService, workspaceService } from "../di/container";
 import type { Workspace } from "../domain/workspace/Workspace";
+import { processWorkspaceIcon } from "../utils/workspaceIcon";
 import { notifyError } from "./notify";
 import { useTagStore } from "./useTagStore";
 import { useUIStore } from "./useUIStore";
@@ -19,6 +20,7 @@ function resetWorkspaceScopedFilters(): void {
 interface WorkspaceState {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
+  icons: Record<string, string>;
   setActiveWorkspace: (id: string) => void;
   fetchWorkspaces: () => Promise<void>;
   createWorkspace: (
@@ -28,12 +30,16 @@ interface WorkspaceState {
     description?: string,
   ) => Promise<Workspace | null>;
   updateWorkspace: (id: string, updates: Partial<Workspace>) => Promise<void>;
+  renameWorkspace: (id: string, name: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
+  uploadWorkspaceIcon: (id: string, file: File) => Promise<void>;
+  removeWorkspaceIcon: (id: string) => Promise<void>;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
+  icons: {},
 
   setActiveWorkspace: (id) => {
     if (get().activeWorkspaceId === id) return;
@@ -52,6 +58,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (activeWorkspaceId !== state.activeWorkspaceId) resetWorkspaceScopedFilters();
         return { workspaces, activeWorkspaceId };
       });
+      const icons: Record<string, string> = {};
+      await Promise.all(
+        workspaces.map(async (w) => {
+          try {
+            const icon = await workspaceService.getIcon(w.id);
+            if (icon) icons[w.id] = icon;
+          } catch {}
+        }),
+      );
+      set({ icons });
     } catch (err) {
       notifyError(err);
     }
@@ -88,6 +104,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
+  renameWorkspace: async (id, name) => {
+    try {
+      const updated = await workspaceService.renameWorkspace(id, name);
+      set((state) => ({
+        workspaces: state.workspaces.map((w) => (w.id === id ? updated : w)),
+      }));
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
   deleteWorkspace: async (id) => {
     const current = get().workspaces;
     const filtered = current.filter((w) => w.id !== id);
@@ -100,11 +127,38 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     try {
       await workspaceService.deleteWorkspace(id);
-      set({ workspaces: filtered, activeWorkspaceId: nextActive });
+      set((state) => {
+        const icons = { ...state.icons };
+        delete icons[id];
+        return { workspaces: filtered, activeWorkspaceId: nextActive, icons };
+      });
       resetWorkspaceScopedFilters();
       if (blobCandidates.length > 0) {
         void noteService.gcOrphanBlobs(blobCandidates).catch(() => {});
       }
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
+  uploadWorkspaceIcon: async (id, file) => {
+    try {
+      const dataUrl = await processWorkspaceIcon(file);
+      await workspaceService.setIcon(id, dataUrl);
+      set((state) => ({ icons: { ...state.icons, [id]: dataUrl } }));
+    } catch (err) {
+      notifyError(err);
+    }
+  },
+
+  removeWorkspaceIcon: async (id) => {
+    try {
+      await workspaceService.removeIcon(id);
+      set((state) => {
+        const icons = { ...state.icons };
+        delete icons[id];
+        return { icons };
+      });
     } catch (err) {
       notifyError(err);
     }

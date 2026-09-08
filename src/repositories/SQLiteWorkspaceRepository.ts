@@ -1,3 +1,4 @@
+import type { EncryptedPayload } from "../domain/EncryptedPayload";
 import type { Workspace } from "../domain/workspace/Workspace";
 import { PersistenceError } from "../errors/AppError";
 import { toPersistenceError } from "../errors/errorMappers";
@@ -12,6 +13,8 @@ interface WorkspaceRow {
   description: string | null;
   createdAt: number;
 }
+
+const KMS_VERSION_DEK = 1;
 
 export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
   private getDb() {
@@ -114,6 +117,41 @@ export class SQLiteWorkspaceRepository implements IWorkspaceRepository {
       ]);
     } catch (err) {
       throw toPersistenceError("deleteWorkspace", err);
+    }
+  }
+
+  async getIcon(workspaceId: string): Promise<EncryptedPayload | null> {
+    try {
+      const db = await this.getDb();
+      const rows = await db.select<Array<{ payload: string }>>(
+        "SELECT payload FROM workspace_icons WHERE workspaceId = ?",
+        [workspaceId],
+      );
+      const payload = rows[0]?.payload;
+      return payload ? (payload as EncryptedPayload) : null;
+    } catch (err) {
+      throw toPersistenceError("getIcon", err);
+    }
+  }
+
+  async upsertIcon(workspaceId: string, payload: EncryptedPayload): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute(
+        "INSERT INTO workspace_icons (workspaceId, payload, kmsVersion, updatedAt) VALUES (?, ?, ?, ?) ON CONFLICT(workspaceId) DO UPDATE SET payload = excluded.payload, kmsVersion = excluded.kmsVersion, updatedAt = excluded.updatedAt",
+        [workspaceId, payload, KMS_VERSION_DEK, Date.now()],
+      );
+    } catch (err) {
+      throw toPersistenceError("upsertIcon", err);
+    }
+  }
+
+  async deleteIcon(workspaceId: string): Promise<void> {
+    try {
+      const db = await this.getDb();
+      await db.execute("DELETE FROM workspace_icons WHERE workspaceId = ?", [workspaceId]);
+    } catch (err) {
+      throw toPersistenceError("deleteIcon", err);
     }
   }
 }
