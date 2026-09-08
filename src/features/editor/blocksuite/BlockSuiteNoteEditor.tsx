@@ -66,6 +66,31 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     };
     scroller.addEventListener("wheel", onWheel, { capture: true, passive: false });
 
+    // Follow the caret the way AFFiNE does, replacing the vendored auto-scroll
+    // we disabled: when a selection lands outside the visible band (Enter at
+    // the bottom pushes the new line below the fold), scroll the MINIMUM
+    // needed to reveal it. One-way and minimal by construction — it only ever
+    // fires while the caret is out of view, so it cannot oscillate.
+    const CARET_MARGIN = 24;
+    const onSelectionChange = () => {
+      const sel = document.getSelection();
+      if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+      const node = sel.anchorNode;
+      const el = node?.nodeType === 1 ? (node as Element) : (node?.parentElement ?? null);
+      if (!el || !scroller.contains(el)) return;
+      // Measure after layout settles — Enter's new line renders async in Lit.
+      requestAnimationFrame(() => {
+        const rect = sel.getRangeAt(0).getBoundingClientRect();
+        const view = scroller.getBoundingClientRect();
+        if (rect.bottom > view.bottom - CARET_MARGIN) {
+          scroller.scrollTop += rect.bottom - (view.bottom - CARET_MARGIN);
+        } else if (rect.top < view.top + CARET_MARGIN) {
+          scroller.scrollTop -= view.top + CARET_MARGIN - rect.top;
+        }
+      });
+    };
+    document.addEventListener("selectionchange", onSelectionChange);
+
     // Dev-only scroll tracer: "the screen scrolls by itself" reports get a
     // ring buffer of every scroll with the hovered element, readable from
     // the WebView2 profile's localStorage (cove-scroll-trace) to identify
@@ -170,6 +195,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     }
     return () => {
       stopTrace();
+      document.removeEventListener("selectionchange", onSelectionChange);
       scroller.removeEventListener("wheel", onWheel, { capture: true });
     };
   }, [mode]);
