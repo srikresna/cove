@@ -81,7 +81,10 @@ const loadPdfFonts = async (): Promise<void> => {
     }
     vfs[file] = btoa(binary);
   }
-  pdfMake.vfs = vfs;
+  // pdfmake 0.3 dropped the `vfs` property — addVirtualFileSystem feeds the
+  // module-level VirtualFileSystem singleton the adapter's fonts resolve
+  // against (entries are base64 strings).
+  pdfMake.addVirtualFileSystem(vfs);
   const slots = {
     normal: "LiberationSans-Regular.ttf",
     bold: "LiberationSans-Bold.ttf",
