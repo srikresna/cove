@@ -1,7 +1,7 @@
 import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
-import { Plus, Smile } from "lucide-react";
+import { ImageUp, Plus, Smile, X } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import {
   Dialog,
@@ -17,17 +17,41 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/pop
 import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import { cn } from "../../lib/utils";
+import { notifyError } from "../../store/notify";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { processWorkspaceIcon } from "../../utils/workspaceIcon";
 
 export const CreateWorkspaceModal: React.FC = () => {
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
+  const uploadWorkspaceIcon = useWorkspaceStore((s) => s.uploadWorkspaceIcon);
   const isCreateModalOpen = useUIStore((s) => s.isCreateModalOpen);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedEmoji, setSelectedEmoji] = useState("🚀");
   const [selectedColor, setSelectedColor] = useState("#ff6f1e");
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const iconInputRef = useRef<HTMLInputElement>(null);
+
+  const clearCustomIcon = () => {
+    setIconFile(null);
+    setIconPreview(null);
+    if (iconInputRef.current) iconInputRef.current.value = "";
+  };
+
+  const handleIconFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const preview = await processWorkspaceIcon(file);
+      setIconFile(file);
+      setIconPreview(preview);
+    } catch (err) {
+      clearCustomIcon();
+      notifyError(err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,10 +63,12 @@ export const CreateWorkspaceModal: React.FC = () => {
       description.trim(),
     );
     if (!created) return;
+    if (iconFile) await uploadWorkspaceIcon(created.id, iconFile);
     setName("");
     setDescription("");
     setSelectedEmoji("🚀");
     setSelectedColor("#ff6f1e");
+    clearCustomIcon();
   };
 
   return (
@@ -51,11 +77,15 @@ export const CreateWorkspaceModal: React.FC = () => {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-lg"
+              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border text-lg"
               style={{ backgroundColor: `${selectedColor}30` }}
               aria-hidden="true"
             >
-              {selectedEmoji}
+              {iconPreview ? (
+                <img src={iconPreview} alt="" className="h-full w-full object-cover" />
+              ) : (
+                selectedEmoji
+              )}
             </div>
             <DialogTitle>{MESSAGES.CREATE_WORKSPACE_TITLE}</DialogTitle>
           </div>
@@ -76,34 +106,88 @@ export const CreateWorkspaceModal: React.FC = () => {
 
           <div className="space-y-1.5">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {MESSAGES.WORKSPACE_EMOJI_LABEL}
+              {MESSAGES.WORKSPACE_ICON_LABEL}
             </span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between"
-                  aria-label="Choose Emoji Icon"
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="text-xl" aria-hidden="true">
-                      {selectedEmoji}
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("flex-1 justify-between", iconPreview && "opacity-60")}
+                    aria-label="Choose Emoji Icon"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="text-xl" aria-hidden="true">
+                        {selectedEmoji}
+                      </span>
+                      <span>Emoji</span>
                     </span>
-                    <span>Choose Emoji Icon</span>
+                    <Smile className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent sideOffset={8} className="overflow-hidden">
+                  <EmojiPicker
+                    emojiStyle={EmojiStyle.NATIVE}
+                    onEmojiClick={(emojiData) => {
+                      clearCustomIcon();
+                      setSelectedEmoji(emojiData.emoji);
+                    }}
+                    autoFocusSearch={true}
+                    width={340}
+                    height={360}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="outline"
+                className="flex-1 justify-between"
+                aria-label={
+                  iconPreview ? MESSAGES.WORKSPACE_CUSTOM_ICON : MESSAGES.WORKSPACE_UPLOAD_ICON
+                }
+                onClick={() => iconInputRef.current?.click()}
+                type="button"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  {iconPreview ? (
+                    <img
+                      src={iconPreview}
+                      alt=""
+                      className="h-5 w-5 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <ImageUp className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  )}
+                  <span className="truncate">
+                    {iconPreview ? MESSAGES.WORKSPACE_CUSTOM_ICON : MESSAGES.WORKSPACE_UPLOAD_ICON}
                   </span>
-                  <Smile className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                </span>
+              </Button>
+              {iconPreview && (
+                <Button
+                  variant="ghost"
+                  size="iconSm"
+                  aria-label="Clear custom icon"
+                  className="shrink-0 text-muted-foreground"
+                  onClick={clearCustomIcon}
+                  type="button"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent sideOffset={8} className="overflow-hidden">
-                <EmojiPicker
-                  emojiStyle={EmojiStyle.NATIVE}
-                  onEmojiClick={(emojiData) => setSelectedEmoji(emojiData.emoji)}
-                  autoFocusSearch={true}
-                  width={340}
-                  height={360}
-                />
-              </PopoverContent>
-            </Popover>
+              )}
+              <input
+                ref={iconInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                hidden
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  void handleIconFile(file);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">

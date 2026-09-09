@@ -46,11 +46,11 @@ export const PromptDialog: React.FC<{
         if (!next) onCancel();
       }}
     >
-      <DialogContent className="max-w-sm gap-5 p-8" hideClose>
+      <DialogContent hideClose>
         <DialogTitle>{title}</DialogTitle>
         {description && <DialogDescription>{description}</DialogDescription>}
 
-        <div className="flex flex-col gap-1.5">
+        <div className="space-y-1.5">
           {label && <Label htmlFor="prompt-dialog-input">{label}</Label>}
           <Input
             id="prompt-dialog-input"
