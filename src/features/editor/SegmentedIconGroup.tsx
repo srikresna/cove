@@ -27,6 +27,10 @@ export function SegmentedIconGroup<T extends string>({
   "aria-label"?: string;
 }): React.ReactNode {
   const isTabs = variant === "tabs";
+  const activeIndex = Math.max(
+    items.findIndex((item) => item.value === value),
+    0,
+  );
   const moveFocus = (fromValue: T, delta: number) => {
     const count = items.length;
     const index = items.findIndex((i) => i.value === fromValue);
@@ -42,10 +46,15 @@ export function SegmentedIconGroup<T extends string>({
       role={isTabs ? "tablist" : "group"}
       aria-label={ariaLabel}
       className={cn(
-        "flex flex-shrink-0 items-center gap-0.5 rounded-lg border bg-muted/60 p-0.5",
+        "relative flex flex-shrink-0 items-center gap-0.5 rounded-lg border bg-muted/60 p-0.5",
         className,
       )}
     >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0.5 left-0.5 w-7 rounded-md bg-card shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+        style={{ transform: `translateX(calc(${activeIndex} * (100% + 0.125rem)))` }}
+      />
       {items.map((item) => {
         const active = item.value === value;
         const Icon = item.icon;
@@ -75,9 +84,9 @@ export function SegmentedIconGroup<T extends string>({
                   }
                 }}
                 className={cn(
-                  "flex h-6 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "relative flex h-6 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active
-                    ? "bg-card text-foreground shadow-sm"
+                    ? "text-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >

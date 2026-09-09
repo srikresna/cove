@@ -51,4 +51,21 @@ describe("SegmentedIconGroup", () => {
     await userEvent.keyboard("{ArrowRight}");
     expect(onChange).toHaveBeenCalledWith("page");
   });
+
+  it("slides the active thumb to the selected segment", () => {
+    const { container, rerender } = renderGroup(
+      <SegmentedIconGroup items={MODE_ITEMS} value="page" onChange={() => {}} />,
+    );
+    const thumb = container.querySelector<HTMLSpanElement>("span[aria-hidden='true']");
+    expect(thumb).not.toBeNull();
+    expect(thumb?.style.transform).toBe("translateX(calc(0 * (100% + 0.125rem)))");
+
+    rerender(
+      <TooltipProvider>
+        <SegmentedIconGroup items={MODE_ITEMS} value="edgeless" onChange={() => {}} />
+      </TooltipProvider>,
+    );
+    expect(thumb?.style.transform).toBe("translateX(calc(1 * (100% + 0.125rem)))");
+    expect(thumb?.className).toContain("motion-reduce:transition-none");
+  });
 });
