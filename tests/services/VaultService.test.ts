@@ -143,7 +143,7 @@ describe("VaultService setup / unlock / lock", () => {
 
   it("rejects a weak passphrase at setup", async () => {
     const { service } = makeVault();
-    await expect(service.setupPassphrase("short1")).rejects.toThrow(ValidationError);
+    await expect(service.setupPassphrase("tiny1")).rejects.toThrow(ValidationError);
   });
 
   it("wrong passphrase at unlock throws EncryptionError", async () => {
