@@ -1,4 +1,3 @@
-import { Lock } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
@@ -36,12 +35,12 @@ export const UnlockScreen: React.FC<UnlockScreenProps> = ({ onRecover }) => {
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-5 rounded-lg border bg-card p-8 shadow-sm"
       >
-        <div
-          className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent text-primary"
+        <img
+          src="/logo.png"
+          alt=""
           aria-hidden="true"
-        >
-          <Lock className="h-6 w-6" />
-        </div>
+          className="mx-auto h-12 w-12 rounded-xl shadow-sm"
+        />
         <div className="space-y-1">
           <h1 className="text-center font-display text-2xl font-medium tracking-tight">
             {MESSAGES.VAULT_UNLOCK_TITLE}
