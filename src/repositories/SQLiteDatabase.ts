@@ -673,6 +673,13 @@ export class SQLiteDatabase {
       );
       await db.execute("PRAGMA user_version = 25");
     }
+
+    if (version < 26) {
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS custom_icons (id TEXT PRIMARY KEY, name TEXT NOT NULL, payload TEXT NOT NULL, kmsVersion INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL)",
+      );
+      await db.execute("PRAGMA user_version = 26");
+    }
   }
 
   private static vacuousRuleWasMatchAll(rule: Record<string, unknown>, op: string): boolean {

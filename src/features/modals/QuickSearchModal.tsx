@@ -1,8 +1,9 @@
 import { Command } from "cmdk";
-import { ArrowRight, CalendarDays, FileText, Search } from "lucide-react";
+import { ArrowRight, CalendarDays, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { extractParagraphs } from "@/services/editor/plainText";
+import { NoteIcon } from "../../components/NoteIcon";
 import { Dialog, DialogContent, DialogTitle } from "../../components/ui/dialog";
 import { MESSAGES } from "../../constants/messages";
 import { journalService, noteService } from "../../di/container";
@@ -46,7 +47,7 @@ const PreviewPane: React.FC<{ preview: PreviewData | null; hasHits: boolean }> =
             className="flex h-6 w-6 shrink-0 items-center justify-center text-lg"
             aria-hidden="true"
           >
-            {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+            <NoteIcon icon={note.icon} className="h-4 w-4" />
           </span>
           <span className="truncate font-display text-[15px] font-semibold text-foreground">
             {note.title || MESSAGES.UNTITLED_NOTE}
@@ -310,7 +311,7 @@ export const QuickSearchModal: React.FC = () => {
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-base"
                         aria-hidden="true"
                       >
-                        {hit.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+                        <NoteIcon icon={hit.icon} className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-foreground">

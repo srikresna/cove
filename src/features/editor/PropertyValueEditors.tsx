@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -492,7 +493,7 @@ const RelationPicker: React.FC<{
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span aria-hidden="true" className="shrink-0 text-sm">
-              {n.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+              <NoteIcon icon={n.icon} className="h-3.5 w-3.5" />
             </span>
             <span className="truncate">{n.title || MESSAGES.UNTITLED_NOTE}</span>
           </button>

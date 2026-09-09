@@ -1,5 +1,5 @@
-import { FileText } from "lucide-react";
 import type React from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
@@ -20,7 +20,7 @@ export const NoteRow: React.FC<{
     )}
   >
     <span aria-hidden="true" className="shrink-0 text-sm">
-      {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+      <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />
     </span>
     <span className="truncate leading-4">{note.title || MESSAGES.UNTITLED_NOTE}</span>
   </button>

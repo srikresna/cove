@@ -1,7 +1,8 @@
 import type { EditorHost } from "@blocksuite/std";
-import { CalendarDays, Eye, FileText, Info, LayoutGrid, List, PanelRightClose } from "lucide-react";
+import { CalendarDays, Eye, Info, LayoutGrid, List, PanelRightClose } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import { Button } from "../../components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { MESSAGES } from "../../constants/messages";
@@ -195,7 +196,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span aria-hidden="true" className="shrink-0 text-sm">
-                    {meta.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+                    <NoteIcon icon={meta.icon} className="h-3.5 w-3.5" />
                   </span>
                   <span className="truncate">{meta.title || MESSAGES.UNTITLED_NOTE}</span>
                 </button>
@@ -219,7 +220,7 @@ export const EditorRightBar: React.FC<EditorRightBarProps> = ({
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span aria-hidden="true" className="shrink-0 text-sm">
-                    {meta.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+                    <NoteIcon icon={meta.icon} className="h-3.5 w-3.5" />
                   </span>
                   <span className="truncate">{meta.title || MESSAGES.UNTITLED_NOTE}</span>
                 </button>

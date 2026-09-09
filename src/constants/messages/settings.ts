@@ -34,6 +34,14 @@ export const SettingsMessages = {
   SETTINGS_CATEGORY_SECURITY: "Security",
   SETTINGS_CATEGORY_BACKUP: "Backup",
   SETTINGS_CATEGORY_ABOUT: "About",
+  SETTINGS_CATEGORY_ICONS: "Icons",
+  ICON_PACK_TITLE: "Custom icons",
+  ICON_PACK_DESC:
+    "Upload images to use as note icons. They are encrypted and appear in the editor's icon picker under Custom.",
+  ICON_PACK_UPLOAD: "Upload image",
+  ICON_PACK_EMPTY: "No custom icons yet. Upload an image to get started.",
+  ICON_PACK_REMOVE: "Remove icon",
+  ICON_PACK_REMOVED: "Icon removed. Notes using it fall back to the default look.",
   SETTINGS_EDITOR_HINT: "Changes apply the next time you open a note.",
   SETTINGS_SHORTCUT_HINT: "to open settings",
   SETTINGS_LOCK_NOW_DESC:

@@ -20,6 +20,7 @@ import { TrashPage } from "./features/trash/TrashPage";
 import { VaultGate } from "./features/vault/VaultGate";
 import { useNotes } from "./hooks/useNotes";
 import { noteActions } from "./store/noteActions";
+import { useCustomIconStore } from "./store/useCustomIconStore";
 import { useNoteUiStore } from "./store/useNoteUiStore";
 import { useUIStore } from "./store/useUIStore";
 import { useViewStore } from "./store/useViewStore";
@@ -33,6 +34,7 @@ export const AppContent: React.FC = () => {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
+  const fetchCustomIcons = useCustomIconStore((s) => s.fetchCustomIcons);
   const isDarkMode = useUIStore((s) => s.isDarkMode);
   const activePage = useUIStore((s) => s.activePage);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
@@ -42,6 +44,7 @@ export const AppContent: React.FC = () => {
 
   useEffect(() => {
     fetchWorkspaces();
+    fetchCustomIcons();
     void noteActions.purgeExpiredTrash();
     void propertyService
       .listDefinitions()
@@ -55,7 +58,7 @@ export const AppContent: React.FC = () => {
         );
       })
       .catch(() => {});
-  }, [fetchWorkspaces]);
+  }, [fetchWorkspaces, fetchCustomIcons]);
 
   useEffect(() => {
     if (activeWorkspaceId) {

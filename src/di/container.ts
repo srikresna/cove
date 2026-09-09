@@ -2,6 +2,7 @@ import type { BlobSource } from "@blocksuite/sync";
 import { invoke } from "@tauri-apps/api/core";
 import "./../services/blocksuite/idempotentCustomElements";
 import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
+import { SQLiteCustomIconRepository } from "../repositories/SQLiteCustomIconRepository";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
@@ -13,7 +14,9 @@ import { SQLiteTagRepository } from "../repositories/SQLiteTagRepository";
 import { SQLiteWorkspaceRepository } from "../repositories/SQLiteWorkspaceRepository";
 import { BlockSuiteEditorService } from "../services/blocksuite/BlockSuiteEditorService";
 import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuiteEditorService";
+import { CustomIconService } from "../services/CustomIconService";
 import { publishingWrites } from "../services/changeBus";
+import type { ICustomIconService } from "../services/ICustomIconService";
 import type { IJournalService } from "../services/IJournalService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
@@ -64,6 +67,7 @@ const propertyRepository = publishingWrites(
   "properties",
 );
 const blobRepository = new SQLiteBlobRepository();
+const customIconRepository = new SQLiteCustomIconRepository();
 
 export const blobSource: BlobSource & { clearCache(): void } = new SqliteBlobSource(
   blobRepository,
@@ -84,6 +88,10 @@ export const savedViewService: ISavedViewService = new SavedViewService(
 );
 export const workspaceService: IWorkspaceService = new WorkspaceService({
   workspaces: workspaceRepository,
+  crypto: cryptoVault,
+});
+export const customIconService: ICustomIconService = new CustomIconService({
+  icons: customIconRepository,
   crypto: cryptoVault,
 });
 const deviceBind = new DeviceBind();

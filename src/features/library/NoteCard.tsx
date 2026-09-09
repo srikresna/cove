@@ -1,5 +1,6 @@
-import { FileText, MoreHorizontal, Star } from "lucide-react";
+import { MoreHorizontal, Star } from "lucide-react";
 import type React from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,7 +90,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           className="flex h-6 w-6 shrink-0 items-center justify-center text-2xl"
           aria-hidden="true"
         >
-          {note.icon || <FileText className="h-5 w-5 text-muted-foreground" />}
+          <NoteIcon icon={note.icon} className="h-5 w-5" />
         </span>
         <span className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-foreground">
           {note.title || MESSAGES.UNTITLED_NOTE}

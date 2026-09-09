@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Database, Info, Palette, PenLine, ShieldCheck, X } from "lucide-react";
+import { Database, Info, Palette, PenLine, Shapes, ShieldCheck, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "../../components/ui/dialog";
@@ -11,9 +11,10 @@ import { AboutSection } from "./AboutSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BackupSection } from "./BackupSection";
 import { EditorSection } from "./EditorSection";
+import { IconsSection } from "./IconsSection";
 import { SecuritySection } from "./SecuritySection";
 
-type SettingsCategoryId = "appearance" | "editor" | "security" | "backup" | "about";
+type SettingsCategoryId = "appearance" | "editor" | "icons" | "security" | "backup" | "about";
 
 interface SettingsCategory {
   id: SettingsCategoryId;
@@ -24,6 +25,7 @@ interface SettingsCategory {
 const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   { id: "appearance", label: MESSAGES.SETTINGS_CATEGORY_APPEARANCE, icon: Palette },
   { id: "editor", label: MESSAGES.SETTINGS_CATEGORY_EDITOR, icon: PenLine },
+  { id: "icons", label: MESSAGES.SETTINGS_CATEGORY_ICONS, icon: Shapes },
   { id: "security", label: MESSAGES.SETTINGS_CATEGORY_SECURITY, icon: ShieldCheck },
   { id: "backup", label: MESSAGES.SETTINGS_CATEGORY_BACKUP, icon: Database },
   { id: "about", label: MESSAGES.SETTINGS_CATEGORY_ABOUT, icon: Info },
@@ -106,6 +108,9 @@ export const SettingsModal: React.FC = () => {
               </div>
               <div className={active === "editor" ? "h-full overflow-y-auto p-6" : "hidden"}>
                 <EditorSection />
+              </div>
+              <div className={active === "icons" ? "h-full overflow-y-auto p-6" : "hidden"}>
+                <IconsSection />
               </div>
               <div className={active === "security" ? "h-full overflow-y-auto p-6" : "hidden"}>
                 <SecuritySection />

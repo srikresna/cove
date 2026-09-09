@@ -10,3 +10,4 @@ export const COVER_COLORS = [
 
 export const DEFAULT_COVER_COLOR = "#ff6f1e";
 export const APP_LOCALE = "en-US";
+export const CUSTOM_ICON_PREFIX = "cove-icon:";

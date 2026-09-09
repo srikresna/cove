@@ -1,6 +1,7 @@
-import { CalendarCheck, CalendarPlus, FileText, Plus, X } from "lucide-react";
+import { CalendarCheck, CalendarPlus, Plus, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import { Button } from "../../components/ui/button";
 import { WeekDatePicker } from "../../components/ui/WeekDatePicker";
 import { MESSAGES } from "../../constants/messages";
@@ -152,7 +153,7 @@ export const JournalsPage: React.FC = () => {
                       className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] leading-4 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span aria-hidden="true" className="shrink-0 text-sm">
-                        {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+                        <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />
                       </span>
                       <span className="truncate">{note.title || MESSAGES.UNTITLED_NOTE}</span>
                       {index > 0 && (

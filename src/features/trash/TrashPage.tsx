@@ -1,6 +1,7 @@
-import { FileText, RotateCcw, Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
@@ -75,7 +76,7 @@ export const TrashPage: React.FC = () => {
                       className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-lg"
                       aria-hidden="true"
                     >
-                      {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+                      <NoteIcon icon={note.icon} className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-medium leading-4 text-foreground">

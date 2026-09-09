@@ -1,15 +1,7 @@
-import {
-  Copy,
-  FileText,
-  LayoutTemplate,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { Copy, LayoutTemplate, MoreHorizontal, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +56,7 @@ const TemplateRow: React.FC<{
       )}
     >
       <span aria-hidden="true" className="shrink-0 text-sm">
-        {note.icon || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+        <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />
       </span>
       <span className="truncate leading-4">{note.title || MESSAGES.UNTITLED_NOTE}</span>
       {isJournalTemplate && (

@@ -8,8 +8,9 @@ import {
   extractClosestEdge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { motion } from "framer-motion";
-import { Copy, FileText, GripVertical, MoreHorizontal, Pin, Star, Trash2 } from "lucide-react";
+import { Copy, GripVertical, MoreHorizontal, Pin, Star, Trash2 } from "lucide-react";
 import React, { useRef } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -202,7 +203,7 @@ export const NoteItem: React.FC<NoteItemProps> = React.memo(
                   className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center text-lg"
                   aria-hidden="true"
                 >
-                  {note.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+                  <NoteIcon icon={note.icon} className="h-4 w-4" />
                 </span>
               )}
               <div className="min-w-0 truncate">

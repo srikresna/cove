@@ -1,15 +1,17 @@
 import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
 import { Image as ImageIcon, Smile, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
-import { COVER_COLORS, DEFAULT_COVER_COLOR } from "../../constants/app";
+import { COVER_COLORS, CUSTOM_ICON_PREFIX, DEFAULT_COVER_COLOR } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import { journalService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 import { noteActions } from "../../store/noteActions";
+import { useCustomIconStore } from "../../store/useCustomIconStore";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { usePropertyStore } from "../../store/usePropertyStore";
 import { useSaveStatusStore } from "../../store/useSaveStatusStore";
@@ -25,29 +27,45 @@ interface IconPickerContentProps {
   onRemove?: () => void;
 }
 
-export const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove }) => (
-  <PopoverContent align="start" className="w-auto overflow-hidden p-0">
-    <EmojiPicker
-      emojiStyle={EmojiStyle.NATIVE}
-      onEmojiClick={(emojiData) => onPick(emojiData.emoji)}
-      autoFocusSearch={true}
-      width={340}
-      height={400}
-    />
-    {onRemove && (
-      <div className="border-t p-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-muted-foreground"
-          onClick={onRemove}
-        >
-          {MESSAGES.ICON_REMOVE}
-        </Button>
-      </div>
-    )}
-  </PopoverContent>
-);
+export const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove }) => {
+  const customIcons = useCustomIconStore((s) => s.icons);
+  const customEmojis = useMemo(
+    () =>
+      Object.entries(customIcons).map(([id, entry]) => ({
+        id,
+        names: [entry.name],
+        imgUrl: entry.dataUrl,
+      })),
+    [customIcons],
+  );
+
+  return (
+    <PopoverContent align="start" className="w-auto overflow-hidden p-0">
+      <EmojiPicker
+        emojiStyle={EmojiStyle.NATIVE}
+        customEmojis={customEmojis}
+        onEmojiClick={(emojiData) =>
+          onPick(emojiData.isCustom ? CUSTOM_ICON_PREFIX + emojiData.emoji : emojiData.emoji)
+        }
+        autoFocusSearch={true}
+        width={340}
+        height={400}
+      />
+      {onRemove && (
+        <div className="border-t p-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-muted-foreground"
+            onClick={onRemove}
+          >
+            {MESSAGES.ICON_REMOVE}
+          </Button>
+        </div>
+      )}
+    </PopoverContent>
+  );
+};
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({ note, isFullWidth }) => {
   const uploadCoverImage = noteActions.uploadCoverImage;
@@ -274,7 +292,9 @@ export const NoteHeaderBody: React.FC<{
                   hasCover ? "-mt-9" : "mt-2",
                 )}
               >
-                <span aria-hidden="true">{note.icon}</span>
+                <span aria-hidden="true">
+                  <NoteIcon icon={note.icon} className="h-12 w-12 rounded-lg" fallback={false} />
+                </span>
               </button>
             </PopoverTrigger>
             <IconPickerContent
