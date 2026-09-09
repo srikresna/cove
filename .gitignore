@@ -33,3 +33,4 @@ desktop.ini
 # build artifacts
 *.tsbuildinfo
 .cache/
+*.stackdump
