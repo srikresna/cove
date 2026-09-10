@@ -173,7 +173,7 @@ describe("SavedViewService", () => {
     expect((await repo.findById(unreviewed.id))?.rules).toEqual([]);
   });
 
-  it("healRules keeps tags/journal/template views and rewrites dead references", async () => {
+  it("healRules keeps tags/template views and rewrites dead references", async () => {
     const repo = new InMemorySavedViewRepository();
     const service = new SavedViewService(repo);
     await repo.create({
@@ -182,14 +182,6 @@ describe("SavedViewService", () => {
       name: "Tagged",
       createdAt: 1,
       rules: tagRule(["work"]),
-      allowNoteIds: [],
-    });
-    await repo.create({
-      id: "vJournal",
-      workspaceId: "ws1",
-      name: "Journals",
-      createdAt: 2,
-      rules: [{ id: "r1", kind: "journal", op: "is", value: true }],
       allowNoteIds: [],
     });
     await repo.create({
@@ -223,9 +215,6 @@ describe("SavedViewService", () => {
     const deletedByHeal = await service.healRules([liveDef("p1", ["live"])]);
 
     expect((await repo.findById("vTags"))?.rules).toEqual(tagRule(["work"]).map(decoded));
-    expect((await repo.findById("vJournal"))?.rules).toEqual([
-      decoded({ id: "r1", kind: "journal", op: "is", value: true }),
-    ]);
     expect((await repo.findById("vPartly"))?.rules).toEqual([
       decoded({ id: "r1", kind: "select", propertyId: "p1", op: "is", optionIds: ["live"] }),
     ]);

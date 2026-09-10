@@ -51,7 +51,7 @@ src/
   services/      orchestration with I*Service contracts
   store/         zustand client state + TanStack Query cache/actions (noteActions, queryClient)
   hooks/         React data hooks (useNotes, useTrash, …)
-  features/      feature UIs (editor, library, journals, modals, settings, sidebar, trash, vault)
+  features/      feature UIs (editor, library, modals, settings, sidebar, trash, vault)
   components/    shared UI kit only (ui/, ErrorBoundary, ToastContainer)
   di/            dependency injection wiring (container.ts) — may import everything
   constants/ errors/ utils/ lib/   shared vocabulary + pure helpers

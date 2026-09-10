@@ -26,14 +26,11 @@ export const SYSTEM_PROPERTY_IDS = [
   "system:workspace",
   "system:created",
   "system:updated",
-  "system:journal",
   "system:doc-mode",
   "system:page-width",
   "system:edgeless-theme",
   "system:template",
 ] as const;
-
-export const JOURNAL_PROPERTY_ID = "system:journal";
 
 export type SystemPropertyId = (typeof SYSTEM_PROPERTY_IDS)[number];
 

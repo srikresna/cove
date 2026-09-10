@@ -3,7 +3,7 @@ import { stackValueText } from "../property/format";
 import type { PropertyDefinition, PropertyValue } from "../property/Property";
 import type { Tag } from "../tag/Tag";
 
-export type GroupBy = "none" | "tags" | "journal" | "created" | "updated" | { defId: string };
+export type GroupBy = "none" | "tags" | "created" | "updated" | { defId: string };
 
 export interface NoteGroup {
   key: string;
@@ -17,7 +17,6 @@ export interface GroupingInputs {
   notes: Note[];
   allTags: Tag[];
   tagIdsByNote: Map<string, string[]> | null;
-  journalByNoteId: { get(id: string): number | null | undefined };
   stackValues: Map<string, Map<string, PropertyValue>> | null;
   stackDefs: PropertyDefinition[];
   defs: PropertyDefinition[];
@@ -52,8 +51,7 @@ const isSpecialKey = (key: string): boolean =>
   key === "p:__novalue__";
 
 export function groupNotes(inputs: GroupingInputs): NoteGroup[] {
-  const { groupBy, notes, allTags, tagIdsByNote, journalByNoteId, stackValues, stackDefs, defs } =
-    inputs;
+  const { groupBy, notes, allTags, tagIdsByNote, stackValues, stackDefs, defs } = inputs;
   if (groupBy === "none") return [];
   const buckets = new Map<string, { label: string; dotColor?: string; notes: Note[] }>();
 
@@ -77,15 +75,6 @@ export function groupNotes(inputs: GroupingInputs): NoteGroup[] {
     }
     for (const note of notes) {
       if (!tagged.has(note.id)) push("__untagged__", "Untagged", note);
-    }
-  } else if (groupBy === "journal") {
-    for (const note of notes) {
-      const ts = journalByNoteId.get(note.id);
-      if (ts == null) {
-        push("__empty__", "Not journals", note);
-      } else {
-        push(`d:${ts}`, relativeDayLabel(ts), note);
-      }
     }
   } else if (groupBy === "created" || groupBy === "updated") {
     for (const note of notes) {

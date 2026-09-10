@@ -680,6 +680,33 @@ export class SQLiteDatabase {
       );
       await db.execute("PRAGMA user_version = 26");
     }
+
+    if (version < 27) {
+      await db.execute("DELETE FROM property_defs WHERE id = 'system:journal'");
+      const views = await db.select<Array<{ id: string; rulesJson: string }>>(
+        "SELECT id, rulesJson FROM saved_views",
+      );
+      for (const view of views) {
+        try {
+          const rules: unknown = JSON.parse(view.rulesJson);
+          if (
+            Array.isArray(rules) &&
+            rules.some((rule) => (rule as { kind?: string })?.kind === "journal")
+          ) {
+            const kept = rules.filter((rule) => (rule as { kind?: string })?.kind !== "journal");
+            if (kept.length === 0) {
+              await db.execute("DELETE FROM saved_views WHERE id = ?", [view.id]);
+            } else {
+              await db.execute("UPDATE saved_views SET rulesJson = ? WHERE id = ?", [
+                JSON.stringify(kept),
+                view.id,
+              ]);
+            }
+          }
+        } catch {}
+      }
+      await db.execute("PRAGMA user_version = 27");
+    }
   }
 
   private static vacuousRuleWasMatchAll(rule: Record<string, unknown>, op: string): boolean {

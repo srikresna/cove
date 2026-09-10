@@ -23,7 +23,6 @@ const tag = (id: string, name: string): Tag =>
 const emptyInputs = {
   allTags: [] as Tag[],
   tagIdsByNote: null,
-  journalByNoteId: new Map<string, number | null>(),
   stackValues: null,
   stackDefs: [],
   defs: [],

@@ -78,7 +78,7 @@ export const PropertyCalendar: React.FC<{
             }}
             className="flex h-6 items-center rounded px-1 text-sm font-normal uppercase text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            {MESSAGES.JOURNAL_TODAY}
+            {MESSAGES.NAV_TODAY}
           </button>
           <button
             type="button"

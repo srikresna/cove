@@ -26,7 +26,7 @@ import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import type { LibrarySort } from "./LibraryNoteList";
 
-export type GroupBy = "none" | "tags" | "journal" | "created" | "updated" | { defId: string };
+export type GroupBy = "none" | "tags" | "created" | "updated" | { defId: string };
 
 export const isGroupByDef = (value: GroupBy): value is { defId: string } =>
   typeof value === "object";
@@ -96,7 +96,6 @@ export const DisplayMenu: React.FC<DisplayMenuProps> = ({
   const groupLabel = (group: GroupBy): string => {
     if (group === "none") return MESSAGES.LIBRARY_GROUP_NONE;
     if (group === "tags") return MESSAGES.TAGS_HEADER;
-    if (group === "journal") return "Journal";
     if (group === "created") return MESSAGES.LIBRARY_SORT_CREATED;
     if (group === "updated") return MESSAGES.LIBRARY_SORT_UPDATED;
     return defs.find((d) => d.id === group.defId)?.name ?? "?";
@@ -139,7 +138,6 @@ export const DisplayMenu: React.FC<DisplayMenuProps> = ({
             {(
               [
                 ["tags", MESSAGES.TAGS_HEADER],
-                ["journal", "Journal"],
                 ["created", MESSAGES.LIBRARY_SORT_CREATED],
                 ["updated", MESSAGES.LIBRARY_SORT_UPDATED],
               ] as const

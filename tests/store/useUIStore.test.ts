@@ -76,8 +76,8 @@ describe("useUIStore", () => {
     useUIStore.getState().setActivePage("library");
     expect(useUIStore.getState().activePage).toBe("library");
 
-    useUIStore.getState().setActivePage("journals");
-    expect(useUIStore.getState().activePage).toBe("journals");
+    useUIStore.getState().setActivePage("trash");
+    expect(useUIStore.getState().activePage).toBe("trash");
 
     useUIStore.getState().setActivePage("editor");
     expect(useUIStore.getState().activePage).toBe("editor");

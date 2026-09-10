@@ -33,7 +33,6 @@ import type { PropertyDefinition, PropertyVisibility } from "../../domain/proper
 import {
   CREATABLE_PROPERTY_TYPES,
   isSystemPropertyId,
-  JOURNAL_PROPERTY_ID,
   PROPERTY_VISIBILITY,
 } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
@@ -267,7 +266,7 @@ const ManagerRow: React.FC<ManagerRowProps> = ({
           )}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-          {(isSystem && def.id !== JOURNAL_PROPERTY_ID && def.id !== "system:template"
+          {(isSystem && def.id !== "system:template"
             ? (["always-show", "always-hide"] as const)
             : PROPERTY_VISIBILITY
           ).map((visibility) => (

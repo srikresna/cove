@@ -10,7 +10,6 @@ import { propertyService, savedViewService } from "./di/container";
 import type { Note } from "./domain/note/Note";
 import { BlockSuiteDialogs } from "./features/editor/BlockSuiteDialogs";
 import { PeekViewModal } from "./features/editor/blocksuite/peek/PeekViewModal";
-import { JournalsPage } from "./features/journals/JournalsPage";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { CreateWorkspaceModal } from "./features/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./features/modals/QuickSearchModal";
@@ -95,8 +94,6 @@ export const AppContent: React.FC = () => {
             <TrashPage />
           ) : activePage === "library" ? (
             <LibraryPage />
-          ) : activePage === "journals" ? (
-            <JournalsPage />
           ) : activeNote ? (
             activeNote.content === "" ? (
               <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">

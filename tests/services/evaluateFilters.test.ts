@@ -23,7 +23,6 @@ function makeItem(
   opts: {
     propertyValues?: [string, PropertyValue][];
     tagIds?: string[];
-    journalTimestamp?: number | null;
     isTemplate?: boolean;
   } = {},
 ): FilterableNote {
@@ -31,7 +30,6 @@ function makeItem(
     note: makeNote(id, { isTemplate: opts.isTemplate }),
     propertyValues: new Map(opts.propertyValues ?? []),
     tagIds: opts.tagIds ?? [],
-    journalTimestamp: opts.journalTimestamp ?? null,
   };
 }
 
@@ -125,14 +123,8 @@ describe("evaluateFilters", () => {
     expect(evaluateFilters(items, [none]).map((i) => i.note.id)).toEqual(["c"]);
   });
 
-  it("journal and template rules check flags", () => {
-    const items = [
-      makeItem("a", { journalTimestamp: Date.now() }),
-      makeItem("b", { isTemplate: true }),
-      makeItem("c"),
-    ];
-    const journal: FilterRule = { id: rid(), kind: "journal", op: "is", value: true };
-    expect(evaluateFilters(items, [journal]).map((i) => i.note.id)).toEqual(["a"]);
+  it("template rules check flags", () => {
+    const items = [makeItem("a"), makeItem("b", { isTemplate: true }), makeItem("c")];
 
     const template: FilterRule = { id: rid(), kind: "template", op: "is", value: true };
     expect(evaluateFilters(items, [template]).map((i) => i.note.id)).toEqual(["b"]);

@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import {
-  CalendarCheck,
   ChevronDown,
   Image as ImageIcon,
   ImageOff,
@@ -200,19 +199,6 @@ export const Sidebar: React.FC = () => {
               >
                 <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">{MESSAGES.NAV_LIBRARY}</span>
-              </button>
-              <button
-                type="button"
-                aria-current={activePage === "journals" ? "page" : undefined}
-                onClick={() => setActivePage("journals")}
-                className={`${navRow} ${
-                  activePage === "journals"
-                    ? "border-border bg-card font-medium text-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                }`}
-              >
-                <CalendarCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{MESSAGES.NAV_JOURNALS}</span>
               </button>
             </div>
 

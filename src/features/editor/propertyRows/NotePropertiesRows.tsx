@@ -15,7 +15,6 @@ import {
   CREATABLE_PROPERTY_TYPES,
   hasOptions,
   isSystemPropertyId,
-  JOURNAL_PROPERTY_ID,
 } from "../../../domain/property/Property";
 import { notifyError } from "../../../store/notify";
 import { usePropertyStore } from "../../../store/usePropertyStore";
@@ -33,7 +32,7 @@ import {
   PageWidthValue,
   TemplateValue,
 } from "./SegmentedValueCells";
-import { DateValue, JournalValue, TagsValue, WorkspaceValue } from "./SystemValueCells";
+import { DateValue, TagsValue, WorkspaceValue } from "./SystemValueCells";
 
 export { TagChip } from "./TagChip";
 export { PROPERTY_TYPE_META };
@@ -176,16 +175,6 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
 
   const renderValue = (def: PropertyDefinition) => {
     const value = values.get(def.id);
-    if (def.id === JOURNAL_PROPERTY_ID) {
-      return (
-        <JournalValue
-          noteId={note.id}
-          value={value?.type === "date" ? value : undefined}
-          onSet={(timestamp) => save(def.id, { type: "date", timestamp })}
-          onClear={() => clear(def.id)}
-        />
-      );
-    }
     switch (def.id) {
       case "system:doc-mode":
         return <DocModeValue note={note} />;

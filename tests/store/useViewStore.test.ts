@@ -59,7 +59,7 @@ describe("useViewStore", () => {
         { id: "r4", kind: "tags", op: "has-any-of", tagIds: ["t1"] },
         {
           id: "r5",
-          kind: "journal",
+          kind: "template",
           op: "is",
           value: true,
           propertyId: "",
@@ -91,7 +91,7 @@ describe("useViewStore", () => {
       { id: "r4", kind: "tags", op: "has-any-of", tagIds: ["t1"] },
       {
         id: "r5",
-        kind: "journal",
+        kind: "template",
         op: "is",
         value: true,
         propertyId: "",

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ActivePage = "editor" | "library" | "journals" | "trash";
+export type ActivePage = "editor" | "library" | "trash";
 
 interface UIState {
   isCreateModalOpen: boolean;

@@ -59,9 +59,8 @@ export interface LibraryInputsData {
 }
 
 export async function fetchLibraryInputs(workspaceId: string): Promise<LibraryInputsData> {
-  const [notes, journalValues, perDef, tagLists] = await Promise.all([
+  const [notes, perDef, tagLists] = await Promise.all([
     noteService.listMetadataByWorkspace(workspaceId),
-    propertyService.valuesForDefinitionAllNotes("system:journal"),
     propertyService.listDefinitions().then((allDefs) =>
       Promise.all(
         allDefs.map(async (def) => ({
@@ -94,13 +93,10 @@ export async function fetchLibraryInputs(workspaceId: string): Promise<LibraryIn
   const filterable = new Map<string, FilterableNote>();
   for (const note of notes) {
     if (note.workspaceId !== workspaceId) continue;
-    const journal = journalValues.get(note.id);
     filterable.set(note.id, {
       note,
       propertyValues: new Map(),
       tagIds: idsByNote.get(note.id) ?? [],
-      journalTimestamp:
-        journal?.type === "date" ? (journal as { timestamp: number }).timestamp : null,
     });
   }
   for (const { propertyId, values } of perDef) {

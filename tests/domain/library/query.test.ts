@@ -31,7 +31,6 @@ const item = (
     note: n,
     propertyValues: values as FilterableNote["propertyValues"],
     tagIds: tags,
-    journalTimestamp: null,
   }) as FilterableNote;
 
 const rule = (r: Partial<FilterRule>): FilterRule => r as FilterRule;
@@ -51,7 +50,6 @@ describe("matchesEmptyInputs (derived from the evaluator)", () => {
       true,
     );
     expect(matchesEmptyInputs(rule({ kind: "tags", op: "is-empty" }))).toBe(true);
-    expect(matchesEmptyInputs(rule({ kind: "journal", value: false }))).toBe(true);
   });
 
   it("template rules read live note fields, so fabricated emptiness decides nothing", () => {

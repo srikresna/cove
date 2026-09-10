@@ -1,5 +1,4 @@
 import { EditorMessages } from "./editor";
-import { JournalsMessages } from "./journals";
 import { LibraryMessages } from "./library";
 import { SearchMessages } from "./search";
 import { SettingsMessages } from "./settings";
@@ -12,7 +11,6 @@ export const MESSAGES = {
   ...ShellMessages,
   ...EditorMessages,
   ...LibraryMessages,
-  ...JournalsMessages,
   ...TrashMessages,
   ...VaultMessages,
   ...SettingsMessages,

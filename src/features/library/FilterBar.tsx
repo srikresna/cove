@@ -51,11 +51,9 @@ const RuleRow: React.FC<{
   const ruleName =
     rule.kind === "tags"
       ? MESSAGES.TAGS_HEADER
-      : rule.kind === "journal"
-        ? "Journal"
-        : rule.kind === "template"
-          ? "Template"
-          : (def?.name ?? "?");
+      : rule.kind === "template"
+        ? "Template"
+        : (def?.name ?? "?");
   const ops = FILTER_OPERATORS[rule.kind];
   const currentOp = (rule as { op: string }).op;
   const needsValue = !currentOp.startsWith("is-empty") && !currentOp.startsWith("is-not-empty");
@@ -63,10 +61,7 @@ const RuleRow: React.FC<{
 
   const numberValue = rule.kind === "number" ? rule.value : undefined;
   const dateValue = rule.kind === "date" ? rule.value : undefined;
-  const boolValue =
-    rule.kind === "checkbox" || rule.kind === "journal" || rule.kind === "template"
-      ? rule.value
-      : undefined;
+  const boolValue = rule.kind === "checkbox" || rule.kind === "template" ? rule.value : undefined;
 
   const optionDef = rule.kind === "select" || rule.kind === "multiSelect" ? def : undefined;
   const optionIds = optionDef ? (rule as { optionIds: string[] }).optionIds : [];
@@ -153,7 +148,7 @@ const RuleRow: React.FC<{
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {(rule.kind === "checkbox" || rule.kind === "journal" || rule.kind === "template") && (
+      {(rule.kind === "checkbox" || rule.kind === "template") && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className={cn(controlBase, "w-32 justify-start")}>
@@ -336,9 +331,6 @@ export const FilterBar: React.FC = () => {
       case "tags":
         addRule({ id: makeRuleId(), kind: "tags", op: "has-any-of", tagIds: [] });
         break;
-      case "journal":
-        addRule({ id: makeRuleId(), kind: "journal", op: "is", value: true });
-        break;
       case "template":
         addRule({ id: makeRuleId(), kind: "template", op: "is", value: false });
         break;
@@ -385,10 +377,6 @@ export const FilterBar: React.FC = () => {
           <DropdownMenuItem onSelect={() => handleAdd("tags")}>
             <Tags className="text-muted-foreground" aria-hidden="true" />
             {MESSAGES.TAGS_HEADER}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => handleAdd("journal")}>
-            <CalendarDays className="text-muted-foreground" aria-hidden="true" />
-            Journal
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => handleAdd("template")}>
             <Check className="text-muted-foreground" aria-hidden="true" />

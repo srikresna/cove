@@ -17,14 +17,12 @@ import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuit
 import { CustomIconService } from "../services/CustomIconService";
 import { publishingWrites } from "../services/changeBus";
 import type { ICustomIconService } from "../services/ICustomIconService";
-import type { IJournalService } from "../services/IJournalService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
 import type { ISavedViewService } from "../services/ISavedViewService";
 import type { ITagService } from "../services/ITagService";
 import type { IVaultService } from "../services/IVaultService";
 import type { IWorkspaceService } from "../services/IWorkspaceService";
-import { JournalService } from "../services/JournalService";
 import { NoteService } from "../services/NoteService";
 import { PropertyService } from "../services/PropertyService";
 import { SavedViewService } from "../services/SavedViewService";
@@ -82,7 +80,6 @@ export const noteService: INoteService = new NoteService(
 );
 export const tagService: ITagService = new TagService(tagRepository, noteService);
 export const propertyService: IPropertyService = new PropertyService(propertyRepository);
-export const journalService: IJournalService = new JournalService(propertyService, noteService);
 export const savedViewService: ISavedViewService = new SavedViewService(
   new SQLiteSavedViewRepository(),
 );

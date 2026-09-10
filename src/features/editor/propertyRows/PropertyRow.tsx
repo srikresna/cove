@@ -20,11 +20,7 @@ import {
 } from "../../../components/ui/dropdown-menu";
 import { MESSAGES } from "../../../constants/messages";
 import type { PropertyDefinition, PropertyVisibility } from "../../../domain/property/Property";
-import {
-  isSystemPropertyId,
-  JOURNAL_PROPERTY_ID,
-  PROPERTY_VISIBILITY,
-} from "../../../domain/property/Property";
+import { isSystemPropertyId, PROPERTY_VISIBILITY } from "../../../domain/property/Property";
 import { cn } from "../../../lib/utils";
 import { InfoRow } from "../NoteInfoPanel";
 import { PROPERTY_ICONS, PROPERTY_TYPE_META, resolvePropertyIcon } from "../PropertyValueEditors";
@@ -177,11 +173,10 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
         icon={resolvePropertyIcon(def)}
         label={label}
         flush={
-          (def.id !== JOURNAL_PROPERTY_ID &&
-            (def.type === "text" ||
-              def.type === "number" ||
-              def.type === "person" ||
-              def.type === "url")) ||
+          def.type === "text" ||
+          def.type === "number" ||
+          def.type === "person" ||
+          def.type === "url" ||
           def.id === "system:doc-mode" ||
           def.id === "system:page-width" ||
           def.id === "system:edgeless-theme"
@@ -266,7 +261,7 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
           )}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{MESSAGES.PROP_VISIBILITY_LABEL}</DropdownMenuLabel>
-          {(isSystem && def.id !== JOURNAL_PROPERTY_ID && def.id !== "system:template"
+          {(isSystem && def.id !== "system:template"
             ? (["always-show", "always-hide"] as const)
             : PROPERTY_VISIBILITY
           ).map((visibility) => (

@@ -72,7 +72,6 @@ export function selectNotesForView(inputs: ViewSelectionInputs, sort: LibrarySor
       note: n,
       propertyValues: new Map<string, PropertyValue>(),
       tagIds: [],
-      journalTimestamp: null,
     }),
     note: n,
   });

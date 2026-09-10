@@ -59,12 +59,6 @@ export interface TagFilterRule extends FilterRuleBase {
   readonly tagIds: string[];
 }
 
-export interface JournalFilterRule extends FilterRuleBase {
-  readonly kind: "journal";
-  readonly op: "is" | "is-not";
-  readonly value: boolean;
-}
-
 export interface TemplateFilterRule extends FilterRuleBase {
   readonly kind: "template";
   readonly op: "is" | "is-not";
@@ -79,7 +73,6 @@ export type FilterRule =
   | MultiSelectFilterRule
   | CheckboxFilterRule
   | TagFilterRule
-  | JournalFilterRule
   | TemplateFilterRule;
 
 export type FilterRules = FilterRule[];
@@ -131,10 +124,6 @@ export const FILTER_OPERATORS: Record<
     { value: "has-none-of", label: "has none of" },
     { value: "is-empty", label: "is empty" },
     { value: "is-not-empty", label: "is not empty" },
-  ],
-  journal: [
-    { value: "is", label: "is" },
-    { value: "is-not", label: "is not" },
   ],
   template: [
     { value: "is", label: "is" },

@@ -70,7 +70,7 @@ describe("migration ladder", () => {
 
   it("brings a fresh database to the current version with the full schema", async () => {
     await runMigrations(db);
-    expect(await userVersion(db)).toBe(26);
+    expect(await userVersion(db)).toBe(27);
 
     const noteCols = await columnsOf(db, "notes");
     for (const col of NOTE_COLUMNS) expect(noteCols).toContain(col);
@@ -96,7 +96,51 @@ describe("migration ladder", () => {
   it("is idempotent — re-running against the current version changes nothing", async () => {
     await runMigrations(db);
     await runMigrations(db);
-    expect(await userVersion(db)).toBe(26);
+    expect(await userVersion(db)).toBe(27);
+  });
+
+  it("v27 drops the journal property def, its values, and journal view rules", async () => {
+    await runMigrations(db);
+    await db.execute(
+      "INSERT INTO workspaces (id, name, emoji, color, createdAt) VALUES ('w1', 'W', '📝', '#111', 1)",
+    );
+    await db.execute(
+      "INSERT INTO notes (id, workspaceId, title, content, createdAt, updatedAt, orderIndex) VALUES ('n1', 'w1', 'J', '', 1, 1, '')",
+    );
+    await db.execute(
+      "INSERT INTO property_defs (id, name, type, optionsJson, createdAt, orderIndex, show) VALUES ('system:journal', 'Journal', 'date', '[]', 0, '', 'hide-when-empty')",
+    );
+    await db.execute(
+      "INSERT INTO note_properties (noteId, propertyId, valueJson) VALUES ('n1', 'system:journal', '{\"type\":\"date\",\"timestamp\":1}')",
+    );
+    await db.execute(
+      'INSERT INTO saved_views (id, workspaceId, name, rulesJson, createdAt) VALUES (\'v1\', \'w1\', \'Journals\', \'[{"kind":"journal","op":"is"},{"kind":"tag","op":"is","tagId":"t1"}]\', 1)',
+    );
+    await db.execute(
+      "INSERT INTO saved_views (id, workspaceId, name, rulesJson, createdAt) VALUES ('v2', 'w1', 'Journal only', '[{\"kind\":\"journal\",\"op\":\"is\"}]', 2)",
+    );
+    await db.execute("PRAGMA user_version = 26");
+
+    await runMigrations(db);
+
+    const defs = await db.select<Array<{ id: string }>>(
+      "SELECT id FROM property_defs WHERE id = 'system:journal'",
+    );
+    expect(defs).toHaveLength(0);
+    const values = await db.select<Array<{ noteId: string }>>(
+      "SELECT noteId FROM note_properties WHERE propertyId = 'system:journal'",
+    );
+    expect(values).toHaveLength(0);
+    const views = await db.select<Array<{ rulesJson: string }>>(
+      "SELECT rulesJson FROM saved_views WHERE id = 'v1'",
+    );
+    expect(JSON.parse(views[0]?.rulesJson ?? "[]")).toEqual([
+      { kind: "tag", op: "is", tagId: "t1" },
+    ]);
+    const journalOnly = await db.select<Array<{ id: string }>>(
+      "SELECT id FROM saved_views WHERE id = 'v2'",
+    );
+    expect(journalOnly).toHaveLength(0);
   });
 
   it("seeds unique ascending orderIndex keys for unkeyed rows (v23)", async () => {

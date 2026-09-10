@@ -7,18 +7,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../../components/ui/dropdown-menu";
-import { PropertyCalendar } from "../../../components/ui/PropertyCalendar";
-import { PropertyCheckbox } from "../../../components/ui/PropertyCheckbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../../components/ui/tooltip";
 import { MESSAGES } from "../../../constants/messages";
-import { journalService, tagService } from "../../../di/container";
+import { tagService } from "../../../di/container";
 import type { Note } from "../../../domain/note/Note";
 import type { Tag } from "../../../domain/tag/Tag";
 import { cn } from "../../../lib/utils";
 import { noteActions } from "../../../store/noteActions";
 import { notifyError } from "../../../store/notify";
-import { usePropertyStore } from "../../../store/usePropertyStore";
 import { useTagStore } from "../../../store/useTagStore";
 import { useWorkspaceStore } from "../../../store/useWorkspaceStore";
 import { formatFullTimestamp, formatRelativeDay } from "../../../utils/time";
@@ -34,102 +31,6 @@ export const DateValue: React.FC<{ timestamp: number }> = ({ timestamp }) => (
     </TooltipContent>
   </Tooltip>
 );
-
-export const JournalValue: React.FC<{
-  noteId: string;
-  value: { timestamp: number } | undefined;
-  onSet: (timestamp: number) => void;
-  onClear: () => void;
-}> = ({ noteId, value, onSet, onClear }) => {
-  const [open, setOpen] = useState(false);
-  const [conflictCount, setConflictCount] = useState(0);
-  const propertyVersion = usePropertyStore((s) => s.version);
-  const todayTimestamp = () => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  };
-  const onSetOrClear = () => (value === undefined ? onSet(todayTimestamp()) : onClear());
-
-  const sameDay = (a: number, b: number) => {
-    const da = new Date(a);
-    const db = new Date(b);
-    return (
-      da.getFullYear() === db.getFullYear() &&
-      da.getMonth() === db.getMonth() &&
-      da.getDate() === db.getDate()
-    );
-  };
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
-  useEffect(() => {
-    if (value === undefined) {
-      setConflictCount(0);
-      return;
-    }
-    let alive = true;
-    journalService
-      .journalValuesByNote()
-      .then((values) => {
-        if (!alive) return;
-        let count = 0;
-        for (const [nid, v] of values) {
-          if (nid === noteId) continue;
-          if (v.type === "date" && sameDay(v.timestamp, value.timestamp)) count += 1;
-        }
-        setConflictCount(count);
-      })
-      .catch(() => {
-        if (alive) setConflictCount(0);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [noteId, value, propertyVersion]);
-
-  return (
-    <PropertyCheckbox
-      checked={value !== undefined}
-      onChange={() => onSetOrClear()}
-      ariaLabel={MESSAGES.JOURNAL_TOGGLE}
-      className="flex h-full min-h-[24px] w-full items-center gap-0.5"
-    >
-      {value !== undefined && (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="rounded px-1 text-sm leading-[22px] text-foreground transition-colors hover:bg-accent/60"
-            >
-              {new Date(value.timestamp).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={10} className="w-auto p-2">
-            <PropertyCalendar
-              value={value.timestamp}
-              onChange={(ts) => {
-                onSet(ts);
-                setOpen(false);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      )}
-      {conflictCount > 0 && (
-        <button
-          type="button"
-          title={MESSAGES.JOURNAL_CONFLICT_HINT.replace("{n}", String(conflictCount))}
-          className="ml-1 rounded border border-destructive/40 bg-destructive/10 px-2 text-sm text-destructive"
-        >
-          {MESSAGES.JOURNAL_CONFLICT}
-        </button>
-      )}
-    </PropertyCheckbox>
-  );
-};
 
 export const TagsValue: React.FC<{ noteId: string; workspaceId: string }> = ({
   noteId,

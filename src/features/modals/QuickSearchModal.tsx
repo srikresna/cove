@@ -1,16 +1,14 @@
 import { Command } from "cmdk";
-import { ArrowRight, CalendarDays, Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { extractParagraphs } from "@/services/editor/plainText";
 import { NoteIcon } from "../../components/NoteIcon";
 import { Dialog, DialogContent, DialogTitle } from "../../components/ui/dialog";
 import { MESSAGES } from "../../constants/messages";
-import { journalService, noteService } from "../../di/container";
+import { noteService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import type { NoteSearchHit } from "../../domain/note/NoteSearchHit";
-import { suggestJournalDate } from "../../services/suggestJournalDate";
-import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useUIStore } from "../../store/useUIStore";
@@ -182,40 +180,7 @@ export const QuickSearchModal: React.FC = () => {
     setQuickSearchOpen(open);
   };
 
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-
-  const openJournal = (timestamp: number) => {
-    if (!activeWorkspaceId) return;
-    journalService
-      .ensureJournalByDate(activeWorkspaceId, timestamp)
-      .then(async (noteId) => {
-        await noteActions.refreshNotesInPlace(activeWorkspaceId);
-        if (pickerResolve) {
-          resolvePicker(noteId);
-          return;
-        }
-        setActiveNoteId(noteId);
-        setQuickSearchOpen(false);
-      })
-      .catch(notifyError);
-  };
-
   const trimmed = query.trim();
-
-  const journalSuggestion = useMemo(
-    () => (trimmed ? suggestJournalDate(trimmed) : null),
-    [trimmed],
-  );
-
-  const suggestionLabel = useMemo(() => {
-    if (!journalSuggestion) return null;
-    const date = new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(journalSuggestion.timestamp));
-    return journalSuggestion.alias ? `${journalSuggestion.alias}, ${date}` : date;
-  }, [journalSuggestion]);
 
   return (
     <Dialog open={isQuickSearchOpen} onOpenChange={onOpenChange}>
@@ -246,48 +211,6 @@ export const QuickSearchModal: React.FC = () => {
                 <div className="p-8 text-center text-sm text-muted-foreground">
                   {MESSAGES.QUICK_SEARCH_PLACEHOLDER}
                 </div>
-              )}
-              {!loading && (journalSuggestion || trimmed) && (
-                <Command.Group
-                  heading={MESSAGES.JOURNAL_FIELD}
-                  className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-widest [&_[cmdk-group-heading]]:text-muted-foreground"
-                >
-                  {journalSuggestion && suggestionLabel && (
-                    <Command.Item
-                      value={`journal-${journalSuggestion.timestamp}`}
-                      onSelect={() => openJournal(journalSuggestion.timestamp)}
-                      className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors aria-selected:bg-accent"
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                        <CalendarDays
-                          className="h-4 w-4 text-muted-foreground"
-                          aria-hidden="true"
-                        />
-                      </span>
-                      <span className="truncate text-sm text-foreground">{suggestionLabel}</span>
-                      <ArrowRight
-                        className="h-4 w-4 shrink-0 text-muted-foreground/50"
-                        aria-hidden="true"
-                      />
-                    </Command.Item>
-                  )}
-                  <Command.Item
-                    value="journal-pick-date"
-                    onSelect={() => openJournal(Date.now())}
-                    className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left outline-none transition-colors aria-selected:bg-accent"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    </span>
-                    <span className="truncate text-sm text-foreground">
-                      {MESSAGES.JOURNAL_PICK_DATE}
-                    </span>
-                    <ArrowRight
-                      className="h-4 w-4 shrink-0 text-muted-foreground/50"
-                      aria-hidden="true"
-                    />
-                  </Command.Item>
-                </Command.Group>
               )}
               {trimmed && loading && (
                 <div className="p-8 text-center text-sm text-muted-foreground">Searching…</div>

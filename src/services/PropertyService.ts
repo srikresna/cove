@@ -4,7 +4,6 @@ import {
   deserializePropertyValue,
   hasOptions,
   isSystemPropertyId,
-  JOURNAL_PROPERTY_ID,
   makePropertyId,
   nextOptionColor,
   orderKeyBetween,
@@ -96,12 +95,7 @@ export class PropertyService implements IPropertyService {
   }
 
   async setDefinitionVisibility(id: string, show: PropertyVisibility): Promise<void> {
-    if (
-      isSystemPropertyId(id) &&
-      id !== JOURNAL_PROPERTY_ID &&
-      id !== "system:template" &&
-      show === "hide-when-empty"
-    ) {
+    if (isSystemPropertyId(id) && id !== "system:template" && show === "hide-when-empty") {
       throw new ValidationError("Built-in properties only support always-show or always-hide.");
     }
     const existing = await this.properties.listDefinitions();

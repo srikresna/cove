@@ -7,13 +7,11 @@ import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { COVER_COLORS, CUSTOM_ICON_PREFIX, DEFAULT_COVER_COLOR } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
-import { journalService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 import { noteActions } from "../../store/noteActions";
 import { useCustomIconStore } from "../../store/useCustomIconStore";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
-import { usePropertyStore } from "../../store/usePropertyStore";
 import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import { NoteInfoPanel } from "./NoteInfoPanel";
 
@@ -110,35 +108,9 @@ export const NoteHeaderBody: React.FC<{
   const commitTitleRef = useRef<() => void>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [journalDate, setJournalDate] = useState<number | null>(null);
-  const propertyVersion = usePropertyStore((s) => s.version);
-
   useEffect(() => {
     setTitle(note.title);
   }, [note.title]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: propertyVersion is an intentional refresh signal, not a body input
-  useEffect(() => {
-    let alive = true;
-    journalService
-      .journalDateOf(note.id)
-      .then((ts) => {
-        if (alive) setJournalDate(ts);
-      })
-      .catch(() => {
-        if (alive) setJournalDate(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [note.id, propertyVersion]);
-
-  const isToday =
-    journalDate != null && new Date(journalDate).toDateString() === new Date().toDateString();
-  const journalWeekday =
-    journalDate != null
-      ? new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(new Date(journalDate))
-      : "";
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
@@ -340,40 +312,19 @@ export const NoteHeaderBody: React.FC<{
           )}
         </div>
 
-        {journalDate != null ? (
-          <div className="mt-2 flex items-center gap-3">
-            <h1 className="font-display text-[40px] font-bold leading-[50px] tracking-tight text-foreground">
-              {new Intl.DateTimeFormat(undefined, {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              }).format(new Date(journalDate))}
-            </h1>
-            {isToday ? (
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-sm font-medium text-primary">
-                {MESSAGES.JOURNAL_TODAY}
-              </span>
-            ) : (
-              <span className="text-sm text-muted-foreground">{journalWeekday}</span>
-            )}
-          </div>
-        ) : (
-          <>
-            <label htmlFor="note-title-input" className="sr-only">
-              Note Title
-            </label>
-            <input
-              id="note-title-input"
-              type="text"
-              value={title}
-              onChange={handleTitleChange}
-              onBlur={() => commitTitleRef.current?.()}
-              placeholder={MESSAGES.UNTITLED_NOTE}
-              aria-label="Note Title"
-              className="mt-2 w-full bg-transparent font-display text-[40px] font-bold leading-[50px] tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
-            />
-          </>
-        )}
+        <label htmlFor="note-title-input" className="sr-only">
+          Note Title
+        </label>
+        <input
+          id="note-title-input"
+          type="text"
+          value={title}
+          onChange={handleTitleChange}
+          onBlur={() => commitTitleRef.current?.()}
+          placeholder={MESSAGES.UNTITLED_NOTE}
+          aria-label="Note Title"
+          className="mt-2 w-full bg-transparent font-display text-[40px] font-bold leading-[50px] tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40"
+        />
         <div
           aria-hidden="true"
           className={cn(

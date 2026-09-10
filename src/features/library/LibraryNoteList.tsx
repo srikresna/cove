@@ -9,7 +9,6 @@ import { type GroupBy, groupNotes, type NoteGroup } from "../../domain/library/g
 import { type LibrarySort, selectNotesForView } from "../../domain/library/query";
 import type { Note } from "../../domain/note/Note";
 import type { PropertyDefinition, PropertyValue } from "../../domain/property/Property";
-import { useJournalValuesByNote } from "../../hooks/useJournalValuesByNote";
 import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { extractParagraphs } from "../../services/editor/plainText";
@@ -90,8 +89,6 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
   const tagIdsByNote = inputsData?.tagIdsByNote ?? null;
   const rulesActive = draftRules.length > 0;
 
-  const journalByNoteId = useJournalValuesByNote();
-
   const workspaceNotes = useMemo(() => {
     const base = notes.filter(
       (n) =>
@@ -137,21 +134,11 @@ export const LibraryNoteList: React.FC<LibraryNoteListProps> = ({
       notes: workspaceNotes,
       allTags,
       tagIdsByNote,
-      journalByNoteId,
       stackValues,
       stackDefs,
       defs,
     });
-  }, [
-    prefs.groupBy,
-    workspaceNotes,
-    tagIdsByNote,
-    allTags,
-    journalByNoteId,
-    stackValues,
-    stackDefs,
-    defs,
-  ]);
+  }, [prefs.groupBy, workspaceNotes, tagIdsByNote, allTags, stackValues, stackDefs, defs]);
 
   const visibleItems = useMemo<GroupItem[]>(() => {
     if (!groups) {

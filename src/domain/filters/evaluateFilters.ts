@@ -7,7 +7,6 @@ export interface FilterableNote {
   note: Note;
   propertyValues: Map<string, PropertyValue>;
   tagIds: string[];
-  journalTimestamp: number | null;
 }
 
 const sameCalendarDay = (a: number, b: number): boolean => {
@@ -150,8 +149,6 @@ function matchRule(rule: FilterRule, item: FilterableNote): boolean {
       }
       return true;
     }
-    case "journal":
-      return rule.value === (item.journalTimestamp != null);
     case "template":
       return rule.value === (item.note.isTemplate === true);
   }
@@ -168,7 +165,6 @@ const emptyInputs = (): FilterableNote => ({
   note: { isTemplate: false } as unknown as Note,
   propertyValues: new Map(),
   tagIds: [],
-  journalTimestamp: null,
 });
 
 export function matchesEmptyInputs(rule: FilterRule): boolean {
