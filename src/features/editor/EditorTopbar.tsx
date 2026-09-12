@@ -146,21 +146,25 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
   );
 
   return (
-    <div className="flex h-10 flex-shrink-0 items-center justify-between border-b bg-card px-3">
+    <div className="@container flex h-10 flex-shrink-0 items-center justify-between gap-x-3 overflow-hidden border-b bg-card px-3">
       <div className="flex min-w-0 items-center gap-x-3 overflow-hidden whitespace-nowrap font-mono text-[11px] leading-4 text-muted-foreground">
-        <span>
+        <span className="@max-[260px]:hidden">
           {wordCount} {MESSAGES.META_WORDS}
         </span>
-        <span aria-hidden="true">·</span>
-        <span>
+        <span aria-hidden="true" className="@max-[400px]:hidden">
+          ·
+        </span>
+        <span className="@max-[520px]:hidden">
           {characterCount} {MESSAGES.META_CHARACTERS}
         </span>
-        <span aria-hidden="true">·</span>
-        <span>
+        <span aria-hidden="true" className="@max-[520px]:hidden">
+          ·
+        </span>
+        <span className="@max-[400px]:hidden">
           {MESSAGES.META_UPDATED_PREFIX} {formattedDate}
         </span>
         {note.isTemplate && (
-          <span className="flex h-6 shrink-0 items-center rounded bg-primary/10 px-2 text-xs font-medium text-primary">
+          <span className="flex h-6 shrink-0 items-center rounded bg-primary/10 px-2 text-xs font-medium text-primary @max-[220px]:hidden">
             {MESSAGES.TEMPLATE_BADGE}
           </span>
         )}
