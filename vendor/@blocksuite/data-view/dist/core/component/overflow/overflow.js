@@ -73,7 +73,10 @@ let Overflow = (() => {
         static { this.styles = css `
     component-overflow {
       display: flex;
-      flex-wrap: wrap;
+      /* Cove: nowrap keeps measurement stable while resizing - wrap caused a
+         measure/hide feedback loop (visible flicker) on every resize frame. */
+      flex-wrap: nowrap;
+      overflow: hidden;
       width: 100%;
       position: relative;
     }
