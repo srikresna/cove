@@ -67,6 +67,11 @@
   font-family: "Twemoji Mozilla", "Segoe UI Emoji", sans-serif !important;
 }
 
+.epr-emoji .epr-emoji-native,
+button .epr-emoji-native {
+  font-family: "Twemoji Mozilla", "Segoe UI Emoji", sans-serif !important;
+}
+
 @font-face {
   font-family: "Liberation Sans";
   src: url("./assets/fonts/LiberationSans-Regular.ttf") format("truetype");
