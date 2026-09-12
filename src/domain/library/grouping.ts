@@ -12,7 +12,7 @@ export interface NoteGroup {
   notes: Note[];
 }
 
-export interface GroupingInputs {
+interface GroupingInputs {
   groupBy: GroupBy;
   notes: Note[];
   allTags: Tag[];
@@ -22,12 +22,12 @@ export interface GroupingInputs {
   defs: PropertyDefinition[];
 }
 
-export const startOfDay = (ts: number): number => {
+const startOfDay = (ts: number): number => {
   const d = new Date(ts);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
 
-export const relativeDayLabel = (ts: number): string => {
+const relativeDayLabel = (ts: number): string => {
   const now = new Date();
   const days = Math.floor(
     (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - startOfDay(ts)) /

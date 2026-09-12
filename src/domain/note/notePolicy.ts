@@ -2,8 +2,7 @@ import type { Note } from "./Note";
 
 export const DEFAULT_NOTE_TITLE = "Untitled Note";
 
-export const DEFAULT_NOTE_CONTENT = '[{"type":"paragraph","content":[]}]';
-export { DEFAULT_NOTE_CONTENT as EMPTY_NOTE_CONTENT };
+export const EMPTY_NOTE_CONTENT = '[{"type":"paragraph","content":[]}]';
 
 export const makeNoteId = (): string => crypto.randomUUID();
 

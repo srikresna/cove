@@ -9,7 +9,6 @@ import type {
   PropertyDefinition,
   PropertyType,
   PropertyValue,
-  PropertyVisibility,
 } from "../../../domain/property/Property";
 import {
   CREATABLE_PROPERTY_TYPES,
@@ -18,8 +17,6 @@ import {
 } from "../../../domain/property/Property";
 import { notifyError } from "../../../store/notify";
 import { usePropertyStore } from "../../../store/usePropertyStore";
-import { useViewStore } from "../../../store/useViewStore";
-import { ConfirmDialog } from "../../modals/ConfirmDialog";
 import {
   PROPERTY_TYPE_META,
   PROPERTY_VALUE_EDITORS,
@@ -33,6 +30,10 @@ import {
   TemplateValue,
 } from "./SegmentedValueCells";
 import { DateValue, TagsValue, WorkspaceValue } from "./SystemValueCells";
+import {
+  DeletePropertyDefinitionDialog,
+  usePropertyDefinitionActions,
+} from "./usePropertyDefinitionActions";
 
 export { TagChip } from "./TagChip";
 export { PROPERTY_TYPE_META };
@@ -112,50 +113,8 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
       .catch(notifyError);
   };
 
-  const handleReorder = useCallback(
-    (id: string, targetId: string, position: "before" | "after") => {
-      setDefinitions((prev) => {
-        const from = prev.findIndex((d) => d.id === id);
-        const to = prev.findIndex((d) => d.id === targetId);
-        if (from === -1 || to === -1) return prev;
-        const next = [...prev];
-        const [moved] = next.splice(from, 1);
-        if (!moved) return prev;
-        const insertAt =
-          position === "before" ? (from < to ? to - 1 : to) : from < to ? to : to + 1;
-        next.splice(insertAt, 0, moved);
-        return next;
-      });
-      propertyService.reorderDefinition(id, targetId, position).catch((err) => {
-        notifyError(err);
-        reload();
-      });
-    },
-    [reload],
-  );
-
-  const commitRename = (def: PropertyDefinition, name: string) => {
-    setRenamingId(null);
-    if (name === def.name) return;
-    propertyService.renameDefinition(def.id, name).catch((err) => {
-      notifyError(err);
-      reload();
-    });
-  };
-
-  const handleVisibility = (def: PropertyDefinition, show: PropertyVisibility) => {
-    propertyService.setDefinitionVisibility(def.id, show).catch((err) => {
-      notifyError(err);
-      reload();
-    });
-  };
-
-  const handleIcon = (def: PropertyDefinition, icon: string | null) => {
-    propertyService.setDefinitionIcon(def.id, icon).catch((err) => {
-      notifyError(err);
-      reload();
-    });
-  };
+  const { handleReorder, commitRename, handleVisibility, handleIcon, deleteDefinition } =
+    usePropertyDefinitionActions({ setDefinitions, setRenamingId, reload });
 
   useEffect(() => {
     if (justCreatedId && values.has(justCreatedId)) setJustCreatedId(null);
@@ -319,24 +278,10 @@ export const NotePropertiesRows: React.FC<{ note: Note }> = ({ note }) => {
         </PopoverContent>
       </Popover>
 
-      <ConfirmDialog
-        open={deletingDef !== null}
-        title={MESSAGES.PROP_DELETE_CONFIRM_TITLE}
-        description={`"${deletingDef?.name ?? ""}" — ${MESSAGES.PROP_DELETE_CONFIRM_DESC}`}
-        confirmLabel={MESSAGES.PROP_DELETE}
-        danger
-        onConfirm={() => {
-          if (deletingDef) {
-            propertyService
-              .deleteDefinition(deletingDef.id)
-              .then(async () => {
-                await useViewStore.getState().syncAfterPropertyDelete(deletingDef.id);
-              })
-              .catch(notifyError);
-          }
-          setDeletingDef(null);
-        }}
-        onCancel={() => setDeletingDef(null)}
+      <DeletePropertyDefinitionDialog
+        target={deletingDef}
+        onClose={() => setDeletingDef(null)}
+        onDelete={deleteDefinition}
       />
     </>
   );

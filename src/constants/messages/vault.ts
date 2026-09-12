@@ -1,5 +1,4 @@
 export const VaultMessages = {
-  VAULT_INITIALIZING: "Loading vault…",
   VAULT_UNLOCK_TITLE: "Unlock Cove Notes",
   VAULT_UNLOCK_DESC: "Enter your passphrase to decrypt your notes.",
   VAULT_PASSPHRASE_LABEL: "Passphrase",

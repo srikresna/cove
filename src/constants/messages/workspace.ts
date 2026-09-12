@@ -2,7 +2,6 @@ export const WorkspaceMessages = {
   CREATE_WORKSPACE_TITLE: "Create Workspace",
   WORKSPACE_NAME_LABEL: "Workspace Name",
   WORKSPACE_NAME_PLACEHOLDER: "Workspace name",
-  WORKSPACE_EMOJI_LABEL: "Emoji Icon",
   WORKSPACE_ICON_LABEL: "Workspace Icon",
   WORKSPACE_UPLOAD_ICON: "Upload image",
   WORKSPACE_CUSTOM_ICON: "Custom icon",

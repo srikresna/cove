@@ -1,12 +1,15 @@
 import {
+  type LinkPreviewProvider,
+  LinkPreviewServiceIdentifier,
   NotificationExtension,
   type NotificationService,
   QuickSearchExtension,
   type QuickSearchService,
 } from "@blocksuite/affine/shared/services";
 import type { ExtensionType } from "@blocksuite/affine/store";
+import { invoke } from "@tauri-apps/api/core";
 
-export interface CoveUiPort {
+interface CoveUiPort {
   toast(message: string): void;
   confirm(options: {
     title: string;
@@ -36,7 +39,7 @@ export function provideCoveUi(port: CoveUiPort): void {
   ui = port;
 }
 
-export const coveNotificationService: NotificationService = {
+const coveNotificationService: NotificationService = {
   toast: (message) => ui?.toast(message),
   confirm: (options) =>
     ui
@@ -74,7 +77,7 @@ export const coveNotificationService: NotificationService = {
 export const coveNotificationExtension: ExtensionType =
   NotificationExtension(coveNotificationService);
 
-export const coveQuickSearchService: QuickSearchService = {
+const coveQuickSearchService: QuickSearchService = {
   openQuickSearch: async () => {
     const docId = (await ui?.pickNote()) ?? null;
     return docId ? { docId } : null;
@@ -82,3 +85,56 @@ export const coveQuickSearchService: QuickSearchService = {
 };
 
 export const coveQuickSearchExtension: ExtensionType = QuickSearchExtension(coveQuickSearchService);
+
+type PreviewResult = Awaited<ReturnType<LinkPreviewProvider["query"]>>;
+
+const LINK_PREVIEW_CACHE_MAX = 50;
+const linkPreviewCache = new Map<string, PreviewResult>();
+const linkPreviewPending = new Map<string, Promise<PreviewResult>>();
+
+function cachePreview(url: string, result: PreviewResult): void {
+  linkPreviewCache.delete(url);
+  linkPreviewCache.set(url, result);
+  if (linkPreviewCache.size > LINK_PREVIEW_CACHE_MAX) {
+    const oldest = linkPreviewCache.keys().next().value;
+    if (oldest !== undefined) linkPreviewCache.delete(oldest);
+  }
+}
+
+export const coveLinkPreviewService: LinkPreviewProvider = {
+  endpoint: "native",
+  setEndpoint: () => {},
+  query: (url) => {
+    const cached = linkPreviewCache.get(url);
+    if (cached) {
+      linkPreviewCache.delete(url);
+      linkPreviewCache.set(url, cached);
+      return Promise.resolve(cached);
+    }
+    const inflight = linkPreviewPending.get(url);
+    if (inflight) return inflight;
+    const promise = invoke<{
+      title?: string | null;
+      description?: string | null;
+      icon?: string | null;
+      image?: string | null;
+    } | null>("fetch_link_preview", { url })
+      .then((data) => {
+        const result: PreviewResult = data ?? {};
+        if (Object.keys(result).length > 0) cachePreview(url, result);
+        return result;
+      })
+      .catch(() => ({}) as PreviewResult)
+      .finally(() => {
+        linkPreviewPending.delete(url);
+      });
+    linkPreviewPending.set(url, promise);
+    return promise;
+  },
+};
+
+export const coveLinkPreviewExtension: ExtensionType = {
+  setup: (di) => {
+    di.override(LinkPreviewServiceIdentifier, coveLinkPreviewService);
+  },
+};

@@ -1,65 +1,65 @@
 import type { PropertyDefinition, PropertyType } from "../property/Property";
 
-export type TextFilterOp = "contains" | "is" | "is-not" | "is-empty" | "is-not-empty";
-export type NumberFilterOp = "=" | "≠" | "<" | ">" | "≤" | "≥" | "is-empty" | "is-not-empty";
-export type DateFilterOp = "is" | "before" | "after" | "is-empty" | "is-not-empty";
-export type SelectFilterOp = "is" | "is-not" | "is-empty" | "is-not-empty";
-export type CheckboxFilterOp = "is";
-export type TagFilterOp = "has-any-of" | "has-all-of" | "has-none-of" | "is-empty" | "is-not-empty";
+type TextFilterOp = "contains" | "is" | "is-not" | "is-empty" | "is-not-empty";
+type NumberFilterOp = "=" | "≠" | "<" | ">" | "≤" | "≥" | "is-empty" | "is-not-empty";
+type DateFilterOp = "is" | "before" | "after" | "is-empty" | "is-not-empty";
+type SelectFilterOp = "is" | "is-not" | "is-empty" | "is-not-empty";
+type CheckboxFilterOp = "is";
+type TagFilterOp = "has-any-of" | "has-all-of" | "has-none-of" | "is-empty" | "is-not-empty";
 
-export interface FilterRuleBase {
+interface FilterRuleBase {
   readonly id: string;
 }
 
-export interface TextFilterRule extends FilterRuleBase {
+interface TextFilterRule extends FilterRuleBase {
   readonly kind: "text";
   readonly propertyId: string;
   readonly op: TextFilterOp;
   readonly value?: string;
 }
 
-export interface NumberFilterRule extends FilterRuleBase {
+interface NumberFilterRule extends FilterRuleBase {
   readonly kind: "number";
   readonly propertyId: string;
   readonly op: NumberFilterOp;
   readonly value?: number;
 }
 
-export interface DateFilterRule extends FilterRuleBase {
+interface DateFilterRule extends FilterRuleBase {
   readonly kind: "date";
   readonly propertyId: string;
   readonly op: DateFilterOp;
   readonly value?: number;
 }
 
-export interface SelectFilterRule extends FilterRuleBase {
+interface SelectFilterRule extends FilterRuleBase {
   readonly kind: "select";
   readonly propertyId: string;
   readonly op: SelectFilterOp;
   readonly optionIds: string[];
 }
 
-export interface CheckboxFilterRule extends FilterRuleBase {
+interface CheckboxFilterRule extends FilterRuleBase {
   readonly kind: "checkbox";
   readonly propertyId: string;
   readonly op: CheckboxFilterOp;
   readonly value: boolean;
 }
 
-export interface MultiSelectFilterRule extends FilterRuleBase {
+interface MultiSelectFilterRule extends FilterRuleBase {
   readonly kind: "multiSelect";
   readonly propertyId: string;
   readonly op: SelectFilterOp;
   readonly optionIds: string[];
 }
 
-export interface TagFilterRule extends FilterRuleBase {
+interface TagFilterRule extends FilterRuleBase {
   readonly kind: "tags";
   readonly op: TagFilterOp;
   readonly tagIds: string[];
 }
 
-export interface TemplateFilterRule extends FilterRuleBase {
+interface TemplateFilterRule extends FilterRuleBase {
   readonly kind: "template";
   readonly op: "is" | "is-not";
   readonly value: boolean;

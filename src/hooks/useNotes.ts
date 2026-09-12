@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { noteService } from "../di/container";
 import type { Note } from "../domain/note/Note";
-import { fetchNotes, notesKey, queryClient, trashKey } from "../store/queryClient";
+import { fetchNotes, notesKey, trashKey } from "../store/queryClient";
 import { useWorkspaceStore } from "../store/useWorkspaceStore";
 
 export function useNotes(): Note[] {
@@ -23,5 +23,3 @@ export function useTrash(): Note[] {
   });
   return query.data ?? [];
 }
-
-export const currentTrash = (): Note[] => queryClient.getQueryData(trashKey) ?? [];

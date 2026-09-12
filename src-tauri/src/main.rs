@@ -4,6 +4,7 @@ mod backup;
 mod crypto;
 mod dpapi;
 mod keychain;
+mod link_preview;
 mod restore;
 mod transaction;
 
@@ -52,7 +53,8 @@ fn main() {
         restore::restore_database,
         transaction::run_sql_transaction,
         save_exported_file,
-        js_log
+        js_log,
+        link_preview::fetch_link_preview
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");

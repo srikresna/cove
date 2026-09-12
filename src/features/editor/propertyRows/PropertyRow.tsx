@@ -24,12 +24,7 @@ import { isSystemPropertyId, PROPERTY_VISIBILITY } from "../../../domain/propert
 import { cn } from "../../../lib/utils";
 import { InfoRow } from "../NoteInfoPanel";
 import { PROPERTY_ICONS, PROPERTY_TYPE_META, resolvePropertyIcon } from "../PropertyValueEditors";
-
-const VISIBILITY_LABEL: Record<PropertyVisibility, string> = {
-  "always-show": MESSAGES.PROP_VIS_ALWAYS_SHOW,
-  "hide-when-empty": MESSAGES.PROP_VIS_HIDE_WHEN_EMPTY,
-  "always-hide": MESSAGES.PROP_VIS_ALWAYS_HIDE,
-};
+import { VISIBILITY_LABEL } from "./usePropertyDefinitionActions";
 
 interface PropertyRowProps {
   def: PropertyDefinition;

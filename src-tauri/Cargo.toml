@@ -25,6 +25,10 @@ sha2 = "0.10"
 keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
 # WAL-safe backup via VACUUM INTO; same sqlx/libsqlite3 already pulled in by tauri-plugin-sql.
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
+# Bookmark link previews: Rust-side fetch keeps the WebView CSP free of remote hosts.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+base64 = "0.22"
+url = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }

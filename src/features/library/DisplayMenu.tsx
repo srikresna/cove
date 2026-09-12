@@ -22,11 +22,12 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { MESSAGES } from "../../constants/messages";
+import type { GroupBy } from "../../domain/library/grouping";
 import type { PropertyDefinition } from "../../domain/property/Property";
 import { cn } from "../../lib/utils";
 import type { LibrarySort } from "./LibraryNoteList";
 
-export type GroupBy = "none" | "tags" | "created" | "updated" | { defId: string };
+export type { GroupBy };
 
 export const isGroupByDef = (value: GroupBy): value is { defId: string } =>
   typeof value === "object";

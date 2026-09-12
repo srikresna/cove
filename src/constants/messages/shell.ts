@@ -1,7 +1,6 @@
 import { DEFAULT_NOTE_TITLE } from "../../domain/note/notePolicy";
 
 export const ShellMessages = {
-  APP_NAME: "Cove Notes",
   UNTITLED_NOTE: DEFAULT_NOTE_TITLE,
   NO_NOTE_SELECTED_TITLE: "No Note Selected",
   NO_NOTE_SELECTED_DESC:
@@ -26,15 +25,12 @@ export const ShellMessages = {
   CANCEL: "Cancel",
   TIME_TODAY: "today",
   TIME_YESTERDAY: "yesterday",
-  TIME_DAYS_AGO_SUFFIX: "days ago",
-  LINKED_NOTE_MISSING: "Deleted note",
   SOMETHING_WENT_WRONG: "Something Went Wrong",
   ERROR_BOUNDARY_DESC:
     "An unexpected error occurred in Cove Notes. You can reload the application safely.",
   RELOAD_APP: "Reload Application",
   EXPAND_SIDEBAR: "Expand Sidebar",
   COLLAPSE_SIDEBAR: "Collapse Sidebar",
-  NOTES_HEADER: "Notes",
   NO_WORKSPACE_TITLE: "No Workspace Yet",
   NO_WORKSPACE_DESC: "Create your first workspace to start organizing your notes and ideas.",
 } as const;

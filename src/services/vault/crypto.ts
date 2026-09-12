@@ -1,18 +1,16 @@
 const PBKDF2_HASH = "SHA-256";
 const HKDF_HASH = "SHA-256";
 const KEY_BITS = 256;
-export const KEY_BYTES = 32;
+const KEY_BYTES = 32;
 const GCM_IV_BYTES = 12;
 const GCM_TAG_BYTES = 16;
-export const SALT_BYTES = 16;
-
-export const PBKDF2_ITERATIONS = 600_000;
+const SALT_BYTES = 16;
 
 export const IV_EXHAUSTION_LIMIT = 2 ** 28;
 
 export type Bytes = Uint8Array<ArrayBuffer>;
 
-export function randomBytes(n: number): Bytes {
+function randomBytes(n: number): Bytes {
   return crypto.getRandomValues(new Uint8Array(n));
 }
 

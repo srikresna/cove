@@ -16,14 +16,14 @@ export interface DocPeekRequest {
   databaseRowId?: string;
 }
 
-export interface TemplatePeekRequest {
+interface TemplatePeekRequest {
   type: "template";
   template: TemplateResult;
 }
 
 export type PeekRequest = DocPeekRequest | TemplatePeekRequest;
 
-export interface PeekSink {
+interface PeekSink {
   open(request: PeekRequest, resolve: () => void): void;
   close(): void;
 }

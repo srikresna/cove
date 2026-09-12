@@ -21,6 +21,7 @@ import { useEffect, useRef } from "react";
 import { blockSuiteEditorService } from "../../../di/container";
 import type { DocMode as CoveDocMode, Note } from "../../../domain/note/Note";
 import {
+  coveLinkPreviewExtension,
   coveNotificationExtension,
   coveQuickSearchExtension,
 } from "../../../services/blocksuite/coveBlockSuiteProviders";
@@ -114,12 +115,14 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
       ...common,
       coveNotificationExtension,
       coveQuickSearchExtension,
+      coveLinkPreviewExtension,
     ];
     editor.edgelessSpecs = [
       ...edgelessSpecs,
       ...common,
       coveNotificationExtension,
       coveQuickSearchExtension,
+      coveLinkPreviewExtension,
     ];
     editor.mode = mode;
     editor.autofocus = true;

@@ -1,4 +1,4 @@
-export type ErrorCategory =
+type ErrorCategory =
   | "not_found"
   | "validation"
   | "persistence"
@@ -7,7 +7,7 @@ export type ErrorCategory =
   | "business_rule"
   | "unknown";
 
-export interface AppErrorOptions {
+interface AppErrorOptions {
   cause?: unknown;
   userFacing?: boolean;
   context?: Record<string, unknown>;
@@ -68,7 +68,7 @@ export class PersistenceError extends AppError {
   }
 }
 
-export type EncryptionErrorReason =
+type EncryptionErrorReason =
   | "key_unavailable"
   | "decrypt_failed"
   | "encrypt_failed"

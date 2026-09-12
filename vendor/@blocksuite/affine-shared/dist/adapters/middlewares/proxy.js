@@ -41,7 +41,10 @@ export class ImageProxyService extends StoreExtension {
         setImageProxyMiddlewareURL(url);
     }
     buildUrl(imageUrl) {
-        if (imageUrl.startsWith(this.imageProxyURL) || isImageProxyURL(imageUrl)) {
+        // Cove: native link previews inline images as data: urls - pass them through unwrapped.
+        if (imageUrl.startsWith('data:') ||
+            imageUrl.startsWith(this.imageProxyURL) ||
+            isImageProxyURL(imageUrl)) {
             return imageUrl;
         }
         return `${this.imageProxyURL}?url=${encodeURIComponent(imageUrl)}`;

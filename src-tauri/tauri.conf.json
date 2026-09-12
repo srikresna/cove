@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self'; object-src 'none'; worker-src 'self' blob:; frame-src 'none'; child-src 'none'; connect-src 'self' ipc: http://ipc.localhost tauri://localhost; base-uri 'none'; form-action 'none'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self'; object-src 'none'; worker-src 'self' blob:; frame-src https://www.youtube.com/embed/ https://www.youtube-nocookie.com/embed/; child-src 'none'; connect-src 'self' ipc: http://ipc.localhost tauri://localhost; base-uri 'none'; form-action 'none'"
     }
   },
   "bundle": {

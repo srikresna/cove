@@ -1,7 +1,7 @@
 import { generateKeyBetween } from "fractional-indexing";
 import { TAG_COLORS } from "../tag/Tag";
 
-export const PROPERTY_TYPES = [
+const PROPERTY_TYPES = [
   "text",
   "number",
   "select",
@@ -21,7 +21,7 @@ export const PROPERTY_TYPES = [
 
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
-export const SYSTEM_PROPERTY_IDS = [
+const SYSTEM_PROPERTY_IDS = [
   "system:tags",
   "system:workspace",
   "system:created",
@@ -32,11 +32,11 @@ export const SYSTEM_PROPERTY_IDS = [
   "system:template",
 ] as const;
 
-export type SystemPropertyId = (typeof SYSTEM_PROPERTY_IDS)[number];
+type SystemPropertyId = (typeof SYSTEM_PROPERTY_IDS)[number];
 
 export const SYSTEM_PROPERTY_TYPES = ["tags", "workspace", "created", "updated"] as const;
 
-export type SystemPropertyType = (typeof SYSTEM_PROPERTY_TYPES)[number];
+type SystemPropertyType = (typeof SYSTEM_PROPERTY_TYPES)[number];
 
 export const isSystemPropertyId = (id: string): id is SystemPropertyId =>
   (SYSTEM_PROPERTY_IDS as readonly string[]).includes(id);
@@ -67,8 +67,6 @@ export const PROPERTY_ICON_NAMES = [
   "book",
   "heart",
 ] as const;
-
-export type PropertyIconName = (typeof PROPERTY_ICON_NAMES)[number];
 
 export const PROPERTY_VISIBILITY = ["always-show", "hide-when-empty", "always-hide"] as const;
 

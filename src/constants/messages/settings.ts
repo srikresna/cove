@@ -35,7 +35,6 @@ export const SettingsMessages = {
   SETTINGS_CATEGORY_BACKUP: "Backup",
   SETTINGS_CATEGORY_ABOUT: "About",
   SETTINGS_CATEGORY_ICONS: "Icons",
-  ICON_PACK_TITLE: "Custom icons",
   ICON_PACK_DESC:
     "Upload images to use as note icons. They are encrypted and appear in the editor's icon picker under Custom.",
   ICON_PACK_UPLOAD: "Upload image",

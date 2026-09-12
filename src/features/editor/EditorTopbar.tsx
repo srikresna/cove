@@ -108,7 +108,7 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
     minute: "2-digit",
   }).format(note.updatedAt);
 
-  const renderOverflowMenu = (includeFavorite: boolean) => (
+  const renderOverflowMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -121,12 +121,6 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
-        {includeFavorite && (
-          <DropdownMenuItem onSelect={() => toggleFavoriteNote(note.id)}>
-            <Star className={cn(note.isFavorite && "text-warm")} aria-hidden="true" />
-            <span>{note.isFavorite ? MESSAGES.UNFAVORITE_NOTE : MESSAGES.FAVORITE_NOTE}</span>
-          </DropdownMenuItem>
-        )}
         <DropdownMenuItem onSelect={onToggleFullWidth}>
           <ArrowRightLeft aria-hidden="true" />
           <span>{isFullWidth ? MESSAGES.STANDARD_WIDTH : MESSAGES.WIDE_WIDTH}</span>
@@ -195,7 +189,7 @@ export const EditorTopbar: React.FC<EditorTopbarProps> = ({
           <Star className="h-4 w-4" aria-hidden="true" />
         </IconAction>
 
-        {renderOverflowMenu(false)}
+        {renderOverflowMenu()}
 
         {!isRightBarOpen && (
           <>

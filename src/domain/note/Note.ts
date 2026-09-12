@@ -1,8 +1,8 @@
 export type DocMode = "page" | "edgeless";
 
-export type EdgelessTheme = "system" | "light" | "dark";
+type EdgelessTheme = "system" | "light" | "dark";
 
-export type PageWidth = "standard" | "fullWidth";
+type PageWidth = "standard" | "fullWidth";
 
 export interface Note {
   readonly id: string;
