@@ -10,6 +10,7 @@
     "sql:default",
     "sql:allow-execute",
     "dialog:default",
-    "opener:allow-open-url"
+    "opener:allow-open-url",
+    "opener:allow-default-urls"
   ]
 }

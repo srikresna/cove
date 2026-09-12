@@ -64,7 +64,7 @@
 
 .emoji-font,
 .epr-emoji {
-  font-family: "Segoe UI Emoji", "Twemoji Mozilla", sans-serif;
+  font-family: "Twemoji Mozilla", "Segoe UI Emoji", sans-serif !important;
 }
 
 @font-face {
