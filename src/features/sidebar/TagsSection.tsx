@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Tag, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -86,11 +86,7 @@ const TagRow: React.FC<{
             : undefined
         }
       >
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: color }}
-        />
+        <Tag className="h-3.5 w-3.5 shrink-0" style={{ color }} aria-hidden="true" />
         <span className="truncate leading-4">{name}</span>
         <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground/70">
           {noteCount}
