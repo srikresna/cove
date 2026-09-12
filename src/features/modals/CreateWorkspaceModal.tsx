@@ -16,8 +16,10 @@ import { Label } from "../../components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { COVER_COLORS } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
+import { useCustomEmojiOptions } from "../../hooks/useCustomEmojiOptions";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
+import { useCustomIconStore } from "../../store/useCustomIconStore";
 import { useUIStore } from "../../store/useUIStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { processWorkspaceIcon } from "../../utils/workspaceIcon";
@@ -25,19 +27,23 @@ import { processWorkspaceIcon } from "../../utils/workspaceIcon";
 export const CreateWorkspaceModal: React.FC = () => {
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace);
   const uploadWorkspaceIcon = useWorkspaceStore((s) => s.uploadWorkspaceIcon);
+  const setWorkspaceIconFromDataUrl = useWorkspaceStore((s) => s.setWorkspaceIconFromDataUrl);
   const isCreateModalOpen = useUIStore((s) => s.isCreateModalOpen);
   const setCreateModalOpen = useUIStore((s) => s.setCreateModalOpen);
+  const customEmojis = useCustomEmojiOptions();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedEmoji, setSelectedEmoji] = useState("🚀");
   const [selectedColor, setSelectedColor] = useState("#ff6f1e");
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [packIconDataUrl, setPackIconDataUrl] = useState<string | null>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   const clearCustomIcon = () => {
     setIconFile(null);
     setIconPreview(null);
+    setPackIconDataUrl(null);
     if (iconInputRef.current) iconInputRef.current.value = "";
   };
 
@@ -45,12 +51,24 @@ export const CreateWorkspaceModal: React.FC = () => {
     if (!file) return;
     try {
       const preview = await processWorkspaceIcon(file);
+      setPackIconDataUrl(null);
       setIconFile(file);
       setIconPreview(preview);
     } catch (err) {
       clearCustomIcon();
       notifyError(err);
     }
+  };
+
+  const pickPackIcon = (emojiData: { isCustom: boolean; emoji: string }) => {
+    if (!emojiData.isCustom) return false;
+    const pack = useCustomIconStore.getState().icons;
+    const entry = pack[emojiData.emoji];
+    if (!entry) return false;
+    setIconFile(null);
+    setPackIconDataUrl(entry.dataUrl);
+    setIconPreview(entry.dataUrl);
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,6 +82,7 @@ export const CreateWorkspaceModal: React.FC = () => {
     );
     if (!created) return;
     if (iconFile) await uploadWorkspaceIcon(created.id, iconFile);
+    else if (packIconDataUrl) await setWorkspaceIconFromDataUrl(created.id, packIconDataUrl);
     setName("");
     setDescription("");
     setSelectedEmoji("🚀");
@@ -77,7 +96,7 @@ export const CreateWorkspaceModal: React.FC = () => {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border text-lg"
+              className="emoji-font flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border text-lg"
               style={{ backgroundColor: `${selectedColor}30` }}
               aria-hidden="true"
             >
@@ -117,7 +136,7 @@ export const CreateWorkspaceModal: React.FC = () => {
                     aria-label="Choose Emoji Icon"
                   >
                     <span className="flex items-center gap-3">
-                      <span className="text-xl" aria-hidden="true">
+                      <span className="emoji-font text-xl" aria-hidden="true">
                         {selectedEmoji}
                       </span>
                       <span>Emoji</span>
@@ -128,7 +147,9 @@ export const CreateWorkspaceModal: React.FC = () => {
                 <PopoverContent sideOffset={8} className="overflow-hidden">
                   <EmojiPicker
                     emojiStyle={EmojiStyle.NATIVE}
+                    customEmojis={customEmojis}
                     onEmojiClick={(emojiData) => {
+                      if (pickPackIcon(emojiData)) return;
                       clearCustomIcon();
                       setSelectedEmoji(emojiData.emoji);
                     }}

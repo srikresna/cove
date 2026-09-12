@@ -1,16 +1,16 @@
 import EmojiPicker, { EmojiStyle } from "emoji-picker-react";
 import { Image as ImageIcon, Smile, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NoteIcon } from "../../components/NoteIcon";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { COVER_COLORS, CUSTOM_ICON_PREFIX, DEFAULT_COVER_COLOR } from "../../constants/app";
 import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
+import { useCustomEmojiOptions } from "../../hooks/useCustomEmojiOptions";
 import { cn } from "../../lib/utils";
 import { noteActions } from "../../store/noteActions";
-import { useCustomIconStore } from "../../store/useCustomIconStore";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useSaveStatusStore } from "../../store/useSaveStatusStore";
 import { NoteInfoPanel } from "./NoteInfoPanel";
@@ -26,16 +26,7 @@ interface IconPickerContentProps {
 }
 
 export const IconPickerContent: React.FC<IconPickerContentProps> = ({ onPick, onRemove }) => {
-  const customIcons = useCustomIconStore((s) => s.icons);
-  const customEmojis = useMemo(
-    () =>
-      Object.entries(customIcons).map(([id, entry]) => ({
-        id,
-        names: [entry.name],
-        imgUrl: entry.dataUrl,
-      })),
-    [customIcons],
-  );
+  const customEmojis = useCustomEmojiOptions();
 
   return (
     <PopoverContent align="start" className="w-auto overflow-hidden p-0">

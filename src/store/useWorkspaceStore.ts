@@ -33,6 +33,7 @@ interface WorkspaceState {
   renameWorkspace: (id: string, name: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
   uploadWorkspaceIcon: (id: string, file: File) => Promise<void>;
+  setWorkspaceIconFromDataUrl: (id: string, dataUrl: string) => Promise<boolean>;
   removeWorkspaceIcon: (id: string) => Promise<void>;
 }
 
@@ -148,6 +149,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set((state) => ({ icons: { ...state.icons, [id]: dataUrl } }));
     } catch (err) {
       notifyError(err);
+    }
+  },
+
+  setWorkspaceIconFromDataUrl: async (id, dataUrl) => {
+    try {
+      await workspaceService.setIcon(id, dataUrl);
+      set((state) => ({ icons: { ...state.icons, [id]: dataUrl } }));
+      return true;
+    } catch (err) {
+      notifyError(err);
+      return false;
     }
   },
 

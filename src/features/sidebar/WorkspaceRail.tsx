@@ -72,7 +72,9 @@ export const WorkspaceRail: React.FC<WorkspaceRailProps> = ({ isCollapsed, onTog
                       className="h-8 w-8 rounded-lg object-cover leading-none"
                     />
                   ) : (
-                    <span aria-hidden="true">{ws.emoji}</span>
+                    <span aria-hidden="true" className="emoji-font">
+                      {ws.emoji}
+                    </span>
                   )}
                 </button>
               </TooltipTrigger>

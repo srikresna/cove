@@ -24,7 +24,7 @@ export const NoteIcon: React.FC<{
       />
     );
   }
-  if (icon && !customId) return <>{icon}</>;
+  if (icon && !customId) return <span className="emoji-font">{icon}</span>;
   return fallback ? (
     <FileText className={cn("shrink-0 text-muted-foreground", className)} aria-hidden="true" />
   ) : null;

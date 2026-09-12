@@ -1,5 +1,6 @@
 import type { BlobSource } from "@blocksuite/sync";
 import { invoke } from "@tauri-apps/api/core";
+import "./../services/blocksuite/externalLinks";
 import "./../services/blocksuite/idempotentCustomElements";
 import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
 import { SQLiteCustomIconRepository } from "../repositories/SQLiteCustomIconRepository";

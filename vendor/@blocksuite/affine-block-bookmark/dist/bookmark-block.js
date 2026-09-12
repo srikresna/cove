@@ -125,6 +125,11 @@ let BookmarkBlockComponent = (() => {
                 const link = this.link;
                 if (!link)
                     return;
+                // Cove: WebView2 blocks window.open - delegate to the native opener when present.
+                if (globalThis.__coveOpenExternal) {
+                    globalThis.__coveOpenExternal(link);
+                    return;
+                }
                 window.open(link, '_blank', 'noopener,noreferrer');
             };
             this.refreshData = () => {

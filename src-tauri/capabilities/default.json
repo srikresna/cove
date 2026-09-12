@@ -9,6 +9,7 @@
     "core:webview:allow-set-webview-zoom",
     "sql:default",
     "sql:allow-execute",
-    "dialog:default"
+    "dialog:default",
+    "opener:allow-open-url"
   ]
 }
