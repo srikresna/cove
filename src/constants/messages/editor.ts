@@ -77,4 +77,6 @@ export const EditorMessages = {
   RIGHTBAR_OPEN: "Open sidebar panel",
   RIGHTBAR_EXPORT: "Export / import",
   RIGHTBAR_CLOSE: "Close sidebar panel",
+  PASTE: "Paste",
+  PASTE_FAILED: "Couldn't read the clipboard.",
 } as const;

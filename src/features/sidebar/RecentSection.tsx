@@ -5,6 +5,7 @@ import { useNotes } from "../../hooks/useNotes";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { NoteContextMenu } from "./NoteContextMenu";
 import { NoteRow } from "./NoteRow";
 
 const RECENT_LIMIT = 5;
@@ -29,12 +30,9 @@ export const RecentSection: React.FC = () => {
   return (
     <CollapsibleSection storageKey="cove-recent-open" label={MESSAGES.RECENT_HEADER}>
       {recent.map((note) => (
-        <NoteRow
-          key={note.id}
-          note={note}
-          isActive={note.id === activeNoteId}
-          onSelect={setActiveNoteId}
-        />
+        <NoteContextMenu key={note.id} note={note}>
+          <NoteRow note={note} isActive={note.id === activeNoteId} onSelect={setActiveNoteId} />
+        </NoteContextMenu>
       ))}
     </CollapsibleSection>
   );

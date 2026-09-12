@@ -22,6 +22,7 @@ export const ShellMessages = {
   UNNAMED: "Unnamed",
   PROPERTIES: "Properties",
   TEMPLATE_TOGGLE: "Use as template",
+  NOTE_NAME_LABEL: "Note name",
   CANCEL: "Cancel",
   TIME_TODAY: "today",
   TIME_YESTERDAY: "yesterday",

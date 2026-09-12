@@ -4,13 +4,16 @@ import { MESSAGES } from "../../constants/messages";
 import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 
-export const NoteRow: React.FC<{
-  note: Note;
-  isActive: boolean;
-  onSelect: (id: string) => void;
-}> = ({ note, isActive, onSelect }) => (
+export const NoteRow: React.FC<
+  {
+    note: Note;
+    isActive: boolean;
+    onSelect: (id: string) => void;
+  } & Omit<React.ComponentPropsWithoutRef<"button">, "onSelect">
+> = ({ note, isActive, onSelect, ...rest }) => (
   <button
     type="button"
+    {...rest}
     onClick={() => onSelect(note.id)}
     className={cn(
       "flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

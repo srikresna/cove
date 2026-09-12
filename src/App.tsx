@@ -17,6 +17,7 @@ import { SettingsModal } from "./features/settings/SettingsModal";
 import { Sidebar } from "./features/sidebar/Sidebar";
 import { TrashPage } from "./features/trash/TrashPage";
 import { VaultGate } from "./features/vault/VaultGate";
+import { useNativeContextMenuSuppression } from "./hooks/useNativeContextMenu";
 import { useNotes } from "./hooks/useNotes";
 import { noteActions } from "./store/noteActions";
 import { useCustomIconStore } from "./store/useCustomIconStore";
@@ -172,12 +173,16 @@ export const AppContent: React.FC = () => {
   );
 };
 
-export const App: React.FC = () => (
-  <ErrorBoundary>
-    <VaultGate>
-      <AppContent />
-    </VaultGate>
-  </ErrorBoundary>
-);
+export const App: React.FC = () => {
+  useNativeContextMenuSuppression();
+
+  return (
+    <ErrorBoundary>
+      <VaultGate>
+        <AppContent />
+      </VaultGate>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

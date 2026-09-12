@@ -19,6 +19,7 @@ import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { NoteContextMenu } from "./NoteContextMenu";
 
 const TemplateRow: React.FC<{
   note: Note;
@@ -31,21 +32,23 @@ const TemplateRow: React.FC<{
   onTrash: () => void;
 }> = ({ note, isActive, onSelect, onUse, onRename, onDuplicate, onRemoveFlag, onTrash }) => (
   <div className="group/tpl flex items-center">
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        isActive
-          ? "border-border bg-card font-medium text-foreground shadow-sm"
-          : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-      )}
-    >
-      <span aria-hidden="true" className="shrink-0 text-sm">
-        <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />
-      </span>
-      <span className="truncate leading-4">{note.title || MESSAGES.UNTITLED_NOTE}</span>
-    </button>
+    <NoteContextMenu note={note} variant="template">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          isActive
+            ? "border-border bg-card font-medium text-foreground shadow-sm"
+            : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+        )}
+      >
+        <span aria-hidden="true" className="shrink-0 text-sm">
+          <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />
+        </span>
+        <span className="truncate leading-4">{note.title || MESSAGES.UNTITLED_NOTE}</span>
+      </button>
+    </NoteContextMenu>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button

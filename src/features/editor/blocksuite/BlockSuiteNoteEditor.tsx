@@ -1,12 +1,22 @@
 import type { EditorHost } from "@blocksuite/std";
+import { readText } from "@tauri-apps/plugin-clipboard-manager";
+import { ClipboardPaste } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { countWordsAndChars } from "@/services/editor/plainText";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "../../../components/ui/context-menu";
 import { TooltipProvider } from "../../../components/ui/tooltip";
+import { MESSAGES } from "../../../constants/messages";
 import type { Note } from "../../../domain/note/Note";
 import { cn } from "../../../lib/utils";
 import { Logger } from "../../../services/Logger";
 import { noteActions } from "../../../store/noteActions";
+import { notifyError } from "../../../store/notify";
 import { EditorHeader } from "../EditorHeader";
 import { EditorRightBar } from "../EditorRightBar";
 import { EditorTopbar } from "../EditorTopbar";
@@ -95,6 +105,23 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
     }
   };
 
+  const pasteFromClipboard = async () => {
+    let text = "";
+    try {
+      text = await readText();
+    } catch (err) {
+      notifyError(err);
+      return;
+    }
+    if (!text || !editorHost) return;
+    editorHost.std.event.active = true;
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    editorHost.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }),
+    );
+  };
+
   const openToggleRef = useRef<HTMLButtonElement>(null);
   const rightBarHeaderRef = useRef<HTMLDivElement>(null);
   const toggledViaKeyboard = useRef(false);
@@ -153,17 +180,27 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
               >
                 <EditorHeader note={note} isFullWidth={isFullWidth} />
 
-                <div
-                  data-page-width={isFullWidth ? "fullWidth" : "standard"}
-                  className={cn(
-                    "flex min-h-0 w-full flex-1 flex-col",
-                    !isFullWidth && "mx-auto max-w-3xl",
-                  )}
-                >
-                  <EditorErrorBoundary resetKey={`${note.id}:page`}>
-                    <BlockSuiteSurface note={note} mode="page" onEditorReady={setEditorHost} />
-                  </EditorErrorBoundary>
-                </div>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      data-page-width={isFullWidth ? "fullWidth" : "standard"}
+                      className={cn(
+                        "flex min-h-0 w-full flex-1 flex-col",
+                        !isFullWidth && "mx-auto max-w-3xl",
+                      )}
+                    >
+                      <EditorErrorBoundary resetKey={`${note.id}:page`}>
+                        <BlockSuiteSurface note={note} mode="page" onEditorReady={setEditorHost} />
+                      </EditorErrorBoundary>
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => void pasteFromClipboard()}>
+                      <ClipboardPaste aria-hidden="true" />
+                      {MESSAGES.PASTE}
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               </div>
             )}
 

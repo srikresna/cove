@@ -7,6 +7,7 @@ import { useNotes } from "../../hooks/useNotes";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { NoteContextMenu } from "./NoteContextMenu";
 import { NoteRow } from "./NoteRow";
 
 const Group: React.FC<{
@@ -24,12 +25,9 @@ const Group: React.FC<{
         {label} <span className="font-mono">({notes.length})</span>
       </div>
       {notes.map((note) => (
-        <NoteRow
-          key={note.id}
-          note={note}
-          isActive={note.id === activeNoteId}
-          onSelect={onSelect}
-        />
+        <NoteContextMenu key={note.id} note={note}>
+          <NoteRow note={note} isActive={note.id === activeNoteId} onSelect={onSelect} />
+        </NoteContextMenu>
       ))}
     </div>
   );
@@ -73,12 +71,9 @@ export const FavoritesSection: React.FC = () => {
         />
       ) : (
         favorites.map((note) => (
-          <NoteRow
-            key={note.id}
-            note={note}
-            isActive={note.id === activeNoteId}
-            onSelect={setActiveNoteId}
-          />
+          <NoteContextMenu key={note.id} note={note}>
+            <NoteRow note={note} isActive={note.id === activeNoteId} onSelect={setActiveNoteId} />
+          </NoteContextMenu>
         ))
       )}
     </CollapsibleSection>

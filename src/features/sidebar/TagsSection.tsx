@@ -2,6 +2,14 @@ import { MoreHorizontal, Pencil, Tag, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../../components/ui/context-menu";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -68,30 +76,69 @@ const TagRow: React.FC<{
 
   return (
     <div className="group/tagrow flex items-center">
-      <button
-        type="button"
-        aria-pressed={isActive}
-        onClick={onSelect}
-        className={cn(
-          "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          isActive
-            ? "border-transparent font-medium text-foreground"
-            : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-        )}
-        style={
-          isActive
-            ? {
-                backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
-              }
-            : undefined
-        }
-      >
-        <Tag className="h-3.5 w-3.5 shrink-0" style={{ color }} aria-hidden="true" />
-        <span className="truncate leading-4">{name}</span>
-        <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground/70">
-          {noteCount}
-        </span>
-      </button>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            type="button"
+            aria-pressed={isActive}
+            onClick={onSelect}
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              isActive
+                ? "border-transparent font-medium text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+            )}
+            style={
+              isActive
+                ? {
+                    backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
+                  }
+                : undefined
+            }
+          >
+            <Tag className="h-3.5 w-3.5 shrink-0" style={{ color }} aria-hidden="true" />
+            <span className="truncate leading-4">{name}</span>
+            <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground/70">
+              {noteCount}
+            </span>
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => setRenaming(true)}>
+            <Pencil aria-hidden="true" />
+            {MESSAGES.PROP_RENAME}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuLabel>{MESSAGES.PROP_ICON_LABEL}</ContextMenuLabel>
+          <div className="grid grid-cols-5 gap-0.5 px-1 pb-1">
+            {TAG_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={c}
+                title={c}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void setTagColor(tagId, c);
+                }}
+                className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  color === c && "ring-2 ring-ring ring-offset-1",
+                )}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+            onSelect={() => void deleteTag(tagId)}
+          >
+            <Trash2 aria-hidden="true" />
+            {MESSAGES.TAG_DELETE}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
