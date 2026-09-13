@@ -12,6 +12,11 @@ export const TagChip: React.FC<{
   className?: string;
 }> = ({ name, color, size = "md", onRemove, onClick, title, className }) => {
   const interactive = onClick !== undefined;
+  // Avoid BlockSuite's global .truncate rule stretching the label vertically.
+  const labelClassName = cn(
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-4",
+    size === "md" ? "max-w-40" : "max-w-28",
+  );
   const chip = (
     <>
       <span
@@ -19,9 +24,7 @@ export const TagChip: React.FC<{
         className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: color }}
       />
-      <span className={cn("min-w-0 truncate leading-4", size === "md" ? "max-w-40" : "max-w-28")}>
-        {name}
-      </span>
+      <span className={labelClassName}>{name}</span>
       {onRemove && (
         <button
           type="button"
@@ -54,9 +57,7 @@ export const TagChip: React.FC<{
           className="h-1.5 w-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <span className={cn("min-w-0 truncate leading-4", size === "md" ? "max-w-40" : "max-w-28")}>
-          {name}
-        </span>
+        <span className={labelClassName}>{name}</span>
       </button>
     );
   }

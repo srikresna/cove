@@ -97,7 +97,10 @@ const TagRow: React.FC<{
             }
           >
             <Tag className="h-3.5 w-3.5 shrink-0" style={{ color }} aria-hidden="true" />
-            <span className="truncate leading-4">{name}</span>
+            {/* Avoid BlockSuite's global .truncate rule stretching the label. */}
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-4">
+              {name}
+            </span>
             <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground/70">
               {noteCount}
             </span>

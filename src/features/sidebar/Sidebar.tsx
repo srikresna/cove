@@ -165,13 +165,14 @@ export const Sidebar: React.FC = () => {
                 type="button"
                 aria-label="Quick Search"
                 onClick={() => setQuickSearchOpen(true)}
-                className="flex h-8 min-w-0 flex-1 items-center justify-between gap-2 rounded-md border border-transparent bg-muted/60 pl-2 pr-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-transparent bg-muted/60 px-2 text-left text-[13px] leading-4 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="flex min-w-0 items-center gap-2 truncate">
-                  <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate leading-4">Search</span>
+                <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {/* BlockSuite's global .truncate rule stretches flex items vertically. */}
+                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                  Search
                 </span>
-                <Kbd className="h-4 border-border/60 bg-background/70 px-1 text-[10px] leading-4">
+                <Kbd className="h-4 shrink-0 border-border/60 bg-background/70 px-1 text-[10px] leading-none">
                   ⌘K
                 </Kbd>
               </button>

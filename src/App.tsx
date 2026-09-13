@@ -87,7 +87,7 @@ export const AppContent: React.FC = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="relative flex h-screen w-screen overflow-hidden bg-background font-sans">
+      <div className="cove-app relative flex h-screen w-screen overflow-hidden bg-background font-sans">
         <Sidebar />
 
         <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">

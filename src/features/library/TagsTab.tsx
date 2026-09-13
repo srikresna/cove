@@ -64,7 +64,8 @@ export const TagsTab: React.FC<{ onOpenTag: (tagId: string) => void }> = ({ onOp
                   aria-hidden="true"
                   style={{ color: tag.color }}
                 />
-                <span className="truncate text-[13px] font-medium leading-4 text-foreground">
+                {/* Avoid BlockSuite's global .truncate rule stretching the label. */}
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium leading-4 text-foreground">
                   {tag.name}
                 </span>
                 <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">
