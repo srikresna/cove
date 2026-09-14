@@ -32,7 +32,10 @@ pub async fn run_sql_transaction(
         .await
         .map_err(|e| format!("Cannot open database for transaction: {e}"))?;
 
-    let mut tx = conn.begin().await.map_err(|e| format!("BEGIN failed: {e}"))?;
+    let mut tx = conn
+        .begin()
+        .await
+        .map_err(|e| format!("BEGIN failed: {e}"))?;
 
     for (idx, stmt) in statements.iter().enumerate() {
         let mut query = sqlx::query(&stmt.sql);
@@ -45,12 +48,17 @@ pub async fn run_sql_transaction(
             .map_err(|e| format!("Statement #{} failed (`{}`): {}", idx + 1, stmt.sql, e))?;
     }
 
-    tx.commit().await.map_err(|e| format!("COMMIT failed: {e}"))?;
+    tx.commit()
+        .await
+        .map_err(|e| format!("COMMIT failed: {e}"))?;
     conn.close().await.ok();
     Ok(())
 }
 
-fn bind_json<'q>(query: BoundQuery<'q>, value: &serde_json::Value) -> Result<BoundQuery<'q>, String> {
+fn bind_json<'q>(
+    query: BoundQuery<'q>,
+    value: &serde_json::Value,
+) -> Result<BoundQuery<'q>, String> {
     Ok(match value {
         serde_json::Value::Null => query.bind(None::<i64>),
         serde_json::Value::Bool(b) => query.bind(*b),

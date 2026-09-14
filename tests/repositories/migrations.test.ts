@@ -70,7 +70,7 @@ describe("migration ladder", () => {
 
   it("brings a fresh database to the current version with the full schema", async () => {
     await runMigrations(db);
-    expect(await userVersion(db)).toBe(27);
+    expect(await userVersion(db)).toBe(28);
 
     const noteCols = await columnsOf(db, "notes");
     for (const col of NOTE_COLUMNS) expect(noteCols).toContain(col);
@@ -87,6 +87,8 @@ describe("migration ladder", () => {
       "note_covers",
       "workspace_icons",
       "custom_icons",
+      "gcal_tokens",
+      "gcal_events",
     ]) {
       const cols = await columnsOf(db, table);
       expect(cols.length, `table ${table} columns`).toBeGreaterThan(0);
@@ -96,7 +98,7 @@ describe("migration ladder", () => {
   it("is idempotent — re-running against the current version changes nothing", async () => {
     await runMigrations(db);
     await runMigrations(db);
-    expect(await userVersion(db)).toBe(27);
+    expect(await userVersion(db)).toBe(28);
   });
 
   it("v27 drops the journal property def, its values, and journal view rules", async () => {

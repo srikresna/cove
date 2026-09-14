@@ -707,6 +707,19 @@ export class SQLiteDatabase {
       }
       await db.execute("PRAGMA user_version = 27");
     }
+
+    if (version < 28) {
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS gcal_tokens (id INTEGER PRIMARY KEY CHECK (id = 1), payload TEXT NOT NULL, kmsVersion INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL)",
+      );
+      await db.execute(
+        "CREATE TABLE IF NOT EXISTS gcal_events (id TEXT PRIMARY KEY, calendarId TEXT NOT NULL, payload TEXT NOT NULL, startsAt INTEGER NOT NULL, endsAt INTEGER NOT NULL, kmsVersion INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL)",
+      );
+      await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gcal_events_starts_at ON gcal_events (startsAt)",
+      );
+      await db.execute("PRAGMA user_version = 28");
+    }
   }
 
   private static vacuousRuleWasMatchAll(rule: Record<string, unknown>, op: string): boolean {

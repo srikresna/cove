@@ -151,7 +151,10 @@ mod tests {
             .execute(&mut writer)
             .await
             .unwrap();
-        assert!(dir.join("cove.db-wal").exists(), "test setup: WAL sidecar expected");
+        assert!(
+            dir.join("cove.db-wal").exists(),
+            "test setup: WAL sidecar expected"
+        );
 
         vacuum_into(&db, &target).await.unwrap();
 
@@ -189,7 +192,10 @@ mod tests {
             b"previous-backup-bytes",
             "old backup must survive a failed vacuum"
         );
-        assert!(!dir.join("backup.db.tmp").exists(), "staged tmp must be cleaned");
+        assert!(
+            !dir.join("backup.db.tmp").exists(),
+            "staged tmp must be cleaned"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

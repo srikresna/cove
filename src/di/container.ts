@@ -5,6 +5,7 @@ import "./../services/blocksuite/idempotentCustomElements";
 import { SQLiteBlobRepository } from "../repositories/SQLiteBlobRepository";
 import { SQLiteCustomIconRepository } from "../repositories/SQLiteCustomIconRepository";
 import { SQLiteDatabase } from "../repositories/SQLiteDatabase";
+import { SQLiteGcalRepository } from "../repositories/SQLiteGcalRepository";
 import { SQLiteKmsRepository } from "../repositories/SQLiteKmsRepository";
 import { SQLiteMigrationRepository } from "../repositories/SQLiteMigrationRepository";
 import { SQLiteNoteLinkRepository } from "../repositories/SQLiteNoteLinkRepository";
@@ -17,6 +18,7 @@ import { BlockSuiteEditorService } from "../services/blocksuite/BlockSuiteEditor
 import type { IBlockSuiteEditorService } from "../services/blocksuite/IBlockSuiteEditorService";
 import { CustomIconService } from "../services/CustomIconService";
 import { publishingWrites } from "../services/changeBus";
+import { GcalService } from "../services/gcal/GcalService";
 import type { ICustomIconService } from "../services/ICustomIconService";
 import type { INoteService } from "../services/INoteService";
 import type { IPropertyService } from "../services/IPropertyService";
@@ -123,3 +125,7 @@ export const blockSuiteEditorService: IBlockSuiteEditorService = new BlockSuiteE
 vaultService.onLock(() => blockSuiteEditorService.reset());
 
 vaultService.onLock(() => blobSource.clearCache());
+
+const gcalRepository = new SQLiteGcalRepository();
+export const gcalService = new GcalService({ repo: gcalRepository, crypto: cryptoVault });
+vaultService.onLock(() => gcalService.clear());

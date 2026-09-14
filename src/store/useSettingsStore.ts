@@ -14,6 +14,10 @@ interface SettingsState {
   setCanvasPref: <K extends keyof CanvasPrefs>(key: K, value: CanvasPrefs[K]) => void;
   zoomFactor: number;
   setZoomFactor: (value: number) => void;
+  gcalClientId: string;
+  setGcalClientId: (value: string) => void;
+  gcalShowEvents: boolean;
+  setGcalShowEvents: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -26,6 +30,10 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({ canvasPrefs: { ...state.canvasPrefs, [key]: value } })),
       zoomFactor: 1,
       setZoomFactor: (value) => set({ zoomFactor: value }),
+      gcalClientId: "",
+      setGcalClientId: (gcalClientId) => set({ gcalClientId }),
+      gcalShowEvents: true,
+      setGcalShowEvents: (gcalShowEvents) => set({ gcalShowEvents }),
     }),
     {
       name: "cove-settings",
@@ -41,6 +49,8 @@ export const useSettingsStore = create<SettingsState>()(
               ? clampZoom(p.zoomFactor)
               : 1,
           canvasPrefs: { ...DEFAULT_CANVAS_PREFS, ...(p.canvasPrefs ?? {}) },
+          gcalClientId: typeof p.gcalClientId === "string" ? p.gcalClientId : "",
+          gcalShowEvents: p.gcalShowEvents !== false,
         };
       },
     },

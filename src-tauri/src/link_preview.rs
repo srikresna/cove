@@ -44,7 +44,9 @@ fn decode_entities(input: &str) -> String {
                         if let Some(code) = entity
                             .strip_prefix("#x")
                             .and_then(|h| u32::from_str_radix(h, 16).ok())
-                            .or_else(|| entity.strip_prefix('#').and_then(|d| d.parse::<u32>().ok()))
+                            .or_else(|| {
+                                entity.strip_prefix('#').and_then(|d| d.parse::<u32>().ok())
+                            })
                         {
                             char::from_u32(code)
                         } else {
@@ -87,7 +89,9 @@ fn attr_value(tag: &str, name: &str) -> Option<String> {
             let end = q.find(['"', '\''])?;
             return Some(q[..end].to_string());
         }
-        let end = value_part.find(char::is_whitespace).unwrap_or(value_part.len());
+        let end = value_part
+            .find(char::is_whitespace)
+            .unwrap_or(value_part.len());
         return Some(value_part[..end].to_string());
     }
     None
@@ -167,10 +171,7 @@ fn absolutize(base: &Url, href: &str) -> Option<Url> {
     base.join(href).ok()
 }
 
-async fn read_capped(
-    mut response: reqwest::Response,
-    cap: u64,
-) -> Result<Vec<u8>, String> {
+async fn read_capped(mut response: reqwest::Response, cap: u64) -> Result<Vec<u8>, String> {
     let mut buf: Vec<u8> = Vec::new();
     let mut total: u64 = 0;
     while let Some(chunk) = response
@@ -213,10 +214,28 @@ async fn fetch_data_url(client: &reqwest::Client, resolved: &Url, cap: u64) -> O
     Some(format!("data:{};base64,{}", content_type, encoded))
 }
 
-fn parse_preview(html: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+fn parse_preview(
+    html: &str,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
     let title = first_meta(html, &["og:title", "twitter:title"]).or_else(|| page_title(html));
-    let description = first_meta(html, &["og:description", "twitter:description", "description"]);
-    let image_href = first_meta(html, &["og:image", "og:image:secure_url", "twitter:image", "twitter:image:src"]);
+    let description = first_meta(
+        html,
+        &["og:description", "twitter:description", "description"],
+    );
+    let image_href = first_meta(
+        html,
+        &[
+            "og:image",
+            "og:image:secure_url",
+            "twitter:image",
+            "twitter:image:src",
+        ],
+    );
     let icon_href = link_icon(html).or_else(|| first_meta(html, &["msapplication-tileimage"]));
     (title, description, icon_href, image_href)
 }
@@ -247,7 +266,10 @@ pub async fn fetch_link_preview(url: String) -> Result<LinkPreviewData, String> 
         Some(resolved) => fetch_data_url(&client, &resolved, MAX_ICON_BYTES).await,
         None => None,
     };
-    let image = match image_href.as_deref().and_then(|h| absolutize(&final_url, h)) {
+    let image = match image_href
+        .as_deref()
+        .and_then(|h| absolutize(&final_url, h))
+    {
         Some(resolved) => fetch_data_url(&client, &resolved, MAX_IMAGE_BYTES).await,
         None => None,
     };
@@ -296,7 +318,10 @@ mod tests {
 
     #[test]
     fn decodes_named_and_numeric_entities() {
-        assert_eq!(decode_entities("a &lt;b&gt; &#65; &#x42; &quot;q&quot; &unknown;"), "a <b> A B \"q\" &unknown;");
+        assert_eq!(
+            decode_entities("a &lt;b&gt; &#65; &#x42; &quot;q&quot; &unknown;"),
+            "a <b> A B \"q\" &unknown;"
+        );
     }
 
     #[test]

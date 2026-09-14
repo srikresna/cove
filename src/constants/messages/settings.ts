@@ -35,6 +35,26 @@ export const SettingsMessages = {
   SETTINGS_CATEGORY_BACKUP: "Backup",
   SETTINGS_CATEGORY_ABOUT: "About",
   SETTINGS_CATEGORY_ICONS: "Icons",
+  SETTINGS_CATEGORY_CONNECTIONS: "Connections",
+  GCAL_SECTION_DESC:
+    "Connect external services. Credentials are encrypted with your vault and cleared when it locks.",
+  GCAL_TITLE: "Google Calendar",
+  GCAL_CONNECT: "Connect",
+  GCAL_CONNECTING: "Waiting for Google…",
+  GCAL_DISCONNECT: "Disconnect",
+  GCAL_RECONNECT: "Reconnect",
+  GCAL_CONNECTED_AS: "Connected as",
+  GCAL_DISCONNECTED_DESC:
+    "See your Google Calendar schedule inside Cove, create events, and delete events — all from the calendar panel.",
+  GCAL_REAUTH_DESC:
+    "The saved Google sign-in expired or was revoked. Reconnect to keep the calendar panel live.",
+  GCAL_SHOW_EVENTS_LABEL: "Show calendar events",
+  GCAL_SHOW_EVENTS_DESC: "Overlay Google Calendar events on the calendar panel.",
+  GCAL_CLIENT_ID_LABEL: "Google OAuth client ID",
+  GCAL_CLIENT_ID_DESC:
+    "Desktop-app client ID from Google Cloud Console. Leave empty to use the one bundled with this build.",
+  GCAL_SETUP_HINT:
+    "One-time setup (whoever builds this app): create a Google Cloud project, enable the Calendar API, create an OAuth client of type “Desktop app”, and publish the consent screen to Production. On first sign-in Google shows an “unverified app” screen — choose Advanced → Continue.",
   ICON_PACK_DESC:
     "Upload images to use as note icons. They are encrypted and appear in the editor's icon picker under Custom.",
   ICON_PACK_UPLOAD: "Upload image",

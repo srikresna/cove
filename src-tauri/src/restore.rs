@@ -174,13 +174,15 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn rejects_databases_without_vault_data_and_non_databases() {
-        let no_kms = std::env::temp_dir().join(format!("cove-restore-no-{}.db", std::process::id()));
+        let no_kms =
+            std::env::temp_dir().join(format!("cove-restore-no-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&no_kms);
         make_db(&no_kms, false).await;
         assert!(validate_backup(&no_kms).await.is_err());
         let _ = std::fs::remove_file(&no_kms);
 
-        let not_db = std::env::temp_dir().join(format!("cove-restore-txt-{}.db", std::process::id()));
+        let not_db =
+            std::env::temp_dir().join(format!("cove-restore-txt-{}.db", std::process::id()));
         std::fs::write(&not_db, b"definitely not sqlite").unwrap();
         assert!(validate_backup(&not_db).await.is_err());
         let _ = std::fs::remove_file(&not_db);

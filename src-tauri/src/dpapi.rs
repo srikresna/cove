@@ -1,9 +1,8 @@
-
 #[cfg(target_os = "windows")]
 mod platform {
     use windows_sys::Win32::Foundation::LocalFree;
     use windows_sys::Win32::Security::Cryptography::{
-        CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB as Blob, CryptProtectData, CryptUnprotectData,
+        CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB as Blob,
     };
 
     const APP_ENTROPY: &[u8] = b"cove-notes::device-bind::v1";
@@ -25,7 +24,10 @@ mod platform {
         unsafe {
             let input = wrap_blob(plaintext);
             let entropy = wrap_blob(APP_ENTROPY);
-            let mut output = Blob { cbData: 0, pbData: std::ptr::null_mut() };
+            let mut output = Blob {
+                cbData: 0,
+                pbData: std::ptr::null_mut(),
+            };
             let ok = CryptProtectData(
                 &input,
                 std::ptr::null(),
@@ -41,8 +43,7 @@ mod platform {
                     std::io::Error::last_os_error()
                 ));
             }
-            let result =
-                std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
+            let result = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
             free_blob(&output);
             Ok(result)
         }
@@ -52,7 +53,10 @@ mod platform {
         unsafe {
             let input = wrap_blob(ciphertext);
             let entropy = wrap_blob(APP_ENTROPY);
-            let mut output = Blob { cbData: 0, pbData: std::ptr::null_mut() };
+            let mut output = Blob {
+                cbData: 0,
+                pbData: std::ptr::null_mut(),
+            };
             let ok = CryptUnprotectData(
                 &input,
                 std::ptr::null_mut(),
@@ -68,8 +72,7 @@ mod platform {
                     std::io::Error::last_os_error()
                 ));
             }
-            let result =
-                std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
+            let result = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
             free_blob(&output);
             Ok(result)
         }

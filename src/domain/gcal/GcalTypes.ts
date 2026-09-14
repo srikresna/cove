@@ -1,0 +1,56 @@
+export interface GcalEventDateTime {
+  dateTime?: string;
+  date?: string;
+}
+
+export interface GcalExtendedProperties {
+  private?: Record<string, string>;
+}
+
+export interface GcalEvent {
+  id: string;
+  summary?: string;
+  start: GcalEventDateTime;
+  end: GcalEventDateTime;
+  hangoutLink?: string;
+  colorId?: string;
+  eventType?: string;
+  status?: string;
+  htmlLink?: string;
+  extendedProperties?: GcalExtendedProperties;
+}
+
+export interface GcalEventInput {
+  id: string;
+  summary: string;
+  description?: string;
+  start: GcalEventDateTime;
+  end: GcalEventDateTime;
+  extendedProperties?: GcalExtendedProperties;
+}
+
+export interface GcalCalendar {
+  id: string;
+  summary: string;
+  backgroundColor?: string;
+  foregroundColor?: string;
+  primary: boolean;
+}
+
+export interface GcalTokens {
+  refreshToken: string;
+  accessToken: string;
+  expiresAtMs: number;
+  scope: string;
+}
+
+export interface GcalAccessToken {
+  accessToken: string;
+  expiresAtMs: number;
+  scope: string;
+}
+
+export const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+
+export const isCoveCreatedEvent = (event: GcalEvent): boolean =>
+  event.extendedProperties?.private?.cove === "1";

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Database, Info, Palette, PenLine, Shapes, ShieldCheck, X } from "lucide-react";
+import { Database, Info, Link2, Palette, PenLine, Shapes, ShieldCheck, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "../../components/ui/dialog";
@@ -10,11 +10,19 @@ import { useUIStore } from "../../store/useUIStore";
 import { AboutSection } from "./AboutSection";
 import { AppearanceSection } from "./AppearanceSection";
 import { BackupSection } from "./BackupSection";
+import { ConnectionsSection } from "./ConnectionsSection";
 import { EditorSection } from "./EditorSection";
 import { IconsSection } from "./IconsSection";
 import { SecuritySection } from "./SecuritySection";
 
-type SettingsCategoryId = "appearance" | "editor" | "icons" | "security" | "backup" | "about";
+type SettingsCategoryId =
+  | "appearance"
+  | "editor"
+  | "icons"
+  | "security"
+  | "backup"
+  | "connections"
+  | "about";
 
 interface SettingsCategory {
   id: SettingsCategoryId;
@@ -28,6 +36,7 @@ const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   { id: "icons", label: MESSAGES.SETTINGS_CATEGORY_ICONS, icon: Shapes },
   { id: "security", label: MESSAGES.SETTINGS_CATEGORY_SECURITY, icon: ShieldCheck },
   { id: "backup", label: MESSAGES.SETTINGS_CATEGORY_BACKUP, icon: Database },
+  { id: "connections", label: MESSAGES.SETTINGS_CATEGORY_CONNECTIONS, icon: Link2 },
   { id: "about", label: MESSAGES.SETTINGS_CATEGORY_ABOUT, icon: Info },
 ];
 
@@ -117,6 +126,9 @@ export const SettingsModal: React.FC = () => {
               </div>
               <div className={active === "backup" ? "h-full overflow-y-auto p-6" : "hidden"}>
                 <BackupSection />
+              </div>
+              <div className={active === "connections" ? "h-full overflow-y-auto p-6" : "hidden"}>
+                <ConnectionsSection />
               </div>
               <div className={active === "about" ? "h-full overflow-y-auto p-6" : "hidden"}>
                 <AboutSection />
