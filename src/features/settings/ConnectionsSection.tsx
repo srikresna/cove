@@ -16,9 +16,12 @@ export const ConnectionsSection: React.FC = () => {
   const accountEmail = useGcalStore((s) => s.accountEmail);
   const gcalClientId = useSettingsStore((s) => s.gcalClientId);
   const setGcalClientId = useSettingsStore((s) => s.setGcalClientId);
+  const gcalClientSecret = useSettingsStore((s) => s.gcalClientSecret);
+  const setGcalClientSecret = useSettingsStore((s) => s.setGcalClientSecret);
   const gcalShowEvents = useSettingsStore((s) => s.gcalShowEvents);
   const setGcalShowEvents = useSettingsStore((s) => s.setGcalShowEvents);
   const [clientIdDraft, setClientIdDraft] = useState(gcalClientId);
+  const [clientSecretDraft, setClientSecretDraft] = useState(gcalClientSecret);
 
   useEffect(() => {
     void gcalService.ensureLoaded().catch(() => {});
@@ -26,6 +29,7 @@ export const ConnectionsSection: React.FC = () => {
 
   const handleConnect = async () => {
     setGcalClientId(clientIdDraft.trim());
+    setGcalClientSecret(clientSecretDraft.trim());
     try {
       await gcalService.connect();
     } catch (err) {
@@ -110,6 +114,23 @@ export const ConnectionsSection: React.FC = () => {
               onBlur={() => setGcalClientId(clientIdDraft.trim())}
               placeholder="########-xxxx.apps.googleusercontent.com"
               aria-label={MESSAGES.GCAL_CLIENT_ID_LABEL}
+              className="font-mono text-xs"
+            />
+          </div>
+        }
+      />
+
+      <SettingRow
+        label={MESSAGES.GCAL_CLIENT_SECRET_LABEL}
+        description={MESSAGES.GCAL_CLIENT_SECRET_DESC}
+        control={
+          <div className="flex w-[240px] shrink-0 items-center gap-2">
+            <Input
+              value={clientSecretDraft}
+              onChange={(e) => setClientSecretDraft(e.target.value)}
+              onBlur={() => setGcalClientSecret(clientSecretDraft.trim())}
+              placeholder="GOCSPX-…"
+              aria-label={MESSAGES.GCAL_CLIENT_SECRET_LABEL}
               className="font-mono text-xs"
             />
           </div>

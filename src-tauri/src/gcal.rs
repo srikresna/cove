@@ -298,10 +298,10 @@ fn wait_for_redirect(listener: TcpListener, expected_state: &str) -> Result<Loop
 }
 
 #[tauri::command]
-pub async fn gcal_connect(client_id: String) -> Result<GcalTokens, String> {
-    if client_id.trim().is_empty() {
+pub async fn gcal_connect(client_id: String, client_secret: String) -> Result<GcalTokens, String> {
+    if client_id.trim().is_empty() || client_secret.trim().is_empty() {
         return Err(
-            "No Google OAuth client ID configured. Add yours in Settings > Connections.".into(),
+            "Google OAuth client ID and secret are required. Copy both from Google Cloud Console into Settings > Connections.".into(),
         );
     }
     let (verifier, challenge) = pkce_pair()?;
@@ -338,6 +338,7 @@ pub async fn gcal_connect(client_id: String) -> Result<GcalTokens, String> {
 
     let body = query_encode(&[
         ("client_id", client_id.trim()),
+        ("client_secret", client_secret.trim()),
         ("code", &code.code),
         ("code_verifier", &verifier),
         ("grant_type", "authorization_code"),
@@ -358,10 +359,12 @@ pub async fn gcal_connect(client_id: String) -> Result<GcalTokens, String> {
 #[tauri::command]
 pub async fn gcal_refresh(
     client_id: String,
+    client_secret: String,
     refresh_token: String,
 ) -> Result<GcalAccessToken, String> {
     let body = query_encode(&[
         ("client_id", client_id.trim()),
+        ("client_secret", client_secret.trim()),
         ("grant_type", "refresh_token"),
         ("refresh_token", &refresh_token),
     ]);

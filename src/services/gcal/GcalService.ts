@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getGcalClientId } from "../../config/gcal";
+import { getGcalClientId, getGcalClientSecret } from "../../config/gcal";
 import type { EncryptedPayload } from "../../domain/EncryptedPayload";
 import type {
   GcalAccessToken,
@@ -106,6 +106,7 @@ export class GcalService {
     try {
       const tokens = await invoke<GcalTokens>("gcal_connect", {
         clientId: this.clientId(),
+        clientSecret: getGcalClientSecret(),
       });
       this.assertWritableScope(tokens.scope);
       this.access = {
@@ -269,6 +270,7 @@ export class GcalService {
     if (!this.tokenBlob) throw new GcalReauthError("Google Calendar is not connected.");
     const refreshed = await invoke<GcalAccessToken>("gcal_refresh", {
       clientId: this.clientId(),
+      clientSecret: getGcalClientSecret(),
       refreshToken: this.tokenBlob.refreshToken,
     });
     this.assertWritableScope(refreshed.scope);

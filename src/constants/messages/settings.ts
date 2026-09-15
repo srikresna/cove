@@ -53,6 +53,9 @@ export const SettingsMessages = {
   GCAL_CLIENT_ID_LABEL: "Google OAuth client ID",
   GCAL_CLIENT_ID_DESC:
     "Desktop-app client ID from Google Cloud Console. Leave empty to use the one bundled with this build.",
+  GCAL_CLIENT_SECRET_LABEL: "Google OAuth client secret",
+  GCAL_CLIENT_SECRET_DESC:
+    "The “Client secret” shown next to the client ID (starts with GOCSPX-). Google requires it even for desktop apps.",
   GCAL_SETUP_HINT:
     "One-time setup (whoever builds this app): create a Google Cloud project, enable the Calendar API, create an OAuth client of type “Desktop app”, and publish the consent screen to Production. On first sign-in Google shows an “unverified app” screen — choose Advanced → Continue.",
   ICON_PACK_DESC:
