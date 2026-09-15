@@ -12,7 +12,6 @@ import { GCAL_SCOPE } from "../../domain/gcal/GcalTypes";
 import { EncryptionError } from "../../errors/AppError";
 import type { IGcalRepository } from "../../repositories/IGcalRepository";
 import { useGcalStore } from "../../store/useGcalStore";
-import { useSettingsStore } from "../../store/useSettingsStore";
 import { gcalEventAad, gcalTokenAad } from "../vault/aad";
 import type { CryptoVault } from "../vault/CryptoVault";
 
@@ -48,6 +47,7 @@ export class GcalService {
   private access: GcalAccessToken | null = null;
   private inflightRefresh: Promise<GcalAccessToken> | null = null;
   private restoreAttempted = false;
+  private clientIdProvider: () => string = () => DEFAULT_GCAL_CLIENT_ID;
 
   constructor(
     private readonly deps: {
@@ -56,8 +56,12 @@ export class GcalService {
     },
   ) {}
 
+  provideClientId(provider: () => string): void {
+    this.clientIdProvider = provider;
+  }
+
   clientId(): string {
-    return useSettingsStore.getState().gcalClientId || DEFAULT_GCAL_CLIENT_ID;
+    return this.clientIdProvider();
   }
 
   isConnected(): boolean {

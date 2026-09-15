@@ -9,12 +9,6 @@ import { useGcalStore } from "@/store/useGcalStore";
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 
-vi.mock("@/store/useSettingsStore", () => ({
-  useSettingsStore: {
-    getState: () => ({ gcalClientId: "test-client.apps.googleusercontent.com" }),
-  },
-}));
-
 function makeCrypto(): Pick<CryptoVault, "encryptBlob" | "decryptBlob"> {
   return {
     encryptBlob: async (bytes: Uint8Array) =>

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { blockSuiteEditorService } from "../di/container";
+import { DEFAULT_GCAL_CLIENT_ID } from "../config/gcal";
+import { blockSuiteEditorService, gcalService } from "../di/container";
 import { clampZoom } from "../lib/appZoom";
 import {
   type CanvasPrefs,
@@ -58,3 +59,7 @@ export const useSettingsStore = create<SettingsState>()(
 );
 
 blockSuiteEditorService.provideCanvasPrefs(() => useSettingsStore.getState().canvasPrefs);
+
+gcalService.provideClientId(
+  () => useSettingsStore.getState().gcalClientId || DEFAULT_GCAL_CLIENT_ID,
+);
