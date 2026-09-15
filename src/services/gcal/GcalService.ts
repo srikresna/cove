@@ -215,6 +215,11 @@ export class GcalService {
   }
 
   async deleteEvent(calendarId: string, eventId: string): Promise<void> {
+    if (eventId.includes("_")) {
+      throw new Error(
+        "This is one occurrence of a repeating event — delete the whole series from Google Calendar.",
+      );
+    }
     const accessToken = await this.ensureAccessToken();
     await invoke("gcal_delete_event", { accessToken, calendarId, eventId });
     await this.deps.repo.deleteEvent(eventId);

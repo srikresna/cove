@@ -387,7 +387,7 @@ async fn api_get_json(access_token: &str, path: &str) -> Result<serde_json::Valu
     let status = resp.status();
     let text = capped_text(resp).await?;
     if !status.is_success() {
-        return Err(format!("Google API {status}: {text}"));
+        return Err(format!("Google API {status} on GET {path}: {text}"));
     }
     serde_json::from_str(&text).map_err(|e| format!("response parse: {e}"))
 }
@@ -457,7 +457,7 @@ pub async fn gcal_create_event(
     let status = resp.status();
     let text = capped_text(resp).await?;
     if !status.is_success() {
-        return Err(format!("Google API {status}: {text}"));
+        return Err(format!("Google API {status} on create event: {text}"));
     }
     serde_json::from_str::<GcalEvent>(&text).map_err(|e| format!("response parse: {e}"))
 }
@@ -488,7 +488,7 @@ pub async fn gcal_delete_event(
         return Ok(());
     }
     let text = capped_text(resp).await?;
-    Err(format!("Google API {status}: {text}"))
+    Err(format!("Google API {status} on delete event: {text}"))
 }
 
 #[tauri::command]

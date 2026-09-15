@@ -23,6 +23,8 @@ const toDateString = (date: Date): string => {
 
 const combine = (date: string, time: string): Date => new Date(`${date}T${time}:00`);
 
+const newEventId = (): string => crypto.randomUUID().replaceAll("-", "");
+
 export const GcalCreateEventDialog: React.FC<{
   open: boolean;
   defaultDate: Date;
@@ -55,7 +57,7 @@ export const GcalCreateEventDialog: React.FC<{
     if (allDay) {
       const endDate = new Date(combine(date, "00:00").getTime() + 86_400_000);
       onConfirm({
-        id: crypto.randomUUID(),
+        id: newEventId(),
         summary: trimmed,
         start: { date },
         end: { date: toDateString(endDate) },
@@ -64,7 +66,7 @@ export const GcalCreateEventDialog: React.FC<{
       return;
     }
     onConfirm({
-      id: crypto.randomUUID(),
+      id: newEventId(),
       summary: trimmed,
       start: { dateTime: combine(date, start).toISOString() },
       end: { dateTime: combine(date, end).toISOString() },
