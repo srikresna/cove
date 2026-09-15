@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_GCAL_CLIENT_ID } from "../config/gcal";
-import { blockSuiteEditorService, gcalService } from "../di/container";
+import { setGcalClientIdOverride } from "../config/gcal";
+import { blockSuiteEditorService } from "../di/container";
 import { clampZoom } from "../lib/appZoom";
 import {
   type CanvasPrefs,
@@ -32,7 +32,10 @@ export const useSettingsStore = create<SettingsState>()(
       zoomFactor: 1,
       setZoomFactor: (value) => set({ zoomFactor: value }),
       gcalClientId: "",
-      setGcalClientId: (gcalClientId) => set({ gcalClientId }),
+      setGcalClientId: (gcalClientId) => {
+        setGcalClientIdOverride(gcalClientId);
+        set({ gcalClientId });
+      },
       gcalShowEvents: true,
       setGcalShowEvents: (gcalShowEvents) => set({ gcalShowEvents }),
     }),
@@ -50,7 +53,7 @@ export const useSettingsStore = create<SettingsState>()(
               ? clampZoom(p.zoomFactor)
               : 1,
           canvasPrefs: { ...DEFAULT_CANVAS_PREFS, ...(p.canvasPrefs ?? {}) },
-          gcalClientId: typeof p.gcalClientId === "string" ? p.gcalClientId : "",
+          gcalClientId: typeof p.gcalClientId === "string" ? p.gcalClientId : base.gcalClientId,
           gcalShowEvents: p.gcalShowEvents !== false,
         };
       },
@@ -58,8 +61,6 @@ export const useSettingsStore = create<SettingsState>()(
   ),
 );
 
-blockSuiteEditorService.provideCanvasPrefs(() => useSettingsStore.getState().canvasPrefs);
+setGcalClientIdOverride(useSettingsStore.getState().gcalClientId);
 
-gcalService.provideClientId(
-  () => useSettingsStore.getState().gcalClientId || DEFAULT_GCAL_CLIENT_ID,
-);
+blockSuiteEditorService.provideCanvasPrefs(() => useSettingsStore.getState().canvasPrefs);

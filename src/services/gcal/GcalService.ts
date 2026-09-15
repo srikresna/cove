@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { DEFAULT_GCAL_CLIENT_ID } from "../../config/gcal";
+import { getGcalClientId } from "../../config/gcal";
 import type { EncryptedPayload } from "../../domain/EncryptedPayload";
 import type {
   GcalAccessToken,
@@ -47,7 +47,6 @@ export class GcalService {
   private access: GcalAccessToken | null = null;
   private inflightRefresh: Promise<GcalAccessToken> | null = null;
   private restoreAttempted = false;
-  private clientIdProvider: () => string = () => DEFAULT_GCAL_CLIENT_ID;
 
   constructor(
     private readonly deps: {
@@ -56,12 +55,8 @@ export class GcalService {
     },
   ) {}
 
-  provideClientId(provider: () => string): void {
-    this.clientIdProvider = provider;
-  }
-
   clientId(): string {
-    return this.clientIdProvider();
+    return getGcalClientId();
   }
 
   isConnected(): boolean {
