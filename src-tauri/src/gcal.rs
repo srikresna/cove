@@ -505,6 +505,12 @@ pub async fn gcal_list_calendars(access_token: String) -> Result<Vec<GcalCalenda
     Ok(calendars)
 }
 
+#[tauri::command]
+pub async fn gcal_primary_calendar(access_token: String) -> Result<GcalCalendar, String> {
+    let value = api_get_json(&access_token, "/calendars/primary").await?;
+    serde_json::from_value::<GcalCalendar>(value).map_err(|e| format!("response parse: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

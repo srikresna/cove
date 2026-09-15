@@ -63,7 +63,8 @@ fn main() {
             gcal::gcal_list_events,
             gcal::gcal_create_event,
             gcal::gcal_delete_event,
-            gcal::gcal_list_calendars
+            gcal::gcal_list_calendars,
+            gcal::gcal_primary_calendar
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

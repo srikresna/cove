@@ -115,21 +115,25 @@ export class GcalService {
         scope: tokens.scope,
       };
 
-      const calendars = await invoke<GcalCalendar[]>("gcal_list_calendars", {
-        accessToken: tokens.accessToken,
-      });
-      const primary = calendars.find((c) => c.primary) ?? calendars[0];
+      let email: string | null = null;
+      try {
+        const primary = await invoke<GcalCalendar>("gcal_primary_calendar", {
+          accessToken: tokens.accessToken,
+        });
+        email = primary?.id ?? null;
+      } catch {
+        // The events scope cannot always read calendar metadata — email stays unknown.
+      }
       const blob: TokenBlob = {
         refreshToken: tokens.refreshToken,
         scope: tokens.scope,
-        email: primary?.id ?? null,
+        email,
       };
       await this.persistTokenBlob(blob);
       this.tokenBlob = blob;
 
       store.setStatus("connected");
       store.setAccountEmail(blob.email);
-      store.setCalendars(calendars);
     } catch (err) {
       if (!this.tokenBlob && !(err instanceof GcalReauthError)) store.setStatus("disconnected");
       throw err;

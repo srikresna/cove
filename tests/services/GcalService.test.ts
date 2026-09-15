@@ -54,11 +54,8 @@ describe("GcalService", () => {
           scope: GCAL_SCOPE,
         };
       }
-      if (cmd === "gcal_list_calendars") {
-        return [
-          { id: "secondary@group.calendar.google.com", summary: "Secondary", primary: false },
-          { id: "me@gmail.com", summary: "me@gmail.com", primary: true },
-        ];
+      if (cmd === "gcal_primary_calendar") {
+        return { id: "me@gmail.com", summary: "me@gmail.com", primary: true };
       }
       return undefined;
     });
@@ -69,6 +66,29 @@ describe("GcalService", () => {
     expect(useGcalStore.getState().accountEmail).toBe("me@gmail.com");
     expect(repo.putTokenPayload).toHaveBeenCalledTimes(1);
     expect(service.isConnected()).toBe(true);
+  });
+
+  it("connect succeeds even when calendar metadata is not readable with the events scope", async () => {
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "gcal_connect") {
+        return {
+          refreshToken: "r1",
+          accessToken: "a1",
+          expiresAtMs: Date.now() + 3_600_000,
+          scope: GCAL_SCOPE,
+        };
+      }
+      if (cmd === "gcal_primary_calendar") {
+        throw new Error("Google API 403 Forbidden");
+      }
+      return undefined;
+    });
+
+    await service.connect();
+
+    expect(useGcalStore.getState().status).toBe("connected");
+    expect(useGcalStore.getState().accountEmail).toBeNull();
+    expect(repo.putTokenPayload).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a read-only grant and marks reconnect needed", async () => {
