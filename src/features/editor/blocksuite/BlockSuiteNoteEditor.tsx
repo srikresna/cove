@@ -76,6 +76,7 @@ export const BlockSuiteNoteEditor: React.FC<BlockSuiteNoteEditorProps> = ({ note
       const el = node?.nodeType === 1 ? (node as Element) : (node?.parentElement ?? null);
       if (!el || !scroller.contains(el)) return;
       requestAnimationFrame(() => {
+        if (sel.rangeCount === 0 || !scroller.isConnected) return;
         const rect = sel.getRangeAt(0).getBoundingClientRect();
         const view = scroller.getBoundingClientRect();
         if (rect.bottom > view.bottom - CARET_MARGIN) {
