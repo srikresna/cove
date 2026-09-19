@@ -124,4 +124,8 @@ export const EditorMessages = {
   CAL_VIEW_AGENDA: "Agenda",
   CAL_TODAY: "Today",
   CAL_MORE: "+{n} more",
+  CAL_EMPTY_MONTH: "Nothing on this month yet.",
+  CAL_NOTE_MARKER: "note",
+  CAL_NOTES_ON_DAY: "{n} note(s) touched this day",
+  CAL_NOTE_FIELD_HINT: "Which note date the calendar shows",
 } as const;

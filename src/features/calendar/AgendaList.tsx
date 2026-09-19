@@ -1,8 +1,10 @@
 import { NotebookPen } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
+import { NoteIcon } from "../../components/NoteIcon";
 import { MESSAGES } from "../../constants/messages";
 import type { GcalAgendaEvent } from "../../domain/gcal/GcalTypes";
+import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
@@ -12,6 +14,9 @@ import { dayKey, eventDayKeys, timeLabel } from "./gcalEventView";
 
 interface AgendaListProps {
   events: GcalAgendaEvent[];
+  notesByDay: Map<string, Note[]>;
+  noteField: "updatedAt" | "createdAt";
+  onOpenNote: (noteId: string) => void;
   onEdit: (event: GcalAgendaEvent) => void;
   onDuplicate: (event: GcalAgendaEvent) => void;
   onDelete: (event: GcalAgendaEvent) => void;
@@ -19,6 +24,9 @@ interface AgendaListProps {
 
 export const AgendaList: React.FC<AgendaListProps> = ({
   events,
+  notesByDay,
+  noteField,
+  onOpenNote,
   onEdit,
   onDuplicate,
   onDelete,
@@ -48,15 +56,18 @@ export const AgendaList: React.FC<AgendaListProps> = ({
         map.set(key, list);
       }
     }
+    for (const key of notesByDay.keys()) {
+      if (!map.has(key)) map.set(key, []);
+    }
     return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
-  }, [events]);
+  }, [events, notesByDay]);
 
   const todayKey = dayKey(new Date());
 
-  if (events.length === 0) {
+  if (events.length === 0 && notesByDay.size === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
-        <p className="text-[13px] text-muted-foreground">{MESSAGES.GCAL_NO_EVENTS}</p>
+        <p className="text-[13px] text-muted-foreground">{MESSAGES.CAL_EMPTY_MONTH}</p>
       </div>
     );
   }
@@ -141,6 +152,34 @@ export const AgendaList: React.FC<AgendaListProps> = ({
                     </EventDetailPopover>
                   </li>
                 ))}
+                {(notesByDay.get(key) ?? [])
+                  .slice()
+                  .sort((a, b) => b[noteField] - a[noteField])
+                  .map((note) => (
+                    <li key={note.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenNote(note.id)}
+                        className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="w-16 shrink-0 text-right font-mono text-[11px] leading-4 text-muted-foreground/70">
+                          {new Intl.DateTimeFormat("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          }).format(new Date(note[noteField]))}
+                        </span>
+                        <span aria-hidden="true" className="shrink-0 text-sm">
+                          <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] leading-5 text-muted-foreground">
+                          {note.title || MESSAGES.UNTITLED_NOTE}
+                        </span>
+                        <span className="shrink-0 font-mono text-[9px] uppercase leading-4 tracking-widest text-muted-foreground/40">
+                          {MESSAGES.CAL_NOTE_MARKER}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
               </ul>
             </section>
           );

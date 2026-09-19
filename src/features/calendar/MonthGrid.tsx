@@ -1,7 +1,9 @@
+import { NotebookPen } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import type { GcalAgendaEvent } from "../../domain/gcal/GcalTypes";
+import type { Note } from "../../domain/note/Note";
 import { cn } from "../../lib/utils";
 import { EventDetailPopover } from "./EventDetailPopover";
 import { dayKey, eventStartMs, timeLabel, type WeekBar, weekBars } from "./gcalEventView";
@@ -14,6 +16,7 @@ interface MonthGridProps {
   weeks: Date[];
   monthCursor: Date;
   events: GcalAgendaEvent[];
+  notesByDay: Map<string, Note[]>;
   weekdays: string[];
   onEdit: (event: GcalAgendaEvent) => void;
   onDuplicate: (event: GcalAgendaEvent) => void;
@@ -39,6 +42,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   weeks,
   monthCursor,
   events,
+  notesByDay,
   weekdays,
   onEdit,
   onDuplicate,
@@ -106,6 +110,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                 const key = dayKey(date);
                 const notCurrentMonth = date.getMonth() !== monthCursor.getMonth();
                 const isToday = key === todayKey;
+                const dayNotes = notesByDay.get(key) ?? [];
                 return (
                   <div
                     key={key}
@@ -122,14 +127,25 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                       dropTargetKey === key && "bg-primary/10 ring-1 ring-primary/60 ring-inset",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "px-0.5 font-mono text-[11px] leading-4",
-                        isToday ? "font-semibold text-primary" : "text-muted-foreground",
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={cn(
+                          "px-0.5 font-mono text-[11px] leading-4",
+                          isToday ? "font-semibold text-primary" : "text-muted-foreground",
+                        )}
+                      >
+                        {date.getDate()}
+                      </span>
+                      {dayNotes.length > 0 && (
+                        <span
+                          title={MESSAGES.CAL_NOTES_ON_DAY.replace("{n}", String(dayNotes.length))}
+                          className="flex items-center gap-0.5 pr-0.5 font-mono text-[9px] leading-4 text-muted-foreground/70"
+                        >
+                          <NotebookPen className="h-2.5 w-2.5" aria-hidden="true" />
+                          {dayNotes.length}
+                        </span>
                       )}
-                    >
-                      {date.getDate()}
-                    </span>
+                    </div>
                   </div>
                 );
               })}
@@ -208,9 +224,9 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
         })}
       </div>
 
-      {events.length === 0 && (
+      {events.length === 0 && notesByDay.size === 0 && (
         <p className="pt-10 text-center text-[13px] text-muted-foreground">
-          {MESSAGES.GCAL_NO_EVENTS}
+          {MESSAGES.CAL_EMPTY_MONTH}
         </p>
       )}
     </div>

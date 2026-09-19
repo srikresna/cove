@@ -1,25 +1,36 @@
-import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Plug } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { MESSAGES } from "../../constants/messages";
 import { gcalService } from "../../di/container";
 import type { GcalAgendaEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
+import type { Note } from "../../domain/note/Note";
 import { useGcalWindowEvents } from "../../hooks/useGcalWindowEvents";
+import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useGcalStore } from "../../store/useGcalStore";
+import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
+import { useUIStore } from "../../store/useUIStore";
+import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { GcalCreateEventDialog } from "../editor/GcalCreateEventDialog";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import { AgendaList } from "./AgendaList";
 import { CalendarPickerMenu } from "./CalendarPickerMenu";
-import { buildWeeks, eventStartMs, shiftEventDates } from "./gcalEventView";
+import { buildWeeks, dayKey, eventStartMs, shiftEventDates } from "./gcalEventView";
 import { MonthGrid } from "./MonthGrid";
 
 type CalendarView = "month" | "agenda";
+type NoteField = "updatedAt" | "createdAt";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const FIELD_KEY = "cove-calendar-field";
+
+const isNoteField = (value: string): value is NoteField =>
+  value === "updatedAt" || value === "createdAt";
 
 export const CalendarPage: React.FC = () => {
   const gcalStatus = useGcalStore((s) => s.status);
@@ -27,7 +38,16 @@ export const CalendarPage: React.FC = () => {
   const selectedCalendarIds = useGcalStore((s) => s.selectedCalendarIds);
   const syncFailed = useGcalStore((s) => s.syncFailed);
 
+  const notes = useNotes();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
+  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+
   const [view, setView] = useState<CalendarView>("month");
+  const [noteField, setNoteField] = useState<NoteField>(() => {
+    const stored = localStorage.getItem(FIELD_KEY) ?? "";
+    return isNoteField(stored) ? stored : "updatedAt";
+  });
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -45,12 +65,29 @@ export const CalendarPage: React.FC = () => {
 
   const { events, createCalendarId } = useGcalWindowEvents(windowStart, windowEndDate);
 
+  const notesByDay = useMemo(() => {
+    const map = new Map<string, Note[]>();
+    for (const note of notes) {
+      if (note.workspaceId !== activeWorkspaceId || note.isTemplate) continue;
+      const key = dayKey(new Date(note[noteField]));
+      const list = map.get(key) ?? [];
+      list.push(note);
+      map.set(key, list);
+    }
+    return map;
+  }, [notes, activeWorkspaceId, noteField]);
+
   const monthLabel = new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
   }).format(monthCursor);
 
   const connected = gcalStatus === "connected";
+
+  const chooseNoteField = (next: NoteField) => {
+    setNoteField(next);
+    localStorage.setItem(FIELD_KEY, next);
+  };
 
   const handleCreate = async (input: GcalEventInput, calendarId: string) => {
     setAddOpen(false);
@@ -219,6 +256,31 @@ export const CalendarPage: React.FC = () => {
           ))}
         </div>
 
+        <div className="flex items-center gap-1">
+          {(
+            [
+              ["updatedAt", MESSAGES.CALENDAR_FILTER_UPDATED],
+              ["createdAt", MESSAGES.CALENDAR_FILTER_CREATED],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={noteField === value}
+              onClick={() => chooseNoteField(value)}
+              title={MESSAGES.CAL_NOTE_FIELD_HINT}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                noteField === value
+                  ? "border-border bg-card text-foreground shadow-sm"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {syncFailed && connected && (
           <span className="font-mono text-[10px] leading-4 text-muted-foreground/60">
             ({MESSAGES.GCAL_SYNC_FAILED})
@@ -227,33 +289,28 @@ export const CalendarPage: React.FC = () => {
 
         <span className="flex-1" />
 
-        {connected && (
-          <CalendarPickerMenu className="rounded-md border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-        )}
-        {connected && (
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
-            {MESSAGES.GCAL_ADD_EVENT}
+        {connected ? (
+          <>
+            <CalendarPickerMenu className="rounded-md border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.GCAL_ADD_EVENT}
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+            <Plug className="h-3.5 w-3.5" aria-hidden="true" />
+            {MESSAGES.GCAL_CONNECT}
           </Button>
         )}
       </div>
 
-      {!connected ? (
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className="max-w-sm text-center">
-            <h2 className="font-display text-lg font-medium text-foreground">
-              {MESSAGES.HOME_CONNECT_CALENDAR}
-            </h2>
-            <p className="mt-2 text-[13px] leading-5 text-muted-foreground">
-              {MESSAGES.GCAL_DISCONNECTED_DESC}
-            </p>
-          </div>
-        </div>
-      ) : view === "month" ? (
+      {view === "month" ? (
         <MonthGrid
           weeks={weeks}
           monthCursor={monthCursor}
           events={events}
+          notesByDay={notesByDay}
           onEdit={setEditTarget}
           onDuplicate={(event) => void handleDuplicate(event)}
           onDelete={setDeleteTarget}
@@ -263,6 +320,9 @@ export const CalendarPage: React.FC = () => {
       ) : (
         <AgendaList
           events={[...events].sort((a, b) => eventStartMs(a) - eventStartMs(b))}
+          notesByDay={notesByDay}
+          noteField={noteField}
+          onOpenNote={(noteId) => setActiveNoteId(noteId)}
           onEdit={setEditTarget}
           onDuplicate={(event) => void handleDuplicate(event)}
           onDelete={setDeleteTarget}
