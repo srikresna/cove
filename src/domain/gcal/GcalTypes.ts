@@ -10,6 +10,8 @@ export interface GcalExtendedProperties {
 export interface GcalEvent {
   id: string;
   summary?: string;
+  description?: string;
+  location?: string;
   start: GcalEventDateTime;
   end: GcalEventDateTime;
   hangoutLink?: string;
@@ -24,6 +26,7 @@ export interface GcalEventInput {
   id: string;
   summary: string;
   description?: string;
+  location?: string;
   start: GcalEventDateTime;
   end: GcalEventDateTime;
   extendedProperties?: GcalExtendedProperties;
@@ -32,6 +35,7 @@ export interface GcalEventInput {
 export interface GcalEventPatch {
   summary: string;
   description?: string;
+  location?: string;
   start: GcalEventDateTime;
   end: GcalEventDateTime;
 }

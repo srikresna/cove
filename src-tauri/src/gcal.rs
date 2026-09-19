@@ -55,6 +55,10 @@ pub struct GcalEvent {
     pub id: String,
     #[serde(default)]
     pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
     #[serde(default)]
     pub start: GcalEventDateTime,
     #[serde(default)]
@@ -80,6 +84,8 @@ pub struct GcalEventInput {
     pub summary: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
     pub start: GcalEventDateTime,
     pub end: GcalEventDateTime,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -92,6 +98,8 @@ pub struct GcalEventPatch {
     pub summary: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
     pub start: GcalEventDateTime,
     pub end: GcalEventDateTime,
 }

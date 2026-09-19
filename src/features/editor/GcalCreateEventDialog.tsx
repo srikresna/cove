@@ -9,11 +9,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
 import { MESSAGES } from "../../constants/messages";
-import type { GcalEventInput } from "../../domain/gcal/GcalTypes";
+import type { GcalCalendar, GcalEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
 import { cn } from "../../lib/utils";
 
 const toDateString = (date: Date): string => {
@@ -23,30 +29,48 @@ const toDateString = (date: Date): string => {
 
 const combine = (date: string, time: string): Date => new Date(`${date}T${time}:00`);
 
-const newEventId = (): string => crypto.randomUUID().replaceAll("-", "");
-
 const timeString = (date: Date): string => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+const newEventId = (): string => crypto.randomUUID().replaceAll("-", "");
+
+const inputClasses =
+  "flex h-8 w-full rounded-md border border-border bg-background px-2.5 text-[13px] leading-5 text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring";
+
 export const GcalCreateEventDialog: React.FC<{
   open: boolean;
   defaultDate: Date;
-  editing?: import("../../domain/gcal/GcalTypes").GcalEvent | null;
-  onConfirm: (input: GcalEventInput) => void;
+  editing?: GcalEvent | null;
+  calendars?: GcalCalendar[];
+  defaultCalendarId?: string;
+  onConfirm: (input: GcalEventInput, calendarId: string) => void;
   onCancel: () => void;
-}> = ({ open, defaultDate, editing = null, onConfirm, onCancel }) => {
+}> = ({
+  open,
+  defaultDate,
+  editing = null,
+  calendars = [],
+  defaultCalendarId,
+  onConfirm,
+  onCancel,
+}) => {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(toDateString(defaultDate));
   const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
+  const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+  const [calendarId, setCalendarId] = useState(defaultCalendarId ?? "primary");
 
   useEffect(() => {
     if (open) {
       if (editing) {
         setTitle(editing.summary ?? "");
+        setLocation(editing.location ?? "");
+        setDescription(editing.description ?? "");
         if (editing.start.date) {
           setDate(editing.start.date);
           setAllDay(true);
@@ -60,14 +84,17 @@ export const GcalCreateEventDialog: React.FC<{
         }
       } else {
         setTitle("");
+        setLocation("");
+        setDescription("");
         setDate(toDateString(defaultDate));
         setAllDay(false);
         setStart("09:00");
         setEnd("10:00");
+        setCalendarId(defaultCalendarId ?? "primary");
       }
     }
     // biome-ignore lint/correctness/useExhaustiveDependencies: fields re-seed only when the dialog (re)opens or switches target, not on every keystroke
-  }, [open, editing]);
+  }, [open, editing, defaultDate, defaultCalendarId]);
 
   const trimmed = title.trim();
   const valid =
@@ -76,28 +103,31 @@ export const GcalCreateEventDialog: React.FC<{
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!valid) return;
+    const common = {
+      id: editing?.id ?? newEventId(),
+      summary: trimmed,
+      location: location.trim() || undefined,
+      description: description.trim() || undefined,
+      extendedProperties: editing?.extendedProperties ?? { private: { cove: "1" } },
+    };
     if (allDay) {
       const midnight = combine(date, "00:00");
       const endDate = new Date(midnight.getFullYear(), midnight.getMonth(), midnight.getDate() + 1);
-      onConfirm({
-        id: newEventId(),
-        summary: trimmed,
-        start: { date },
-        end: { date: toDateString(endDate) },
-        extendedProperties: { private: { cove: "1" } },
-      });
+      onConfirm({ ...common, start: { date }, end: { date: toDateString(endDate) } }, calendarId);
       return;
     }
-    onConfirm({
-      id: newEventId(),
-      summary: trimmed,
-      start: { dateTime: combine(date, start).toISOString() },
-      end: { dateTime: combine(date, end).toISOString() },
-      extendedProperties: { private: { cove: "1" } },
-    });
+    onConfirm(
+      {
+        ...common,
+        start: { dateTime: combine(date, start).toISOString() },
+        end: { dateTime: combine(date, end).toISOString() },
+      },
+      calendarId,
+    );
   };
 
   const fieldClass = "font-mono text-[13px]";
+  const selectedCalendar = calendars.find((entry) => entry.id === calendarId);
 
   return (
     <Dialog
@@ -126,15 +156,58 @@ export const GcalCreateEventDialog: React.FC<{
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="gcal-event-date">{MESSAGES.GCAL_EVENT_DATE_LABEL}</Label>
-            <Input
-              id="gcal-event-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={fieldClass}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="gcal-event-date">{MESSAGES.GCAL_EVENT_DATE_LABEL}</Label>
+              <Input
+                id="gcal-event-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+            {!editing && calendars.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>{MESSAGES.GCAL_CALENDAR_LABEL}</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(inputClasses, "items-center justify-between text-left")}
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 shrink-0 rounded-full border border-border"
+                          style={{
+                            backgroundColor: selectedCalendar?.backgroundColor ?? "transparent",
+                          }}
+                        />
+                        <span className="truncate">
+                          {selectedCalendar?.summary || MESSAGES.GCAL_PRIMARY_SUFFIX}
+                        </span>
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    {calendars.map((calendar) => (
+                      <DropdownMenuItem
+                        key={calendar.id}
+                        onSelect={() => setCalendarId(calendar.id)}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full border border-border"
+                          style={{ backgroundColor: calendar.backgroundColor ?? "transparent" }}
+                        />
+                        <span className="truncate">{calendar.summary || calendar.id}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-3">
@@ -177,6 +250,28 @@ export const GcalCreateEventDialog: React.FC<{
               </div>
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="gcal-event-location">{MESSAGES.GCAL_LOCATION_LABEL}</Label>
+            <Input
+              id="gcal-event-location"
+              value={location}
+              placeholder={MESSAGES.GCAL_LOCATION_PLACEHOLDER}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="gcal-event-description">{MESSAGES.GCAL_DESCRIPTION_LABEL}</Label>
+            <textarea
+              id="gcal-event-description"
+              value={description}
+              placeholder={MESSAGES.GCAL_DESCRIPTION_PLACEHOLDER}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className={cn(inputClasses, "h-auto resize-none py-1.5")}
+            />
+          </div>
 
           {!valid && trimmed && !allDay && (
             <p className="text-[12px] text-destructive">{MESSAGES.GCAL_TIME_INVALID}</p>

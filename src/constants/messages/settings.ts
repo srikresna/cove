@@ -52,7 +52,12 @@ export const SettingsMessages = {
   GCAL_SHOW_EVENTS_DESC: "Overlay Google Calendar events on the calendar panel.",
   GCAL_REMINDERS_LABEL: "Event reminders",
   GCAL_REMINDERS_DESC:
-    "Show a desktop notification 10 minutes before an event starts (while Cove is running).",
+    "Show a desktop notification before an event starts (while Cove is running).",
+  GCAL_REMINDER_LEAD_LABEL: "Remind me before",
+  GCAL_REMINDER_LEAD_DESC: "How many minutes before an event the reminder fires.",
+  GCAL_EXPIRY_WARNING_LABEL: "Sign-in renewal",
+  GCAL_EXPIRY_WARNING_DESC:
+    "Your Google sign-in is 5+ days old. If your Google app is still in testing mode it expires after 7 days — reconnect to be safe.",
   GCAL_WIDE_SCOPE_HINT:
     "Reconnect to enable choosing calendars — the wider permission is requested at sign-in.",
   GCAL_CLIENT_ID_LABEL: "Google OAuth client ID",

@@ -6,6 +6,7 @@ export type GcalConnectionStatus = "disconnected" | "connecting" | "connected" |
 interface GcalState {
   status: GcalConnectionStatus;
   accountEmail: string | null;
+  connectedAt: number | null;
   calendars: GcalCalendar[];
   selectedCalendarIds: string[];
   wideScopeMissing: boolean;
@@ -16,6 +17,7 @@ interface GcalState {
   refreshTick: number;
   setStatus: (status: GcalConnectionStatus) => void;
   setAccountEmail: (email: string | null) => void;
+  setConnectedAt: (at: number | null) => void;
   setCalendars: (calendars: GcalCalendar[]) => void;
   setSelectedCalendarIds: (ids: string[]) => void;
   setWideScopeMissing: (missing: boolean) => void;
@@ -30,6 +32,7 @@ interface GcalState {
 export const useGcalStore = create<GcalState>()((set) => ({
   status: "disconnected",
   accountEmail: null,
+  connectedAt: null,
   calendars: [],
   selectedCalendarIds: ["primary"],
   wideScopeMissing: false,
@@ -40,6 +43,7 @@ export const useGcalStore = create<GcalState>()((set) => ({
   refreshTick: 0,
   setStatus: (status) => set({ status }),
   setAccountEmail: (accountEmail) => set({ accountEmail }),
+  setConnectedAt: (connectedAt) => set({ connectedAt }),
   setCalendars: (calendars) => set({ calendars }),
   setSelectedCalendarIds: (selectedCalendarIds) => set({ selectedCalendarIds }),
   setWideScopeMissing: (wideScopeMissing) => set({ wideScopeMissing }),
@@ -52,6 +56,7 @@ export const useGcalStore = create<GcalState>()((set) => ({
     set({
       status: "disconnected",
       accountEmail: null,
+      connectedAt: null,
       calendars: [],
       selectedCalendarIds: ["primary"],
       wideScopeMissing: false,

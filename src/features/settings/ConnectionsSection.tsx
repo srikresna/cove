@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
+import { GCAL_REMINDER_LEAD_OPTIONS } from "../../config/gcal";
 import { MESSAGES } from "../../constants/messages";
 import { gcalService } from "../../di/container";
+import { cn } from "../../lib/utils";
 import { notifyError } from "../../store/notify";
 import { useGcalStore } from "../../store/useGcalStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
@@ -22,7 +24,11 @@ export const ConnectionsSection: React.FC = () => {
   const setGcalShowEvents = useSettingsStore((s) => s.setGcalShowEvents);
   const gcalReminders = useSettingsStore((s) => s.gcalReminders);
   const setGcalReminders = useSettingsStore((s) => s.setGcalReminders);
+  const gcalReminderLead = useSettingsStore((s) => s.gcalReminderLead);
+  const setGcalReminderLead = useSettingsStore((s) => s.setGcalReminderLead);
   const wideScopeMissing = useGcalStore((s) => s.wideScopeMissing);
+  const connectedAt = useGcalStore((s) => s.connectedAt);
+  const daysSinceConnect = connectedAt ? Math.floor((Date.now() - connectedAt) / 86_400_000) : 0;
   const [clientIdDraft, setClientIdDraft] = useState(gcalClientId);
   const [clientSecretDraft, setClientSecretDraft] = useState(gcalClientSecret);
 
@@ -116,6 +122,46 @@ export const ConnectionsSection: React.FC = () => {
               onCheckedChange={setGcalReminders}
               aria-label={MESSAGES.GCAL_REMINDERS_LABEL}
             />
+          }
+        />
+      )}
+
+      {connected && gcalReminders && (
+        <SettingRow
+          label={MESSAGES.GCAL_REMINDER_LEAD_LABEL}
+          description={MESSAGES.GCAL_REMINDER_LEAD_DESC}
+          control={
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/60 p-0.5">
+              {GCAL_REMINDER_LEAD_OPTIONS.map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  aria-pressed={gcalReminderLead === minutes}
+                  onClick={() => setGcalReminderLead(minutes)}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-mono text-[11px] leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    gcalReminderLead === minutes
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {minutes}m
+                </button>
+              ))}
+            </div>
+          }
+        />
+      )}
+
+      {connected && daysSinceConnect >= 5 && (
+        <SettingRow
+          label={MESSAGES.GCAL_EXPIRY_WARNING_LABEL}
+          description={MESSAGES.GCAL_EXPIRY_WARNING_DESC}
+          control={
+            <Button variant="outline" size="sm" onClick={() => void handleConnect()}>
+              <PlugZap className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.GCAL_RECONNECT}
+            </Button>
           }
         />
       )}

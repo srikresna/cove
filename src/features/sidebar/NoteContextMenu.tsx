@@ -1,4 +1,4 @@
-import { Copy, LayoutTemplate, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { CalendarPlus, Copy, LayoutTemplate, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -10,8 +10,11 @@ import {
 } from "../../components/ui/context-menu";
 import { PromptDialog } from "../../components/ui/prompt-dialog";
 import { MESSAGES } from "../../constants/messages";
+import { gcalService } from "../../di/container";
 import type { Note } from "../../domain/note/Note";
 import { noteActions } from "../../store/noteActions";
+import { notifyError } from "../../store/notify";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
 export const NoteContextMenu: React.FC<{
@@ -21,6 +24,26 @@ export const NoteContextMenu: React.FC<{
 }> = ({ note, variant = "note", children }) => {
   const [renaming, setRenaming] = useState(false);
   const [trashing, setTrashing] = useState(false);
+
+  const scheduleAsEvent = async () => {
+    try {
+      const tomorrow = new Date(Date.now() + 86_400_000);
+      tomorrow.setHours(9, 0, 0, 0);
+      await gcalService.createEvent("primary", {
+        id: crypto.randomUUID().replaceAll("-", ""),
+        summary: note.title || MESSAGES.UNTITLED_NOTE,
+        start: { dateTime: tomorrow.toISOString() },
+        end: { dateTime: new Date(tomorrow.getTime() + 3_600_000).toISOString() },
+        extendedProperties: { private: { cove: "1", coveNoteId: note.id } },
+      });
+      useNotificationStore.getState().pushToast({
+        kind: "success",
+        title: MESSAGES.GCAL_EVENT_FROM_NOTE_TOAST,
+      });
+    } catch (err) {
+      notifyError(err);
+    }
+  };
 
   return (
     <ContextMenu>
@@ -46,6 +69,11 @@ export const NoteContextMenu: React.FC<{
         <ContextMenuItem onSelect={() => setRenaming(true)}>
           <Pencil aria-hidden="true" />
           {MESSAGES.PROP_RENAME}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => void scheduleAsEvent()}>
+          <CalendarPlus aria-hidden="true" />
+          {MESSAGES.GCAL_SCHEDULE_NOTE_AS_EVENT}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem

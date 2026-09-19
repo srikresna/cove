@@ -19,3 +19,17 @@ export const setGcalRemindersEnabled = (enabled: boolean): void => {
 };
 
 export const getGcalRemindersEnabled = (): boolean => remindersEnabled;
+
+export const GCAL_REMINDER_LEAD_OPTIONS = [5, 10, 15, 30] as const;
+
+let reminderLeadMinutes = 10;
+
+export const setGcalReminderLeadMinutes = (minutes: number): void => {
+  reminderLeadMinutes = GCAL_REMINDER_LEAD_OPTIONS.includes(
+    minutes as (typeof GCAL_REMINDER_LEAD_OPTIONS)[number],
+  )
+    ? minutes
+    : 10;
+};
+
+export const getGcalReminderLeadMinutes = (): number => reminderLeadMinutes;

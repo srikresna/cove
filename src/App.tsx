@@ -8,8 +8,10 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { MESSAGES } from "./constants/messages";
 import { propertyService, savedViewService } from "./di/container";
 import type { Note } from "./domain/note/Note";
+import { CalendarPage } from "./features/calendar/CalendarPage";
 import { BlockSuiteDialogs } from "./features/editor/BlockSuiteDialogs";
 import { PeekViewModal } from "./features/editor/blocksuite/peek/PeekViewModal";
+import { HomePage } from "./features/home/HomePage";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { CreateWorkspaceModal } from "./features/modals/CreateWorkspaceModal";
 import { QuickSearchModal } from "./features/modals/QuickSearchModal";
@@ -91,7 +93,11 @@ export const AppContent: React.FC = () => {
         <Sidebar />
 
         <main className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-card">
-          {activePage === "trash" ? (
+          {activePage === "home" ? (
+            <HomePage />
+          ) : activePage === "calendar" ? (
+            <CalendarPage />
+          ) : activePage === "trash" ? (
             <TrashPage />
           ) : activePage === "library" ? (
             <LibraryPage />

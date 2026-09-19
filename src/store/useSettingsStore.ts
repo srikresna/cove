@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setGcalClientCredentials, setGcalRemindersEnabled } from "../config/gcal";
+import {
+  setGcalClientCredentials,
+  setGcalReminderLeadMinutes,
+  setGcalRemindersEnabled,
+} from "../config/gcal";
 import { blockSuiteEditorService } from "../di/container";
 import { clampZoom } from "../lib/appZoom";
 import {
@@ -23,6 +27,8 @@ interface SettingsState {
   setGcalShowEvents: (value: boolean) => void;
   gcalReminders: boolean;
   setGcalReminders: (value: boolean) => void;
+  gcalReminderLead: number;
+  setGcalReminderLead: (value: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -52,6 +58,11 @@ export const useSettingsStore = create<SettingsState>()(
         setGcalRemindersEnabled(gcalReminders);
         set({ gcalReminders });
       },
+      gcalReminderLead: 10,
+      setGcalReminderLead: (gcalReminderLead) => {
+        setGcalReminderLeadMinutes(gcalReminderLead);
+        set({ gcalReminderLead });
+      },
     }),
     {
       name: "cove-settings",
@@ -72,6 +83,8 @@ export const useSettingsStore = create<SettingsState>()(
             typeof p.gcalClientSecret === "string" ? p.gcalClientSecret : base.gcalClientSecret,
           gcalShowEvents: p.gcalShowEvents !== false,
           gcalReminders: p.gcalReminders !== false,
+          gcalReminderLead:
+            typeof p.gcalReminderLead === "number" ? p.gcalReminderLead : base.gcalReminderLead,
         };
       },
     },
@@ -79,9 +92,11 @@ export const useSettingsStore = create<SettingsState>()(
 );
 
 {
-  const { gcalClientId, gcalClientSecret, gcalReminders } = useSettingsStore.getState();
+  const { gcalClientId, gcalClientSecret, gcalReminders, gcalReminderLead } =
+    useSettingsStore.getState();
   setGcalClientCredentials(gcalClientId, gcalClientSecret);
   setGcalRemindersEnabled(gcalReminders);
+  setGcalReminderLeadMinutes(gcalReminderLead);
 }
 
 blockSuiteEditorService.provideCanvasPrefs(() => useSettingsStore.getState().canvasPrefs);

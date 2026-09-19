@@ -24,6 +24,7 @@ import { MESSAGES } from "../../constants/messages";
 import { gcalService } from "../../di/container";
 import type { GcalAgendaEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
 import type { Note } from "../../domain/note/Note";
+import { useGcalWindowEvents } from "../../hooks/useGcalWindowEvents";
 import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
 import { openExternal } from "../../services/blocksuite/externalLinks";
@@ -35,7 +36,6 @@ import { useSettingsStore } from "../../store/useSettingsStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import { GcalCreateEventDialog } from "./GcalCreateEventDialog";
-import { useGcalWindowEvents } from "./useGcalWindowEvents";
 
 type DateField = "updatedAt" | "createdAt";
 
@@ -140,10 +140,10 @@ export const CalendarPanel: React.FC = () => {
     return new Date(y ?? 0, m ?? 0, d ?? 1);
   }, [selectedDay]);
 
-  const handleCreateEvent = async (input: GcalEventInput) => {
+  const handleCreateEvent = async (input: GcalEventInput, calendarId: string) => {
     setAddEventOpen(false);
     try {
-      await gcalService.createEvent(createCalendarId, input);
+      await gcalService.createEvent(calendarId || createCalendarId, input);
       useNotificationStore.getState().pushToast({
         kind: "success",
         title: MESSAGES.GCAL_EVENT_CREATED_TOAST,
@@ -153,14 +153,15 @@ export const CalendarPanel: React.FC = () => {
     }
   };
 
-  const handleEditEvent = async (input: GcalEventInput) => {
+  const handleEditEvent = async (input: GcalEventInput, calendarId: string) => {
     const target = editTarget;
     setEditTarget(null);
     if (!target) return;
     try {
-      await gcalService.updateEvent(target.calendarId, target.id, {
+      await gcalService.updateEvent(calendarId || target.calendarId, target.id, {
         summary: input.summary,
         description: input.description,
+        location: input.location,
         start: input.start,
         end: input.end,
       });
@@ -499,7 +500,7 @@ export const CalendarPanel: React.FC = () => {
       <GcalCreateEventDialog
         open={isAddEventOpen}
         defaultDate={selectedDayDate}
-        onConfirm={(input) => void handleCreateEvent(input)}
+        onConfirm={(input, calendarId) => void handleCreateEvent(input, calendarId)}
         onCancel={() => setAddEventOpen(false)}
       />
 
@@ -508,7 +509,7 @@ export const CalendarPanel: React.FC = () => {
           open
           editing={editTarget}
           defaultDate={selectedDayDate}
-          onConfirm={(input) => void handleEditEvent(input)}
+          onConfirm={(input, calendarId) => void handleEditEvent(input, calendarId)}
           onCancel={() => setEditTarget(null)}
         />
       )}

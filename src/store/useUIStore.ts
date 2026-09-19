@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ActivePage = "editor" | "library" | "trash";
+export type ActivePage = "home" | "editor" | "library" | "calendar" | "trash";
 
 interface UIState {
   isCreateModalOpen: boolean;
@@ -29,7 +29,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isCreateModalOpen: false,
   isQuickSearchOpen: false,
   isSettingsOpen: false,
-  activePage: "editor",
+  activePage: "home",
   isDarkMode: getInitialDarkMode(),
   pickerResolve: null,
 

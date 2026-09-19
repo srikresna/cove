@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { gcalService } from "../../di/container";
-import type { GcalAgendaEvent } from "../../domain/gcal/GcalTypes";
-import { GcalReauthError } from "../../services/gcal/GcalService";
-import { useGcalStore } from "../../store/useGcalStore";
-import { useSettingsStore } from "../../store/useSettingsStore";
+import { gcalService } from "../di/container";
+import type { GcalAgendaEvent } from "../domain/gcal/GcalTypes";
+import { GcalReauthError } from "../services/gcal/GcalService";
+import { useGcalStore } from "../store/useGcalStore";
+import { useSettingsStore } from "../store/useSettingsStore";
 
 export function useGcalWindowEvents(
   from: Date,

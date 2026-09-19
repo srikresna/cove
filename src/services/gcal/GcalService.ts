@@ -6,7 +6,12 @@ import {
   Schedule,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { getGcalClientId, getGcalClientSecret, getGcalRemindersEnabled } from "../../config/gcal";
+import {
+  getGcalClientId,
+  getGcalClientSecret,
+  getGcalReminderLeadMinutes,
+  getGcalRemindersEnabled,
+} from "../../config/gcal";
 import type { EncryptedPayload } from "../../domain/EncryptedPayload";
 import type {
   GcalAccessToken,
@@ -39,10 +44,10 @@ interface TokenBlob {
   clientSecret: string;
   calendars: GcalCalendar[];
   selectedCalendarIds: string[];
+  connectedAt: number;
 }
 
 const AUTOSYNC_INTERVAL_MS = 10 * 60 * 1000;
-const REMINDER_LEAD_MS = 10 * 60 * 1000;
 const REMINDER_HORIZON_MS = 24 * 60 * 60 * 1000;
 
 export const gcalStartMs = (event: GcalEvent): number =>
@@ -65,7 +70,7 @@ export class GcalService {
   private inflightRefresh: Promise<GcalAccessToken> | null = null;
   private restoreAttempted = false;
   private autoSyncTimer: number | null = null;
-  private lastWindow: { calendarIds: string[]; fromMs: number; toMs: number } | null = null;
+  private visibleWindow: { fromMs: number; toMs: number } | null = null;
   private reminderKeys = new Set<string>();
 
   constructor(
@@ -112,12 +117,14 @@ export class GcalService {
         clientSecret: raw.clientSecret ?? "",
         calendars: raw.calendars ?? [],
         selectedCalendarIds: raw.selectedCalendarIds ?? [],
+        connectedAt: raw.connectedAt ?? 0,
       };
       this.restoreAttempted = true;
       store.setStatus("connected");
       store.setAccountEmail(this.tokenBlob.email);
       store.setCalendars(this.tokenBlob.calendars);
       store.setSelectedCalendarIds(this.selectedCalendarIds());
+      store.setConnectedAt(this.tokenBlob.connectedAt);
       this.startAutoSync();
       if (this.tokenBlob.calendars.length === 0) {
         void this.listCalendars().catch(() => {
@@ -145,7 +152,7 @@ export class GcalService {
     this.reminderKeys.clear();
     this.tokenBlob = null;
     this.access = null;
-    this.lastWindow = null;
+    this.visibleWindow = null;
     this.restoreAttempted = false;
     useGcalStore.getState().reset();
   }
@@ -185,6 +192,7 @@ export class GcalService {
         clientSecret: getGcalClientSecret(),
         calendars,
         selectedCalendarIds: previous?.selectedCalendarIds ?? [],
+        connectedAt: Date.now(),
       };
       await this.persistTokenBlob(blob);
       this.tokenBlob = blob;
@@ -330,26 +338,50 @@ export class GcalService {
   }
 
   async syncAllSelected(fromMs: number, toMs: number): Promise<GcalAgendaEvent[]> {
+    this.visibleWindow = { fromMs, toMs };
+    return this.syncWindows([[fromMs, toMs]]);
+  }
+
+  private autoSyncWindows(): Array<[number, number]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStart = today.getTime();
+    const todayWindow: [number, number] = [
+      todayStart - 14 * 86_400_000,
+      todayStart + 45 * 86_400_000,
+    ];
+    const windows: Array<[number, number]> = [todayWindow];
+    const visible = this.visibleWindow;
+    if (visible && (visible.toMs <= todayWindow[0] || visible.fromMs >= todayWindow[1])) {
+      windows.push([visible.fromMs, visible.toMs]);
+    }
+    return windows;
+  }
+
+  private async syncWindows(windows: Array<[number, number]>): Promise<GcalAgendaEvent[]> {
     const calendarIds = this.selectedCalendarIds();
-    const results = await Promise.allSettled(
-      calendarIds.map((calendarId) => this.syncWindow(calendarId, fromMs, toMs)),
-    );
     const calendars = this.tokenBlob?.calendars ?? [];
-    const merged: GcalAgendaEvent[] = [];
+    const merged = new Map<string, GcalAgendaEvent>();
     let anyFailed = false;
-    for (let index = 0; index < calendarIds.length; index++) {
-      const calendarId = calendarIds[index];
-      if (!calendarId) continue;
-      const result = results[index];
-      if (result && result.status === "fulfilled") {
-        for (const event of result.value) merged.push(this.decorate(event, calendarId, calendars));
-      } else {
-        anyFailed = true;
+    for (const [fromMs, toMs] of windows) {
+      const results = await Promise.allSettled(
+        calendarIds.map((calendarId) => this.syncWindow(calendarId, fromMs, toMs)),
+      );
+      for (let index = 0; index < calendarIds.length; index++) {
+        const calendarId = calendarIds[index];
+        if (!calendarId) continue;
+        const result = results[index];
+        if (result && result.status === "fulfilled") {
+          for (const event of result.value) {
+            merged.set(`${calendarId}:${event.id}`, this.decorate(event, calendarId, calendars));
+          }
+        } else {
+          anyFailed = true;
+        }
       }
     }
     if (anyFailed) useGcalStore.getState().setSyncFailed(true);
-    this.lastWindow = { calendarIds, fromMs, toMs };
-    return merged;
+    return [...merged.values()].sort((a, b) => gcalStartMs(a) - gcalStartMs(b));
   }
 
   syncReminders(events: GcalAgendaEvent[]): void {
@@ -363,10 +395,11 @@ export class GcalService {
         await cancelAll();
         this.reminderKeys.clear();
         const now = Date.now();
+        const leadMs = getGcalReminderLeadMinutes() * 60 * 1000;
         for (const event of events) {
           const start = gcalStartMs(event);
           if (!event.start.dateTime || start <= now || start > now + REMINDER_HORIZON_MS) continue;
-          const at = start - REMINDER_LEAD_MS;
+          const at = start - leadMs;
           if (at <= now) continue;
           const key = `${event.calendarId}:${event.id}:${start}`;
           if (this.reminderKeys.has(key)) continue;
@@ -386,9 +419,8 @@ export class GcalService {
   private startAutoSync(): void {
     this.stopAutoSync();
     this.autoSyncTimer = window.setInterval(() => {
-      const lastWindow = this.lastWindow;
-      if (!this.tokenBlob || !lastWindow) return;
-      void this.syncAllSelected(lastWindow.fromMs, lastWindow.toMs)
+      if (!this.tokenBlob) return;
+      void this.syncWindows(this.autoSyncWindows())
         .then((events) => {
           useGcalStore.getState().setEvents(events);
           this.syncReminders(events);

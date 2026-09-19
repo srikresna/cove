@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import {
+  CalendarDays,
   ChevronDown,
+  House,
   Image as ImageIcon,
   ImageOff,
   Library,
@@ -188,19 +190,31 @@ export const Sidebar: React.FC = () => {
             </div>
 
             <div className="space-y-0.5 px-3 pt-2">
-              <button
-                type="button"
-                aria-current={activePage === "library" ? "page" : undefined}
-                onClick={() => setActivePage("library")}
-                className={`${navRow} ${
-                  activePage === "library"
-                    ? "border-border bg-card font-medium text-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                }`}
-              >
-                <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{MESSAGES.NAV_LIBRARY}</span>
-              </button>
+              {(
+                [
+                  ["home", MESSAGES.NAV_HOME, House, "page"],
+                  ["library", MESSAGES.NAV_LIBRARY, Library, "page"],
+                  ["calendar", MESSAGES.NAV_CALENDAR, CalendarDays, "page"],
+                ] as const
+              ).map(([page, label, Icon, currentType]) => {
+                const isActive = activePage === page;
+                return (
+                  <button
+                    key={page}
+                    type="button"
+                    aria-current={isActive ? currentType : undefined}
+                    onClick={() => setActivePage(page)}
+                    className={`${navRow} ${
+                      isActive
+                        ? "border-border bg-card font-medium text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
