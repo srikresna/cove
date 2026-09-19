@@ -27,6 +27,10 @@ export function useGcalWindowEvents(
   const toMs = to.getTime();
   const active = showEvents && status === "connected";
 
+  useEffect(() => {
+    void gcalService.ensureLoaded().catch(() => {});
+  }, []);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTick is an intentional reload signal after local create/delete, not a body input
   useEffect(() => {
     if (!active) {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setGcalClientCredentials } from "@/config/gcal";
 import type { EncryptedPayload } from "@/domain/EncryptedPayload";
 import { GCAL_SCOPE } from "@/domain/gcal/GcalTypes";
 import type { IGcalRepository } from "@/repositories/IGcalRepository";
@@ -39,6 +40,7 @@ describe("GcalService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setGcalClientCredentials("cid", "cs");
     useGcalStore.getState().reset();
     repo = makeRepo();
     service = new GcalService({ repo, crypto: makeCrypto() as unknown as CryptoVault });
@@ -66,6 +68,45 @@ describe("GcalService", () => {
     expect(useGcalStore.getState().accountEmail).toBe("me@gmail.com");
     expect(repo.putTokenPayload).toHaveBeenCalledTimes(1);
     expect(service.isConnected()).toBe(true);
+
+    const persisted = String(vi.mocked(repo.putTokenPayload).mock.calls[0]?.[0]).replace(
+      /^enc:/,
+      "",
+    );
+    const blob = JSON.parse(atob(persisted));
+    expect(blob.clientId).toBe("cid");
+    expect(blob.clientSecret).toBe("cs");
+  });
+
+  it("upgrades a legacy token blob with credentials from settings on first refresh", async () => {
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "gcal_refresh") {
+        return { accessToken: "a2", expiresAtMs: Date.now() + 3_600_000, scope: GCAL_SCOPE };
+      }
+      if (cmd === "gcal_list_events") return [];
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    vi.mocked(repo.getTokenPayload).mockResolvedValue(
+      "enc:eyJyZWZyZXNoVG9rZW4iOiJyMSIsInNjb3BlIjoiIiwiZW1haWwiOm51bGx9" as EncryptedPayload,
+    );
+
+    await service.syncWindow("primary", 0, 1);
+
+    expect(invoke).toHaveBeenCalledWith(
+      "gcal_refresh",
+      expect.objectContaining({ clientId: "cid", clientSecret: "cs" }),
+    );
+    expect(repo.putTokenPayload).toHaveBeenCalledTimes(1);
+  });
+
+  it("demands reconnection when no credentials exist anywhere", async () => {
+    setGcalClientCredentials("", "");
+    vi.mocked(repo.getTokenPayload).mockResolvedValue(
+      "enc:eyJyZWZyZXNoVG9rZW4iOiJyMSIsInNjb3BlIjoiIiwiZW1haWwiOm51bGx9" as EncryptedPayload,
+    );
+
+    await expect(service.syncWindow("primary", 0, 1)).rejects.toBeInstanceOf(GcalReauthError);
+    expect(useGcalStore.getState().status).toBe("reauth");
   });
 
   it("connect succeeds even when calendar metadata is not readable with the events scope", async () => {

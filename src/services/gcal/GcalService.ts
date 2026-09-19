@@ -26,6 +26,8 @@ interface TokenBlob {
   refreshToken: string;
   scope: string;
   email: string | null;
+  clientId: string;
+  clientSecret: string;
 }
 
 export const gcalStartMs = (event: GcalEvent): number =>
@@ -64,24 +66,32 @@ export class GcalService {
   }
 
   async restore(): Promise<void> {
-    this.restoreAttempted = true;
     const store = useGcalStore.getState();
     try {
       const payload = await this.deps.repo.getTokenPayload();
       if (!payload) {
+        this.restoreAttempted = true;
         store.setStatus("disconnected");
         return;
       }
       const blob = JSON.parse(
         new TextDecoder().decode(await this.deps.crypto.decryptBlob(payload, gcalTokenAad())),
-      ) as TokenBlob;
-      this.tokenBlob = blob;
+      ) as Partial<TokenBlob>;
+      this.tokenBlob = {
+        refreshToken: blob.refreshToken ?? "",
+        scope: blob.scope ?? "",
+        email: blob.email ?? null,
+        clientId: blob.clientId ?? "",
+        clientSecret: blob.clientSecret ?? "",
+      };
+      this.restoreAttempted = true;
       store.setStatus("connected");
-      store.setAccountEmail(blob.email);
+      store.setAccountEmail(this.tokenBlob.email);
     } catch (err) {
       if (err instanceof EncryptionError && err.reason === "key_unavailable") {
         return;
       }
+      this.restoreAttempted = true;
       this.tokenBlob = null;
       store.setStatus("reauth");
     }
@@ -128,6 +138,8 @@ export class GcalService {
         refreshToken: tokens.refreshToken,
         scope: tokens.scope,
         email,
+        clientId: this.clientId(),
+        clientSecret: getGcalClientSecret(),
       };
       await this.persistTokenBlob(blob);
       this.tokenBlob = blob;
@@ -277,11 +289,23 @@ export class GcalService {
 
   private async refreshAccessToken(): Promise<GcalAccessToken> {
     if (!this.tokenBlob) throw new GcalReauthError("Google Calendar is not connected.");
+    const clientId = this.tokenBlob.clientId || this.clientId();
+    const clientSecret = this.tokenBlob.clientSecret || getGcalClientSecret();
+    if (!clientId || !clientSecret) {
+      useGcalStore.getState().setStatus("reauth");
+      throw new GcalReauthError(
+        "Add your Google client ID and secret in Settings > Connections, then reconnect.",
+      );
+    }
     const refreshed = await invoke<GcalAccessToken>("gcal_refresh", {
-      clientId: this.clientId(),
-      clientSecret: getGcalClientSecret(),
+      clientId,
+      clientSecret,
       refreshToken: this.tokenBlob.refreshToken,
     });
+    if (!this.tokenBlob.clientId || !this.tokenBlob.clientSecret) {
+      this.tokenBlob = { ...this.tokenBlob, clientId, clientSecret };
+      void this.persistTokenBlob(this.tokenBlob).catch(() => {});
+    }
     this.assertWritableScope(refreshed.scope);
     this.access = refreshed;
     return refreshed;
