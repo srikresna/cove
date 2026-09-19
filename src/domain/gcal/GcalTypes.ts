@@ -29,6 +29,18 @@ export interface GcalEventInput {
   extendedProperties?: GcalExtendedProperties;
 }
 
+export interface GcalEventPatch {
+  summary: string;
+  description?: string;
+  start: GcalEventDateTime;
+  end: GcalEventDateTime;
+}
+
+export type GcalAgendaEvent = GcalEvent & {
+  calendarId: string;
+  calendarColor?: string;
+};
+
 export interface GcalCalendar {
   id: string;
   summary: string;
@@ -51,6 +63,7 @@ export interface GcalAccessToken {
 }
 
 export const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+export const GCAL_SCOPES = `${GCAL_SCOPE} https://www.googleapis.com/auth/calendar.readonly`;
 
 export const isCoveCreatedEvent = (event: GcalEvent): boolean =>
   event.extendedProperties?.private?.cove === "1";

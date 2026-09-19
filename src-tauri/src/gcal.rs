@@ -9,7 +9,7 @@ use std::time::Duration;
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const API_BASE: &str = "https://www.googleapis.com/calendar/v3";
-pub const GCAL_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
+pub const GCAL_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly";
 
 const CONSENT_TIMEOUT_SECS: u64 = 120;
 const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
@@ -84,6 +84,16 @@ pub struct GcalEventInput {
     pub end: GcalEventDateTime,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extended_properties: Option<GcalExtendedProperties>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GcalEventPatch {
+    pub summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub start: GcalEventDateTime,
+    pub end: GcalEventDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -462,6 +472,35 @@ pub async fn gcal_create_event(
     let text = capped_text(resp).await?;
     if !status.is_success() {
         return Err(format!("Google API {status} on create event: {text}"));
+    }
+    serde_json::from_str::<GcalEvent>(&text).map_err(|e| format!("response parse: {e}"))
+}
+
+#[tauri::command]
+pub async fn gcal_update_event(
+    access_token: String,
+    calendar_id: String,
+    event_id: String,
+    patch: GcalEventPatch,
+) -> Result<GcalEvent, String> {
+    let url = format!(
+        "{API_BASE}/calendars/{}/events/{}?sendUpdates=none",
+        urlencoding_escape(&calendar_id),
+        urlencoding_escape(&event_id)
+    );
+    let body = serde_json::to_string(&patch).map_err(|e| format!("encode patch: {e}"))?;
+    let resp = client()
+        .patch(&url)
+        .header("Authorization", format!("Bearer {access_token}"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| format!("request failed: {e}"))?;
+    let status = resp.status();
+    let text = capped_text(resp).await?;
+    if !status.is_success() {
+        return Err(format!("Google API {status} on update event: {text}"));
     }
     serde_json::from_str::<GcalEvent>(&text).map_err(|e| format!("response parse: {e}"))
 }

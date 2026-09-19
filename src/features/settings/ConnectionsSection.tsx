@@ -20,6 +20,9 @@ export const ConnectionsSection: React.FC = () => {
   const setGcalClientSecret = useSettingsStore((s) => s.setGcalClientSecret);
   const gcalShowEvents = useSettingsStore((s) => s.gcalShowEvents);
   const setGcalShowEvents = useSettingsStore((s) => s.setGcalShowEvents);
+  const gcalReminders = useSettingsStore((s) => s.gcalReminders);
+  const setGcalReminders = useSettingsStore((s) => s.setGcalReminders);
+  const wideScopeMissing = useGcalStore((s) => s.wideScopeMissing);
   const [clientIdDraft, setClientIdDraft] = useState(gcalClientId);
   const [clientSecretDraft, setClientSecretDraft] = useState(gcalClientSecret);
 
@@ -99,6 +102,33 @@ export const ConnectionsSection: React.FC = () => {
               onCheckedChange={setGcalShowEvents}
               aria-label={MESSAGES.GCAL_SHOW_EVENTS_LABEL}
             />
+          }
+        />
+      )}
+
+      {connected && (
+        <SettingRow
+          label={MESSAGES.GCAL_REMINDERS_LABEL}
+          description={MESSAGES.GCAL_REMINDERS_DESC}
+          control={
+            <Switch
+              checked={gcalReminders}
+              onCheckedChange={setGcalReminders}
+              aria-label={MESSAGES.GCAL_REMINDERS_LABEL}
+            />
+          }
+        />
+      )}
+
+      {connected && wideScopeMissing && (
+        <SettingRow
+          label={MESSAGES.GCAL_CALENDARS_PICKER}
+          description={MESSAGES.GCAL_WIDE_SCOPE_HINT}
+          control={
+            <Button variant="outline" size="sm" onClick={() => void handleConnect()}>
+              <PlugZap className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.GCAL_RECONNECT}
+            </Button>
           }
         />
       )}

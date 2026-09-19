@@ -3,6 +3,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Layers,
+  Pencil,
   Plus,
   Trash2,
   Video,
@@ -11,9 +13,16 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import { NoteIcon } from "../../components/NoteIcon";
 import { Button } from "../../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 import { MESSAGES } from "../../constants/messages";
 import { gcalService } from "../../di/container";
-import type { GcalEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
+import type { GcalAgendaEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
 import type { Note } from "../../domain/note/Note";
 import { useNotes } from "../../hooks/useNotes";
 import { cn } from "../../lib/utils";
@@ -38,21 +47,21 @@ const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth()}
 
 const keyOf = (timestamp: number): string => dayKey(new Date(timestamp));
 
-const eventStartMs = (event: GcalEvent): number =>
+const eventStartMs = (event: GcalAgendaEvent): number =>
   event.start.dateTime
     ? Date.parse(event.start.dateTime)
     : event.start.date
       ? new Date(`${event.start.date}T00:00:00`).getTime()
       : 0;
 
-const eventEndMs = (event: GcalEvent): number =>
+const eventEndMs = (event: GcalAgendaEvent): number =>
   event.end.dateTime
     ? Date.parse(event.end.dateTime)
     : event.end.date
       ? new Date(`${event.end.date}T00:00:00`).getTime()
       : 0;
 
-const timeLabel = (event: GcalEvent): string => {
+const timeLabel = (event: GcalAgendaEvent): string => {
   if (!event.start.dateTime) return MESSAGES.GCAL_EVENT_ALL_DAY;
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
     new Date(event.start.dateTime),
@@ -109,18 +118,21 @@ export const CalendarPanel: React.FC = () => {
   const showGcal = useSettingsStore((s) => s.gcalShowEvents);
   const gcalStatus = useGcalStore((s) => s.status);
   const gcalSyncFailed = useGcalStore((s) => s.syncFailed);
+  const gcalCalendars = useGcalStore((s) => s.calendars);
+  const gcalSelectedIds = useGcalStore((s) => s.selectedCalendarIds);
   const lastCell = cells[cells.length - 1] ?? monthCursor;
   const windowEnd = useMemo(
     () => new Date(lastCell.getFullYear(), lastCell.getMonth(), lastCell.getDate() + 1),
     [lastCell],
   );
-  const { events: gcalEvents, calendarId } = useGcalWindowEvents(
+  const { events: gcalEvents, createCalendarId } = useGcalWindowEvents(
     cells[0] ?? monthCursor,
     windowEnd,
   );
 
   const [isAddEventOpen, setAddEventOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<GcalEvent | null>(null);
+  const [editTarget, setEditTarget] = useState<GcalAgendaEvent | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GcalAgendaEvent | null>(null);
 
   const selectedDayDate = useMemo(() => {
     if (!selectedDay) return new Date();
@@ -131,10 +143,30 @@ export const CalendarPanel: React.FC = () => {
   const handleCreateEvent = async (input: GcalEventInput) => {
     setAddEventOpen(false);
     try {
-      await gcalService.createEvent(calendarId, input);
+      await gcalService.createEvent(createCalendarId, input);
       useNotificationStore.getState().pushToast({
         kind: "success",
         title: MESSAGES.GCAL_EVENT_CREATED_TOAST,
+      });
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handleEditEvent = async (input: GcalEventInput) => {
+    const target = editTarget;
+    setEditTarget(null);
+    if (!target) return;
+    try {
+      await gcalService.updateEvent(target.calendarId, target.id, {
+        summary: input.summary,
+        description: input.description,
+        start: input.start,
+        end: input.end,
+      });
+      useNotificationStore.getState().pushToast({
+        kind: "success",
+        title: MESSAGES.GCAL_EVENT_UPDATED_TOAST,
       });
     } catch (err) {
       notifyError(err);
@@ -146,7 +178,7 @@ export const CalendarPanel: React.FC = () => {
     setDeleteTarget(null);
     if (!target) return;
     try {
-      await gcalService.deleteEvent(calendarId, target.id);
+      await gcalService.deleteEvent(target.calendarId, target.id);
       useNotificationStore.getState().pushToast({
         kind: "info",
         title: MESSAGES.GCAL_EVENT_DELETED_TOAST,
@@ -156,8 +188,15 @@ export const CalendarPanel: React.FC = () => {
     }
   };
 
+  const toggleCalendar = (calendarId: string) => {
+    const next = gcalSelectedIds.includes(calendarId)
+      ? gcalSelectedIds.filter((id) => id !== calendarId)
+      : [...gcalSelectedIds, calendarId];
+    void gcalService.updateSelectedCalendars(next).catch((err) => notifyError(err));
+  };
+
   const eventsByDay = useMemo(() => {
-    const map = new Map<string, GcalEvent[]>();
+    const map = new Map<string, GcalAgendaEvent[]>();
     for (const event of gcalEvents) {
       const start = eventStartMs(event);
       const end = eventEndMs(event);
@@ -284,10 +323,14 @@ export const CalendarPanel: React.FC = () => {
                   )}
                 />
                 <span
-                  className={cn(
-                    "h-1 w-1 rounded-full",
-                    hasEvents ? "bg-primary" : "bg-transparent",
-                  )}
+                  className={cn("h-1 w-1 rounded-full", !hasEvents && "bg-transparent")}
+                  style={
+                    hasEvents
+                      ? {
+                          backgroundColor: eventsByDay.get(key)?.[0]?.calendarColor ?? undefined,
+                        }
+                      : undefined
+                  }
                 />
               </span>
             </button>
@@ -337,15 +380,55 @@ export const CalendarPanel: React.FC = () => {
                   </span>
                 )}
               </span>
-              <button
-                type="button"
-                aria-label={MESSAGES.GCAL_ADD_EVENT}
-                title={MESSAGES.GCAL_ADD_EVENT}
-                onClick={() => setAddEventOpen(true)}
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
+              <span className="flex items-center gap-0.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={MESSAGES.GCAL_CALENDARS_PICKER}
+                      title={MESSAGES.GCAL_CALENDARS_PICKER}
+                      className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {gcalCalendars.length === 0 ? (
+                      <DropdownMenuItem disabled>
+                        {MESSAGES.GCAL_RECONNECT_FOR_CALENDARS}
+                      </DropdownMenuItem>
+                    ) : (
+                      gcalCalendars.map((calendar) => (
+                        <DropdownMenuCheckboxItem
+                          key={calendar.id}
+                          checked={gcalSelectedIds.includes(calendar.id)}
+                          onCheckedChange={() => toggleCalendar(calendar.id)}
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="h-2.5 w-2.5 shrink-0 rounded-full border border-border"
+                            style={{ backgroundColor: calendar.backgroundColor ?? "transparent" }}
+                          />
+                          <span className="truncate">
+                            {calendar.summary || calendar.id}
+                            {calendar.primary ? ` (${MESSAGES.GCAL_PRIMARY_SUFFIX})` : ""}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <button
+                  type="button"
+                  aria-label={MESSAGES.GCAL_ADD_EVENT}
+                  title={MESSAGES.GCAL_ADD_EVENT}
+                  onClick={() => setAddEventOpen(true)}
+                  className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </span>
             </div>
             {selectedEvents.length === 0 && (
               <p className="px-1 py-1 text-xs text-muted-foreground/70">
@@ -357,7 +440,10 @@ export const CalendarPanel: React.FC = () => {
                 key={event.id}
                 className="group/event flex items-center gap-2 rounded-md px-2 py-1 text-[13px] leading-4 transition-colors hover:bg-accent/50"
               >
-                <span className="w-16 shrink-0 font-mono text-[11px] text-muted-foreground">
+                <span
+                  className="w-16 shrink-0 font-mono text-[11px]"
+                  style={{ color: event.calendarColor ?? undefined }}
+                >
                   {timeLabel(event)}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-foreground">
@@ -390,6 +476,14 @@ export const CalendarPanel: React.FC = () => {
                 )}
                 <button
                   type="button"
+                  aria-label={`${MESSAGES.GCAL_EDIT_EVENT_TITLE}: ${event.summary ?? ""}`}
+                  onClick={() => setEditTarget(event)}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/event:opacity-100"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
                   aria-label={`${MESSAGES.GCAL_DELETE_EVENT}: ${event.summary ?? ""}`}
                   onClick={() => setDeleteTarget(event)}
                   className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-destructive focus-visible:opacity-100 group-hover/event:opacity-100"
@@ -408,6 +502,16 @@ export const CalendarPanel: React.FC = () => {
         onConfirm={(input) => void handleCreateEvent(input)}
         onCancel={() => setAddEventOpen(false)}
       />
+
+      {editTarget && (
+        <GcalCreateEventDialog
+          open
+          editing={editTarget}
+          defaultDate={selectedDayDate}
+          onConfirm={(input) => void handleEditEvent(input)}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

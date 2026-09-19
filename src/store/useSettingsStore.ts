@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setGcalClientCredentials } from "../config/gcal";
+import { setGcalClientCredentials, setGcalRemindersEnabled } from "../config/gcal";
 import { blockSuiteEditorService } from "../di/container";
 import { clampZoom } from "../lib/appZoom";
 import {
@@ -21,6 +21,8 @@ interface SettingsState {
   setGcalClientSecret: (value: string) => void;
   gcalShowEvents: boolean;
   setGcalShowEvents: (value: boolean) => void;
+  gcalReminders: boolean;
+  setGcalReminders: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -45,6 +47,11 @@ export const useSettingsStore = create<SettingsState>()(
       },
       gcalShowEvents: true,
       setGcalShowEvents: (gcalShowEvents) => set({ gcalShowEvents }),
+      gcalReminders: true,
+      setGcalReminders: (gcalReminders) => {
+        setGcalRemindersEnabled(gcalReminders);
+        set({ gcalReminders });
+      },
     }),
     {
       name: "cove-settings",
@@ -64,6 +71,7 @@ export const useSettingsStore = create<SettingsState>()(
           gcalClientSecret:
             typeof p.gcalClientSecret === "string" ? p.gcalClientSecret : base.gcalClientSecret,
           gcalShowEvents: p.gcalShowEvents !== false,
+          gcalReminders: p.gcalReminders !== false,
         };
       },
     },
@@ -71,8 +79,9 @@ export const useSettingsStore = create<SettingsState>()(
 );
 
 {
-  const { gcalClientId, gcalClientSecret } = useSettingsStore.getState();
+  const { gcalClientId, gcalClientSecret, gcalReminders } = useSettingsStore.getState();
   setGcalClientCredentials(gcalClientId, gcalClientSecret);
+  setGcalRemindersEnabled(gcalReminders);
 }
 
 blockSuiteEditorService.provideCanvasPrefs(() => useSettingsStore.getState().canvasPrefs);

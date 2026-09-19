@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { gcalService } from "../../di/container";
-import type { GcalEvent } from "../../domain/gcal/GcalTypes";
+import type { GcalAgendaEvent } from "../../domain/gcal/GcalTypes";
 import { GcalReauthError } from "../../services/gcal/GcalService";
 import { useGcalStore } from "../../store/useGcalStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
@@ -9,19 +9,19 @@ export function useGcalWindowEvents(
   from: Date,
   to: Date,
 ): {
-  events: GcalEvent[];
-  calendarId: string;
+  events: GcalAgendaEvent[];
+  createCalendarId: string;
 } {
   const status = useGcalStore((s) => s.status);
   const calendars = useGcalStore((s) => s.calendars);
+  const selectedCalendarIds = useGcalStore((s) => s.selectedCalendarIds);
   const refreshTick = useGcalStore((s) => s.refreshTick);
+  const events = useGcalStore((s) => s.events);
   const showEvents = useSettingsStore((s) => s.gcalShowEvents);
-  const [events, setEvents] = useState<GcalEvent[]>([]);
+  const showReminders = useSettingsStore((s) => s.gcalReminders);
 
-  const calendarId = useMemo(
-    () => calendars.find((calendar) => calendar.primary)?.id ?? "primary",
-    [calendars],
-  );
+  const createCalendarId =
+    calendars.find((calendar) => calendar.primary)?.id ?? selectedCalendarIds[0] ?? "primary";
 
   const fromMs = from.getTime();
   const toMs = to.getTime();
@@ -31,10 +31,9 @@ export function useGcalWindowEvents(
     void gcalService.ensureLoaded().catch(() => {});
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTick is an intentional reload signal after local create/delete, not a body input
   useEffect(() => {
     if (!active) {
-      setEvents([]);
+      useGcalStore.getState().setEvents([]);
       return;
     }
     let cancelled = false;
@@ -43,15 +42,15 @@ export function useGcalWindowEvents(
         try {
           const cached = await gcalService.loadCachedWindow(fromMs, toMs);
           if (cancelled) return;
-          setEvents(cached.map((entry) => entry.event));
+          useGcalStore.getState().setEvents(cached);
         } catch {
           // Locked vault or suspended DB — no cached paint this round.
         }
         try {
-          const fresh = await gcalService.syncWindow(calendarId, fromMs, toMs);
+          const fresh = await gcalService.syncAllSelected(fromMs, toMs);
           if (!cancelled) {
-            setEvents(fresh);
-            useGcalStore.getState().setSyncFailed(false);
+            useGcalStore.getState().setEvents(fresh);
+            if (showReminders) gcalService.syncReminders(fresh);
           }
         } catch (err) {
           if (err instanceof GcalReauthError) return;
@@ -64,7 +63,8 @@ export function useGcalWindowEvents(
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [active, calendarId, fromMs, toMs, refreshTick]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTick is an intentional reload signal after local edits, not a body input
+  }, [active, selectedCalendarIds, fromMs, toMs, refreshTick, showReminders]);
 
-  return { events, calendarId };
+  return { events, createCalendarId };
 }

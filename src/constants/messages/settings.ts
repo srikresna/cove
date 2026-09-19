@@ -50,6 +50,11 @@ export const SettingsMessages = {
     "The saved Google sign-in expired or was revoked. Reconnect to keep the calendar panel live.",
   GCAL_SHOW_EVENTS_LABEL: "Show calendar events",
   GCAL_SHOW_EVENTS_DESC: "Overlay Google Calendar events on the calendar panel.",
+  GCAL_REMINDERS_LABEL: "Event reminders",
+  GCAL_REMINDERS_DESC:
+    "Show a desktop notification 10 minutes before an event starts (while Cove is running).",
+  GCAL_WIDE_SCOPE_HINT:
+    "Reconnect to enable choosing calendars — the wider permission is requested at sign-in.",
   GCAL_CLIENT_ID_LABEL: "Google OAuth client ID",
   GCAL_CLIENT_ID_DESC:
     "Desktop-app client ID from Google Cloud Console. Leave empty to use the one bundled with this build.",

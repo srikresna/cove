@@ -25,12 +25,18 @@ const combine = (date: string, time: string): Date => new Date(`${date}T${time}:
 
 const newEventId = (): string => crypto.randomUUID().replaceAll("-", "");
 
+const timeString = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 export const GcalCreateEventDialog: React.FC<{
   open: boolean;
   defaultDate: Date;
+  editing?: import("../../domain/gcal/GcalTypes").GcalEvent | null;
   onConfirm: (input: GcalEventInput) => void;
   onCancel: () => void;
-}> = ({ open, defaultDate, onConfirm, onCancel }) => {
+}> = ({ open, defaultDate, editing = null, onConfirm, onCancel }) => {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(toDateString(defaultDate));
   const [allDay, setAllDay] = useState(false);
@@ -39,13 +45,29 @@ export const GcalCreateEventDialog: React.FC<{
 
   useEffect(() => {
     if (open) {
-      setTitle("");
-      setDate(toDateString(defaultDate));
-      setAllDay(false);
-      setStart("09:00");
-      setEnd("10:00");
+      if (editing) {
+        setTitle(editing.summary ?? "");
+        if (editing.start.date) {
+          setDate(editing.start.date);
+          setAllDay(true);
+        } else {
+          const startDate = new Date(editing.start.dateTime ?? Date.now());
+          const endDate = new Date(editing.end.dateTime ?? startDate.getTime() + 3_600_000);
+          setDate(toDateString(startDate));
+          setAllDay(false);
+          setStart(timeString(startDate));
+          setEnd(timeString(endDate > startDate ? endDate : startDate));
+        }
+      } else {
+        setTitle("");
+        setDate(toDateString(defaultDate));
+        setAllDay(false);
+        setStart("09:00");
+        setEnd("10:00");
+      }
     }
-  }, [open, defaultDate]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: fields re-seed only when the dialog (re)opens or switches target, not on every keystroke
+  }, [open, editing]);
 
   const trimmed = title.trim();
   const valid =
@@ -86,7 +108,9 @@ export const GcalCreateEventDialog: React.FC<{
     >
       <DialogContent className="max-w-sm" hideClose>
         <DialogHeader>
-          <DialogTitle>{MESSAGES.GCAL_ADD_EVENT_TITLE}</DialogTitle>
+          <DialogTitle>
+            {editing ? MESSAGES.GCAL_EDIT_EVENT_TITLE : MESSAGES.GCAL_ADD_EVENT_TITLE}
+          </DialogTitle>
           <DialogDescription>{MESSAGES.GCAL_ADD_EVENT_DESC}</DialogDescription>
         </DialogHeader>
 
@@ -163,7 +187,7 @@ export const GcalCreateEventDialog: React.FC<{
               {MESSAGES.CANCEL}
             </Button>
             <Button type="submit" disabled={!valid}>
-              {MESSAGES.GCAL_ADD_EVENT}
+              {editing ? MESSAGES.GCAL_SAVE_EVENT : MESSAGES.GCAL_ADD_EVENT}
             </Button>
           </DialogFooter>
         </form>

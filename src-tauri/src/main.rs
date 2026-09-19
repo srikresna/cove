@@ -44,6 +44,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             dpapi::device_wrap,
             dpapi::device_unwrap,
@@ -62,6 +63,7 @@ fn main() {
             gcal::gcal_refresh,
             gcal::gcal_list_events,
             gcal::gcal_create_event,
+            gcal::gcal_update_event,
             gcal::gcal_delete_event,
             gcal::gcal_list_calendars,
             gcal::gcal_primary_calendar

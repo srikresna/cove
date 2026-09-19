@@ -56,8 +56,11 @@ describe("GcalService", () => {
           scope: GCAL_SCOPE,
         };
       }
-      if (cmd === "gcal_primary_calendar") {
-        return { id: "me@gmail.com", summary: "me@gmail.com", primary: true };
+      if (cmd === "gcal_list_calendars") {
+        return [
+          { id: "secondary@group.calendar.google.com", summary: "Secondary", primary: false },
+          { id: "me@gmail.com", summary: "me@gmail.com", primary: true },
+        ];
       }
       return undefined;
     });
@@ -147,8 +150,8 @@ describe("GcalService", () => {
           scope: GCAL_SCOPE,
         };
       }
-      if (cmd === "gcal_primary_calendar") {
-        throw new Error("Google API 403 Forbidden");
+      if (cmd === "gcal_list_calendars") {
+        throw new Error("Google API 403 Forbidden on GET /users/me/calendarList");
       }
       return undefined;
     });
@@ -157,7 +160,43 @@ describe("GcalService", () => {
 
     expect(useGcalStore.getState().status).toBe("connected");
     expect(useGcalStore.getState().accountEmail).toBeNull();
+    expect(useGcalStore.getState().wideScopeMissing).toBe(true);
     expect(repo.putTokenPayload).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates an event through the patch endpoint and refreshes the cache", async () => {
+    vi.mocked(repo.getTokenPayload).mockResolvedValue(
+      "enc:eyJyZWZyZXNoVG9rZW4iOiJyMSIsInNjb3BlIjoiIiwiZW1haWwiOm51bGx9" as EncryptedPayload,
+    );
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "gcal_refresh") {
+        return { accessToken: "a2", expiresAtMs: Date.now() + 3_600_000, scope: GCAL_SCOPE };
+      }
+      if (cmd === "gcal_update_event") {
+        return {
+          id: "evt-1",
+          summary: "Renamed",
+          start: { dateTime: "2026-09-14T09:00:00.000Z" },
+          end: { dateTime: "2026-09-14T10:00:00.000Z" },
+        };
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+
+    await service.updateEvent("primary", "evt-1", {
+      summary: "Renamed",
+      start: { dateTime: "2026-09-14T09:00:00.000Z" },
+      end: { dateTime: "2026-09-14T10:00:00.000Z" },
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "gcal_update_event",
+      expect.objectContaining({ calendarId: "primary", eventId: "evt-1" }),
+    );
+    expect(repo.upsertEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "evt-1", calendarId: "primary" }),
+    );
+    expect(useGcalStore.getState().refreshTick).toBe(1);
   });
 
   it("rejects a read-only grant and marks reconnect needed", async () => {

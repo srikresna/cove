@@ -1,11 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getGcalClientId, getGcalClientSecret } from "../../config/gcal";
+import {
+  cancelAll,
+  isPermissionGranted,
+  requestPermission,
+  Schedule,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
+import { getGcalClientId, getGcalClientSecret, getGcalRemindersEnabled } from "../../config/gcal";
 import type { EncryptedPayload } from "../../domain/EncryptedPayload";
 import type {
   GcalAccessToken,
+  GcalAgendaEvent,
   GcalCalendar,
   GcalEvent,
   GcalEventInput,
+  GcalEventPatch,
   GcalTokens,
 } from "../../domain/gcal/GcalTypes";
 import { GCAL_SCOPE } from "../../domain/gcal/GcalTypes";
@@ -28,7 +37,13 @@ interface TokenBlob {
   email: string | null;
   clientId: string;
   clientSecret: string;
+  calendars: GcalCalendar[];
+  selectedCalendarIds: string[];
 }
+
+const AUTOSYNC_INTERVAL_MS = 10 * 60 * 1000;
+const REMINDER_LEAD_MS = 10 * 60 * 1000;
+const REMINDER_HORIZON_MS = 24 * 60 * 60 * 1000;
 
 export const gcalStartMs = (event: GcalEvent): number =>
   event.start.dateTime
@@ -49,6 +64,9 @@ export class GcalService {
   private access: GcalAccessToken | null = null;
   private inflightRefresh: Promise<GcalAccessToken> | null = null;
   private restoreAttempted = false;
+  private autoSyncTimer: number | null = null;
+  private lastWindow: { calendarIds: string[]; fromMs: number; toMs: number } | null = null;
+  private reminderKeys = new Set<string>();
 
   constructor(
     private readonly deps: {
@@ -65,6 +83,15 @@ export class GcalService {
     return this.tokenBlob !== null;
   }
 
+  selectedCalendarIds(): string[] {
+    if (!this.tokenBlob) return ["primary"];
+    if (this.tokenBlob.selectedCalendarIds.length === 0) {
+      const primary = this.tokenBlob.calendars.find((calendar) => calendar.primary);
+      return [primary?.id ?? "primary"];
+    }
+    return this.tokenBlob.selectedCalendarIds;
+  }
+
   async restore(): Promise<void> {
     const store = useGcalStore.getState();
     try {
@@ -74,19 +101,29 @@ export class GcalService {
         store.setStatus("disconnected");
         return;
       }
-      const blob = JSON.parse(
+      const raw = JSON.parse(
         new TextDecoder().decode(await this.deps.crypto.decryptBlob(payload, gcalTokenAad())),
       ) as Partial<TokenBlob>;
       this.tokenBlob = {
-        refreshToken: blob.refreshToken ?? "",
-        scope: blob.scope ?? "",
-        email: blob.email ?? null,
-        clientId: blob.clientId ?? "",
-        clientSecret: blob.clientSecret ?? "",
+        refreshToken: raw.refreshToken ?? "",
+        scope: raw.scope ?? "",
+        email: raw.email ?? null,
+        clientId: raw.clientId ?? "",
+        clientSecret: raw.clientSecret ?? "",
+        calendars: raw.calendars ?? [],
+        selectedCalendarIds: raw.selectedCalendarIds ?? [],
       };
       this.restoreAttempted = true;
       store.setStatus("connected");
       store.setAccountEmail(this.tokenBlob.email);
+      store.setCalendars(this.tokenBlob.calendars);
+      store.setSelectedCalendarIds(this.selectedCalendarIds());
+      this.startAutoSync();
+      if (this.tokenBlob.calendars.length === 0) {
+        void this.listCalendars().catch(() => {
+          useGcalStore.getState().setWideScopeMissing(true);
+        });
+      }
     } catch (err) {
       if (err instanceof EncryptionError && err.reason === "key_unavailable") {
         return;
@@ -103,11 +140,14 @@ export class GcalService {
   }
 
   clear(): void {
+    this.stopAutoSync();
+    void cancelAll().catch(() => {});
+    this.reminderKeys.clear();
     this.tokenBlob = null;
     this.access = null;
+    this.lastWindow = null;
     this.restoreAttempted = false;
-    const store = useGcalStore.getState();
-    store.reset();
+    useGcalStore.getState().reset();
   }
 
   async connect(): Promise<void> {
@@ -126,26 +166,35 @@ export class GcalService {
       };
 
       let email: string | null = null;
+      let calendars: GcalCalendar[] = [];
       try {
-        const primary = await invoke<GcalCalendar>("gcal_primary_calendar", {
+        calendars = await invoke<GcalCalendar[]>("gcal_list_calendars", {
           accessToken: tokens.accessToken,
         });
+        const primary = calendars.find((calendar) => calendar.primary);
         email = primary?.id ?? null;
       } catch {
-        // The events scope cannot always read calendar metadata — email stays unknown.
+        // Calendar metadata needs the wider scope — email stays unknown.
       }
+      const previous = this.tokenBlob;
       const blob: TokenBlob = {
         refreshToken: tokens.refreshToken,
         scope: tokens.scope,
         email,
         clientId: this.clientId(),
         clientSecret: getGcalClientSecret(),
+        calendars,
+        selectedCalendarIds: previous?.selectedCalendarIds ?? [],
       };
       await this.persistTokenBlob(blob);
       this.tokenBlob = blob;
 
       store.setStatus("connected");
       store.setAccountEmail(blob.email);
+      store.setCalendars(blob.calendars);
+      store.setWideScopeMissing(blob.calendars.length === 0);
+      store.setSelectedCalendarIds(this.selectedCalendarIds());
+      this.startAutoSync();
     } catch (err) {
       store.setStatus(this.tokenBlob || err instanceof GcalReauthError ? "reauth" : "disconnected");
       throw err;
@@ -162,7 +211,26 @@ export class GcalService {
     const accessToken = await this.ensureAccessToken();
     const calendars = await invoke<GcalCalendar[]>("gcal_list_calendars", { accessToken });
     useGcalStore.getState().setCalendars(calendars);
+    useGcalStore.getState().setWideScopeMissing(false);
+    if (this.tokenBlob) {
+      this.tokenBlob = { ...this.tokenBlob, calendars };
+      await this.persistTokenBlob(this.tokenBlob);
+    }
     return calendars;
+  }
+
+  async updateSelectedCalendars(ids: string[]): Promise<void> {
+    if (!this.tokenBlob) return;
+    const selected = this.tokenBlob.calendars
+      .map((calendar) => calendar.id)
+      .filter((id) => ids.includes(id));
+    this.tokenBlob = {
+      ...this.tokenBlob,
+      selectedCalendarIds: selected.length > 0 ? selected : this.selectedCalendarIds(),
+    };
+    await this.persistTokenBlob(this.tokenBlob);
+    useGcalStore.getState().setSelectedCalendarIds(this.selectedCalendarIds());
+    useGcalStore.getState().bumpRefresh();
   }
 
   async syncWindow(calendarId: string, fromMs: number, toMs: number): Promise<GcalEvent[]> {
@@ -183,16 +251,16 @@ export class GcalService {
       })),
     );
     await this.deps.repo.replaceWindow(calendarId, fromMs, toMs, rows);
-    useGcalStore.getState().setLastSyncAt(Date.now());
+    const store = useGcalStore.getState();
+    store.setLastSyncAt(Date.now());
+    store.setSyncFailed(false);
     return live;
   }
 
-  async loadCachedWindow(
-    fromMs: number,
-    toMs: number,
-  ): Promise<Array<{ calendarId: string; event: GcalEvent }>> {
+  async loadCachedWindow(fromMs: number, toMs: number): Promise<GcalAgendaEvent[]> {
     const rows = await this.deps.repo.listEventsBetween(fromMs, toMs);
-    const out: Array<{ calendarId: string; event: GcalEvent }> = [];
+    const calendars = this.tokenBlob?.calendars ?? [];
+    const out: GcalAgendaEvent[] = [];
     for (const row of rows) {
       try {
         const event = JSON.parse(
@@ -200,7 +268,7 @@ export class GcalService {
             await this.deps.crypto.decryptBlob(row.payload, gcalEventAad(row.id)),
           ),
         ) as GcalEvent;
-        out.push({ calendarId: row.calendarId, event });
+        out.push(this.decorate(event, row.calendarId, calendars));
       } catch {
         // A single undecryptable cached event is dropped, not fatal.
       }
@@ -226,6 +294,29 @@ export class GcalService {
     return created;
   }
 
+  async updateEvent(
+    calendarId: string,
+    eventId: string,
+    patch: GcalEventPatch,
+  ): Promise<GcalEvent> {
+    const accessToken = await this.ensureAccessToken();
+    const updated = await invoke<GcalEvent>("gcal_update_event", {
+      accessToken,
+      calendarId,
+      eventId,
+      patch,
+    });
+    await this.deps.repo.upsertEvent({
+      id: updated.id,
+      calendarId,
+      startsAt: gcalStartMs(updated),
+      endsAt: gcalEndMs(updated),
+      payload: await this.encryptEvent(updated),
+    });
+    useGcalStore.getState().bumpRefresh();
+    return updated;
+  }
+
   async deleteEvent(calendarId: string, eventId: string): Promise<void> {
     if (eventId.includes("_")) {
       throw new Error(
@@ -236,6 +327,96 @@ export class GcalService {
     await invoke("gcal_delete_event", { accessToken, calendarId, eventId });
     await this.deps.repo.deleteEvent(eventId);
     useGcalStore.getState().bumpRefresh();
+  }
+
+  async syncAllSelected(fromMs: number, toMs: number): Promise<GcalAgendaEvent[]> {
+    const calendarIds = this.selectedCalendarIds();
+    const results = await Promise.allSettled(
+      calendarIds.map((calendarId) => this.syncWindow(calendarId, fromMs, toMs)),
+    );
+    const calendars = this.tokenBlob?.calendars ?? [];
+    const merged: GcalAgendaEvent[] = [];
+    let anyFailed = false;
+    for (let index = 0; index < calendarIds.length; index++) {
+      const calendarId = calendarIds[index];
+      if (!calendarId) continue;
+      const result = results[index];
+      if (result && result.status === "fulfilled") {
+        for (const event of result.value) merged.push(this.decorate(event, calendarId, calendars));
+      } else {
+        anyFailed = true;
+      }
+    }
+    if (anyFailed) useGcalStore.getState().setSyncFailed(true);
+    this.lastWindow = { calendarIds, fromMs, toMs };
+    return merged;
+  }
+
+  syncReminders(events: GcalAgendaEvent[]): void {
+    if (!getGcalRemindersEnabled()) return;
+    void (async () => {
+      try {
+        if (!(await isPermissionGranted())) {
+          const permission = await requestPermission();
+          if (permission !== "granted") return;
+        }
+        await cancelAll();
+        this.reminderKeys.clear();
+        const now = Date.now();
+        for (const event of events) {
+          const start = gcalStartMs(event);
+          if (!event.start.dateTime || start <= now || start > now + REMINDER_HORIZON_MS) continue;
+          const at = start - REMINDER_LEAD_MS;
+          if (at <= now) continue;
+          const key = `${event.calendarId}:${event.id}:${start}`;
+          if (this.reminderKeys.has(key)) continue;
+          this.reminderKeys.add(key);
+          sendNotification({
+            title: MESSAGES_TITLE,
+            body: `${timeLabel(event)} — ${event.summary || MESSAGES_UNTITLED}`,
+            schedule: Schedule.at(new Date(at)),
+          });
+        }
+      } catch {
+        // Notifications are best-effort; never surface as errors.
+      }
+    })();
+  }
+
+  private startAutoSync(): void {
+    this.stopAutoSync();
+    this.autoSyncTimer = window.setInterval(() => {
+      const lastWindow = this.lastWindow;
+      if (!this.tokenBlob || !lastWindow) return;
+      void this.syncAllSelected(lastWindow.fromMs, lastWindow.toMs)
+        .then((events) => {
+          useGcalStore.getState().setEvents(events);
+          this.syncReminders(events);
+        })
+        .catch(() => {
+          useGcalStore.getState().setSyncFailed(true);
+        });
+    }, AUTOSYNC_INTERVAL_MS);
+  }
+
+  private stopAutoSync(): void {
+    if (this.autoSyncTimer !== null) {
+      window.clearInterval(this.autoSyncTimer);
+      this.autoSyncTimer = null;
+    }
+  }
+
+  private decorate(
+    event: GcalEvent,
+    calendarId: string,
+    calendars: GcalCalendar[],
+  ): GcalAgendaEvent {
+    const calendar = calendars.find((entry) => entry.id === calendarId);
+    return {
+      ...event,
+      calendarId,
+      calendarColor: calendar?.backgroundColor ?? calendar?.foregroundColor,
+    };
   }
 
   private async encryptEvent(event: GcalEvent): Promise<EncryptedPayload> {
@@ -311,3 +492,11 @@ export class GcalService {
     return refreshed;
   }
 }
+
+const MESSAGES_TITLE = "Cove";
+const MESSAGES_UNTITLED = "(No title)";
+
+const timeLabel = (event: GcalEvent): string =>
+  new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
+    new Date(event.start.dateTime as string),
+  );
