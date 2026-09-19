@@ -55,7 +55,8 @@ export const GcalCreateEventDialog: React.FC<{
     event.preventDefault();
     if (!valid) return;
     if (allDay) {
-      const endDate = new Date(combine(date, "00:00").getTime() + 86_400_000);
+      const midnight = combine(date, "00:00");
+      const endDate = new Date(midnight.getFullYear(), midnight.getMonth(), midnight.getDate() + 1);
       onConfirm({
         id: newEventId(),
         summary: trimmed,
@@ -151,6 +152,10 @@ export const GcalCreateEventDialog: React.FC<{
                 />
               </div>
             </div>
+          )}
+
+          {!valid && trimmed && !allDay && (
+            <p className="text-[12px] text-destructive">{MESSAGES.GCAL_TIME_INVALID}</p>
           )}
 
           <DialogFooter>

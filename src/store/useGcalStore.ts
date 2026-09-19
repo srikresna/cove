@@ -10,6 +10,7 @@ interface GcalState {
   events: GcalEvent[];
   lastSyncAtMs: number | null;
   syncing: boolean;
+  syncFailed: boolean;
   refreshTick: number;
   setStatus: (status: GcalConnectionStatus) => void;
   setAccountEmail: (email: string | null) => void;
@@ -17,6 +18,7 @@ interface GcalState {
   setEvents: (events: GcalEvent[]) => void;
   setLastSyncAt: (at: number) => void;
   setSyncing: (syncing: boolean) => void;
+  setSyncFailed: (failed: boolean) => void;
   bumpRefresh: () => void;
   reset: () => void;
 }
@@ -28,6 +30,7 @@ export const useGcalStore = create<GcalState>()((set) => ({
   events: [],
   lastSyncAtMs: null,
   syncing: false,
+  syncFailed: false,
   refreshTick: 0,
   setStatus: (status) => set({ status }),
   setAccountEmail: (accountEmail) => set({ accountEmail }),
@@ -35,6 +38,7 @@ export const useGcalStore = create<GcalState>()((set) => ({
   setEvents: (events) => set({ events }),
   setLastSyncAt: (lastSyncAtMs) => set({ lastSyncAtMs }),
   setSyncing: (syncing) => set({ syncing }),
+  setSyncFailed: (syncFailed) => set({ syncFailed }),
   bumpRefresh: () => set((state) => ({ refreshTick: state.refreshTick + 1 })),
   reset: () =>
     set({
@@ -44,6 +48,7 @@ export const useGcalStore = create<GcalState>()((set) => ({
       events: [],
       lastSyncAtMs: null,
       syncing: false,
+      syncFailed: false,
       refreshTick: 0,
     }),
 }));

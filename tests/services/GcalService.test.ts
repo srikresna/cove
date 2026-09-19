@@ -109,6 +109,34 @@ describe("GcalService", () => {
     expect(useGcalStore.getState().status).toBe("reauth");
   });
 
+  it("rolls back to a recoverable status when a reconnect attempt fails", async () => {
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "gcal_refresh") {
+        throw new Error("token endpoint returned 400 Bad Request: invalid_grant");
+      }
+      if (cmd === "gcal_connect") {
+        throw new Error("Timed out waiting for Google sign-in in the browser");
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    vi.mocked(repo.getTokenPayload).mockResolvedValue(
+      "enc:eyJyZWZyZXNoVG9rZW4iOiJyMSIsInNjb3BlIjoiIiwiZW1haWwiOm51bGx9" as EncryptedPayload,
+    );
+
+    await expect(service.syncWindow("primary", 0, 1)).rejects.toBeInstanceOf(GcalReauthError);
+    expect(useGcalStore.getState().status).toBe("reauth");
+
+    await expect(service.connect()).rejects.toThrow(/Timed out/);
+    expect(useGcalStore.getState().status).toBe("reauth");
+  });
+
+  it("lands on disconnected when a first-ever connect fails", async () => {
+    invoke.mockRejectedValue(new Error("Timed out waiting for Google sign-in in the browser"));
+
+    await expect(service.connect()).rejects.toThrow(/Timed out/);
+    expect(useGcalStore.getState().status).toBe("disconnected");
+  });
+
   it("connect succeeds even when calendar metadata is not readable with the events scope", async () => {
     invoke.mockImplementation((cmd: string) => {
       if (cmd === "gcal_connect") {

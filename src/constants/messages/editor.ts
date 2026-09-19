@@ -100,4 +100,6 @@ export const EditorMessages = {
   GCAL_DELETE_CONFIRM_DESC: "It will be removed from Google Calendar for everyone.",
   GCAL_EVENT_CREATED_TOAST: "Event created",
   GCAL_EVENT_DELETED_TOAST: "Event deleted",
+  GCAL_SYNC_FAILED: "couldn't refresh — showing saved",
+  GCAL_TIME_INVALID: "End time must be after the start time.",
 } as const;

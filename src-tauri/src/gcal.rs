@@ -11,7 +11,7 @@ const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const API_BASE: &str = "https://www.googleapis.com/calendar/v3";
 pub const GCAL_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
 
-const CONSENT_TIMEOUT_SECS: u64 = 300;
+const CONSENT_TIMEOUT_SECS: u64 = 120;
 const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_EVENT_PAGES: usize = 10;
 const CONNECT_SUCCESS_PAGE: &str = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Cove</title></head><body style=\"font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0\"><div style=\"text-align:center\"><h2>Google Calendar connected</h2><p>You can close this tab and return to Cove.</p></div></body></html>";
@@ -99,12 +99,16 @@ pub struct GcalCalendar {
     pub primary: bool,
 }
 
-fn client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .user_agent("CoveNotes/0.1")
-        .timeout(Duration::from_secs(15))
-        .build()
-        .expect("reqwest client")
+static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
+fn client() -> &'static reqwest::Client {
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .user_agent("CoveNotes/0.1")
+            .timeout(Duration::from_secs(15))
+            .build()
+            .expect("reqwest client")
+    })
 }
 
 fn random_urlsafe(bytes: usize) -> Result<String, String> {

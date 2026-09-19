@@ -52,8 +52,6 @@ const eventEndMs = (event: GcalEvent): number =>
       ? new Date(`${event.end.date}T00:00:00`).getTime()
       : 0;
 
-const DAY_MS = 86_400_000;
-
 const timeLabel = (event: GcalEvent): string => {
   if (!event.start.dateTime) return MESSAGES.GCAL_EVENT_ALL_DAY;
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
@@ -110,9 +108,15 @@ export const CalendarPanel: React.FC = () => {
 
   const showGcal = useSettingsStore((s) => s.gcalShowEvents);
   const gcalStatus = useGcalStore((s) => s.status);
+  const gcalSyncFailed = useGcalStore((s) => s.syncFailed);
+  const lastCell = cells[cells.length - 1] ?? monthCursor;
+  const windowEnd = useMemo(
+    () => new Date(lastCell.getFullYear(), lastCell.getMonth(), lastCell.getDate() + 1),
+    [lastCell],
+  );
   const { events: gcalEvents, calendarId } = useGcalWindowEvents(
     cells[0] ?? monthCursor,
-    cells[cells.length - 1] ?? monthCursor,
+    windowEnd,
   );
 
   const [isAddEventOpen, setAddEventOpen] = useState(false);
@@ -157,17 +161,14 @@ export const CalendarPanel: React.FC = () => {
     for (const event of gcalEvents) {
       const start = eventStartMs(event);
       const end = eventEndMs(event);
-      const firstMidnight = new Date(start);
-      firstMidnight.setHours(0, 0, 0, 0);
-      for (
-        let at = firstMidnight.getTime();
-        at < end && at < firstMidnight.getTime() + 62 * DAY_MS;
-        at += DAY_MS
-      ) {
-        const key = keyOf(at);
+      const cursor = new Date(start);
+      cursor.setHours(0, 0, 0, 0);
+      for (let day = 0; day < 62 && cursor.getTime() < end; day++) {
+        const key = dayKey(cursor);
         const list = map.get(key) ?? [];
         list.push(event);
         map.set(key, list);
+        cursor.setDate(cursor.getDate() + 1);
       }
     }
     return map;
@@ -325,8 +326,16 @@ export const CalendarPanel: React.FC = () => {
         {showGcal && gcalStatus === "connected" && (selectedEvents.length > 0 || selectedDay) && (
           <div className="space-y-0.5 pt-1">
             <div className="flex items-center justify-between px-1 pb-0.5">
-              <span className="text-[10px] font-semibold uppercase leading-4 tracking-widest text-muted-foreground">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase leading-4 tracking-widest text-muted-foreground">
                 {MESSAGES.GCAL_AGENDA_TITLE}
+                {gcalSyncFailed && (
+                  <span
+                    className="font-mono text-[9px] font-medium normal-case tracking-normal text-muted-foreground/70"
+                    title={MESSAGES.GCAL_SYNC_FAILED}
+                  >
+                    ({MESSAGES.GCAL_SYNC_FAILED})
+                  </span>
+                )}
               </span>
               <button
                 type="button"

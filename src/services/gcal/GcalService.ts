@@ -147,7 +147,7 @@ export class GcalService {
       store.setStatus("connected");
       store.setAccountEmail(blob.email);
     } catch (err) {
-      if (!this.tokenBlob && !(err instanceof GcalReauthError)) store.setStatus("disconnected");
+      store.setStatus(this.tokenBlob || err instanceof GcalReauthError ? "reauth" : "disconnected");
       throw err;
     }
   }

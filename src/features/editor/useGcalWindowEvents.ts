@@ -49,10 +49,14 @@ export function useGcalWindowEvents(
         }
         try {
           const fresh = await gcalService.syncWindow(calendarId, fromMs, toMs);
-          if (!cancelled) setEvents(fresh);
+          if (!cancelled) {
+            setEvents(fresh);
+            useGcalStore.getState().setSyncFailed(false);
+          }
         } catch (err) {
           if (err instanceof GcalReauthError) return;
-          // Offline or transient API failure — the cached view stays.
+          // Offline or transient API failure — the cached view stays, flagged stale.
+          if (!cancelled) useGcalStore.getState().setSyncFailed(true);
         }
       })();
     }, 200);
