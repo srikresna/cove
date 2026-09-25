@@ -38,6 +38,7 @@ export interface GcalEventPatch {
   location?: string;
   start: GcalEventDateTime;
   end: GcalEventDateTime;
+  extendedProperties?: GcalExtendedProperties;
 }
 
 export type GcalAgendaEvent = GcalEvent & {

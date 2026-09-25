@@ -19,6 +19,11 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
 import { MESSAGES } from "../../constants/messages";
+import {
+  type GcalCategory,
+  getGcalCategory,
+  withGcalCategory,
+} from "../../domain/gcal/GcalCategory";
 import type { GcalCalendar, GcalEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
 import { cn } from "../../lib/utils";
 
@@ -45,6 +50,7 @@ export const GcalCreateEventDialog: React.FC<{
   editing?: GcalEvent | null;
   calendars?: GcalCalendar[];
   defaultCalendarId?: string;
+  defaultCategory?: GcalCategory;
   onConfirm: (input: GcalEventInput, calendarId: string) => void;
   onCancel: () => void;
 }> = ({
@@ -53,6 +59,7 @@ export const GcalCreateEventDialog: React.FC<{
   editing = null,
   calendars = [],
   defaultCalendarId,
+  defaultCategory = "event",
   onConfirm,
   onCancel,
 }) => {
@@ -64,10 +71,13 @@ export const GcalCreateEventDialog: React.FC<{
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [calendarId, setCalendarId] = useState(defaultCalendarId ?? "primary");
+  const [category, setCategory] = useState<GcalCategory>(defaultCategory);
 
   useEffect(() => {
     if (open) {
       if (editing) {
+        setCategory(getGcalCategory(editing));
+        setCalendarId(defaultCalendarId ?? "primary");
         setTitle(editing.summary ?? "");
         setLocation(editing.location ?? "");
         setDescription(editing.description ?? "");
@@ -83,18 +93,18 @@ export const GcalCreateEventDialog: React.FC<{
           setEnd(timeString(endDate > startDate ? endDate : startDate));
         }
       } else {
+        setCategory(defaultCategory);
         setTitle("");
         setLocation("");
         setDescription("");
         setDate(toDateString(defaultDate));
         setAllDay(false);
-        setStart("09:00");
-        setEnd("10:00");
+        setStart(timeString(defaultDate));
+        setEnd(timeString(new Date(defaultDate.getTime() + 3_600_000)));
         setCalendarId(defaultCalendarId ?? "primary");
       }
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: fields re-seed only when the dialog (re)opens or switches target, not on every keystroke
-  }, [open, editing, defaultDate, defaultCalendarId]);
+  }, [open, editing, defaultDate, defaultCalendarId, defaultCategory]);
 
   const trimmed = title.trim();
   const valid =
@@ -108,20 +118,29 @@ export const GcalCreateEventDialog: React.FC<{
       summary: trimmed,
       location: location.trim() || undefined,
       description: description.trim() || undefined,
-      extendedProperties: editing?.extendedProperties ?? { private: { cove: "1" } },
+      extendedProperties: editing?.extendedProperties,
     };
     if (allDay) {
       const midnight = combine(date, "00:00");
       const endDate = new Date(midnight.getFullYear(), midnight.getMonth(), midnight.getDate() + 1);
-      onConfirm({ ...common, start: { date }, end: { date: toDateString(endDate) } }, calendarId);
+      onConfirm(
+        withGcalCategory(
+          { ...common, start: { date }, end: { date: toDateString(endDate) } },
+          category,
+        ),
+        calendarId,
+      );
       return;
     }
     onConfirm(
-      {
-        ...common,
-        start: { dateTime: combine(date, start).toISOString() },
-        end: { dateTime: combine(date, end).toISOString() },
-      },
+      withGcalCategory(
+        {
+          ...common,
+          start: { dateTime: combine(date, start).toISOString() },
+          end: { dateTime: combine(date, end).toISOString() },
+        },
+        category,
+      ),
       calendarId,
     );
   };
@@ -141,10 +160,38 @@ export const GcalCreateEventDialog: React.FC<{
           <DialogTitle>
             {editing ? MESSAGES.GCAL_EDIT_EVENT_TITLE : MESSAGES.GCAL_ADD_EVENT_TITLE}
           </DialogTitle>
-          <DialogDescription>{MESSAGES.GCAL_ADD_EVENT_DESC}</DialogDescription>
+          <DialogDescription>
+            {editing
+              ? "Update this schedule in Google Calendar."
+              : "This schedule will be saved as an event in Google Calendar."}
+          </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <fieldset className="flex gap-1 rounded-lg bg-muted/60 p-1" aria-label="Schedule type">
+            {(
+              [
+                ["event", "Event"],
+                ["meeting", "Meeting"],
+                ["task", "Task reminder"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={category === value}
+                onClick={() => setCategory(value)}
+                className={cn(
+                  "flex-1 rounded-md px-2 py-1.5 text-xs",
+                  category === value
+                    ? "bg-card font-semibold text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </fieldset>
           <div className="space-y-1.5">
             <Label htmlFor="gcal-event-title">{MESSAGES.GCAL_EVENT_NAME_LABEL}</Label>
             <Input

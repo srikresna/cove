@@ -10,7 +10,7 @@ import { noteActions } from "../../store/noteActions";
 import { notifyError } from "../../store/notify";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import { EventDetailPopover } from "./EventDetailPopover";
-import { dayKey, eventDayKeys, timeLabel } from "./gcalEventView";
+import { dayKey, eventDayKeys, eventEndMs, formatClock24, timeLabel } from "./gcalEventView";
 
 interface AgendaListProps {
   events: GcalAgendaEvent[];
@@ -117,41 +117,64 @@ export const AgendaList: React.FC<AgendaListProps> = ({
                 </button>
               </div>
               <ul className="space-y-0.5">
-                {dayEvents.map((event) => (
-                  <li key={`${event.calendarId}:${event.id}`}>
-                    <EventDetailPopover
-                      event={event}
-                      onEdit={onEdit}
-                      onDuplicate={onDuplicate}
-                      onDelete={onDelete}
-                    >
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                {dayEvents.map((event) => {
+                  const isPast = eventEndMs(event) < Date.now();
+                  const isDone = event.extendedProperties?.private?.coveTaskCompleted === "1";
+                  return (
+                    <li key={`${event.calendarId}:${event.id}`}>
+                      <EventDetailPopover
+                        event={event}
+                        onEdit={onEdit}
+                        onDuplicate={onDuplicate}
+                        onDelete={onDelete}
                       >
-                        <span
-                          className="w-16 shrink-0 text-right font-mono text-[11px] leading-4"
-                          style={{ color: event.calendarColor ?? undefined }}
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          {timeLabel(event)}
-                        </span>
-                        <span
-                          aria-hidden="true"
-                          className="h-2 w-2 shrink-0 rounded-full border border-border"
-                          style={{ backgroundColor: event.calendarColor ?? "transparent" }}
-                        />
-                        <span className="min-w-0 flex-1 truncate text-[13px] leading-5 text-foreground">
-                          {event.summary || MESSAGES.GCAL_EVENT_UNTITLED}
-                        </span>
-                        {event.location && (
-                          <span className="hidden max-w-[160px] shrink-0 truncate text-[11px] leading-4 text-muted-foreground/70 md:block">
-                            {event.location}
+                          <span
+                            className={cn(
+                              "w-16 shrink-0 text-right font-mono text-[11px] leading-4",
+                              (isPast || isDone) && "text-muted-foreground",
+                            )}
+                            style={{
+                              color:
+                                isPast || isDone ? undefined : (event.calendarColor ?? undefined),
+                            }}
+                          >
+                            {timeLabel(event)}
                           </span>
-                        )}
-                      </button>
-                    </EventDetailPopover>
-                  </li>
-                ))}
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "h-2 w-2 shrink-0 rounded-full border",
+                              isPast || isDone ? "border-zinc-400 bg-zinc-300" : "border-border",
+                            )}
+                            style={{
+                              backgroundColor:
+                                isPast || isDone
+                                  ? undefined
+                                  : (event.calendarColor ?? "transparent"),
+                            }}
+                          />
+                          <span
+                            className={cn(
+                              "min-w-0 flex-1 truncate text-[13px] leading-5",
+                              isPast || isDone ? "text-muted-foreground" : "text-foreground",
+                            )}
+                          >
+                            {event.summary || MESSAGES.GCAL_EVENT_UNTITLED}
+                          </span>
+                          {event.location && (
+                            <span className="hidden max-w-[160px] shrink-0 truncate text-[11px] leading-4 text-muted-foreground/70 md:block">
+                              {event.location}
+                            </span>
+                          )}
+                        </button>
+                      </EventDetailPopover>
+                    </li>
+                  );
+                })}
                 {(notesByDay.get(key) ?? [])
                   .slice()
                   .sort((a, b) => b[noteField] - a[noteField])
@@ -163,10 +186,7 @@ export const AgendaList: React.FC<AgendaListProps> = ({
                         className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <span className="w-16 shrink-0 text-right font-mono text-[11px] leading-4 text-muted-foreground/70">
-                          {new Intl.DateTimeFormat("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          }).format(new Date(note[noteField]))}
+                          {formatClock24(new Date(note[noteField]))}
                         </span>
                         <span aria-hidden="true" className="shrink-0 text-sm">
                           <NoteIcon icon={note.icon} className="h-3.5 w-3.5" />

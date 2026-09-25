@@ -102,6 +102,8 @@ pub struct GcalEventPatch {
     pub location: Option<String>,
     pub start: GcalEventDateTime,
     pub end: GcalEventDateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extended_properties: Option<GcalExtendedProperties>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

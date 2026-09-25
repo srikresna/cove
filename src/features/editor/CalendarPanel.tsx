@@ -34,6 +34,7 @@ import { useNoteUiStore } from "../../store/useNoteUiStore";
 import { useNotificationStore } from "../../store/useNotificationStore";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
+import { formatClock24 } from "../calendar/gcalEventView";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 import { GcalCreateEventDialog } from "./GcalCreateEventDialog";
 
@@ -63,9 +64,7 @@ const eventEndMs = (event: GcalAgendaEvent): number =>
 
 const timeLabel = (event: GcalAgendaEvent): string => {
   if (!event.start.dateTime) return MESSAGES.GCAL_EVENT_ALL_DAY;
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
-    new Date(event.start.dateTime),
-  );
+  return formatClock24(new Date(event.start.dateTime));
 };
 
 const isDateField = (value: string): value is DateField =>
@@ -164,6 +163,7 @@ export const CalendarPanel: React.FC = () => {
         location: input.location,
         start: input.start,
         end: input.end,
+        extendedProperties: input.extendedProperties,
       });
       useNotificationStore.getState().pushToast({
         kind: "success",
@@ -499,7 +499,14 @@ export const CalendarPanel: React.FC = () => {
 
       <GcalCreateEventDialog
         open={isAddEventOpen}
-        defaultDate={selectedDayDate}
+        defaultDate={
+          new Date(
+            selectedDayDate.getFullYear(),
+            selectedDayDate.getMonth(),
+            selectedDayDate.getDate(),
+            9,
+          )
+        }
         onConfirm={(input, calendarId) => void handleCreateEvent(input, calendarId)}
         onCancel={() => setAddEventOpen(false)}
       />
@@ -509,6 +516,7 @@ export const CalendarPanel: React.FC = () => {
           open
           editing={editTarget}
           defaultDate={selectedDayDate}
+          defaultCalendarId={editTarget.calendarId}
           onConfirm={(input, calendarId) => void handleEditEvent(input, calendarId)}
           onCancel={() => setEditTarget(null)}
         />

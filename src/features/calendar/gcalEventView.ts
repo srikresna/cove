@@ -20,11 +20,16 @@ export const dayKey = (date: Date): string =>
 
 export const isAllDay = (event: GcalAgendaEvent): boolean => !event.start.dateTime;
 
+export const formatClock24 = (date: Date): string =>
+  new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+
 export const timeLabel = (event: GcalAgendaEvent): string => {
   if (!event.start.dateTime) return MESSAGES.GCAL_EVENT_ALL_DAY;
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
-    new Date(event.start.dateTime),
-  );
+  return formatClock24(new Date(event.start.dateTime));
 };
 
 export const timeRangeLabel = (event: GcalAgendaEvent): string => {
@@ -32,9 +37,10 @@ export const timeRangeLabel = (event: GcalAgendaEvent): string => {
   const start = new Date(event.start.dateTime);
   const end = new Date(event.end.dateTime ?? event.start.dateTime);
   const sameDay = dayKey(start) === dayKey(end);
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
     ...(sameDay ? {} : { weekday: "short", month: "short", day: "numeric" }),
   });
   return `${formatter.format(start)} – ${formatter.format(end)}`;
@@ -118,7 +124,7 @@ export const weekBars = (events: GcalAgendaEvent[], weekStart: Date): WeekBar[] 
 export const buildWeeks = (monthCursor: Date): Date[] => {
   const first = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1);
   const last = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0);
-  const start = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay());
+  const start = new Date(first.getFullYear(), first.getMonth(), 1 - ((first.getDay() + 6) % 7));
   const weeks: Date[] = [];
   for (let cursor = new Date(start); cursor <= last; cursor.setDate(cursor.getDate() + 7)) {
     weeks.push(new Date(cursor));

@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  CheckCircle2,
   Copy,
   ExternalLink,
   MapPin,
@@ -12,10 +13,18 @@ import type React from "react";
 import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { MESSAGES } from "../../constants/messages";
+import { gcalService } from "../../di/container";
+import {
+  getGcalCategory,
+  isGcalTaskCompleted,
+  withGcalTaskCompleted,
+} from "../../domain/gcal/GcalCategory";
 import type { GcalAgendaEvent } from "../../domain/gcal/GcalTypes";
 import { openExternal } from "../../services/blocksuite/externalLinks";
+import { notifyError } from "../../store/notify";
 import { useGcalStore } from "../../store/useGcalStore";
 import { useNoteUiStore } from "../../store/useNoteUiStore";
+import { useNotificationStore } from "../../store/useNotificationStore";
 import { longDateLabel, timeRangeLabel } from "./gcalEventView";
 
 interface EventDetailPopoverProps {
@@ -38,6 +47,28 @@ export const EventDetailPopover: React.FC<EventDetailPopoverProps> = ({
   const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const calendar = calendars.find((entry) => entry.id === event.calendarId);
   const linkedNoteId = event.extendedProperties?.private?.coveNoteId;
+  const isTask = getGcalCategory(event) === "task";
+  const taskCompleted = isGcalTaskCompleted(event);
+
+  const toggleTaskCompleted = async () => {
+    try {
+      await gcalService.updateEvent(event.calendarId, event.id, {
+        summary: event.summary ?? "",
+        description: event.description,
+        location: event.location,
+        start: event.start,
+        end: event.end,
+        extendedProperties: withGcalTaskCompleted(event, !taskCompleted).extendedProperties,
+      });
+      useNotificationStore.getState().pushToast({
+        kind: "success",
+        title: taskCompleted ? "Task reopened" : "Task completed",
+      });
+      setOpen(false);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,10 +93,25 @@ export const EventDetailPopover: React.FC<EventDetailPopoverProps> = ({
           </div>
           {event.extendedProperties?.private?.cove === "1" && (
             <span className="shrink-0 rounded bg-primary/10 px-1 text-[9px] font-semibold uppercase text-primary">
-              {MESSAGES.GCAL_EVENT_COVE_BADGE}
+              {getGcalCategory(event) === "task"
+                ? "Task reminder"
+                : getGcalCategory(event) === "meeting"
+                  ? "Meeting"
+                  : MESSAGES.GCAL_EVENT_COVE_BADGE}
             </span>
           )}
         </div>
+
+        {isTask && (
+          <button
+            type="button"
+            onClick={() => void toggleTaskCompleted()}
+            className="mt-3 flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+            {taskCompleted ? "Mark task as active" : "Mark task as complete"}
+          </button>
+        )}
 
         {event.location && (
           <button

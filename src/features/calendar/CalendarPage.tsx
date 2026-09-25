@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { MESSAGES } from "../../constants/messages";
 import { gcalService } from "../../di/container";
+import {
+  type GcalCategory,
+  type GcalCategoryFilter,
+  getGcalCategory,
+} from "../../domain/gcal/GcalCategory";
 import type { GcalAgendaEvent, GcalEventInput } from "../../domain/gcal/GcalTypes";
 import type { Note } from "../../domain/note/Note";
 import { useGcalWindowEvents } from "../../hooks/useGcalWindowEvents";
@@ -21,11 +26,12 @@ import { AgendaList } from "./AgendaList";
 import { CalendarPickerMenu } from "./CalendarPickerMenu";
 import { buildWeeks, dayKey, eventStartMs, shiftEventDates } from "./gcalEventView";
 import { MonthGrid } from "./MonthGrid";
+import { TimeGrid } from "./TimeGrid";
 
-type CalendarView = "month" | "agenda";
+type CalendarView = "day" | "week" | "month" | "agenda";
 type NoteField = "updatedAt" | "createdAt";
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const FIELD_KEY = "cove-calendar-field";
 
@@ -43,27 +49,58 @@ export const CalendarPage: React.FC = () => {
   const setActiveNoteId = useNoteUiStore((s) => s.setActiveNoteId);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
 
-  const [view, setView] = useState<CalendarView>("month");
+  const [view, setView] = useState<CalendarView>("week");
+  const [categoryFilter, setCategoryFilter] = useState<GcalCategoryFilter>("all");
+  const [newCategory, setNewCategory] = useState<GcalCategory>("event");
+  const [newDate, setNewDate] = useState(() => new Date());
   const [noteField, setNoteField] = useState<NoteField>(() => {
     const stored = localStorage.getItem(FIELD_KEY) ?? "";
     return isNoteField(stored) ? stored : "updatedAt";
   });
-  const [monthCursor, setMonthCursor] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [monthCursor, setMonthCursor] = useState(() => new Date());
   const [isAddOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<GcalAgendaEvent | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GcalAgendaEvent | null>(null);
 
   const weeks = useMemo(() => buildWeeks(monthCursor), [monthCursor]);
-  const windowStart = weeks[0] ?? monthCursor;
+  const weekStart = useMemo(() => {
+    const start = new Date(
+      monthCursor.getFullYear(),
+      monthCursor.getMonth(),
+      monthCursor.getDate(),
+    );
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    return start;
+  }, [monthCursor]);
+  const visibleDays = useMemo(() => {
+    const first =
+      view === "day"
+        ? new Date(monthCursor.getFullYear(), monthCursor.getMonth(), monthCursor.getDate())
+        : weekStart;
+    return Array.from(
+      { length: view === "day" ? 1 : 7 },
+      (_, offset) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + offset),
+    );
+  }, [view, monthCursor, weekStart]);
+  const windowStart =
+    view === "day" || view === "week" ? (visibleDays[0] ?? weekStart) : (weeks[0] ?? monthCursor);
   const windowEndDate = useMemo(() => {
+    if (view === "day" || view === "week") {
+      const last = visibleDays[visibleDays.length - 1] ?? monthCursor;
+      return new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
+    }
     const last = weeks[weeks.length - 1] ?? monthCursor;
     return new Date(last.getFullYear(), last.getMonth(), last.getDate() + 7);
-  }, [weeks, monthCursor]);
+  }, [weeks, monthCursor, view, visibleDays]);
 
   const { events, createCalendarId } = useGcalWindowEvents(windowStart, windowEndDate);
+  const filteredEvents = useMemo(
+    () =>
+      categoryFilter === "all"
+        ? events
+        : events.filter((event) => getGcalCategory(event) === categoryFilter),
+    [events, categoryFilter],
+  );
 
   const notesByDay = useMemo(() => {
     const map = new Map<string, Note[]>();
@@ -76,6 +113,10 @@ export const CalendarPage: React.FC = () => {
     }
     return map;
   }, [notes, activeWorkspaceId, noteField]);
+  const visibleNotesByDay = useMemo(
+    () => (categoryFilter === "all" ? notesByDay : new Map<string, Note[]>()),
+    [categoryFilter, notesByDay],
+  );
 
   const monthLabel = new Intl.DateTimeFormat("en-US", {
     month: "long",
@@ -83,6 +124,34 @@ export const CalendarPage: React.FC = () => {
   }).format(monthCursor);
 
   const connected = gcalStatus === "connected";
+
+  const openCreate = (
+    date: Date,
+    category: GcalCategory = categoryFilter === "all" ? "event" : categoryFilter,
+  ) => {
+    setNewDate(date);
+    setNewCategory(category);
+    setAddOpen(true);
+  };
+
+  const shiftRange = (direction: number) => {
+    const next = new Date(monthCursor);
+    if (view === "month" || view === "agenda") next.setMonth(next.getMonth() + direction);
+    else next.setDate(next.getDate() + direction * (view === "week" ? 7 : 1));
+    setMonthCursor(next);
+  };
+
+  const rangeLabel =
+    view === "day"
+      ? new Intl.DateTimeFormat("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }).format(monthCursor)
+      : view === "week"
+        ? `${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(visibleDays[0] ?? monthCursor)} – ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(visibleDays[6] ?? monthCursor)}`
+        : monthLabel;
 
   const chooseNoteField = (next: NoteField) => {
     setNoteField(next);
@@ -113,6 +182,7 @@ export const CalendarPage: React.FC = () => {
         location: input.location,
         start: input.start,
         end: input.end,
+        extendedProperties: input.extendedProperties,
       });
       useNotificationStore.getState().pushToast({
         kind: "success",
@@ -187,54 +257,91 @@ export const CalendarPage: React.FC = () => {
 
   return (
     <div className="cove-doc-scroll flex h-full flex-col overflow-hidden">
-      <div className="flex h-14 flex-shrink-0 items-center gap-3 border-b px-5">
+      <div className="flex min-h-14 flex-shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
         <h1 className="font-display text-lg font-medium tracking-tight text-foreground">
           {MESSAGES.NAV_CALENDAR}
         </h1>
-        <span aria-hidden="true" className="waterline h-5 w-px opacity-70" />
+        {syncFailed && connected && (
+          <span className="font-mono text-[10px] leading-4 text-muted-foreground/60">
+            ({MESSAGES.GCAL_SYNC_FAILED})
+          </span>
+        )}
 
+        <span className="flex-1" />
+
+        {connected ? (
+          <>
+            <CalendarPickerMenu className="rounded-md border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            <Button size="sm" onClick={() => openCreate(new Date())}>
+              <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
+              {MESSAGES.GCAL_ADD_EVENT}
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+            <Plug className="h-3.5 w-3.5" aria-hidden="true" />
+            {MESSAGES.GCAL_CONNECT}
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1 border-b px-5 py-2">
+        {(
+          [
+            ["all", "All Scheduled"],
+            ["event", "Events"],
+            ["meeting", "Meetings"],
+            ["task", "Task Reminders"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={categoryFilter === value}
+            onClick={() => setCategoryFilter(value)}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              categoryFilter === value
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-b px-5 py-2">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="iconSm"
-            aria-label="Previous month"
-            onClick={() =>
-              setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
-            }
-            className="text-muted-foreground"
+            aria-label="Previous period"
+            onClick={() => shiftRange(-1)}
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <span className="min-w-[150px] text-center text-[13px] font-medium leading-4 text-foreground">
-            {monthLabel}
+          <span className="min-w-[165px] text-center text-[13px] font-medium leading-4 text-foreground">
+            {rangeLabel}
           </span>
           <Button
             variant="ghost"
             size="iconSm"
-            aria-label="Next month"
-            onClick={() =>
-              setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
-            }
-            className="text-muted-foreground"
+            aria-label="Next period"
+            onClick={() => shiftRange(1)}
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const now = new Date();
-              setMonthCursor(new Date(now.getFullYear(), now.getMonth(), 1));
-            }}
-            className="text-muted-foreground"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setMonthCursor(new Date())}>
             {MESSAGES.CAL_TODAY}
           </Button>
         </div>
-
+        <span className="flex-1" />
         <div className="flex items-center gap-1 rounded-lg border bg-muted/60 p-0.5">
           {(
             [
+              ["day", "Day"],
+              ["week", "Week"],
               ["month", MESSAGES.CAL_VIEW_MONTH],
               ["agenda", MESSAGES.CAL_VIEW_AGENDA],
             ] as const
@@ -255,7 +362,15 @@ export const CalendarPage: React.FC = () => {
             </button>
           ))}
         </div>
-
+        <input
+          type="date"
+          aria-label="Jump to date"
+          value={`${monthCursor.getFullYear()}-${String(monthCursor.getMonth() + 1).padStart(2, "0")}-${String(monthCursor.getDate()).padStart(2, "0")}`}
+          onChange={(event) => {
+            if (event.target.value) setMonthCursor(new Date(`${event.target.value}T12:00:00`));
+          }}
+          className="h-8 rounded-md border bg-background px-2 font-mono text-xs text-foreground"
+        />
         <div className="flex items-center gap-1">
           {(
             [
@@ -280,37 +395,25 @@ export const CalendarPage: React.FC = () => {
             </button>
           ))}
         </div>
-
-        {syncFailed && connected && (
-          <span className="font-mono text-[10px] leading-4 text-muted-foreground/60">
-            ({MESSAGES.GCAL_SYNC_FAILED})
-          </span>
-        )}
-
-        <span className="flex-1" />
-
-        {connected ? (
-          <>
-            <CalendarPickerMenu className="rounded-md border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
-              {MESSAGES.GCAL_ADD_EVENT}
-            </Button>
-          </>
-        ) : (
-          <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-            <Plug className="h-3.5 w-3.5" aria-hidden="true" />
-            {MESSAGES.GCAL_CONNECT}
-          </Button>
-        )}
       </div>
 
-      {view === "month" ? (
+      {view === "day" || view === "week" ? (
+        <TimeGrid
+          days={visibleDays}
+          events={filteredEvents}
+          onCreate={(date) => openCreate(date)}
+          onEdit={setEditTarget}
+          onDuplicate={(event) => void handleDuplicate(event)}
+          onDelete={setDeleteTarget}
+        />
+      ) : view === "month" ? (
         <MonthGrid
           weeks={weeks}
           monthCursor={monthCursor}
-          events={events}
-          notesByDay={notesByDay}
+          events={filteredEvents}
+          onCreate={(date) => openCreate(date)}
+          onOpenNote={setActiveNoteId}
+          notesByDay={visibleNotesByDay}
           onEdit={setEditTarget}
           onDuplicate={(event) => void handleDuplicate(event)}
           onDelete={setDeleteTarget}
@@ -319,8 +422,8 @@ export const CalendarPage: React.FC = () => {
         />
       ) : (
         <AgendaList
-          events={[...events].sort((a, b) => eventStartMs(a) - eventStartMs(b))}
-          notesByDay={notesByDay}
+          events={[...filteredEvents].sort((a, b) => eventStartMs(a) - eventStartMs(b))}
+          notesByDay={visibleNotesByDay}
           noteField={noteField}
           onOpenNote={(noteId) => setActiveNoteId(noteId)}
           onEdit={setEditTarget}
@@ -331,7 +434,8 @@ export const CalendarPage: React.FC = () => {
 
       <GcalCreateEventDialog
         open={isAddOpen}
-        defaultDate={new Date()}
+        defaultDate={newDate}
+        defaultCategory={newCategory}
         calendars={selectableCalendars}
         defaultCalendarId={createCalendarId}
         onConfirm={(input, calendarId) => void handleCreate(input, calendarId)}
@@ -344,6 +448,7 @@ export const CalendarPage: React.FC = () => {
           editing={editTarget}
           defaultDate={new Date()}
           calendars={selectableCalendars}
+          defaultCalendarId={editTarget.calendarId}
           onConfirm={(input, calendarId) => void handleEdit(input, calendarId)}
           onCancel={() => setEditTarget(null)}
         />
