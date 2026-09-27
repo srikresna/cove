@@ -128,6 +128,29 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
     editor.autofocus = true;
     editor.style.colorScheme = edgelessDark ? "dark" : "light";
 
+    // Paragraph rich-text disables its local undo handler and relies on the
+    // page dispatcher. Handle history at document capture so WebView selection
+    // state cannot prevent the page history shortcut from running.
+    const handleDocumentHistory = (event: KeyboardEvent) => {
+      const eventPath = event.composedPath();
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = (key === "z" && event.shiftKey) || (key === "y" && event.ctrlKey);
+      if (!isUndo && !isRedo) return;
+
+      const store = editor.doc;
+      const undoManager = store.history.undoManager;
+      if (!eventPath.includes(editor)) return;
+      if (isUndo ? undoManager.canUndo() : undoManager.canRedo()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (isUndo) store.undo();
+        else store.redo();
+      }
+    };
+    document.addEventListener("keydown", handleDocumentHistory, { capture: true });
+
     editor.style.pointerEvents = "none";
     container.append(editor);
 
@@ -255,6 +278,7 @@ export const BlockSuiteSurface: React.FC<BlockSuiteSurfaceProps> = ({
 
     return () => {
       disposed = true;
+      document.removeEventListener("keydown", handleDocumentHistory, { capture: true });
       cancelAnimationFrame(readyFrame);
       widgetObserver.disconnect();
       stopPresentationWatch?.();

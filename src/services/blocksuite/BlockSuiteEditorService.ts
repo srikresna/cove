@@ -103,6 +103,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
   private cachedEdgelessSpecs: ExtensionType[] | null = null;
 
   private readonly initializedDocs = new Set<string>();
+  private readonly storeLifecycleStartedDocs = new Set<string>();
 
   private readonly coveOwnedDocIds = new Set<string>();
 
@@ -206,9 +207,10 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     const ws = this.getWorkspace();
     this.coveOwnedDocIds.add(noteId);
     const doc = ws.getDoc(noteId) ?? ws.createDoc(noteId);
-    if (!this.initializedDocs.has(noteId)) {
+    const store = doc.getStore();
+    const needsRestore = !this.initializedDocs.has(noteId);
+    if (needsRestore) {
       const snapshotB64 = unpackBlockSuiteContent(content);
-      const store = doc.getStore();
       try {
         const flags = store.get(FeatureFlagService);
 
@@ -242,9 +244,19 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
           seedDefaultBlocks(store);
         } catch {}
       }
-      doc.getStore().resetHistory();
-      this.initializedDocs.add(noteId);
+    }
 
+    // Store history signals/listeners are started by Store.load(), not by
+    // BlockSuiteDoc.load(). Without this lifecycle call, Yjs UndoManager stacks
+    // receive text edits but store.canUndo/canRedo remain stuck at false.
+    if (!this.storeLifecycleStartedDocs.has(noteId)) {
+      store.load();
+      this.storeLifecycleStartedDocs.add(noteId);
+    }
+
+    if (needsRestore) {
+      store.resetHistory();
+      this.initializedDocs.add(noteId);
       this.assertMetaTitle(noteId);
     }
     return doc;
@@ -419,6 +431,7 @@ export class BlockSuiteEditorService implements IBlockSuiteEditorService {
     this.cachedPageSpecs = null;
     this.cachedEdgelessSpecs = null;
     this.initializedDocs.clear();
+    this.storeLifecycleStartedDocs.clear();
     this.coveOwnedDocIds.clear();
     this.registeredMetaIds.clear();
     this.knownTitles.clear();
