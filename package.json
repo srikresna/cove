@@ -1,7 +1,7 @@
 {
     "name": "cove-notes",
     "private": true,
-    "version": "0.1.0",
+    "version": "0.1.1",
     "type": "module",
     "scripts": {
         "postinstall": "node scripts/link-blocksuite.mjs",
@@ -43,7 +43,9 @@
         "@tauri-apps/plugin-dialog": "^2.7.2",
         "@tauri-apps/plugin-notification": "^2.4.0",
         "@tauri-apps/plugin-opener": "^2.5.5",
+        "@tauri-apps/plugin-process": "^2.3.1",
         "@tauri-apps/plugin-sql": "^2.2.0",
+        "@tauri-apps/plugin-updater": "^2.12.0",
         "@toeverything/theme": "^1.1.23",
         "@vanilla-extract/css": "^1.21.2",
         "bytes": "^3.1.2",

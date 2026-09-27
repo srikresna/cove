@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { MESSAGES } from "../../constants/messages";
 import { SectionHeading } from "./SettingRow";
 
-const FALLBACK_APP_VERSION = "0.1.0";
+const FALLBACK_APP_VERSION = "0.1.1";
 const APP_IDENTIFIER = "com.cove.notes";
 
 const AboutRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (

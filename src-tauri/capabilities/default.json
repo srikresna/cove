@@ -13,6 +13,8 @@
     "opener:allow-open-url",
     "opener:allow-default-urls",
     "clipboard-manager:allow-read-text",
-    "notification:default"
+    "notification:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

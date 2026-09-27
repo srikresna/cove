@@ -1,6 +1,6 @@
 [package]
 name = "cove-notes"
-version = "0.1.0"
+version = "0.1.1"
 description = "Joyful Notion-like Desktop Note Taking Application"
 authors = ["Cove Team"]
 edition = "2021"
@@ -33,6 +33,8 @@ base64 = "0.22"
 url = "2"
 getrandom = "0.3"
 tauri-plugin-notification = "2.4.0"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
