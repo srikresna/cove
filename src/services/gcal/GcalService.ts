@@ -342,6 +342,24 @@ export class GcalService {
     return this.syncWindows([[fromMs, toMs]]);
   }
 
+  async syncNow(): Promise<void> {
+    await this.ensureLoaded();
+    useGcalStore.getState().setSyncing(true);
+    try {
+      const events = await this.syncWindows(this.autoSyncWindows());
+      useGcalStore.getState().setEvents(events);
+      this.syncReminders(events);
+      if (useGcalStore.getState().syncFailed) {
+        throw new Error("Some selected Google calendars could not be refreshed.");
+      }
+    } catch (error) {
+      useGcalStore.getState().setSyncFailed(true);
+      throw error;
+    } finally {
+      useGcalStore.getState().setSyncing(false);
+    }
+  }
+
   private autoSyncWindows(): Array<[number, number]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -380,7 +398,7 @@ export class GcalService {
         }
       }
     }
-    if (anyFailed) useGcalStore.getState().setSyncFailed(true);
+    useGcalStore.getState().setSyncFailed(anyFailed);
     return [...merged.values()].sort((a, b) => gcalStartMs(a) - gcalStartMs(b));
   }
 

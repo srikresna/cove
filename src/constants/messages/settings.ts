@@ -53,6 +53,11 @@ export const SettingsMessages = {
   GCAL_CONNECTING: "Waiting for Google…",
   GCAL_DISCONNECT: "Disconnect",
   GCAL_RECONNECT: "Reconnect",
+  GCAL_SYNC_LABEL: "Sync Google Calendar",
+  GCAL_SYNC_DESC: "Refresh your selected calendars now.",
+  GCAL_SYNC_FAILED_DESC: "The last refresh failed. Your saved calendar data is still available.",
+  GCAL_SYNC_NOW: "Sync now",
+  GCAL_SYNCING: "Syncing…",
   GCAL_CONNECTED_AS: "Connected as",
   GCAL_DISCONNECTED_DESC:
     "See your Google Calendar schedule inside Cove, create events, and delete events — all from the calendar panel.",

@@ -53,6 +53,8 @@ const SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   { id: "about", label: MESSAGES.SETTINGS_CATEGORY_ABOUT, icon: Info },
 ];
 
+const SETTINGS_PANE_CLASS = "min-h-0 flex-1 overflow-y-auto overscroll-contain p-6";
+
 export const SettingsModal: React.FC = () => {
   const isSettingsOpen = useUIStore((s) => s.isSettingsOpen);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
@@ -72,7 +74,7 @@ export const SettingsModal: React.FC = () => {
   return (
     <Dialog open={isSettingsOpen} onOpenChange={setSettingsOpen}>
       <DialogContent
-        className="top-[8%] h-[min(620px,86vh)] w-[min(920px,94vw)] max-w-none -translate-y-0 gap-0 overflow-hidden p-0"
+        className="top-[8%] flex h-[min(620px,86vh)] w-[min(920px,94vw)] max-w-none -translate-y-0 flex-col gap-0 overflow-hidden p-0"
         hideClose
       >
         <div className="flex h-full flex-col">
@@ -87,9 +89,9 @@ export const SettingsModal: React.FC = () => {
           </div>
           <div aria-hidden="true" className="waterline w-full shrink-0 opacity-70" />
 
-          <div className="grid min-h-0 flex-1 grid-cols-[210px_1fr]">
+          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[210px_1fr] overflow-hidden">
             <nav
-              className="flex min-h-0 flex-col gap-1 border-r bg-muted/30 p-2"
+              className="flex min-h-0 flex-col gap-1 overflow-y-auto border-r bg-muted/30 p-2"
               aria-label={MESSAGES.SETTINGS_TITLE}
             >
               {SETTINGS_CATEGORIES.map((item) => {
@@ -108,10 +110,8 @@ export const SettingsModal: React.FC = () => {
                     {isActive && (
                       <span
                         aria-hidden="true"
-                        className="absolute top-1/2 left-0 flex h-[28px] w-[6px] -translate-y-1/2 items-center justify-center overflow-hidden"
-                      >
-                        <span className="waterline w-[28px] rotate-90" />
-                      </span>
+                        className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary"
+                      />
                     )}
                     <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">{item.label}</span>
@@ -124,29 +124,29 @@ export const SettingsModal: React.FC = () => {
               </div>
             </nav>
 
-            <div className="min-h-0 min-w-0">
-              <div className={active === "appearance" ? "h-full overflow-y-auto p-6" : "hidden"}>
+            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+              <div className={active === "appearance" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <AppearanceSection />
               </div>
-              <div className={active === "editor" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "editor" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <EditorSection />
               </div>
-              <div className={active === "icons" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "icons" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <IconsSection />
               </div>
-              <div className={active === "security" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "security" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <SecuritySection />
               </div>
-              <div className={active === "backup" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "backup" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <BackupSection />
               </div>
-              <div className={active === "connections" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "connections" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <ConnectionsSection />
               </div>
-              <div className={active === "updates" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "updates" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <UpdatesSection />
               </div>
-              <div className={active === "about" ? "h-full overflow-y-auto p-6" : "hidden"}>
+              <div className={active === "about" ? SETTINGS_PANE_CLASS : "hidden"}>
                 <AboutSection />
               </div>
             </div>

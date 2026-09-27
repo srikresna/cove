@@ -102,6 +102,40 @@ describe("GcalService", () => {
     expect(repo.putTokenPayload).toHaveBeenCalledTimes(1);
   });
 
+  it("manually syncs selected calendars and clears the stale status after success", async () => {
+    vi.mocked(repo.getTokenPayload).mockResolvedValue(
+      `enc:${btoa(
+        JSON.stringify({
+          refreshToken: "r1",
+          scope: GCAL_SCOPE,
+          calendars: [{ id: "primary", summary: "Primary", primary: true }],
+          selectedCalendarIds: ["primary"],
+        }),
+      )}` as EncryptedPayload,
+    );
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === "gcal_refresh") {
+        return { accessToken: "a1", expiresAtMs: Date.now() + 3_600_000, scope: GCAL_SCOPE };
+      }
+      if (cmd === "gcal_list_events") return [];
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    useGcalStore.getState().setSyncFailed(true);
+
+    try {
+      await service.syncNow();
+
+      expect(invoke).toHaveBeenCalledWith(
+        "gcal_list_events",
+        expect.objectContaining({ calendarId: "primary" }),
+      );
+      expect(useGcalStore.getState().syncFailed).toBe(false);
+      expect(useGcalStore.getState().syncing).toBe(false);
+    } finally {
+      service.clear();
+    }
+  });
+
   it("demands reconnection when no credentials exist anywhere", async () => {
     setGcalClientCredentials("", "");
     vi.mocked(repo.getTokenPayload).mockResolvedValue(

@@ -1,4 +1,4 @@
-import { CalendarCheck, ExternalLink, Plug, PlugZap } from "lucide-react";
+import { CalendarCheck, ExternalLink, Plug, PlugZap, RefreshCw } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
@@ -15,6 +15,8 @@ import { SectionHeading, SettingRow } from "./SettingRow";
 
 export const ConnectionsSection: React.FC = () => {
   const status = useGcalStore((s) => s.status);
+  const syncing = useGcalStore((s) => s.syncing);
+  const syncFailed = useGcalStore((s) => s.syncFailed);
   const accountEmail = useGcalStore((s) => s.accountEmail);
   const gcalClientId = useSettingsStore((s) => s.gcalClientId);
   const setGcalClientId = useSettingsStore((s) => s.setGcalClientId);
@@ -49,6 +51,14 @@ export const ConnectionsSection: React.FC = () => {
   const handleDisconnect = async () => {
     try {
       await gcalService.disconnect();
+    } catch (err) {
+      notifyError(err);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    try {
+      await gcalService.syncNow();
     } catch (err) {
       notifyError(err);
     }
@@ -97,6 +107,27 @@ export const ConnectionsSection: React.FC = () => {
           )
         }
       />
+
+      {connected && (
+        <SettingRow
+          label={MESSAGES.GCAL_SYNC_LABEL}
+          description={syncFailed ? MESSAGES.GCAL_SYNC_FAILED_DESC : MESSAGES.GCAL_SYNC_DESC}
+          control={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleSyncNow()}
+              disabled={syncing}
+            >
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
+                aria-hidden="true"
+              />
+              {syncing ? MESSAGES.GCAL_SYNCING : MESSAGES.GCAL_SYNC_NOW}
+            </Button>
+          }
+        />
+      )}
 
       {connected && (
         <SettingRow

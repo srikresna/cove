@@ -1,6 +1,6 @@
 [package]
 name = "cove-notes"
-version = "0.1.1"
+version = "0.1.2"
 description = "Joyful Notion-like Desktop Note Taking Application"
 authors = ["Cove Team"]
 edition = "2021"
