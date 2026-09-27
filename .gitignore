@@ -8,7 +8,7 @@ src-tauri/gen
 .DS_Store
 coverage
 stats.html
-AFFiNE/
+/AFFiNE/
 docs/
 .remember
 .kilo
